@@ -17,6 +17,22 @@ public class ControlServer extends BaseEntity {
 
     private String host;
 
+    private String xuiEndpoint;
+
+    private String xuiBasePath;
+
+    private String xuiApiToken;
+
+    private String xuiUsername;
+
+    private String xuiPassword;
+
+    private String xuiTwoFactorCode;
+
+    private Integer xuiAllowInsecure;
+
+    private Long xuiLastSync;
+
     private Integer sshPort;
 
     private String sshUser;

@@ -2,7 +2,7 @@
 
 ## 接力摘要
 
-- 当前目标：基于 `flux-panel` 建立 `3x-ui` 能力融合、Snell 支持、主控/副控多服务器节点编排的第一版项目骨架，并补充一个公开的 `github.io` 项目站点。
+- 当前目标：补齐真正可操作的 3x-ui 面板出入站管理能力，让主控中心从“任务骨架”推进到“能连接 3x-ui、同步 inbound、提交 inbound/outbound 操作请求”的可用版本。
 - 已完成：
   - 从 `zhizhishu/flux-panel` 创建新项目 `flux-panel-3xui-orchestrator`。
   - 将参考仓库 `MHSanaei/3x-ui` 与 `jinqians/snell.sh` 克隆到本地 `_references/`，仅作为本地参考，不推送。
@@ -10,16 +10,23 @@
   - 将原 `zhizhishu/flux-panel` 远端改名为 `upstream`，只作为来源参考；已删除误推的远端分支，没有创建 PR。
   - 后端新增主控服务器、协议模板、部署任务、Snell 非交互部署脚本生成相关实体、服务、控制器和数据库表结构。
   - 前端新增 `/orchestrator` 主控中心页面和侧边栏入口，保持 `flux-panel` 现有 UI 基调。
+  - 新增 3x-ui 远端代理：Bearer API token 管理 `/panel/api/inbounds/*`、读取 Xray config、读取 outbounds、重启 Xray；账号密码 + CSRF 通道用于保存 `/panel/xray/update`。
+  - 主控中心服务器卡片新增“测 3x-ui / 入站 / 入站操作 / 配置 / 出站 / 保存出站 / 重启 Xray”入口。
+  - README 补齐数据库升级 SQL、3x-ui API token 配置、入站/出站使用步骤和本项目 API 列表。
+  - 公开站点 `zhizhishu.github.io` 文案已同步为 3x-ui 出入站代理版本。
   - 补齐主项目 README。
   - 创建公开站点仓库 `zhizhishu/zhizhishu.github.io`，发布静态项目官网到 `https://zhizhishu.github.io/`。
 - 下一步：
-  - 在有 Java/Maven 与前端依赖完整环境后，补跑后端和前端端到端构建。
-  - 继续实现真正的 agent 执行器、3x-ui 远端 inbound HTTP 客户端、任务回调和流量快照同步。
+  - 在具备 Java/Maven 的环境中补跑后端编译。
+  - 处理项目既有 HeroUI 类型依赖不匹配后，补跑完整前端 `npm run build`。
+  - 下一轮可把入站 JSON 编辑器升级成结构化表单，并把远端流量同步进本地表。
 - 关键文件：
   - `springboot-backend/src/main/java/com/admin/controller/ControlServerController.java`
   - `springboot-backend/src/main/java/com/admin/controller/ProtocolProfileController.java`
   - `springboot-backend/src/main/java/com/admin/controller/DeployTaskController.java`
+  - `springboot-backend/src/main/java/com/admin/controller/ThreeXuiController.java`
   - `springboot-backend/src/main/java/com/admin/service/impl/SnellTemplateServiceImpl.java`
+  - `springboot-backend/src/main/java/com/admin/service/impl/ThreeXuiServiceImpl.java`
   - `vite-frontend/src/pages/orchestrator.tsx`
   - `gost.sql`
   - `README.md`
@@ -32,10 +39,11 @@
   - 主项目和站点仓库均已推送，当前分支干净并跟踪各自 `origin/main`。
   - `https://zhizhishu.github.io/` 返回 `200`，页面标题为 `Flux 3x-ui Orchestrator`。
   - 本机当前没有可用 `java`、`mvn`、`mvnw`；`npm install --legacy-peer-deps` 曾因网络下载过慢超时，已停止相关 npm 进程，完整构建待依赖环境恢复后复跑。
+  - 2026-05-19 本轮用 `node node_modules\typescript\bin\tsc --noEmit` 做前端检查：命令可运行，但仓库原有 HeroUI 类型声明/隐式 any 问题导致全局失败；新增页面相关问题主要沿用同类 HeroUI 类型不匹配，未发现语法级阻塞。
 - 风险/待确认：
   - 主仓库保持私有；由于当前 GitHub plan 不支持私有仓库 Pages，官网使用独立公开仓库 `zhizhishu.github.io`。
-  - Snell 第一版只生成可审计的非交互脚本，不自动远程执行。
-  - 3x-ui 完整能力很大，当前优先交付可持续扩展的 MVP 骨架。
+  - Snell 第一版仍只生成可审计的非交互脚本，不自动远程执行。
+  - 3x-ui 各版本 API 可能有差异，本轮按本地 `_references/3x-ui` 的实际路由实现兼容代理，并把风险写进使用说明。
 
 ## 迭代计划
 
@@ -47,6 +55,7 @@
 6. 将项目迁移并推送到用户自己的新仓库 `zhizhishu/flux-3xui-orchestrator`。
 7. 为项目创建公开 `github.io` 站点，并验证线上访问。
 8. 修复项目任务日志编码，补齐 GitHub Pages 发布记录。
+9. 补齐 3x-ui 真实出入站管理代理、前端使用入口、文档和验证记录。
 
 ## 任务清单
 
@@ -57,6 +66,7 @@
 - [x] ~~**目标:** 创建自有仓库 `zhizhishu/flux-3xui-orchestrator`，补充 README，并推送当前项目~~ (创建于: 2026-05-18 23:29:20 | **完成于: 2026-05-18 23:34:10**)
 - [x] ~~**目标:** 新增 GitHub Pages 项目官网并发布到 `github.io`~~ (创建于: 2026-05-18 23:37:48 | **完成于: 2026-05-18 23:49:41**)
 - [x] ~~**目标:** 修复 `TASK_LOG.md` 编码并补齐 GitHub Pages 发布接力记录~~ (创建于: 2026-05-18 23:53:08 | **完成于: 2026-05-18 23:54:21**)
+- [x] ~~**目标:** 补齐 3x-ui 面板连接、inbound/outbound 管理代理和使用说明~~ (创建于: 2026-05-19 00:07:55 | **完成于: 2026-05-19 00:42:56**)
 
 ## 推送记录
 

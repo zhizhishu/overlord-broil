@@ -56,6 +56,22 @@ export const getDeployTaskScript = (id: number) => Network.post("/deploy-task/sc
 export const updateDeployTaskState = (data: any) => Network.post("/deploy-task/state", data);
 export const deleteDeployTask = (id: number) => Network.post("/deploy-task/delete", { id });
 
+// 3x-ui 远端面板出入站管理
+export const testThreeXuiConnection = (serverId: number) => Network.post("/three-xui/test", { serverId });
+export const listThreeXuiInbounds = (serverId: number) => Network.post("/three-xui/inbounds/list", { serverId });
+export const addThreeXuiInbound = (data: any) => Network.post("/three-xui/inbounds/add", data);
+export const updateThreeXuiInbound = (data: any) => Network.post("/three-xui/inbounds/update", data);
+export const deleteThreeXuiInbound = (data: any) => Network.post("/three-xui/inbounds/delete", data);
+export const setThreeXuiInboundEnable = (data: any) => Network.post("/three-xui/inbounds/set-enable", data);
+export const addThreeXuiClient = (data: any) => Network.post("/three-xui/clients/add", data);
+export const updateThreeXuiClient = (data: any) => Network.post("/three-xui/clients/update", data);
+export const deleteThreeXuiClient = (data: any) => Network.post("/three-xui/clients/delete", data);
+export const resetThreeXuiClientTraffic = (data: any) => Network.post("/three-xui/clients/reset-traffic", data);
+export const getThreeXuiConfig = (serverId: number) => Network.post("/three-xui/config", { serverId });
+export const getThreeXuiOutbounds = (serverId: number) => Network.post("/three-xui/outbounds", { serverId });
+export const saveThreeXuiOutbounds = (data: any) => Network.post("/three-xui/outbounds/save", data);
+export const restartThreeXuiXray = (serverId: number) => Network.post("/three-xui/restart-xray", { serverId });
+
 // 隧道CRUD操作 - 全部使用POST请求
 export const createTunnel = (data: any) => Network.post("/tunnel/create", data);
 export const getTunnelList = () => Network.post("/tunnel/list");

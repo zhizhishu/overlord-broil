@@ -52,9 +52,22 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         ControlServer server = new ControlServer();
         BeanUtils.copyProperties(dto, server);
         server.setApiToken(null);
+        preserveMaskedXuiSecrets(dto, exists, server);
         server.setUpdatedTime(System.currentTimeMillis());
 
         return this.updateById(server) ? R.ok("server updated") : R.err("server update failed");
+    }
+
+    private void preserveMaskedXuiSecrets(ControlServerUpdateDto dto, ControlServer exists, ControlServer server) {
+        if (dto.getXuiApiToken() != null && dto.getXuiApiToken().contains("****")) {
+            server.setXuiApiToken(exists.getXuiApiToken());
+        }
+        if ("********".equals(dto.getXuiPassword())) {
+            server.setXuiPassword(exists.getXuiPassword());
+        }
+        if ("******".equals(dto.getXuiTwoFactorCode())) {
+            server.setXuiTwoFactorCode(exists.getXuiTwoFactorCode());
+        }
     }
 
     @Override
@@ -116,6 +129,16 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         String token = copy.getApiToken();
         if (token != null && token.length() > 8) {
             copy.setApiToken(token.substring(0, 4) + "****" + token.substring(token.length() - 4));
+        }
+        String xuiToken = copy.getXuiApiToken();
+        if (xuiToken != null && xuiToken.length() > 8) {
+            copy.setXuiApiToken(xuiToken.substring(0, 4) + "****" + xuiToken.substring(xuiToken.length() - 4));
+        }
+        if (copy.getXuiPassword() != null && !copy.getXuiPassword().isEmpty()) {
+            copy.setXuiPassword("********");
+        }
+        if (copy.getXuiTwoFactorCode() != null && !copy.getXuiTwoFactorCode().isEmpty()) {
+            copy.setXuiTwoFactorCode("******");
         }
         return copy;
     }

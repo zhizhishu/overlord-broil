@@ -16,13 +16,22 @@ import {
   deleteControlServer,
   deleteDeployTask,
   deleteProtocolProfile,
+  addThreeXuiInbound,
+  deleteThreeXuiInbound,
   ensureDefaultProtocolProfiles,
   getControlServerList,
   getControlServerToken,
   getDeployTaskList,
   getDeployTaskScript,
   getProtocolProfileList,
+  getThreeXuiConfig,
+  getThreeXuiOutbounds,
+  listThreeXuiInbounds,
   rotateControlServerToken,
+  restartThreeXuiXray,
+  saveThreeXuiOutbounds,
+  testThreeXuiConnection,
+  updateThreeXuiInbound,
   updateControlServer,
   updateProtocolProfile
 } from "@/api";
@@ -33,6 +42,13 @@ interface ServerForm {
   name: string;
   role: string;
   endpoint: string;
+  xuiEndpoint: string;
+  xuiBasePath: string;
+  xuiApiToken: string;
+  xuiUsername: string;
+  xuiPassword: string;
+  xuiTwoFactorCode: string;
+  xuiAllowInsecure: number;
   host: string;
   sshPort: number;
   sshUser: string;
@@ -61,10 +77,24 @@ interface DeployForm {
   psk: string;
 }
 
+interface ThreeXuiInboundForm {
+  serverId: number | null;
+  inboundId: string;
+  mode: "add" | "update" | "delete";
+  payloadJson: string;
+}
+
 const blankServerForm: ServerForm = {
   name: "",
   role: "agent",
   endpoint: "",
+  xuiEndpoint: "",
+  xuiBasePath: "",
+  xuiApiToken: "",
+  xuiUsername: "",
+  xuiPassword: "",
+  xuiTwoFactorCode: "",
+  xuiAllowInsecure: 0,
   host: "",
   sshPort: 22,
   sshUser: "root",
@@ -92,6 +122,28 @@ const blankDeployForm: DeployForm = {
   psk: ""
 };
 
+const defaultInboundPayload = {
+  up: 0,
+  down: 0,
+  total: 0,
+  remark: "flux-vless",
+  enable: true,
+  expiryTime: 0,
+  listen: "",
+  port: 443,
+  protocol: "vless",
+  settings: "{\"clients\":[{\"id\":\"replace-with-uuid\",\"flow\":\"xtls-rprx-vision\",\"email\":\"user@example.com\",\"limitIp\":0,\"totalGB\":0,\"expiryTime\":0,\"enable\":true,\"tgId\":0,\"subId\":\"\",\"comment\":\"\",\"reset\":0}],\"decryption\":\"none\",\"fallbacks\":[]}",
+  streamSettings: "{\"network\":\"tcp\",\"security\":\"reality\",\"realitySettings\":{\"show\":false,\"dest\":\"www.cloudflare.com:443\",\"xver\":0,\"serverNames\":[\"www.cloudflare.com\"],\"privateKey\":\"replace-private-key\",\"shortIds\":[\"\"]}}",
+  sniffing: "{\"enabled\":true,\"destOverride\":[\"http\",\"tls\",\"quic\",\"fakedns\"]}"
+};
+
+const blankThreeXuiInboundForm: ThreeXuiInboundForm = {
+  serverId: null,
+  inboundId: "",
+  mode: "add",
+  payloadJson: JSON.stringify(defaultInboundPayload, null, 2)
+};
+
 export default function OrchestratorPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -102,11 +154,17 @@ export default function OrchestratorPage() {
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [deployModalOpen, setDeployModalOpen] = useState(false);
   const [scriptModalOpen, setScriptModalOpen] = useState(false);
+  const [threeXuiInboundModalOpen, setThreeXuiInboundModalOpen] = useState(false);
+  const [xraySettingModalOpen, setXraySettingModalOpen] = useState(false);
   const [scriptTitle, setScriptTitle] = useState("");
   const [scriptText, setScriptText] = useState("");
+  const [xraySettingServerId, setXraySettingServerId] = useState<number | null>(null);
+  const [xraySettingText, setXraySettingText] = useState("");
+  const [outboundTestUrl, setOutboundTestUrl] = useState("https://www.google.com/generate_204");
   const [serverForm, setServerForm] = useState<ServerForm>(blankServerForm);
   const [profileForm, setProfileForm] = useState<ProfileForm>(blankProfileForm);
   const [deployForm, setDeployForm] = useState<DeployForm>(blankDeployForm);
+  const [threeXuiInboundForm, setThreeXuiInboundForm] = useState<ThreeXuiInboundForm>(blankThreeXuiInboundForm);
 
   const onlineServers = useMemo(() => {
     const now = Date.now();
@@ -146,6 +204,13 @@ export default function OrchestratorPage() {
       name: server.name,
       role: server.role || "agent",
       endpoint: server.endpoint || "",
+      xuiEndpoint: server.xuiEndpoint || "",
+      xuiBasePath: server.xuiBasePath || "",
+      xuiApiToken: server.xuiApiToken || "",
+      xuiUsername: server.xuiUsername || "",
+      xuiPassword: server.xuiPassword || "",
+      xuiTwoFactorCode: server.xuiTwoFactorCode || "",
+      xuiAllowInsecure: server.xuiAllowInsecure || 0,
       host: server.host || "",
       sshPort: server.sshPort || 22,
       sshUser: server.sshUser || "root",
@@ -278,6 +343,151 @@ export default function OrchestratorPage() {
     }
   };
 
+  const isThreeXuiSuccess = (res: any) => res.code === 0 && (!res.data || res.data.success !== false);
+
+  const showThreeXuiResult = (title: string, data: any) => {
+    setScriptTitle(title);
+    setScriptText(typeof data === "string" ? data : JSON.stringify(data, null, 2));
+    setScriptModalOpen(true);
+  };
+
+  const testXui = async (server: ControlServer) => {
+    const res = await testThreeXuiConnection(server.id);
+    if (isThreeXuiSuccess(res)) {
+      toast.success("3x-ui 连接正常");
+      showThreeXuiResult(`${server.name} 3x-ui 状态`, res.data);
+    } else {
+      toast.error(res.msg || res.data?.msg || "3x-ui 连接失败");
+    }
+  };
+
+  const showThreeXuiInbounds = async (server: ControlServer) => {
+    const res = await listThreeXuiInbounds(server.id);
+    if (isThreeXuiSuccess(res)) {
+      showThreeXuiResult(`${server.name} 入站列表`, res.data);
+      loadData();
+    } else {
+      toast.error(res.msg || res.data?.msg || "读取入站失败");
+    }
+  };
+
+  const showThreeXuiConfig = async (server: ControlServer) => {
+    const res = await getThreeXuiConfig(server.id);
+    if (isThreeXuiSuccess(res)) {
+      showThreeXuiResult(`${server.name} Xray 配置`, res.data);
+    } else {
+      toast.error(res.msg || res.data?.msg || "读取配置失败");
+    }
+  };
+
+  const showThreeXuiOutbounds = async (server: ControlServer) => {
+    const res = await getThreeXuiOutbounds(server.id);
+    if (isThreeXuiSuccess(res)) {
+      showThreeXuiResult(`${server.name} 出站配置`, res.data);
+    } else {
+      toast.error(res.msg || res.data?.msg || "读取出站失败");
+    }
+  };
+
+  const openThreeXuiInboundModal = (server: ControlServer) => {
+    setThreeXuiInboundForm({
+      ...blankThreeXuiInboundForm,
+      serverId: server.id
+    });
+    setThreeXuiInboundModalOpen(true);
+  };
+
+  const saveThreeXuiInbound = async () => {
+    if (!threeXuiInboundForm.serverId) {
+      toast.error("请选择服务器");
+      return;
+    }
+    if (threeXuiInboundForm.mode !== "add" && !threeXuiInboundForm.inboundId.trim()) {
+      toast.error("更新或删除入站时必须填写 inbound id");
+      return;
+    }
+
+    setSubmitting(true);
+    let res: any;
+    try {
+      const inboundId = threeXuiInboundForm.inboundId ? Number(threeXuiInboundForm.inboundId) : undefined;
+      if (threeXuiInboundForm.mode === "delete") {
+        res = await deleteThreeXuiInbound({ serverId: threeXuiInboundForm.serverId, inboundId });
+      } else {
+        const payload = JSON.parse(threeXuiInboundForm.payloadJson);
+        res = threeXuiInboundForm.mode === "add"
+          ? await addThreeXuiInbound({ serverId: threeXuiInboundForm.serverId, payload })
+          : await updateThreeXuiInbound({ serverId: threeXuiInboundForm.serverId, inboundId, payload });
+      }
+    } catch (error) {
+      setSubmitting(false);
+      toast.error("入站 JSON 格式不正确");
+      return;
+    }
+    setSubmitting(false);
+
+    if (isThreeXuiSuccess(res)) {
+      toast.success("3x-ui 入站操作已提交");
+      setThreeXuiInboundModalOpen(false);
+      showThreeXuiResult("3x-ui 入站操作结果", res.data);
+    } else {
+      toast.error(res.msg || res.data?.msg || "3x-ui 入站操作失败");
+    }
+  };
+
+  const openXraySettingModal = async (server: ControlServer) => {
+    const res = await getThreeXuiConfig(server.id);
+    if (!isThreeXuiSuccess(res)) {
+      toast.error(res.msg || res.data?.msg || "读取 Xray 配置失败");
+      return;
+    }
+
+    const config = res.data?.obj || res.data;
+    setXraySettingServerId(server.id);
+    setXraySettingText(typeof config === "string" ? config : JSON.stringify(config, null, 2));
+    setOutboundTestUrl("https://www.google.com/generate_204");
+    setXraySettingModalOpen(true);
+  };
+
+  const saveXraySetting = async () => {
+    if (!xraySettingServerId) {
+      toast.error("缺少服务器");
+      return;
+    }
+    try {
+      JSON.parse(xraySettingText);
+    } catch (error) {
+      toast.error("Xray 配置 JSON 格式不正确");
+      return;
+    }
+
+    setSubmitting(true);
+    const res = await saveThreeXuiOutbounds({
+      serverId: xraySettingServerId,
+      xraySetting: xraySettingText,
+      outboundTestUrl
+    });
+    setSubmitting(false);
+
+    if (isThreeXuiSuccess(res)) {
+      toast.success("3x-ui 出站配置已保存");
+      setXraySettingModalOpen(false);
+      showThreeXuiResult("3x-ui 出站保存结果", res.data);
+    } else {
+      toast.error(res.msg || res.data?.msg || "保存出站配置失败");
+    }
+  };
+
+  const restartXray = async (server: ControlServer) => {
+    const res = await restartThreeXuiXray(server.id);
+    if (isThreeXuiSuccess(res)) {
+      toast.success("已请求重启 Xray");
+      showThreeXuiResult(`${server.name} Xray 重启结果`, res.data);
+    } else {
+      toast.error(res.msg || res.data?.msg || "重启 Xray 失败");
+    }
+  };
+
   const copyScript = async () => {
     await navigator.clipboard.writeText(scriptText);
     toast.success("已复制");
@@ -399,6 +609,10 @@ export default function OrchestratorPage() {
                       <p className="truncate">{server.endpoint || "-"}</p>
                     </div>
                     <div>
+                      <p className="text-gray-500">3x-ui</p>
+                      <p className="truncate">{server.xuiEndpoint || "-"}</p>
+                    </div>
+                    <div>
                       <p className="text-gray-500">Agent</p>
                       <p>{server.agentVersion || "-"}</p>
                     </div>
@@ -420,8 +634,16 @@ export default function OrchestratorPage() {
                     </div>
                   </div>
                   <p className="text-xs text-gray-500">心跳：{formatTime(server.lastHeartbeat)}</p>
+                  <p className="text-xs text-gray-500">3x-ui 同步：{formatTime(server.xuiLastSync)}</p>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="flat" onPress={() => openDeployModal(server)}>部署</Button>
+                    <Button size="sm" variant="flat" onPress={() => testXui(server)}>测 3x-ui</Button>
+                    <Button size="sm" variant="flat" onPress={() => showThreeXuiInbounds(server)}>入站</Button>
+                    <Button size="sm" variant="flat" onPress={() => openThreeXuiInboundModal(server)}>入站操作</Button>
+                    <Button size="sm" variant="flat" onPress={() => showThreeXuiConfig(server)}>配置</Button>
+                    <Button size="sm" variant="flat" onPress={() => showThreeXuiOutbounds(server)}>出站</Button>
+                    <Button size="sm" variant="flat" onPress={() => openXraySettingModal(server)}>保存出站</Button>
+                    <Button size="sm" variant="flat" onPress={() => restartXray(server)}>重启 Xray</Button>
                     <Button size="sm" variant="flat" onPress={() => openServerModal(server)}>编辑</Button>
                     <Button size="sm" variant="flat" onPress={() => showServerToken(server)}>Token</Button>
                     <Button size="sm" variant="flat" color="warning" onPress={() => showServerToken(server, true)}>轮换</Button>
@@ -491,7 +713,7 @@ export default function OrchestratorPage() {
         </section>
       </div>
 
-      <Modal isOpen={serverModalOpen} onOpenChange={setServerModalOpen} size="2xl">
+      <Modal isOpen={serverModalOpen} onOpenChange={setServerModalOpen} size="4xl">
         <ModalContent>
           <ModalHeader>{serverForm.id ? "编辑服务器" : "添加服务器"}</ModalHeader>
           <ModalBody>
@@ -505,6 +727,16 @@ export default function OrchestratorPage() {
               <Input label="SSH 端口" type="number" value={serverForm.sshPort.toString()} onChange={e => setServerForm(prev => ({ ...prev, sshPort: Number(e.target.value) || 22 }))} variant="bordered" />
               <Input label="SSH 用户" value={serverForm.sshUser} onChange={e => setServerForm(prev => ({ ...prev, sshUser: e.target.value }))} variant="bordered" />
               <Input label="副控 API" value={serverForm.endpoint} onChange={e => setServerForm(prev => ({ ...prev, endpoint: e.target.value }))} variant="bordered" />
+              <Input label="3x-ui 面板地址" value={serverForm.xuiEndpoint} onChange={e => setServerForm(prev => ({ ...prev, xuiEndpoint: e.target.value }))} variant="bordered" placeholder="https://1.2.3.4:54321" />
+              <Input label="3x-ui Base Path" value={serverForm.xuiBasePath} onChange={e => setServerForm(prev => ({ ...prev, xuiBasePath: e.target.value }))} variant="bordered" placeholder="/secret-path" />
+              <Input label="3x-ui API Token" value={serverForm.xuiApiToken} onChange={e => setServerForm(prev => ({ ...prev, xuiApiToken: e.target.value }))} variant="bordered" />
+              <Input label="3x-ui 用户名" value={serverForm.xuiUsername} onChange={e => setServerForm(prev => ({ ...prev, xuiUsername: e.target.value }))} variant="bordered" />
+              <Input label="3x-ui 密码" type="password" value={serverForm.xuiPassword} onChange={e => setServerForm(prev => ({ ...prev, xuiPassword: e.target.value }))} variant="bordered" />
+              <Input label="3x-ui 2FA" value={serverForm.xuiTwoFactorCode} onChange={e => setServerForm(prev => ({ ...prev, xuiTwoFactorCode: e.target.value }))} variant="bordered" />
+              <Select label="3x-ui TLS 校验" selectedKeys={[serverForm.xuiAllowInsecure.toString()]} onSelectionChange={keys => setServerForm(prev => ({ ...prev, xuiAllowInsecure: Number(Array.from(keys)[0]) }))} variant="bordered">
+                <SelectItem key="0">校验证书</SelectItem>
+                <SelectItem key="1">允许自签名</SelectItem>
+              </Select>
             </div>
           </ModalBody>
           <ModalFooter>
@@ -562,6 +794,58 @@ export default function OrchestratorPage() {
           <ModalFooter>
             <Button variant="light" onPress={() => setDeployModalOpen(false)}>取消</Button>
             <Button color="primary" isLoading={submitting} onPress={saveDeployTask}>生成</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={threeXuiInboundModalOpen} onOpenChange={setThreeXuiInboundModalOpen} size="5xl" scrollBehavior="inside">
+        <ModalContent>
+          <ModalHeader>3x-ui 入站操作</ModalHeader>
+          <ModalBody>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Select label="动作" selectedKeys={[threeXuiInboundForm.mode]} onSelectionChange={keys => setThreeXuiInboundForm(prev => ({ ...prev, mode: Array.from(keys)[0] as ThreeXuiInboundForm["mode"] }))} variant="bordered">
+                <SelectItem key="add">新增 inbound</SelectItem>
+                <SelectItem key="update">更新 inbound</SelectItem>
+                <SelectItem key="delete">删除 inbound</SelectItem>
+              </Select>
+              <Input label="Inbound ID" value={threeXuiInboundForm.inboundId} onChange={e => setThreeXuiInboundForm(prev => ({ ...prev, inboundId: e.target.value }))} variant="bordered" />
+              <Input label="服务器 ID" value={threeXuiInboundForm.serverId?.toString() || ""} isReadOnly variant="bordered" />
+            </div>
+            {threeXuiInboundForm.mode !== "delete" && (
+              <Textarea
+                label="Inbound Payload JSON"
+                minRows={18}
+                value={threeXuiInboundForm.payloadJson}
+                onChange={e => setThreeXuiInboundForm(prev => ({ ...prev, payloadJson: e.target.value }))}
+                variant="bordered"
+                classNames={{ input: "font-mono text-xs" }}
+              />
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={() => setThreeXuiInboundModalOpen(false)}>取消</Button>
+            <Button color={threeXuiInboundForm.mode === "delete" ? "danger" : "primary"} isLoading={submitting} onPress={saveThreeXuiInbound}>提交</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={xraySettingModalOpen} onOpenChange={setXraySettingModalOpen} size="5xl" scrollBehavior="inside">
+        <ModalContent>
+          <ModalHeader>保存 3x-ui Xray / Outbound 配置</ModalHeader>
+          <ModalBody>
+            <Input label="Outbound 测试地址" value={outboundTestUrl} onChange={e => setOutboundTestUrl(e.target.value)} variant="bordered" />
+            <Textarea
+              label="完整 Xray 配置 JSON"
+              minRows={22}
+              value={xraySettingText}
+              onChange={e => setXraySettingText(e.target.value)}
+              variant="bordered"
+              classNames={{ input: "font-mono text-xs" }}
+            />
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={() => setXraySettingModalOpen(false)}>取消</Button>
+            <Button color="primary" isLoading={submitting} onPress={saveXraySetting}>保存到 3x-ui</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

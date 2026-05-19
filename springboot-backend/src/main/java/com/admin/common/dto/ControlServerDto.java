@@ -16,6 +16,20 @@ public class ControlServerDto {
 
     private String endpoint;
 
+    private String xuiEndpoint;
+
+    private String xuiBasePath;
+
+    private String xuiApiToken;
+
+    private String xuiUsername;
+
+    private String xuiPassword;
+
+    private String xuiTwoFactorCode;
+
+    private Integer xuiAllowInsecure = 0;
+
     @NotBlank(message = "host is required")
     private String host;
 

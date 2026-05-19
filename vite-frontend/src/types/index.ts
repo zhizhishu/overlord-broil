@@ -82,6 +82,14 @@ export interface ControlServer {
   name: string;
   role: 'master' | 'agent' | string;
   endpoint?: string;
+  xuiEndpoint?: string;
+  xuiBasePath?: string;
+  xuiApiToken?: string;
+  xuiUsername?: string;
+  xuiPassword?: string;
+  xuiTwoFactorCode?: string;
+  xuiAllowInsecure?: number;
+  xuiLastSync?: number;
   host: string;
   sshPort?: number;
   sshUser?: string;
