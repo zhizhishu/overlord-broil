@@ -46,9 +46,11 @@
   - 主项目和站点仓库均已推送，当前分支干净并跟踪各自 `origin/main`。
   - `https://zhizhishu.github.io/` 返回 `200`，页面标题为 `Flux 3x-ui Orchestrator`。
   - `bash -n scripts/flux-agent.sh` 通过。
+  - 本机前端已清理损坏的 `vite-frontend/node_modules`，重新执行 `npm install --legacy-peer-deps --no-audit --no-fund` 成功。
+  - 本机前端 `npm run build` 通过，包含 `tsc` 与 Vite production build。
   - 前端已用 Docker Node 20 验证：`npm install --legacy-peer-deps --no-audit --no-fund && npm run build` 通过。
   - 后端已用 Docker Maven 验证：`mvn -B -DskipTests package` 通过。
-  - 本机仍没有原生 `java`、`mvn`、`mvnw`；本地 Windows `vite-frontend/node_modules` 曾被中断安装破坏，改用 Docker/CI 作为干净构建基线。
+  - 本机仍没有原生 `java`、`mvn`、`mvnw`；后端使用 Docker Maven 作为本地可复现构建基线。
 - 风险/待确认：
   - 主仓库保持私有；由于当前 GitHub plan 不支持私有仓库 Pages，官网使用独立公开仓库 `zhizhishu.github.io`。
   - Snell 现在已经可通过副控 agent 自动领取和执行任务，但常驻服务、重试/退避、并发锁和 systemd 安装仍建议继续增强。
