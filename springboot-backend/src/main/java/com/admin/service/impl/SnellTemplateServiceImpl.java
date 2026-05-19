@@ -2,7 +2,10 @@ package com.admin.service.impl;
 
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.admin.common.dto.DeployTaskDto;
+import com.admin.entity.ProtocolNode;
 import com.admin.entity.ProtocolProfile;
 import com.admin.service.SnellTemplateService;
 import org.springframework.stereotype.Service;
@@ -17,127 +20,199 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
         String exactVersion = firstNotBlank(dto.getExactVersion(), "v5".equalsIgnoreCase(versionFamily) ? "v5.0.0" : "v4.1.1");
         Integer port = firstNotNull(dto.getListenPort(), profile == null ? null : profile.getListenPort(), 8388);
         String psk = StrUtil.isBlank(dto.getPsk()) ? IdUtil.simpleUUID().substring(0, 20) : dto.getPsk();
+        return buildScript(action, exactVersion, port, psk, null, "Snell Main", "snell.service", "snell-main.conf");
+    }
 
+    @Override
+    public String buildNodeScript(ProtocolNode node, String action) {
+        JSONObject credential = parseObject(node.getCredentialJson());
+        JSONObject config = parseObject(node.getConfigJson());
+        String version = firstNotBlank(stringValue(config, "version"), "v4.1.1");
+        String psk = firstNotBlank(stringValue(credential, "psk"), IdUtil.simpleUUID().substring(0, 20));
+        String serviceName = normalizeServiceName(firstNotBlank(node.getServiceName(), "snell-node-" + node.getId()));
+        String configName = "node-" + node.getId() + ".conf";
+        return buildScript(normalizeAction(action), version, firstNotNull(node.getPort(), 8390), psk,
+                node.getId(), firstNotBlank(node.getName(), "Snell " + node.getId()), serviceName, configName);
+    }
+
+    private String buildScript(String action, String version, Integer port, String psk,
+                               Long nodeId, String nodeName, String serviceName, String configName) {
         StringBuilder script = new StringBuilder();
         script.append("#!/usr/bin/env bash\n");
         script.append("set -euo pipefail\n\n");
-        script.append("ACTION=").append(shellQuote(action)).append("\n");
-        script.append("SNELL_VERSION=").append(shellQuote(exactVersion)).append("\n");
+        appendVar(script, "ACTION", action);
+        appendVar(script, "SNELL_VERSION", version);
         script.append("PORT=").append(port).append("\n");
-        script.append("PSK=").append(shellQuote(psk)).append("\n");
+        appendVar(script, "PSK", psk);
+        appendVar(script, "PROTOCOL_NODE_ID", nodeId == null ? "" : String.valueOf(nodeId));
+        appendVar(script, "NODE_NAME", firstNotBlank(nodeName, "Snell"));
+        appendVar(script, "SERVICE_NAME", normalizeServiceName(serviceName));
+        appendVar(script, "CONFIG_NAME", configName);
         script.append("DOWNLOAD_BASE_URL='https://dl.nssurge.com/snell'\n");
-        script.append("INSTALL_DIR='/usr/local/bin'\n");
         script.append("BINARY_PATH='/usr/local/bin/snell-server'\n");
         script.append("CONFIG_DIR='/etc/snell'\n");
         script.append("USERS_DIR='/etc/snell/users'\n");
-        script.append("MAIN_CONFIG_PATH='/etc/snell/users/snell-main.conf'\n");
-        script.append("SERVICE_PATH='/etc/systemd/system/snell.service'\n\n");
-
-        script.append("require_root() {\n");
-        script.append("  if [ \"$(id -u)\" -ne 0 ]; then\n");
-        script.append("    echo 'Please run this script as root.' >&2\n");
-        script.append("    exit 1\n");
-        script.append("  fi\n");
-        script.append("}\n\n");
-
-        script.append("map_arch() {\n");
-        script.append("  local arch\n");
-        script.append("  arch=\"$(uname -m)\"\n");
-        script.append("  case \"$arch\" in\n");
-        script.append("    x86_64|amd64) echo 'amd64' ;;\n");
-        script.append("    i386|i686) echo 'i386' ;;\n");
-        script.append("    aarch64|arm64) echo 'aarch64' ;;\n");
-        script.append("    armv7l|armv7) echo 'armv7l' ;;\n");
-        script.append("    *) echo \"Unsupported architecture: $arch\" >&2; exit 1 ;;\n");
-        script.append("  esac\n");
-        script.append("}\n\n");
-
-        script.append("install_deps() {\n");
-        script.append("  if command -v apt-get >/dev/null 2>&1; then\n");
-        script.append("    apt-get update\n");
-        script.append("    apt-get install -y curl wget unzip\n");
-        script.append("  elif command -v yum >/dev/null 2>&1; then\n");
-        script.append("    yum install -y curl wget unzip\n");
-        script.append("  elif command -v dnf >/dev/null 2>&1; then\n");
-        script.append("    dnf install -y curl wget unzip\n");
-        script.append("  fi\n");
-        script.append("}\n\n");
-
-        script.append("download_snell() {\n");
-        script.append("  local arch url tmp\n");
-        script.append("  arch=\"$(map_arch)\"\n");
-        script.append("  url=\"${DOWNLOAD_BASE_URL}/snell-server-${SNELL_VERSION}-linux-${arch}.zip\"\n");
-        script.append("  tmp=\"$(mktemp -d)\"\n");
-        script.append("  echo \"Downloading ${url}\"\n");
-        script.append("  if command -v curl >/dev/null 2>&1; then\n");
-        script.append("    curl -fsSL \"$url\" -o \"$tmp/snell-server.zip\"\n");
-        script.append("  else\n");
-        script.append("    wget -q \"$url\" -O \"$tmp/snell-server.zip\"\n");
-        script.append("  fi\n");
-        script.append("  unzip -o \"$tmp/snell-server.zip\" -d \"$tmp\"\n");
-        script.append("  install -m 0755 \"$tmp/snell-server\" \"$BINARY_PATH\"\n");
-        script.append("  rm -rf \"$tmp\"\n");
-        script.append("}\n\n");
-
-        script.append("write_config() {\n");
-        script.append("  mkdir -p \"$USERS_DIR\"\n");
-        script.append("  cat > \"$MAIN_CONFIG_PATH\" <<SNELL_CONFIG\n");
-        script.append("[snell-server]\n");
-        script.append("listen = ::0:${PORT}\n");
-        script.append("psk = ${PSK}\n");
-        script.append("ipv6 = true\n");
-        script.append("SNELL_CONFIG\n");
-        script.append("  chmod 600 \"$MAIN_CONFIG_PATH\"\n");
-        script.append("}\n\n");
-
-        script.append("write_service() {\n");
-        script.append("  cat > \"$SERVICE_PATH\" <<SNELL_SERVICE\n");
-        script.append("[Unit]\n");
-        script.append("Description=Snell Proxy Service\n");
-        script.append("After=network.target\n\n");
-        script.append("[Service]\n");
-        script.append("Type=simple\n");
-        script.append("User=nobody\n");
-        script.append("Group=nogroup\n");
-        script.append("ExecStart=${BINARY_PATH} -c ${MAIN_CONFIG_PATH}\n");
-        script.append("Restart=on-failure\n");
-        script.append("RestartSec=5\n");
-        script.append("LimitNOFILE=1048576\n\n");
-        script.append("[Install]\n");
-        script.append("WantedBy=multi-user.target\n");
-        script.append("SNELL_SERVICE\n");
-        script.append("  systemctl daemon-reload\n");
-        script.append("}\n\n");
-
-        script.append("install_snell() {\n");
-        script.append("  require_root\n");
-        script.append("  install_deps\n");
-        script.append("  download_snell\n");
-        script.append("  write_config\n");
-        script.append("  write_service\n");
-        script.append("  systemctl enable snell\n");
-        script.append("  systemctl restart snell\n");
-        script.append("  systemctl --no-pager --full status snell || true\n");
-        script.append("}\n\n");
-
-        script.append("uninstall_snell() {\n");
-        script.append("  require_root\n");
-        script.append("  systemctl stop snell 2>/dev/null || true\n");
-        script.append("  systemctl disable snell 2>/dev/null || true\n");
-        script.append("  rm -f \"$SERVICE_PATH\" \"$BINARY_PATH\"\n");
-        script.append("  systemctl daemon-reload\n");
-        script.append("  echo \"Snell removed. Config kept at ${CONFIG_DIR}.\"\n");
-        script.append("}\n\n");
-
-        script.append("case \"$ACTION\" in\n");
-        script.append("  present) install_snell ;;\n");
-        script.append("  absent) uninstall_snell ;;\n");
-        script.append("  restarted) require_root; systemctl restart snell; systemctl --no-pager status snell || true ;;\n");
-        script.append("  status) systemctl --no-pager status snell || true ;;\n");
-        script.append("  *) echo \"Unsupported action: $ACTION\" >&2; exit 1 ;;\n");
-        script.append("esac\n");
-
+        script.append("MAIN_CONFIG_PATH=\"${USERS_DIR}/${CONFIG_NAME}\"\n");
+        script.append("SERVICE_PATH=\"/etc/systemd/system/${SERVICE_NAME}\"\n\n");
+        script.append(body());
         return script.toString();
+    }
+
+    private String body() {
+        return """
+                require_root() {
+                  if [ "$(id -u)" -ne 0 ]; then
+                    echo 'Please run this script as root.' >&2
+                    exit 1
+                  fi
+                }
+
+                map_arch() {
+                  local arch
+                  arch="$(uname -m)"
+                  case "$arch" in
+                    x86_64|amd64) echo 'amd64' ;;
+                    i386|i686) echo 'i386' ;;
+                    aarch64|arm64) echo 'aarch64' ;;
+                    armv7l|armv7) echo 'armv7l' ;;
+                    *) echo "Unsupported architecture: $arch" >&2; exit 1 ;;
+                  esac
+                }
+
+                install_deps() {
+                  if command -v apt-get >/dev/null 2>&1; then
+                    apt-get update
+                    DEBIAN_FRONTEND=noninteractive apt-get install -y curl wget unzip python3
+                  elif command -v yum >/dev/null 2>&1; then
+                    yum install -y curl wget unzip python3
+                  elif command -v dnf >/dev/null 2>&1; then
+                    dnf install -y curl wget unzip python3
+                  fi
+                }
+
+                download_snell() {
+                  local arch url tmp
+                  arch="$(map_arch)"
+                  url="${DOWNLOAD_BASE_URL}/snell-server-${SNELL_VERSION}-linux-${arch}.zip"
+                  tmp="$(mktemp -d)"
+                  echo "Downloading ${url}"
+                  if command -v curl >/dev/null 2>&1; then
+                    curl -fsSL "$url" -o "$tmp/snell-server.zip"
+                  else
+                    wget -q "$url" -O "$tmp/snell-server.zip"
+                  fi
+                  unzip -o "$tmp/snell-server.zip" -d "$tmp"
+                  install -m 0755 "$tmp/snell-server" "$BINARY_PATH"
+                  rm -rf "$tmp"
+                }
+
+                write_config() {
+                  mkdir -p "$USERS_DIR"
+                  cat > "$MAIN_CONFIG_PATH" <<SNELL_CONFIG
+                [snell-server]
+                listen = ::0:${PORT}
+                psk = ${PSK}
+                ipv6 = true
+                SNELL_CONFIG
+                  chmod 600 "$MAIN_CONFIG_PATH"
+                }
+
+                write_service() {
+                  cat > "$SERVICE_PATH" <<SNELL_SERVICE
+                [Unit]
+                Description=Snell Proxy Node ${NODE_NAME}
+                After=network.target
+
+                [Service]
+                Type=simple
+                User=nobody
+                Group=nogroup
+                ExecStart=${BINARY_PATH} -c ${MAIN_CONFIG_PATH}
+                Restart=on-failure
+                RestartSec=5
+                LimitNOFILE=1048576
+
+                [Install]
+                WantedBy=multi-user.target
+                SNELL_SERVICE
+                  systemctl daemon-reload
+                }
+
+                install_snell() {
+                  require_root
+                  install_deps
+                  download_snell
+                  write_config
+                  write_service
+                  systemctl enable "$SERVICE_NAME"
+                  systemctl restart "$SERVICE_NAME"
+                  systemctl --no-pager --full status "$SERVICE_NAME" || true
+                }
+
+                uninstall_snell() {
+                  require_root
+                  systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+                  systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+                  rm -f "$SERVICE_PATH" "$MAIN_CONFIG_PATH"
+                  systemctl daemon-reload
+                  echo "Snell node removed. Config path was ${MAIN_CONFIG_PATH}."
+                }
+
+                emit_result_marker() {
+                  local service_status snell_version node_state
+                  service_status="$(systemctl is-active "$SERVICE_NAME" 2>/dev/null || echo not-installed)"
+                  snell_version=''
+                  if command -v snell-server >/dev/null 2>&1; then
+                    snell_version="$(snell-server -v 2>&1 | head -n 1 || true)"
+                  fi
+                  node_state="$service_status"
+                  if [ "$ACTION" = "absent" ]; then
+                    node_state='deleted'
+                  fi
+                  FLUX_NODE_ID="$PROTOCOL_NODE_ID" NODE_NAME="$NODE_NAME" SERVICE_NAME="$SERVICE_NAME" MAIN_CONFIG_PATH="$MAIN_CONFIG_PATH" PORT="$PORT" PSK="$PSK" SNELL_VERSION="$SNELL_VERSION" SNELL_RUNTIME_VERSION="$snell_version" NODE_STATE="$node_state" python3 <<'PY'
+                import json
+                import os
+
+                node_id = os.environ.get("FLUX_NODE_ID") or None
+                node = {
+                    "name": os.environ.get("NODE_NAME"),
+                    "protocol": "snell",
+                    "engine": "snell",
+                    "direction": "inbound",
+                    "listen": "::0",
+                    "port": int(os.environ.get("PORT", "0")),
+                    "transport": "tcp",
+                    "security": "psk",
+                    "credential": {"psk": os.environ.get("PSK")},
+                    "config": {
+                        "configPath": os.environ.get("MAIN_CONFIG_PATH"),
+                        "version": os.environ.get("SNELL_VERSION"),
+                    },
+                    "remoteId": os.environ.get("SERVICE_NAME"),
+                    "serviceName": os.environ.get("SERVICE_NAME"),
+                    "state": os.environ.get("NODE_STATE"),
+                }
+                if node_id:
+                    node["id"] = int(node_id)
+                result = {
+                    "protocolNodes": [node],
+                    "server": {"snellVersion": os.environ.get("SNELL_RUNTIME_VERSION")},
+                    "services": {"snell": os.environ.get("NODE_STATE")},
+                }
+                print("FLUX_AGENT_RESULT_JSON=" + json.dumps(result, ensure_ascii=False, separators=(",", ":")))
+                PY
+                }
+
+                case "$ACTION" in
+                  present) install_snell ;;
+                  absent) uninstall_snell ;;
+                  restarted) require_root; systemctl restart "$SERVICE_NAME"; systemctl --no-pager status "$SERVICE_NAME" || true ;;
+                  status) systemctl --no-pager status "$SERVICE_NAME" || true ;;
+                  *) echo "Unsupported action: $ACTION" >&2; exit 1 ;;
+                esac
+
+                emit_result_marker
+                """;
     }
 
     private String normalizeAction(String action) {
@@ -151,6 +226,15 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
         return "present";
     }
 
+    private String normalizeServiceName(String value) {
+        String service = StrUtil.isBlank(value) ? "snell.service" : value.trim();
+        return service.endsWith(".service") ? service : service + ".service";
+    }
+
+    private void appendVar(StringBuilder script, String key, String value) {
+        script.append(key).append('=').append(shellQuote(value == null ? "" : value)).append('\n');
+    }
+
     private String shellQuote(String value) {
         return "'" + value.replace("'", "'\"'\"'") + "'";
     }
@@ -158,7 +242,7 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
     private String firstNotBlank(String... values) {
         for (String value : values) {
             if (StrUtil.isNotBlank(value)) {
-                return value;
+                return value.trim();
             }
         }
         return "";
@@ -171,5 +255,21 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
             }
         }
         return null;
+    }
+
+    private JSONObject parseObject(String value) {
+        if (StrUtil.isBlank(value)) {
+            return new JSONObject();
+        }
+        try {
+            return JSON.parseObject(value);
+        } catch (Exception ignored) {
+            return new JSONObject();
+        }
+    }
+
+    private String stringValue(JSONObject object, String key) {
+        Object value = object == null ? null : object.get(key);
+        return value == null ? null : String.valueOf(value);
     }
 }

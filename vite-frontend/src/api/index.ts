@@ -49,6 +49,14 @@ export const updateProtocolProfile = (data: any) => Network.post("/protocol-prof
 export const deleteProtocolProfile = (id: number) => Network.post("/protocol-profile/delete", { id });
 export const ensureDefaultProtocolProfiles = () => Network.post("/protocol-profile/ensure-defaults");
 
+// 统一协议节点：Xray/3x-ui inbound 与 Snell 节点
+export const createProtocolNode = (data: any) => Network.post("/protocol-node/create", data);
+export const getProtocolNodeList = (data: any = {}) => Network.post("/protocol-node/list", data);
+export const updateProtocolNode = (data: any) => Network.post("/protocol-node/update", data);
+export const deleteProtocolNode = (id: number) => Network.post("/protocol-node/delete", { id });
+export const restartProtocolNode = (id: number) => Network.post("/protocol-node/restart", { id });
+export const syncProtocolNodes = (serverId: number) => Network.post("/protocol-node/sync", { serverId });
+
 // 多服务器协议部署任务
 export const createDeployTask = (data: any) => Network.post("/deploy-task/create", data);
 export const createOrchestrationTask = (data: any) => Network.post("/deploy-task/orchestrate", data);

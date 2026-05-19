@@ -129,6 +129,35 @@ CREATE TABLE `protocol_profile` (
 
 -- --------------------------------------------------------
 
+CREATE TABLE `protocol_node` (
+  `id` int(10) NOT NULL,
+  `server_id` int(10) NOT NULL,
+  `server_name` varchar(100) DEFAULT NULL,
+  `name` varchar(100) NOT NULL,
+  `protocol` varchar(50) NOT NULL,
+  `engine` varchar(50) NOT NULL,
+  `direction` varchar(30) NOT NULL DEFAULT 'inbound',
+  `listen` varchar(100) DEFAULT NULL,
+  `port` int(10) DEFAULT NULL,
+  `transport` varchar(50) DEFAULT NULL,
+  `security` varchar(50) DEFAULT NULL,
+  `credential_json` longtext,
+  `config_json` longtext,
+  `remote_id` varchar(100) DEFAULT NULL,
+  `service_name` varchar(100) DEFAULT NULL,
+  `state` varchar(50) DEFAULT NULL,
+  `up` bigint(20) NOT NULL DEFAULT '0',
+  `down` bigint(20) NOT NULL DEFAULT '0',
+  `total` bigint(20) NOT NULL DEFAULT '0',
+  `last_sync` bigint(20) DEFAULT NULL,
+  `last_error` longtext,
+  `created_time` bigint(20) NOT NULL,
+  `updated_time` bigint(20) DEFAULT NULL,
+  `status` int(10) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
 CREATE TABLE `deploy_task` (
   `id` int(10) NOT NULL,
   `server_id` int(10) NOT NULL,
@@ -319,6 +348,13 @@ ALTER TABLE `control_server`
 ALTER TABLE `protocol_profile`
   ADD PRIMARY KEY (`id`);
 
+ALTER TABLE `protocol_node`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `server_id` (`server_id`),
+  ADD KEY `engine` (`engine`),
+  ADD KEY `protocol` (`protocol`),
+  ADD KEY `remote_id` (`remote_id`);
+
 ALTER TABLE `deploy_task`
   ADD PRIMARY KEY (`id`),
   ADD KEY `server_id` (`server_id`);
@@ -377,6 +413,9 @@ ALTER TABLE `control_server`
   MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
 
 ALTER TABLE `protocol_profile`
+  MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+
+ALTER TABLE `protocol_node`
   MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
 
 ALTER TABLE `deploy_task`

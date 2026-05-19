@@ -13,6 +13,7 @@ import com.admin.entity.ProtocolProfile;
 import com.admin.mapper.DeployTaskMapper;
 import com.admin.service.ControlServerService;
 import com.admin.service.DeployTaskService;
+import com.admin.service.ProtocolNodeService;
 import com.admin.service.ProtocolProfileService;
 import com.admin.service.SnellTemplateService;
 import com.admin.service.XuiOrchestrationScriptService;
@@ -49,6 +50,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
 
     @Resource
     private XuiOrchestrationScriptService xuiOrchestrationScriptService;
+
+    @Resource
+    private ProtocolNodeService protocolNodeService;
 
     @Override
     public R createTask(DeployTaskDto dto) {
@@ -376,6 +380,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             update.setLastError(null);
             update.setStatus(STATUS_ACTIVE);
             controlServerService.updateById(update);
+            protocolNodeService.applyAgentResultNodes(task, root);
         } catch (Exception ignored) {
             // Result metadata is best-effort; task logs remain the source of truth when parsing fails.
         }

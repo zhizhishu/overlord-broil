@@ -35,6 +35,7 @@ The first iteration adds the foundation for:
 - Deployment tasks:
   - generated task records
   - generated Snell install/restart/status/uninstall script
+  - unified `protocol_node` records for Xray/3x-ui inbounds and Snell services
   - one-click 3x-ui orchestration task for installing/configuring 3x-ui, creating starter protocol nodes, installing Snell and returning connection metadata
   - agent task claim/report API protected by `X-Agent-Token`
   - `scripts/flux-agent.sh` polling executor for副控 servers
@@ -53,6 +54,7 @@ The first iteration adds the foundation for:
 - Frontend workspace:
   - new `主控中心` page
   - server cards
+  - unified protocol node cards for Xray and Snell
   - protocol profile cards
   - deployment task cards
   - structured 3x-ui inbound form for VLESS Reality, VMess WS, Trojan TLS and Shadowsocks
@@ -149,6 +151,38 @@ CREATE TABLE `three_xui_traffic_snapshot` (
   KEY `source_type` (`source_type`),
   KEY `synced_time` (`synced_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `protocol_node` (
+  `id` int(10) NOT NULL AUTO_INCREMENT,
+  `server_id` int(10) NOT NULL,
+  `server_name` varchar(100) DEFAULT NULL,
+  `name` varchar(100) NOT NULL,
+  `protocol` varchar(50) NOT NULL,
+  `engine` varchar(50) NOT NULL,
+  `direction` varchar(30) NOT NULL DEFAULT 'inbound',
+  `listen` varchar(100) DEFAULT NULL,
+  `port` int(10) DEFAULT NULL,
+  `transport` varchar(50) DEFAULT NULL,
+  `security` varchar(50) DEFAULT NULL,
+  `credential_json` longtext,
+  `config_json` longtext,
+  `remote_id` varchar(100) DEFAULT NULL,
+  `service_name` varchar(100) DEFAULT NULL,
+  `state` varchar(50) DEFAULT NULL,
+  `up` bigint(20) NOT NULL DEFAULT '0',
+  `down` bigint(20) NOT NULL DEFAULT '0',
+  `total` bigint(20) NOT NULL DEFAULT '0',
+  `last_sync` bigint(20) DEFAULT NULL,
+  `last_error` longtext,
+  `created_time` bigint(20) NOT NULL,
+  `updated_time` bigint(20) DEFAULT NULL,
+  `status` int(10) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `server_id` (`server_id`),
+  KEY `engine` (`engine`),
+  KEY `protocol` (`protocol`),
+  KEY `remote_id` (`remote_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
 ### 2. Create a 3x-ui API token
@@ -220,7 +254,19 @@ Click `生成一键任务`. The master creates one deployment task per selected 
 
 The one-click script validates duplicate ports before it is saved. ACME HTTP mode requires the domain DNS to point at the target server and port `80` to be reachable.
 
-### 6. Manage inbounds
+### 6. Manage unified protocol nodes
+
+Open `主控中心` and use `新增节点`.
+
+- VLESS / VMess / Trojan / Shadowsocks nodes are created through the remote 3x-ui inbound API and stored locally in `protocol_node`.
+- Snell nodes are stored in `protocol_node`, then the master creates an agent task. The remote agent installs or updates a node-specific Snell systemd service such as `snell-node-12.service`, writes `/etc/snell/users/node-12.conf`, starts the service, and reports the final service status plus generated PSK back to the master.
+- `同步节点` pulls existing 3x-ui inbounds into `protocol_node` so the unified list can show nodes that were created outside this panel.
+- `重启` restarts Snell by generating an agent task. For Xray-backed nodes it requests a remote Xray restart through 3x-ui.
+- `删除` deletes Xray inbounds through 3x-ui. For Snell it generates an agent task that removes the node service and config.
+
+Snell is not a native Xray protocol. This project treats it as the same product-level node type while keeping the runtime adapter separate: Xray nodes go through 3x-ui/Xray, Snell nodes go through the副控 agent and systemd.
+
+### 7. Manage inbounds
 
 On a server card:
 
@@ -235,7 +281,7 @@ On a server card:
 
 For Reality, generate the private/public key pair in 3x-ui or Xray first, then fill `Reality Private Key`, `SNI`, `Dest`, `Short ID`, UUID, email and port before submitting.
 
-### 7. Manage outbounds and traffic
+### 8. Manage outbounds and traffic
 
 On a server card:
 
@@ -251,7 +297,7 @@ Outbound saving intentionally edits the full Xray config rather than only patchi
 
 Traffic is also synced automatically every 5 minutes for active servers with `3x-ui 面板地址` and `3x-ui API Token` configured.
 
-### 8. API endpoints exposed by this project
+### 9. API endpoints exposed by this project
 
 ```text
 POST /api/v1/control-server/create
@@ -269,6 +315,12 @@ POST /api/v1/deploy-task/state
 POST /api/v1/deploy-task/delete
 POST /api/v1/agent-task/claim
 POST /api/v1/agent-task/report
+POST /api/v1/protocol-node/create
+POST /api/v1/protocol-node/update
+POST /api/v1/protocol-node/list
+POST /api/v1/protocol-node/delete
+POST /api/v1/protocol-node/restart
+POST /api/v1/protocol-node/sync
 POST /api/v1/three-xui/test
 POST /api/v1/three-xui/inbounds/list
 POST /api/v1/three-xui/inbounds/add

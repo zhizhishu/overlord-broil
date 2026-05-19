@@ -126,6 +126,32 @@ export interface ProtocolProfile {
   status: number;
 }
 
+export interface ProtocolNode {
+  id: number;
+  serverId: number;
+  serverName?: string;
+  name: string;
+  protocol: string;
+  engine: "xray" | "snell" | string;
+  direction: "inbound" | "outbound" | string;
+  listen?: string;
+  port?: number;
+  transport?: string;
+  security?: string;
+  credentialJson?: string;
+  configJson?: string;
+  remoteId?: string;
+  serviceName?: string;
+  state?: string;
+  up?: number;
+  down?: number;
+  total?: number;
+  lastSync?: number;
+  lastError?: string;
+  createdTime?: number;
+  status: number;
+}
+
 export interface DeployTask {
   id: number;
   serverId: number;

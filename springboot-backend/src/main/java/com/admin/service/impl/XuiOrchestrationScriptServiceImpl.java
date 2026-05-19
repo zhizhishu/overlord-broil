@@ -412,7 +412,26 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                     )
                     with urllib.request.urlopen(req, context=ctx, timeout=30) as resp:
                         body = resp.read().decode()
-                    created.append({"name": name, "port": payload["port"], "protocol": payload["protocol"], "response": body[:1200]})
+                    try:
+                        response = json.loads(body)
+                    except json.JSONDecodeError:
+                        response = {}
+                    try:
+                        stream = json.loads(payload.get("streamSettings") or "{}")
+                    except json.JSONDecodeError:
+                        stream = {}
+                    remote_id = response.get("obj", {}).get("id") if isinstance(response.get("obj"), dict) else None
+                    created.append({
+                        "name": name,
+                        "engine": "xray",
+                        "direction": "inbound",
+                        "port": payload["port"],
+                        "protocol": payload["protocol"],
+                        "transport": stream.get("network"),
+                        "security": stream.get("security"),
+                        "remoteId": str(remote_id) if remote_id else "",
+                        "response": body[:1200],
+                    })
 
                 sniffing = json.dumps({"enabled": True, "destOverride": ["http", "tls", "quic", "fakedns"]})
                 now = int(time.time())
@@ -605,7 +624,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                   base_path="/${WEB_BASE_PATH#/}"
                   endpoint="${LOCAL_SCHEME}://${PUBLIC_HOST}:${PANEL_PORT}"
                   api_token="$API_TOKEN"
-                  XUI_ENDPOINT="$endpoint" XUI_BASE_PATH="$base_path" XUI_API_TOKEN="$api_token" XUI_USERNAME="$PANEL_USERNAME" XUI_PASSWORD="$PANEL_PASSWORD" XUI_ALLOW_INSECURE="$XUI_ALLOW_INSECURE" XRAY_VERSION="$xray_version" SNELL_VERSION="$snell_version" XUI_SERVICE_STATUS="$xui_service_status" XRAY_SERVICE_STATUS="$xray_service_status" SNELL_SERVICE_STATUS="$snell_service_status" CERT_STATUS="$cert_status" CERT_EXPIRE_AT="$cert_expire_at" python3 <<'PY'
+                  XUI_ENDPOINT="$endpoint" XUI_BASE_PATH="$base_path" XUI_API_TOKEN="$api_token" XUI_USERNAME="$PANEL_USERNAME" XUI_PASSWORD="$PANEL_PASSWORD" XUI_ALLOW_INSECURE="$XUI_ALLOW_INSECURE" XRAY_VERSION="$xray_version" SNELL_VERSION="$snell_version" XUI_SERVICE_STATUS="$xui_service_status" XRAY_SERVICE_STATUS="$xray_service_status" SNELL_SERVICE_STATUS="$snell_service_status" CERT_STATUS="$cert_status" CERT_EXPIRE_AT="$cert_expire_at" INSTALL_SNELL="$INSTALL_SNELL" SNELL_PORT="$SNELL_PORT" SNELL_PSK="$SNELL_PSK" python3 <<'PY'
                 import json
                 import os
 
@@ -638,6 +657,24 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                     "xray": os.environ.get("XRAY_SERVICE_STATUS"),
                     "snell": os.environ.get("SNELL_SERVICE_STATUS"),
                 }
+                result.setdefault("protocolNodes", [])
+                if os.environ.get("INSTALL_SNELL") == "1":
+                    snell_port = int(os.environ.get("SNELL_PORT") or "8390")
+                    result["protocolNodes"].append({
+                        "name": "flux-snell",
+                        "protocol": "snell",
+                        "engine": "snell",
+                        "direction": "inbound",
+                        "listen": "::0",
+                        "port": snell_port,
+                        "transport": "tcp",
+                        "security": "psk",
+                        "credential": {"psk": os.environ.get("SNELL_PSK")},
+                        "config": {"configPath": "/etc/snell/users/snell-main.conf", "version": "v4.1.1"},
+                        "remoteId": "snell.service",
+                        "serviceName": "snell.service",
+                        "state": os.environ.get("SNELL_SERVICE_STATUS"),
+                    })
                 print("FLUX_AGENT_RESULT_JSON=" + json.dumps(result, ensure_ascii=False, separators=(",", ":")))
                 PY
                 }

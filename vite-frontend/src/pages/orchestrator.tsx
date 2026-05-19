@@ -13,10 +13,12 @@ import toast from "react-hot-toast";
 import {
   createControlServer,
   createDeployTask,
+  createProtocolNode,
   createOrchestrationTask,
   createProtocolProfile,
   deleteControlServer,
   deleteDeployTask,
+  deleteProtocolNode,
   deleteProtocolProfile,
   addThreeXuiInbound,
   deleteThreeXuiInbound,
@@ -25,6 +27,7 @@ import {
   getControlServerToken,
   getDeployTaskList,
   getDeployTaskScript,
+  getProtocolNodeList,
   getProtocolProfileList,
   getThreeXuiConfig,
   getThreeXuiOutboundTraffic,
@@ -32,15 +35,18 @@ import {
   listThreeXuiTraffic,
   listThreeXuiInbounds,
   rotateControlServerToken,
+  restartProtocolNode,
   restartThreeXuiXray,
   saveThreeXuiOutbounds,
   syncThreeXuiTraffic,
+  syncProtocolNodes,
   testThreeXuiConnection,
   updateThreeXuiInbound,
   updateControlServer,
+  updateProtocolNode,
   updateProtocolProfile
 } from "@/api";
-import type { ControlServer, DeployTask, ProtocolProfile, ThreeXuiTrafficSnapshot } from "@/types";
+import type { ControlServer, DeployTask, ProtocolNode, ProtocolProfile, ThreeXuiTrafficSnapshot } from "@/types";
 
 interface ServerForm {
   id?: number;
@@ -139,6 +145,32 @@ interface ThreeXuiInboundForm {
   wsPath: string;
   ssMethod: string;
   payloadJson: string;
+}
+
+interface ProtocolNodeForm {
+  id?: number;
+  serverId: number | null;
+  name: string;
+  protocol: "vless" | "vmess" | "trojan" | "shadowsocks" | "snell";
+  engine: "xray" | "snell";
+  listen: string;
+  port: number;
+  transport: "tcp" | "ws";
+  security: "none" | "tls" | "reality" | "psk";
+  clientEmail: string;
+  clientId: string;
+  clientPassword: string;
+  flow: string;
+  totalGb: number;
+  expiryDays: number;
+  sni: string;
+  realityDest: string;
+  realityPrivateKey: string;
+  realityShortId: string;
+  wsPath: string;
+  ssMethod: string;
+  snellPsk: string;
+  snellVersion: string;
 }
 
 const blankServerForm: ServerForm = {
@@ -251,6 +283,31 @@ const blankThreeXuiInboundForm: ThreeXuiInboundForm = {
   wsPath: "/ws",
   ssMethod: "2022-blake3-aes-128-gcm",
   payloadJson: JSON.stringify(defaultInboundPayload, null, 2)
+};
+
+const blankProtocolNodeForm: ProtocolNodeForm = {
+  serverId: null,
+  name: "flux-vless",
+  protocol: "vless",
+  engine: "xray",
+  listen: "",
+  port: 443,
+  transport: "tcp",
+  security: "reality",
+  clientEmail: "user@example.com",
+  clientId: "replace-with-uuid",
+  clientPassword: "replace-with-password",
+  flow: "xtls-rprx-vision",
+  totalGb: 0,
+  expiryDays: 0,
+  sni: "www.cloudflare.com",
+  realityDest: "www.cloudflare.com:443",
+  realityPrivateKey: "replace-private-key",
+  realityShortId: "",
+  wsPath: "/ws",
+  ssMethod: "2022-blake3-aes-128-gcm",
+  snellPsk: "",
+  snellVersion: "v4.1.1"
 };
 
 const GB = 1024 * 1024 * 1024;
@@ -387,15 +444,40 @@ const buildInboundPayloadFromForm = (form: ThreeXuiInboundForm) => {
 
 const inboundPayloadPreview = (form: ThreeXuiInboundForm) => JSON.stringify(buildInboundPayloadFromForm(form), null, 2);
 
+const inboundFormFromNodeForm = (form: ProtocolNodeForm): ThreeXuiInboundForm => ({
+  ...blankThreeXuiInboundForm,
+  serverId: form.serverId,
+  remark: form.name,
+  listen: form.listen,
+  port: form.port,
+  protocol: form.protocol === "snell" ? "vless" : form.protocol,
+  network: form.transport === "ws" ? "ws" : "tcp",
+  security: form.security === "psk" ? "none" : form.security,
+  clientEmail: form.clientEmail,
+  clientId: form.clientId,
+  clientPassword: form.clientPassword,
+  flow: form.flow,
+  totalGb: form.totalGb,
+  expiryDays: form.expiryDays,
+  sni: form.sni,
+  realityDest: form.realityDest,
+  realityPrivateKey: form.realityPrivateKey,
+  realityShortId: form.realityShortId,
+  wsPath: form.wsPath,
+  ssMethod: form.ssMethod
+});
+
 export default function OrchestratorPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [servers, setServers] = useState<ControlServer[]>([]);
+  const [protocolNodes, setProtocolNodes] = useState<ProtocolNode[]>([]);
   const [profiles, setProfiles] = useState<ProtocolProfile[]>([]);
   const [tasks, setTasks] = useState<DeployTask[]>([]);
   const [trafficSnapshots, setTrafficSnapshots] = useState<ThreeXuiTrafficSnapshot[]>([]);
   const [serverModalOpen, setServerModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [protocolNodeModalOpen, setProtocolNodeModalOpen] = useState(false);
   const [deployModalOpen, setDeployModalOpen] = useState(false);
   const [orchestrationModalOpen, setOrchestrationModalOpen] = useState(false);
   const [scriptModalOpen, setScriptModalOpen] = useState(false);
@@ -408,6 +490,7 @@ export default function OrchestratorPage() {
   const [outboundTestUrl, setOutboundTestUrl] = useState("https://www.google.com/generate_204");
   const [serverForm, setServerForm] = useState<ServerForm>(blankServerForm);
   const [profileForm, setProfileForm] = useState<ProfileForm>(blankProfileForm);
+  const [protocolNodeForm, setProtocolNodeForm] = useState<ProtocolNodeForm>(blankProtocolNodeForm);
   const [deployForm, setDeployForm] = useState<DeployForm>(blankDeployForm);
   const [orchestrationForm, setOrchestrationForm] = useState<OrchestrationForm>(blankOrchestrationForm);
   const [threeXuiInboundForm, setThreeXuiInboundForm] = useState<ThreeXuiInboundForm>(blankThreeXuiInboundForm);
@@ -420,6 +503,14 @@ export default function OrchestratorPage() {
   const runningTasks = useMemo(() => {
     return tasks.filter(task => ["generated", "claimed", "running"].includes(task.state)).length;
   }, [tasks]);
+
+  const snellNodes = useMemo(() => {
+    return protocolNodes.filter(node => node.engine === "snell").length;
+  }, [protocolNodes]);
+
+  const xrayNodes = useMemo(() => {
+    return protocolNodes.filter(node => node.engine === "xray").length;
+  }, [protocolNodes]);
 
   const failedTasks = useMemo(() => {
     return tasks.filter(task => task.state === "failed").length;
@@ -437,16 +528,18 @@ export default function OrchestratorPage() {
     setLoading(true);
     try {
       await ensureDefaultProtocolProfiles();
-      const [serverRes, profileRes, taskRes] = await Promise.all([
+      const [serverRes, profileRes, taskRes, nodeRes] = await Promise.all([
         getControlServerList(),
         getProtocolProfileList(),
-        getDeployTaskList()
+        getDeployTaskList(),
+        getProtocolNodeList({ limit: 300 })
       ]);
 
       if (serverRes.code === 0) setServers(serverRes.data || []);
       if (profileRes.code === 0) setProfiles(profileRes.data || []);
       if (taskRes.code === 0) setTasks(taskRes.data || []);
-      if (serverRes.code !== 0 || profileRes.code !== 0 || taskRes.code !== 0) {
+      if (nodeRes.code === 0) setProtocolNodes(nodeRes.data || []);
+      if (serverRes.code !== 0 || profileRes.code !== 0 || taskRes.code !== 0 || nodeRes.code !== 0) {
         toast.error("主控数据加载不完整");
       }
     } catch (error) {
@@ -489,6 +582,39 @@ export default function OrchestratorPage() {
       configJson: profile.configJson || "{}"
     } : blankProfileForm);
     setProfileModalOpen(true);
+  };
+
+  const openProtocolNodeModal = (server?: ControlServer, node?: ProtocolNode) => {
+    const protocol = (node?.protocol || "vless") as ProtocolNodeForm["protocol"];
+    const engine = (node?.engine || (protocol === "snell" ? "snell" : "xray")) as ProtocolNodeForm["engine"];
+    setProtocolNodeForm({
+      ...blankProtocolNodeForm,
+      id: node?.id,
+      serverId: node?.serverId || server?.id || servers[0]?.id || null,
+      name: node?.name || (protocol === "snell" ? "flux-snell" : `flux-${protocol}`),
+      protocol,
+      engine,
+      listen: node?.listen || (protocol === "snell" ? "::0" : ""),
+      port: node?.port || (protocol === "snell" ? 8390 : protocol === "vmess" ? 2086 : protocol === "shadowsocks" ? 8388 : 443),
+      transport: node?.transport === "ws" ? "ws" : "tcp",
+      security: (node?.security as ProtocolNodeForm["security"]) || (protocol === "snell" ? "psk" : protocol === "vless" ? "reality" : protocol === "trojan" ? "tls" : "none")
+    });
+    setProtocolNodeModalOpen(true);
+  };
+
+  const patchProtocolNodeForm = (patch: Partial<ProtocolNodeForm>) => {
+    setProtocolNodeForm(prev => ({ ...prev, ...patch }));
+  };
+
+  const updateProtocolNodeProtocol = (protocol: ProtocolNodeForm["protocol"]) => {
+    const defaults: Record<ProtocolNodeForm["protocol"], Partial<ProtocolNodeForm>> = {
+      vless: { protocol, engine: "xray", name: "flux-vless", port: 443, transport: "tcp", security: "reality", flow: "xtls-rprx-vision" },
+      vmess: { protocol, engine: "xray", name: "flux-vmess", port: 2086, transport: "ws", security: "none", flow: "" },
+      trojan: { protocol, engine: "xray", name: "flux-trojan", port: 8443, transport: "tcp", security: "tls", flow: "" },
+      shadowsocks: { protocol, engine: "xray", name: "flux-shadowsocks", port: 8388, transport: "tcp", security: "none", flow: "" },
+      snell: { protocol, engine: "snell", name: "flux-snell", listen: "::0", port: 8390, transport: "tcp", security: "psk", flow: "" }
+    };
+    patchProtocolNodeForm(defaults[protocol]);
   };
 
   const selectProfileForDeploy = (profileId: number) => {
@@ -567,6 +693,93 @@ export default function OrchestratorPage() {
       loadData();
     } else {
       toast.error(res.msg || "保存协议模板失败");
+    }
+  };
+
+  const saveProtocolNode = async () => {
+    if (!protocolNodeForm.serverId) {
+      toast.error("请选择目标服务器");
+      return;
+    }
+    if (!protocolNodeForm.name.trim()) {
+      toast.error("请填写节点名称");
+      return;
+    }
+    if (!protocolNodeForm.port || protocolNodeForm.port < 1 || protocolNodeForm.port > 65535) {
+      toast.error("节点端口不合法");
+      return;
+    }
+
+    const isSnell = protocolNodeForm.protocol === "snell";
+    const payload = isSnell ? undefined : buildInboundPayloadFromForm(inboundFormFromNodeForm(protocolNodeForm));
+    const requestPayload = isSnell ? {
+      id: protocolNodeForm.id,
+      serverId: protocolNodeForm.serverId,
+      name: protocolNodeForm.name,
+      protocol: "snell",
+      engine: "snell",
+      direction: "inbound",
+      listen: protocolNodeForm.listen || "::0",
+      port: protocolNodeForm.port,
+      transport: "tcp",
+      security: "psk",
+      credentialJson: JSON.stringify({ psk: protocolNodeForm.snellPsk }),
+      configJson: JSON.stringify({ version: protocolNodeForm.snellVersion || "v4.1.1" })
+    } : {
+      id: protocolNodeForm.id,
+      serverId: protocolNodeForm.serverId,
+      name: protocolNodeForm.name,
+      protocol: protocolNodeForm.protocol,
+      engine: "xray",
+      direction: "inbound",
+      listen: protocolNodeForm.listen,
+      port: protocolNodeForm.port,
+      transport: protocolNodeForm.transport,
+      security: protocolNodeForm.security,
+      configJson: JSON.stringify(payload),
+      payload
+    };
+
+    setSubmitting(true);
+    const res = protocolNodeForm.id ? await updateProtocolNode(requestPayload) : await createProtocolNode(requestPayload);
+    setSubmitting(false);
+
+    if (res.code === 0) {
+      toast.success(isSnell ? "Snell 节点任务已生成" : "Xray 入站节点已创建");
+      setProtocolNodeModalOpen(false);
+      loadData();
+    } else {
+      toast.error(res.msg || "保存协议节点失败");
+    }
+  };
+
+  const syncServerProtocolNodes = async (server: ControlServer) => {
+    const res = await syncProtocolNodes(server.id);
+    if (res.code === 0) {
+      toast.success("协议节点已同步");
+      loadData();
+    } else {
+      toast.error(res.msg || "同步协议节点失败");
+    }
+  };
+
+  const removeProtocolNode = async (node: ProtocolNode) => {
+    const res = await deleteProtocolNode(node.id);
+    if (res.code === 0) {
+      toast.success(node.engine === "snell" ? "Snell 删除任务已生成" : "协议节点已删除");
+      loadData();
+    } else {
+      toast.error(res.msg || "删除协议节点失败");
+    }
+  };
+
+  const restartNode = async (node: ProtocolNode) => {
+    const res = await restartProtocolNode(node.id);
+    if (res.code === 0) {
+      toast.success(node.engine === "snell" ? "Snell 重启任务已生成" : "已请求重启 Xray");
+      loadData();
+    } else {
+      toast.error(res.msg || "重启协议节点失败");
     }
   };
 
@@ -971,10 +1184,11 @@ export default function OrchestratorPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">主控中心</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">服务器编排、3x-ui 协议模板、Snell 部署任务</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">服务器编排、统一协议节点、Snell / Xray 运维</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button color="primary" onPress={() => openOrchestrationModal()}>一键编排</Button>
+            <Button color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>新增节点</Button>
             <Button color="primary" onPress={() => openDeployModal()}>新建部署</Button>
             <Button variant="flat" onPress={() => openServerModal()}>添加服务器</Button>
             <Button variant="flat" onPress={() => openProfileModal()}>添加模板</Button>
@@ -991,9 +1205,9 @@ export default function OrchestratorPage() {
           </Card>
           <Card radius="sm">
             <CardBody>
-              <p className="text-sm text-gray-500">协议模板</p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">{profiles.length}</p>
-              <p className="text-xs text-gray-500 mt-1">Xray / Snell</p>
+              <p className="text-sm text-gray-500">协议节点</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">{protocolNodes.length}</p>
+              <p className="text-xs text-gray-500 mt-1">Xray {xrayNodes} / Snell {snellNodes}</p>
             </CardBody>
           </Card>
           <Card radius="sm">
@@ -1078,6 +1292,8 @@ export default function OrchestratorPage() {
                   {server.lastError && <p className="text-xs text-danger">最近错误：{server.lastError}</p>}
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" color="primary" variant="flat" onPress={() => openOrchestrationModal(server)}>一键编排</Button>
+                    <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal(server)}>新增节点</Button>
+                    <Button size="sm" variant="flat" onPress={() => syncServerProtocolNodes(server)}>同步节点</Button>
                     <Button size="sm" variant="flat" onPress={() => openDeployModal(server)}>部署</Button>
                     <Button size="sm" variant="flat" onPress={() => testXui(server)}>测 3x-ui</Button>
                     <Button size="sm" variant="flat" onPress={() => showThreeXuiInbounds(server)}>入站</Button>
@@ -1093,6 +1309,54 @@ export default function OrchestratorPage() {
                     <Button size="sm" variant="flat" onPress={() => showServerToken(server)}>Token</Button>
                     <Button size="sm" variant="flat" color="warning" onPress={() => showServerToken(server, true)}>轮换</Button>
                     <Button size="sm" variant="light" color="danger" onPress={() => removeServer(server)}>删除</Button>
+                  </div>
+                </CardBody>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">协议节点</h2>
+            <Button size="sm" variant="light" onPress={() => openProtocolNodeModal()}>新增</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {protocolNodes.map(node => (
+              <Card key={node.id} radius="sm">
+                <CardBody className="space-y-3">
+                  <div className="flex justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-gray-900 dark:text-white">{node.name}</p>
+                      <p className="text-xs text-gray-500">{node.serverName || node.serverId} / {node.direction || "inbound"}</p>
+                    </div>
+                    <Chip size="sm" variant="flat" color={serviceColor(node.state) as any}>{node.state || "-"}</Chip>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-gray-500">引擎</p>
+                      <p>{node.engine}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">协议</p>
+                      <p>{node.protocol}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">端口</p>
+                      <p>{node.listen || "*"}:{node.port || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">流量</p>
+                      <p>{formatBytes(node.total || ((node.up || 0) + (node.down || 0)))}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500">远端：{node.remoteId || node.serviceName || "-"}</p>
+                  <p className="text-xs text-gray-500">同步：{formatTime(node.lastSync)}</p>
+                  {node.lastError && <p className="text-xs text-danger">错误：{node.lastError}</p>}
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(undefined, node)}>编辑</Button>
+                    <Button size="sm" variant="flat" onPress={() => restartNode(node)}>重启</Button>
+                    <Button size="sm" variant="light" color="danger" onPress={() => removeProtocolNode(node)}>删除</Button>
                   </div>
                 </CardBody>
               </Card>
@@ -1208,6 +1472,93 @@ export default function OrchestratorPage() {
           <ModalFooter>
             <Button variant="light" onPress={() => setProfileModalOpen(false)}>取消</Button>
             <Button color="primary" isLoading={submitting} onPress={saveProfile}>保存</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={protocolNodeModalOpen} onOpenChange={setProtocolNodeModalOpen} size="5xl" scrollBehavior="inside">
+        <ModalContent>
+          <ModalHeader>{protocolNodeForm.id ? "编辑协议节点" : "新增协议节点"}</ModalHeader>
+          <ModalBody>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Select label="目标服务器" selectedKeys={protocolNodeForm.serverId ? [protocolNodeForm.serverId.toString()] : []} onSelectionChange={keys => patchProtocolNodeForm({ serverId: Number(Array.from(keys)[0]) })} variant="bordered">
+                  {servers.map(server => <SelectItem key={server.id.toString()}>{server.name}</SelectItem>)}
+                </Select>
+                <Input label="节点名称" value={protocolNodeForm.name} onChange={e => patchProtocolNodeForm({ name: e.target.value })} variant="bordered" />
+                <Select label="协议" selectedKeys={[protocolNodeForm.protocol]} onSelectionChange={keys => updateProtocolNodeProtocol(Array.from(keys)[0] as ProtocolNodeForm["protocol"])} variant="bordered">
+                  <SelectItem key="vless">VLESS Reality</SelectItem>
+                  <SelectItem key="vmess">VMess WS</SelectItem>
+                  <SelectItem key="trojan">Trojan TLS</SelectItem>
+                  <SelectItem key="shadowsocks">Shadowsocks</SelectItem>
+                  <SelectItem key="snell">Snell</SelectItem>
+                </Select>
+                <Input label="监听地址" value={protocolNodeForm.listen} onChange={e => patchProtocolNodeForm({ listen: e.target.value })} variant="bordered" placeholder={protocolNodeForm.protocol === "snell" ? "::0" : "留空监听全部"} />
+                <Input label="端口" type="number" value={protocolNodeForm.port.toString()} onChange={e => patchProtocolNodeForm({ port: Number(e.target.value) || 0 })} variant="bordered" />
+                <Select label="传输" selectedKeys={[protocolNodeForm.transport]} onSelectionChange={keys => patchProtocolNodeForm({ transport: Array.from(keys)[0] as ProtocolNodeForm["transport"] })} variant="bordered" isDisabled={protocolNodeForm.protocol === "snell"}>
+                  <SelectItem key="tcp">TCP</SelectItem>
+                  <SelectItem key="ws">WebSocket</SelectItem>
+                </Select>
+                <Select label="安全" selectedKeys={[protocolNodeForm.security]} onSelectionChange={keys => patchProtocolNodeForm({ security: Array.from(keys)[0] as ProtocolNodeForm["security"] })} variant="bordered" isDisabled={protocolNodeForm.protocol === "snell"}>
+                  <SelectItem key="none">None</SelectItem>
+                  <SelectItem key="tls">TLS</SelectItem>
+                  <SelectItem key="reality">Reality</SelectItem>
+                  <SelectItem key="psk">PSK</SelectItem>
+                </Select>
+              </div>
+
+              {protocolNodeForm.protocol === "snell" ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input label="Snell PSK" value={protocolNodeForm.snellPsk} onChange={e => patchProtocolNodeForm({ snellPsk: e.target.value })} variant="bordered" placeholder="留空自动生成" />
+                  <Input label="Snell 版本" value={protocolNodeForm.snellVersion} onChange={e => patchProtocolNodeForm({ snellVersion: e.target.value })} variant="bordered" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Input label="客户端 Email" value={protocolNodeForm.clientEmail} onChange={e => patchProtocolNodeForm({ clientEmail: e.target.value })} variant="bordered" />
+                    {protocolNodeForm.protocol !== "trojan" && protocolNodeForm.protocol !== "shadowsocks" && (
+                      <Input label="客户端 UUID" value={protocolNodeForm.clientId} onChange={e => patchProtocolNodeForm({ clientId: e.target.value })} variant="bordered" />
+                    )}
+                    {(protocolNodeForm.protocol === "trojan" || protocolNodeForm.protocol === "shadowsocks") && (
+                      <Input label="客户端密码 / PSK" value={protocolNodeForm.clientPassword} onChange={e => patchProtocolNodeForm({ clientPassword: e.target.value })} variant="bordered" />
+                    )}
+                    {protocolNodeForm.protocol === "vless" && (
+                      <Input label="Flow" value={protocolNodeForm.flow} onChange={e => patchProtocolNodeForm({ flow: e.target.value })} variant="bordered" />
+                    )}
+                    <Input label="流量限制 GB" type="number" value={protocolNodeForm.totalGb.toString()} onChange={e => patchProtocolNodeForm({ totalGb: Number(e.target.value) || 0 })} variant="bordered" />
+                    <Input label="有效期天数" type="number" value={protocolNodeForm.expiryDays.toString()} onChange={e => patchProtocolNodeForm({ expiryDays: Number(e.target.value) || 0 })} variant="bordered" />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Input label="SNI / Host" value={protocolNodeForm.sni} onChange={e => patchProtocolNodeForm({ sni: e.target.value })} variant="bordered" />
+                    {protocolNodeForm.protocol === "vless" && protocolNodeForm.security === "reality" && (
+                      <>
+                        <Input label="Reality Dest" value={protocolNodeForm.realityDest} onChange={e => patchProtocolNodeForm({ realityDest: e.target.value })} variant="bordered" />
+                        <Input label="Reality Private Key" value={protocolNodeForm.realityPrivateKey} onChange={e => patchProtocolNodeForm({ realityPrivateKey: e.target.value })} variant="bordered" />
+                        <Input label="Reality Short ID" value={protocolNodeForm.realityShortId} onChange={e => patchProtocolNodeForm({ realityShortId: e.target.value })} variant="bordered" />
+                      </>
+                    )}
+                    {protocolNodeForm.protocol === "vmess" && (
+                      <Input label="WebSocket Path" value={protocolNodeForm.wsPath} onChange={e => patchProtocolNodeForm({ wsPath: e.target.value })} variant="bordered" />
+                    )}
+                    {protocolNodeForm.protocol === "shadowsocks" && (
+                      <Input label="加密方法" value={protocolNodeForm.ssMethod} onChange={e => patchProtocolNodeForm({ ssMethod: e.target.value })} variant="bordered" />
+                    )}
+                  </div>
+                  <Textarea
+                    label="Inbound Payload 预览"
+                    minRows={10}
+                    value={inboundPayloadPreview(inboundFormFromNodeForm(protocolNodeForm))}
+                    readOnly
+                    variant="bordered"
+                    classNames={{ input: "font-mono text-xs" }}
+                  />
+                </div>
+              )}
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={() => setProtocolNodeModalOpen(false)}>取消</Button>
+            <Button color="primary" isLoading={submitting} onPress={saveProtocolNode}>保存</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

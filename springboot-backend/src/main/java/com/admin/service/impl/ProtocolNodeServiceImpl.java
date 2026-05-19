@@ -1,0 +1,674 @@
+package com.admin.service.impl;
+
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
+import com.admin.common.dto.ProtocolNodeDto;
+import com.admin.common.dto.ProtocolNodeQueryDto;
+import com.admin.common.dto.ThreeXuiInboundDto;
+import com.admin.common.dto.ThreeXuiServerDto;
+import com.admin.common.lang.R;
+import com.admin.entity.ControlServer;
+import com.admin.entity.DeployTask;
+import com.admin.entity.ProtocolNode;
+import com.admin.mapper.DeployTaskMapper;
+import com.admin.mapper.ProtocolNodeMapper;
+import com.admin.service.ControlServerService;
+import com.admin.service.ProtocolNodeService;
+import com.admin.service.SnellTemplateService;
+import com.admin.service.ThreeXuiService;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+@Service
+public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, ProtocolNode> implements ProtocolNodeService {
+
+    private static final int STATUS_ACTIVE = 1;
+    private static final int STATUS_DELETED = 0;
+    private static final String ENGINE_XRAY = "xray";
+    private static final String ENGINE_SNELL = "snell";
+    private static final String DIRECTION_INBOUND = "inbound";
+
+    @Resource
+    private ControlServerService controlServerService;
+
+    @Resource
+    private ThreeXuiService threeXuiService;
+
+    @Resource
+    private SnellTemplateService snellTemplateService;
+
+    @Resource
+    private DeployTaskMapper deployTaskMapper;
+
+    @Override
+    public R createNode(ProtocolNodeDto dto) {
+        ControlServer server = resolveServer(dto == null ? null : dto.getServerId());
+        if (server == null) {
+            return R.err("server not found");
+        }
+        String protocol = normalize(dto.getProtocol(), "vless");
+        String engine = normalize(dto.getEngine(), inferEngine(protocol));
+        long now = System.currentTimeMillis();
+
+        ProtocolNode node = new ProtocolNode();
+        copyDtoToNode(dto, node);
+        node.setServerId(server.getId());
+        node.setServerName(server.getName());
+        node.setName(firstNotBlank(dto.getName(), "flux-" + protocol + "-" + now));
+        node.setProtocol(protocol);
+        node.setEngine(engine);
+        node.setDirection(normalize(dto.getDirection(), DIRECTION_INBOUND));
+        node.setState("pending");
+        node.setStatus(STATUS_ACTIVE);
+        node.setCreatedTime(now);
+        node.setUpdatedTime(now);
+
+        if (ENGINE_SNELL.equals(engine)) {
+            if (node.getPort() == null) {
+                return R.err("snell port is required");
+            }
+            if (!this.save(node)) {
+                return R.err("protocol node create failed");
+            }
+            fillSnellDefaults(node);
+            this.updateById(node);
+            DeployTask task = createSnellTask(server, node, normalize(dto.getAction(), "present"));
+            return R.ok(result(node, task));
+        }
+
+        Map<String, Object> payload = payloadFrom(dto);
+        if (payload == null || payload.isEmpty()) {
+            return R.err("xray node payload is required");
+        }
+        ThreeXuiInboundDto inboundDto = new ThreeXuiInboundDto();
+        inboundDto.setServerId(server.getId());
+        inboundDto.setPayload(payload);
+        R remote = threeXuiService.addInbound(inboundDto);
+        if (!isRemoteSuccess(remote)) {
+            return R.err(remoteError(remote, "3x-ui inbound create failed"));
+        }
+
+        node.setRemoteId(firstNotBlank(node.getRemoteId(), extractRemoteId(remote.getData())));
+        node.setConfigJson(JSON.toJSONString(payload));
+        node.setState("active");
+        node.setLastSync(now);
+        return this.save(node) ? R.ok(result(node, null)) : R.err("protocol node create failed");
+    }
+
+    @Override
+    public R updateNode(ProtocolNodeDto dto) {
+        if (dto == null || dto.getId() == null) {
+            return R.err("protocol node id is required");
+        }
+        ProtocolNode exists = this.getById(dto.getId());
+        if (exists == null) {
+            return R.err("protocol node not found");
+        }
+        ControlServer server = resolveServer(exists.getServerId());
+        if (server == null) {
+            return R.err("server not found");
+        }
+
+        copyDtoToNode(dto, exists);
+        exists.setUpdatedTime(System.currentTimeMillis());
+        if (ENGINE_SNELL.equals(normalize(exists.getEngine(), inferEngine(exists.getProtocol())))) {
+            fillSnellDefaults(exists);
+            exists.setState("pending");
+            this.updateById(exists);
+            DeployTask task = createSnellTask(server, exists, normalize(dto.getAction(), "present"));
+            return R.ok(result(exists, task));
+        }
+
+        Map<String, Object> payload = payloadFrom(dto);
+        if (payload != null && !payload.isEmpty() && !isBlank(exists.getRemoteId())) {
+            ThreeXuiInboundDto inboundDto = new ThreeXuiInboundDto();
+            inboundDto.setServerId(server.getId());
+            inboundDto.setInboundId(parseInt(exists.getRemoteId()));
+            inboundDto.setPayload(payload);
+            R remote = threeXuiService.updateInbound(inboundDto);
+            if (!isRemoteSuccess(remote)) {
+                return R.err(remoteError(remote, "3x-ui inbound update failed"));
+            }
+            exists.setConfigJson(JSON.toJSONString(payload));
+            exists.setState("active");
+            exists.setLastSync(System.currentTimeMillis());
+        }
+        return this.updateById(exists) ? R.ok(exists) : R.err("protocol node update failed");
+    }
+
+    @Override
+    public R listNodes(ProtocolNodeQueryDto dto) {
+        QueryWrapper<ProtocolNode> query = new QueryWrapper<>();
+        query.eq("status", STATUS_ACTIVE);
+        if (dto.getServerId() != null) {
+            query.eq("server_id", dto.getServerId());
+        }
+        if (!isBlank(dto.getProtocol())) {
+            query.eq("protocol", normalize(dto.getProtocol(), ""));
+        }
+        if (!isBlank(dto.getEngine())) {
+            query.eq("engine", normalize(dto.getEngine(), ""));
+        }
+        if (!isBlank(dto.getDirection())) {
+            query.eq("direction", normalize(dto.getDirection(), ""));
+        }
+        query.orderByDesc("updated_time").orderByDesc("id");
+        if (dto.getLimit() != null) {
+            int limit = Math.max(1, Math.min(dto.getLimit(), 500));
+            query.last("LIMIT " + limit);
+        }
+        return R.ok(this.list(query));
+    }
+
+    @Override
+    public R deleteNode(ProtocolNodeDto dto) {
+        if (dto == null || dto.getId() == null) {
+            return R.err("protocol node id is required");
+        }
+        ProtocolNode node = this.getById(dto.getId());
+        if (node == null) {
+            return R.err("protocol node not found");
+        }
+        ControlServer server = resolveServer(node.getServerId());
+        if (server == null) {
+            return R.err("server not found");
+        }
+
+        if (ENGINE_SNELL.equals(node.getEngine())) {
+            node.setState("deleting");
+            node.setUpdatedTime(System.currentTimeMillis());
+            this.updateById(node);
+            DeployTask task = createSnellTask(server, node, "absent");
+            return R.ok(result(node, task));
+        }
+
+        if (!isBlank(node.getRemoteId())) {
+            ThreeXuiInboundDto inboundDto = new ThreeXuiInboundDto();
+            inboundDto.setServerId(server.getId());
+            inboundDto.setInboundId(parseInt(node.getRemoteId()));
+            R remote = threeXuiService.deleteInbound(inboundDto);
+            if (!isRemoteSuccess(remote)) {
+                return R.err(remoteError(remote, "3x-ui inbound delete failed"));
+            }
+        }
+        return this.removeById(node.getId()) ? R.ok("protocol node deleted") : R.err("protocol node delete failed");
+    }
+
+    @Override
+    public R restartNode(ProtocolNodeDto dto) {
+        if (dto == null || dto.getId() == null) {
+            return R.err("protocol node id is required");
+        }
+        ProtocolNode node = this.getById(dto.getId());
+        if (node == null) {
+            return R.err("protocol node not found");
+        }
+        ControlServer server = resolveServer(node.getServerId());
+        if (server == null) {
+            return R.err("server not found");
+        }
+        if (ENGINE_SNELL.equals(node.getEngine())) {
+            DeployTask task = createSnellTask(server, node, "restarted");
+            node.setState("pending");
+            node.setUpdatedTime(System.currentTimeMillis());
+            this.updateById(node);
+            return R.ok(result(node, task));
+        }
+        return threeXuiService.restartXray(serverDto(server.getId()));
+    }
+
+    @Override
+    public R syncNodes(ProtocolNodeQueryDto dto) {
+        if (dto == null || dto.getServerId() == null) {
+            return R.err("server id is required");
+        }
+        ControlServer server = resolveServer(dto.getServerId());
+        if (server == null) {
+            return R.err("server not found");
+        }
+        R remote = threeXuiService.listInbounds(serverDto(server.getId()));
+        if (!isRemoteSuccess(remote)) {
+            return R.err(remoteError(remote, "3x-ui inbound sync failed"));
+        }
+
+        long now = System.currentTimeMillis();
+        int count = 0;
+        JSONArray inbounds = toJsonArray(unwrap(remote.getData()));
+        for (Object item : inbounds) {
+            JSONObject inbound = toJsonObject(item);
+            if (inbound == null) {
+                continue;
+            }
+            upsertXrayInbound(server, inbound, now);
+            count++;
+        }
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("serverId", server.getId());
+        summary.put("syncedTime", now);
+        summary.put("inboundCount", count);
+        return R.ok(summary);
+    }
+
+    @Override
+    public void applyAgentResultNodes(DeployTask task, JSONObject result) {
+        if (task == null || result == null) {
+            return;
+        }
+        ControlServer server = resolveServer(task.getServerId());
+        if (server == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        for (Object item : toJsonArray(result.get("inbounds"))) {
+            JSONObject inbound = toJsonObject(item);
+            if (inbound != null) {
+                upsertOrchestratedInbound(server, inbound, now);
+            }
+        }
+        for (Object item : toJsonArray(result.get("protocolNodes"))) {
+            JSONObject meta = toJsonObject(item);
+            if (meta != null) {
+                upsertNodeMeta(server, meta, now);
+            }
+        }
+    }
+
+    private DeployTask createSnellTask(ControlServer server, ProtocolNode node, String action) {
+        long now = System.currentTimeMillis();
+        DeployTask task = new DeployTask();
+        task.setServerId(server.getId());
+        task.setServerName(server.getName());
+        task.setProtocol("snell");
+        task.setAction(action);
+        task.setState("generated");
+        task.setRequestJson(JSON.toJSONString(result(node, null)));
+        task.setScript(snellTemplateService.buildNodeScript(node, action));
+        task.setStatus(STATUS_ACTIVE);
+        task.setCreatedTime(now);
+        task.setUpdatedTime(now);
+        deployTaskMapper.insert(task);
+        return task;
+    }
+
+    private void upsertXrayInbound(ControlServer server, JSONObject inbound, long now) {
+        ProtocolNode node = findExisting(server.getId(), ENGINE_XRAY, DIRECTION_INBOUND,
+                stringValue(inbound.get("id")), inbound.getString("protocol"), inbound.getInteger("port"), inbound.getString("remark"));
+        if (node == null) {
+            node = new ProtocolNode();
+            node.setCreatedTime(now);
+        }
+        node.setServerId(server.getId());
+        node.setServerName(server.getName());
+        node.setName(firstNotBlank(inbound.getString("remark"), "xray-inbound-" + inbound.getString("id")));
+        node.setProtocol(normalize(inbound.getString("protocol"), "xray"));
+        node.setEngine(ENGINE_XRAY);
+        node.setDirection(DIRECTION_INBOUND);
+        node.setListen(inbound.getString("listen"));
+        node.setPort(inbound.getInteger("port"));
+        node.setRemoteId(stringValue(inbound.get("id")));
+        node.setState(Boolean.FALSE.equals(inbound.getBoolean("enable")) ? "disabled" : "active");
+        node.setUp(longValue(inbound, "up"));
+        node.setDown(longValue(inbound, "down"));
+        node.setTotal(totalValue(node.getUp(), node.getDown(), longValue(inbound, "total")));
+        node.setConfigJson(JSON.toJSONString(inbound));
+        node.setLastSync(now);
+        node.setLastError(null);
+        node.setStatus(STATUS_ACTIVE);
+        node.setUpdatedTime(now);
+        saveOrUpdate(node);
+    }
+
+    private void upsertOrchestratedInbound(ControlServer server, JSONObject inbound, long now) {
+        JSONObject response = parseObject(inbound.getString("response"));
+        JSONObject obj = toJsonObject(response == null ? null : response.get("obj"));
+        String remoteId = obj == null ? null : stringValue(obj.get("id"));
+        if (isBlank(remoteId)) {
+            remoteId = extractRemoteId(response);
+        }
+
+        ProtocolNode node = findExisting(server.getId(), ENGINE_XRAY, DIRECTION_INBOUND,
+                remoteId, inbound.getString("protocol"), inbound.getInteger("port"), inbound.getString("name"));
+        if (node == null) {
+            node = new ProtocolNode();
+            node.setCreatedTime(now);
+        }
+        node.setServerId(server.getId());
+        node.setServerName(server.getName());
+        node.setName(firstNotBlank(inbound.getString("name"), "flux-" + inbound.getString("protocol")));
+        node.setProtocol(normalize(inbound.getString("protocol"), "xray"));
+        node.setEngine(ENGINE_XRAY);
+        node.setDirection(DIRECTION_INBOUND);
+        node.setPort(inbound.getInteger("port"));
+        node.setRemoteId(remoteId);
+        node.setTransport(firstNotBlank(inbound.getString("transport"), "tcp"));
+        node.setSecurity(inbound.getString("security"));
+        node.setConfigJson(JSON.toJSONString(inbound));
+        node.setState("active");
+        node.setLastSync(now);
+        node.setStatus(STATUS_ACTIVE);
+        node.setUpdatedTime(now);
+        saveOrUpdate(node);
+    }
+
+    private void upsertNodeMeta(ControlServer server, JSONObject meta, long now) {
+        ProtocolNode node = null;
+        Long id = meta.getLong("id");
+        if (id != null) {
+            node = this.getById(id);
+        }
+        if (node == null) {
+            node = findExisting(server.getId(), normalize(meta.getString("engine"), inferEngine(meta.getString("protocol"))),
+                    normalize(meta.getString("direction"), DIRECTION_INBOUND),
+                    firstNotBlank(meta.getString("remoteId"), meta.getString("serviceName")),
+                    meta.getString("protocol"), meta.getInteger("port"), meta.getString("name"));
+        }
+        if (node == null) {
+            node = new ProtocolNode();
+            node.setCreatedTime(now);
+        }
+
+        String protocol = normalize(meta.getString("protocol"), "snell");
+        String engine = normalize(meta.getString("engine"), inferEngine(protocol));
+        node.setServerId(server.getId());
+        node.setServerName(server.getName());
+        node.setName(firstNotBlank(meta.getString("name"), node.getName(), protocol + "-" + now));
+        node.setProtocol(protocol);
+        node.setEngine(engine);
+        node.setDirection(normalize(meta.getString("direction"), DIRECTION_INBOUND));
+        setIfNotBlank(meta.getString("listen"), node::setListen);
+        if (meta.getInteger("port") != null) node.setPort(meta.getInteger("port"));
+        setIfNotBlank(meta.getString("transport"), node::setTransport);
+        setIfNotBlank(meta.getString("security"), node::setSecurity);
+        setJson(meta, "credentialJson", "credential", node::setCredentialJson);
+        setJson(meta, "configJson", "config", node::setConfigJson);
+        setIfNotBlank(meta.getString("remoteId"), node::setRemoteId);
+        setIfNotBlank(meta.getString("serviceName"), node::setServiceName);
+        setIfNotBlank(meta.getString("state"), node::setState);
+        if (meta.getLong("up") != null) node.setUp(meta.getLong("up"));
+        if (meta.getLong("down") != null) node.setDown(meta.getLong("down"));
+        if (meta.getLong("total") != null) node.setTotal(meta.getLong("total"));
+        node.setLastSync(now);
+        node.setLastError(meta.getString("lastError"));
+        node.setStatus("deleted".equals(node.getState()) ? STATUS_DELETED : STATUS_ACTIVE);
+        node.setUpdatedTime(now);
+        saveOrUpdate(node);
+    }
+
+    private ProtocolNode findExisting(Long serverId, String engine, String direction, String remoteId,
+                                      String protocol, Integer port, String name) {
+        QueryWrapper<ProtocolNode> query = new QueryWrapper<>();
+        query.eq("server_id", serverId)
+                .eq("engine", engine)
+                .eq("direction", direction)
+                .eq("status", STATUS_ACTIVE);
+        if (!isBlank(remoteId)) {
+            query.eq("remote_id", remoteId);
+        } else if (port != null && !isBlank(protocol)) {
+            query.eq("port", port).eq("protocol", normalize(protocol, ""));
+        } else if (!isBlank(name)) {
+            query.eq("name", name);
+        } else {
+            return null;
+        }
+        query.last("LIMIT 1");
+        return this.getOne(query, false);
+    }
+
+    private void fillSnellDefaults(ProtocolNode node) {
+        node.setEngine(ENGINE_SNELL);
+        node.setProtocol("snell");
+        node.setDirection(normalize(node.getDirection(), DIRECTION_INBOUND));
+        node.setTransport(firstNotBlank(node.getTransport(), "tcp"));
+        node.setSecurity(firstNotBlank(node.getSecurity(), "psk"));
+        if (isBlank(node.getListen())) {
+            node.setListen("::0");
+        }
+        if (isBlank(node.getServiceName())) {
+            node.setServiceName("snell-node-" + node.getId() + ".service");
+        }
+        if (isBlank(node.getRemoteId())) {
+            node.setRemoteId(node.getServiceName());
+        }
+    }
+
+    private void copyDtoToNode(ProtocolNodeDto dto, ProtocolNode node) {
+        if (dto == null) {
+            return;
+        }
+        setIfNotBlank(dto.getName(), node::setName);
+        setIfNotBlank(dto.getProtocol(), value -> node.setProtocol(normalize(value, "")));
+        setIfNotBlank(dto.getEngine(), value -> node.setEngine(normalize(value, "")));
+        setIfNotBlank(dto.getDirection(), value -> node.setDirection(normalize(value, "")));
+        if (dto.getListen() != null) node.setListen(dto.getListen().trim());
+        if (dto.getPort() != null) node.setPort(dto.getPort());
+        setIfNotBlank(dto.getTransport(), node::setTransport);
+        setIfNotBlank(dto.getSecurity(), node::setSecurity);
+        setIfNotBlank(dto.getCredentialJson(), node::setCredentialJson);
+        setIfNotBlank(dto.getConfigJson(), node::setConfigJson);
+        setIfNotBlank(dto.getRemoteId(), node::setRemoteId);
+        setIfNotBlank(dto.getServiceName(), node::setServiceName);
+    }
+
+    private Map<String, Object> payloadFrom(ProtocolNodeDto dto) {
+        if (dto == null) {
+            return null;
+        }
+        if (dto.getPayload() != null && !dto.getPayload().isEmpty()) {
+            return dto.getPayload();
+        }
+        if (isBlank(dto.getConfigJson())) {
+            return null;
+        }
+        try {
+            Object parsed = JSON.parse(dto.getConfigJson());
+            if (parsed instanceof Map) {
+                return (Map<String, Object>) parsed;
+            }
+        } catch (Exception ignored) {
+            return null;
+        }
+        return null;
+    }
+
+    private Map<String, Object> result(ProtocolNode node, DeployTask task) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("node", node);
+        if (task != null) {
+            data.put("task", task);
+        }
+        return data;
+    }
+
+    private ThreeXuiServerDto serverDto(Long serverId) {
+        ThreeXuiServerDto dto = new ThreeXuiServerDto();
+        dto.setServerId(serverId);
+        return dto;
+    }
+
+    private ControlServer resolveServer(Long serverId) {
+        return serverId == null ? null : controlServerService.getById(serverId);
+    }
+
+    private String inferEngine(String protocol) {
+        return "snell".equals(normalize(protocol, "")) ? ENGINE_SNELL : ENGINE_XRAY;
+    }
+
+    private String normalize(String value, String fallback) {
+        return isBlank(value) ? fallback : value.trim().toLowerCase();
+    }
+
+    private String firstNotBlank(String... values) {
+        for (String value : values) {
+            if (!isBlank(value)) {
+                return value.trim();
+            }
+        }
+        return null;
+    }
+
+    private boolean isRemoteSuccess(R remote) {
+        if (remote == null || remote.getCode() != 0) {
+            return false;
+        }
+        JSONObject object = toJsonObject(remote.getData());
+        if (object == null) {
+            return true;
+        }
+        Boolean success = object.getBoolean("success");
+        return success == null || success;
+    }
+
+    private String remoteError(R remote, String fallback) {
+        if (remote == null) {
+            return fallback;
+        }
+        JSONObject object = toJsonObject(remote.getData());
+        if (object != null && !isBlank(object.getString("msg"))) {
+            return object.getString("msg");
+        }
+        return isBlank(remote.getMsg()) ? fallback : remote.getMsg();
+    }
+
+    private Object unwrap(Object data) {
+        JSONObject object = toJsonObject(data);
+        if (object != null && object.containsKey("obj")) {
+            return object.get("obj");
+        }
+        return data;
+    }
+
+    private String extractRemoteId(Object data) {
+        JSONObject object = toJsonObject(data);
+        if (object == null) {
+            return null;
+        }
+        Object unwrapped = object.containsKey("obj") ? object.get("obj") : object;
+        JSONObject obj = toJsonObject(unwrapped);
+        if (obj != null) {
+            return stringValue(firstNotNull(obj.get("id"), obj.get("inboundId")));
+        }
+        return stringValue(unwrapped);
+    }
+
+    private Object firstNotNull(Object... values) {
+        for (Object value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private JSONArray toJsonArray(Object value) {
+        if (value == null) {
+            return new JSONArray();
+        }
+        if (value instanceof JSONArray) {
+            return (JSONArray) value;
+        }
+        if (value instanceof String) {
+            try {
+                Object parsed = JSON.parse((String) value);
+                return parsed instanceof JSONArray ? (JSONArray) parsed : new JSONArray();
+            } catch (Exception ignored) {
+                return new JSONArray();
+            }
+        }
+        try {
+            Object parsed = JSON.parse(JSON.toJSONString(value));
+            return parsed instanceof JSONArray ? (JSONArray) parsed : new JSONArray();
+        } catch (Exception ignored) {
+            return new JSONArray();
+        }
+    }
+
+    private JSONObject toJsonObject(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof JSONObject) {
+            return (JSONObject) value;
+        }
+        if (value instanceof String) {
+            return parseObject((String) value);
+        }
+        try {
+            Object parsed = JSON.parse(JSON.toJSONString(value));
+            return parsed instanceof JSONObject ? (JSONObject) parsed : null;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private JSONObject parseObject(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        try {
+            return JSON.parseObject(value);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private Long longValue(JSONObject object, String key) {
+        if (object == null || object.get(key) == null) {
+            return 0L;
+        }
+        try {
+            return object.getLong(key);
+        } catch (Exception ignored) {
+            return 0L;
+        }
+    }
+
+    private Long totalValue(Long up, Long down, Long total) {
+        if (total != null && total > 0) {
+            return total;
+        }
+        return (up == null ? 0L : up) + (down == null ? 0L : down);
+    }
+
+    private Integer parseInt(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(value.trim());
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private void setIfNotBlank(String value, java.util.function.Consumer<String> setter) {
+        if (!isBlank(value)) {
+            setter.accept(value.trim());
+        }
+    }
+
+    private void setJson(JSONObject object, String stringKey, String objectKey, java.util.function.Consumer<String> setter) {
+        Object value = object.get(stringKey);
+        if (value == null) {
+            value = object.get(objectKey);
+        }
+        if (value == null) {
+            return;
+        }
+        setter.accept(value instanceof String ? (String) value : JSON.toJSONString(value));
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+}
