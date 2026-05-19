@@ -58,6 +58,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addPathPatterns("/api/**")
                 .excludePathPatterns("/flow/**")
                 .excludePathPatterns("/api/v1/open_api/**")
+                .excludePathPatterns("/api/v1/agent-task/**")
                 .excludePathPatterns("/api/v1/control-server/heartbeat")
                 .excludePathPatterns("/api/v1/config/get")
                 .excludePathPatterns("/api/v1/user/login")

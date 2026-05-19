@@ -2,7 +2,7 @@
 
 ## 接力摘要
 
-- 当前目标：主控一键选择服务器、自动安装/配置 3x-ui、自动创建多协议节点、自动管理 Snell/Xray/Reality/流量/证书/状态、多服务器统一可视化运维闭环已完成，进入提交推送收口。
+- 当前目标：本地 Docker 一键编排与 agent 闭环烟测已通过，正在提交修复并清理本次创建的容器、网络和临时资源。
 - 已完成：
   - 从 `zhizhishu/flux-panel` 创建新项目 `flux-panel-3xui-orchestrator`。
   - 将参考仓库 `MHSanaei/3x-ui` 与 `jinqians/snell.sh` 克隆到本地 `_references/`，仅作为本地参考，不推送。
@@ -57,6 +57,8 @@
   - README 已补齐数据库升级、agent 常驻安装、一键编排使用方式、自动流量同步和 API 列表。
   - 本机仍没有原生 `java`、`mvn`、`mvnw`；后端使用 Docker Maven 作为本地可复现构建基线。
   - 2026-05-19 06:14:15：`git diff --check` 通过；`bash -n scripts/flux-agent.sh scripts/install-flux-agent.sh` 通过；`vite-frontend npm run build` 通过；Docker Maven 后端构建容器退出码 `0`，产出 `springboot-backend/target/admin-0.0.1-SNAPSHOT.jar`。
+  - 2026-05-19 07:12:45：本地 Docker 烟测发现并修复 `/api/v1/agent-task/**` 被 JWT 拦截的问题；修复后通过临时 MySQL + 后端容器验证登录、创建服务器、生成一键编排任务、agent claim、agent report、heartbeat、服务器元数据回写。
+  - 2026-05-19 07:12:45：实际运行 `scripts/flux-agent.sh --once` 于 `node:20-bookworm` 临时容器，成功领取安全任务、执行脚本、解析 `FLUX_AGENT_RESULT_JSON`、回传 succeeded，并把服务器 3x-ui/证书/服务状态更新到临时数据库。
 - 风险/待确认：
   - 主仓库保持私有；由于当前 GitHub plan 不支持私有仓库 Pages，官网使用独立公开仓库 `zhizhishu.github.io`。
   - Snell 现在已经可通过副控 agent 自动领取和执行任务，且已提供 systemd 常驻安装脚本；重试/退避和并发锁仍可继续增强。
@@ -94,6 +96,7 @@
 - [x] ~~**目标:** 补齐 3x-ui 面板连接、inbound/outbound 管理代理和使用说明~~ (创建于: 2026-05-19 00:07:55 | **完成于: 2026-05-19 00:42:56**)
 - [x] ~~**目标:** 完成 Snell agent 执行、结构化 inbound 表单、远端流量同步和构建验证收口~~ (创建于: 2026-05-19 02:32:57 | **完成于: 2026-05-19 04:39:18**)
 - [x] ~~**目标:** 完成主控一键安装/配置 3x-ui、多协议节点、证书状态与多服务器统一运维闭环~~ (创建于: 2026-05-19 05:31:55 | **完成于: 2026-05-19 06:14:15**)
+- [x] ~~**目标:** 用本地 Docker 完成主控 API 生成一键编排任务与 agent claim/report/heartbeat 闭环烟测并清理资源~~ (创建于: 2026-05-19 06:26:54 | **完成于: 2026-05-19 07:12:45**)
 
 ## 推送记录
 
