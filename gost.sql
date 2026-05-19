@@ -141,6 +141,31 @@ CREATE TABLE `deploy_task` (
 
 -- --------------------------------------------------------
 
+CREATE TABLE `three_xui_traffic_snapshot` (
+  `id` int(10) NOT NULL,
+  `server_id` int(10) NOT NULL,
+  `server_name` varchar(100) DEFAULT NULL,
+  `source_type` varchar(30) NOT NULL,
+  `inbound_id` int(10) DEFAULT NULL,
+  `inbound_remark` varchar(255) DEFAULT NULL,
+  `protocol` varchar(50) DEFAULT NULL,
+  `tag` varchar(255) DEFAULT NULL,
+  `email` varchar(255) DEFAULT NULL,
+  `client_id` varchar(255) DEFAULT NULL,
+  `up` bigint(20) NOT NULL DEFAULT '0',
+  `down` bigint(20) NOT NULL DEFAULT '0',
+  `total` bigint(20) NOT NULL DEFAULT '0',
+  `expiry_time` bigint(20) DEFAULT NULL,
+  `enable` int(1) DEFAULT NULL,
+  `synced_time` bigint(20) NOT NULL,
+  `raw_json` longtext,
+  `created_time` bigint(20) NOT NULL,
+  `updated_time` bigint(20) DEFAULT NULL,
+  `status` int(10) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
 CREATE TABLE `speed_limit` (
   `id` int(10) NOT NULL,
   `name` varchar(100) NOT NULL,
@@ -291,6 +316,12 @@ ALTER TABLE `deploy_task`
   ADD PRIMARY KEY (`id`),
   ADD KEY `server_id` (`server_id`);
 
+ALTER TABLE `three_xui_traffic_snapshot`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `server_id` (`server_id`),
+  ADD KEY `source_type` (`source_type`),
+  ADD KEY `synced_time` (`synced_time`);
+
 ALTER TABLE `speed_limit`
   ADD PRIMARY KEY (`id`);
 
@@ -342,6 +373,9 @@ ALTER TABLE `protocol_profile`
   MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
 
 ALTER TABLE `deploy_task`
+  MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+
+ALTER TABLE `three_xui_traffic_snapshot`
   MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
 
 --

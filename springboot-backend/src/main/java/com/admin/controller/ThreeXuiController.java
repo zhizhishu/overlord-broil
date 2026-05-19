@@ -4,6 +4,7 @@ import com.admin.common.annotation.RequireRole;
 import com.admin.common.aop.LogAnnotation;
 import com.admin.common.dto.ThreeXuiInboundDto;
 import com.admin.common.dto.ThreeXuiServerDto;
+import com.admin.common.dto.ThreeXuiTrafficQueryDto;
 import com.admin.common.dto.ThreeXuiXraySettingDto;
 import com.admin.common.lang.R;
 import com.admin.service.ThreeXuiService;
@@ -102,6 +103,27 @@ public class ThreeXuiController {
     @PostMapping("/outbounds")
     public R outbounds(@Validated @RequestBody ThreeXuiServerDto dto) {
         return threeXuiService.getOutbounds(dto);
+    }
+
+    @LogAnnotation
+    @RequireRole
+    @PostMapping("/outbounds/traffic")
+    public R outboundsTraffic(@Validated @RequestBody ThreeXuiServerDto dto) {
+        return threeXuiService.getOutboundsTraffic(dto);
+    }
+
+    @LogAnnotation
+    @RequireRole
+    @PostMapping("/traffic/sync")
+    public R syncTraffic(@Validated @RequestBody ThreeXuiServerDto dto) {
+        return threeXuiService.syncTraffic(dto);
+    }
+
+    @LogAnnotation
+    @RequireRole
+    @PostMapping("/traffic/list")
+    public R listTraffic(@RequestBody ThreeXuiTrafficQueryDto dto) {
+        return threeXuiService.listTrafficSnapshots(dto);
     }
 
     @LogAnnotation

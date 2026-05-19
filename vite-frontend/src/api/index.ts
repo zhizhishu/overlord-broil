@@ -69,6 +69,9 @@ export const deleteThreeXuiClient = (data: any) => Network.post("/three-xui/clie
 export const resetThreeXuiClientTraffic = (data: any) => Network.post("/three-xui/clients/reset-traffic", data);
 export const getThreeXuiConfig = (serverId: number) => Network.post("/three-xui/config", { serverId });
 export const getThreeXuiOutbounds = (serverId: number) => Network.post("/three-xui/outbounds", { serverId });
+export const getThreeXuiOutboundTraffic = (serverId: number) => Network.post("/three-xui/outbounds/traffic", { serverId });
+export const syncThreeXuiTraffic = (serverId: number) => Network.post("/three-xui/traffic/sync", { serverId });
+export const listThreeXuiTraffic = (data: any) => Network.post("/three-xui/traffic/list", data);
 export const saveThreeXuiOutbounds = (data: any) => Network.post("/three-xui/outbounds/save", data);
 export const restartThreeXuiXray = (serverId: number) => Network.post("/three-xui/restart-xray", { serverId });
 

@@ -5,12 +5,16 @@ import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.admin.common.dto.ThreeXuiInboundDto;
 import com.admin.common.dto.ThreeXuiServerDto;
+import com.admin.common.dto.ThreeXuiTrafficQueryDto;
 import com.admin.common.dto.ThreeXuiXraySettingDto;
 import com.admin.common.lang.R;
 import com.admin.config.RestTemplateConfig;
 import com.admin.entity.ControlServer;
+import com.admin.entity.ThreeXuiTrafficSnapshot;
+import com.admin.mapper.ThreeXuiTrafficSnapshotMapper;
 import com.admin.service.ControlServerService;
 import com.admin.service.ThreeXuiService;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -33,6 +37,9 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
 
     @Resource
     private ControlServerService controlServerService;
+
+    @Resource
+    private ThreeXuiTrafficSnapshotMapper trafficSnapshotMapper;
 
     @Override
     public R testConnection(ThreeXuiServerDto dto) {
@@ -138,6 +145,79 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
         result.put("config", config);
         result.put("outbounds", outbounds);
         return R.ok(result);
+    }
+
+    @Override
+    public R getOutboundsTraffic(ThreeXuiServerDto dto) {
+        ControlServer server = resolveServer(dto.getServerId());
+        XuiSession session = loginSession(server);
+        if (!session.isReady()) {
+            return R.err(session.error);
+        }
+        return exchange(server, HttpMethod.GET, "/panel/xray/getOutboundsTraffic", new HttpEntity<>(session.headers()), false);
+    }
+
+    @Override
+    public R syncTraffic(ThreeXuiServerDto dto) {
+        ControlServer server = resolveServer(dto.getServerId());
+        if (server == null) {
+            return R.err("server not found");
+        }
+
+        long now = System.currentTimeMillis();
+        List<ThreeXuiTrafficSnapshot> snapshots = new ArrayList<>();
+        TrafficTotals totals = new TrafficTotals();
+
+        R inboundResult = apiGet(server, "/panel/api/inbounds/list", true);
+        if (inboundResult.getCode() != 0 || !isSuccessEnvelope(inboundResult.getData())) {
+            return inboundResult.getCode() != 0 ? inboundResult : R.err("3x-ui inbound traffic sync failed");
+        }
+        syncInboundSnapshots(server, toJsonArray(unwrapObj(inboundResult.getData())), now, snapshots, totals);
+
+        String outboundError = null;
+        R outboundResult = getOutboundsTraffic(dto);
+        if (outboundResult.getCode() == 0 && isSuccessEnvelope(outboundResult.getData())) {
+            syncOutboundSnapshots(server, toJsonArray(unwrapObj(outboundResult.getData())), now, snapshots, totals);
+        } else {
+            outboundError = outboundResult.getMsg();
+            if (outboundError == null || outboundError.isEmpty()) {
+                outboundError = "3x-ui outbound traffic sync skipped";
+            }
+        }
+
+        for (ThreeXuiTrafficSnapshot snapshot : snapshots) {
+            trafficSnapshotMapper.insert(snapshot);
+        }
+        markTrafficSynced(server, now, totals);
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("serverId", server.getId());
+        summary.put("syncedTime", now);
+        summary.put("snapshotCount", snapshots.size());
+        summary.put("inboundCount", countType(snapshots, "inbound"));
+        summary.put("clientCount", countType(snapshots, "client"));
+        summary.put("outboundCount", countType(snapshots, "outbound"));
+        summary.put("uploadTraffic", totals.up);
+        summary.put("downloadTraffic", totals.down);
+        summary.put("totalTraffic", totals.up + totals.down);
+        if (outboundError != null) {
+            summary.put("outboundWarning", outboundError);
+        }
+        return R.ok(summary);
+    }
+
+    @Override
+    public R listTrafficSnapshots(ThreeXuiTrafficQueryDto dto) {
+        int limit = dto.getLimit() == null ? 200 : Math.max(1, Math.min(dto.getLimit(), 500));
+        QueryWrapper<ThreeXuiTrafficSnapshot> query = new QueryWrapper<>();
+        if (dto.getServerId() != null) {
+            query.eq("server_id", dto.getServerId());
+        }
+        if (!isBlank(dto.getSourceType())) {
+            query.eq("source_type", dto.getSourceType().trim().toLowerCase());
+        }
+        query.orderByDesc("synced_time").orderByDesc("id").last("LIMIT " + limit);
+        return R.ok(trafficSnapshotMapper.selectList(query));
     }
 
     @Override
@@ -270,6 +350,105 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
         controlServerService.updateById(update);
     }
 
+    private void markTrafficSynced(ControlServer server, long syncedTime, TrafficTotals totals) {
+        ControlServer update = new ControlServer();
+        update.setId(server.getId());
+        update.setXuiLastSync(syncedTime);
+        update.setUploadTraffic(totals.up);
+        update.setDownloadTraffic(totals.down);
+        update.setUpdatedTime(syncedTime);
+        controlServerService.updateById(update);
+    }
+
+    private void syncInboundSnapshots(ControlServer server, JSONArray inbounds, long now,
+                                      List<ThreeXuiTrafficSnapshot> snapshots, TrafficTotals totals) {
+        for (Object item : inbounds) {
+            JSONObject inbound = toJsonObject(item);
+            if (inbound == null) {
+                continue;
+            }
+            Integer inboundId = inbound.getInteger("id");
+            String remark = inbound.getString("remark");
+            String tag = inbound.getString("tag");
+            String protocol = inbound.getString("protocol");
+
+            ThreeXuiTrafficSnapshot inboundSnapshot = baseSnapshot(server, "inbound", now);
+            inboundSnapshot.setInboundId(inboundId);
+            inboundSnapshot.setInboundRemark(remark);
+            inboundSnapshot.setProtocol(protocol);
+            inboundSnapshot.setTag(tag);
+            inboundSnapshot.setUp(longValue(inbound, "up"));
+            inboundSnapshot.setDown(longValue(inbound, "down"));
+            inboundSnapshot.setTotal(totalValue(inboundSnapshot.getUp(), inboundSnapshot.getDown(), longValue(inbound, "total")));
+            inboundSnapshot.setExpiryTime(longValue(inbound, "expiryTime"));
+            inboundSnapshot.setEnable(booleanToInt(inbound.getBoolean("enable")));
+            inboundSnapshot.setRawJson(JSON.toJSONString(inbound));
+            snapshots.add(inboundSnapshot);
+            totals.add(inboundSnapshot.getUp(), inboundSnapshot.getDown());
+
+            JSONArray clientStats = toJsonArray(inbound.get("clientStats"));
+            for (Object clientItem : clientStats) {
+                JSONObject client = toJsonObject(clientItem);
+                if (client == null) {
+                    continue;
+                }
+                ThreeXuiTrafficSnapshot clientSnapshot = baseSnapshot(server, "client", now);
+                clientSnapshot.setInboundId(firstInt(client.getInteger("inboundId"), client.getInteger("inbound_id"), inboundId));
+                clientSnapshot.setInboundRemark(remark);
+                clientSnapshot.setProtocol(protocol);
+                clientSnapshot.setTag(tag);
+                clientSnapshot.setEmail(client.getString("email"));
+                clientSnapshot.setClientId(firstString(client.getString("id"), client.getString("uuid"), client.getString("clientId")));
+                clientSnapshot.setUp(longValue(client, "up"));
+                clientSnapshot.setDown(longValue(client, "down"));
+                clientSnapshot.setTotal(totalValue(clientSnapshot.getUp(), clientSnapshot.getDown(), longValue(client, "total")));
+                clientSnapshot.setExpiryTime(longValue(client, "expiryTime"));
+                clientSnapshot.setEnable(booleanToInt(client.getBoolean("enable")));
+                clientSnapshot.setRawJson(JSON.toJSONString(client));
+                snapshots.add(clientSnapshot);
+            }
+        }
+    }
+
+    private void syncOutboundSnapshots(ControlServer server, JSONArray outbounds, long now,
+                                       List<ThreeXuiTrafficSnapshot> snapshots, TrafficTotals totals) {
+        for (Object item : outbounds) {
+            JSONObject outbound = toJsonObject(item);
+            if (outbound == null) {
+                continue;
+            }
+            ThreeXuiTrafficSnapshot snapshot = baseSnapshot(server, "outbound", now);
+            snapshot.setTag(outbound.getString("tag"));
+            snapshot.setUp(longValue(outbound, "up"));
+            snapshot.setDown(longValue(outbound, "down"));
+            snapshot.setTotal(totalValue(snapshot.getUp(), snapshot.getDown(), longValue(outbound, "total")));
+            snapshot.setRawJson(JSON.toJSONString(outbound));
+            snapshots.add(snapshot);
+        }
+    }
+
+    private ThreeXuiTrafficSnapshot baseSnapshot(ControlServer server, String sourceType, long now) {
+        ThreeXuiTrafficSnapshot snapshot = new ThreeXuiTrafficSnapshot();
+        snapshot.setServerId(server.getId());
+        snapshot.setServerName(server.getName());
+        snapshot.setSourceType(sourceType);
+        snapshot.setSyncedTime(now);
+        snapshot.setStatus(1);
+        snapshot.setCreatedTime(now);
+        snapshot.setUpdatedTime(now);
+        return snapshot;
+    }
+
+    private int countType(List<ThreeXuiTrafficSnapshot> snapshots, String sourceType) {
+        int count = 0;
+        for (ThreeXuiTrafficSnapshot snapshot : snapshots) {
+            if (sourceType.equals(snapshot.getSourceType())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     private String buildUrl(ControlServer server, String path) {
         String endpoint = trimTrailingSlash(server.getXuiEndpoint().trim());
         String basePath = normalizeBasePath(server.getXuiBasePath());
@@ -345,6 +524,88 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
         return data;
     }
 
+    private JSONArray toJsonArray(Object value) {
+        if (value == null) {
+            return new JSONArray();
+        }
+        if (value instanceof JSONArray) {
+            return (JSONArray) value;
+        }
+        if (value instanceof Collection) {
+            return JSON.parseArray(JSON.toJSONString(value));
+        }
+        if (value instanceof String) {
+            try {
+                Object parsed = JSON.parse((String) value);
+                return parsed instanceof JSONArray ? (JSONArray) parsed : new JSONArray();
+            } catch (Exception ignored) {
+                return new JSONArray();
+            }
+        }
+        return new JSONArray();
+    }
+
+    private JSONObject toJsonObject(Object value) {
+        if (value instanceof JSONObject) {
+            return (JSONObject) value;
+        }
+        if (value instanceof Map) {
+            return JSON.parseObject(JSON.toJSONString(value));
+        }
+        if (value instanceof String) {
+            try {
+                Object parsed = JSON.parse((String) value);
+                return parsed instanceof JSONObject ? (JSONObject) parsed : null;
+            } catch (Exception ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private Long longValue(JSONObject object, String key) {
+        if (object == null || !object.containsKey(key) || object.get(key) == null) {
+            return 0L;
+        }
+        try {
+            return object.getLong(key);
+        } catch (Exception ignored) {
+            return 0L;
+        }
+    }
+
+    private Long totalValue(Long up, Long down, Long total) {
+        if (total != null && total > 0) {
+            return total;
+        }
+        return (up == null ? 0L : up) + (down == null ? 0L : down);
+    }
+
+    private Integer firstInt(Integer... values) {
+        for (Integer value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private String firstString(String... values) {
+        for (String value : values) {
+            if (!isBlank(value)) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private Integer booleanToInt(Boolean value) {
+        if (value == null) {
+            return null;
+        }
+        return value ? 1 : 0;
+    }
+
     private Object extractOutbounds(Object config) {
         Object parsed = config;
         if (parsed instanceof String) {
@@ -391,6 +652,16 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
 
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    private static class TrafficTotals {
+        private long up;
+        private long down;
+
+        private void add(Long up, Long down) {
+            this.up += up == null ? 0L : up;
+            this.down += down == null ? 0L : down;
+        }
     }
 
     private static class XuiSession {

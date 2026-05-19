@@ -135,6 +135,28 @@ export interface DeployTask {
   status: number;
 }
 
+export interface ThreeXuiTrafficSnapshot {
+  id: number;
+  serverId: number;
+  serverName?: string;
+  sourceType: "inbound" | "client" | "outbound" | string;
+  inboundId?: number;
+  inboundRemark?: string;
+  protocol?: string;
+  tag?: string;
+  email?: string;
+  clientId?: string;
+  up?: number;
+  down?: number;
+  total?: number;
+  expiryTime?: number;
+  enable?: number;
+  syncedTime?: number;
+  rawJson?: string;
+  createdTime?: number;
+  status: number;
+}
+
 export interface Pagination {
   current: number;
   size: number;

@@ -25,17 +25,20 @@ import {
   getDeployTaskScript,
   getProtocolProfileList,
   getThreeXuiConfig,
+  getThreeXuiOutboundTraffic,
   getThreeXuiOutbounds,
+  listThreeXuiTraffic,
   listThreeXuiInbounds,
   rotateControlServerToken,
   restartThreeXuiXray,
   saveThreeXuiOutbounds,
+  syncThreeXuiTraffic,
   testThreeXuiConnection,
   updateThreeXuiInbound,
   updateControlServer,
   updateProtocolProfile
 } from "@/api";
-import type { ControlServer, DeployTask, ProtocolProfile } from "@/types";
+import type { ControlServer, DeployTask, ProtocolProfile, ThreeXuiTrafficSnapshot } from "@/types";
 
 interface ServerForm {
   id?: number;
@@ -81,6 +84,26 @@ interface ThreeXuiInboundForm {
   serverId: number | null;
   inboundId: string;
   mode: "add" | "update" | "delete";
+  editMode: "form" | "json";
+  remark: string;
+  enable: number;
+  listen: string;
+  port: number;
+  protocol: "vless" | "vmess" | "trojan" | "shadowsocks";
+  network: "tcp" | "ws";
+  security: "none" | "tls" | "reality";
+  clientEmail: string;
+  clientId: string;
+  clientPassword: string;
+  flow: string;
+  totalGb: number;
+  expiryDays: number;
+  sni: string;
+  realityDest: string;
+  realityPrivateKey: string;
+  realityShortId: string;
+  wsPath: string;
+  ssMethod: string;
   payloadJson: string;
 }
 
@@ -141,8 +164,162 @@ const blankThreeXuiInboundForm: ThreeXuiInboundForm = {
   serverId: null,
   inboundId: "",
   mode: "add",
+  editMode: "form",
+  remark: "flux-vless",
+  enable: 1,
+  listen: "",
+  port: 443,
+  protocol: "vless",
+  network: "tcp",
+  security: "reality",
+  clientEmail: "user@example.com",
+  clientId: "replace-with-uuid",
+  clientPassword: "replace-with-password",
+  flow: "xtls-rprx-vision",
+  totalGb: 0,
+  expiryDays: 0,
+  sni: "www.cloudflare.com",
+  realityDest: "www.cloudflare.com:443",
+  realityPrivateKey: "replace-private-key",
+  realityShortId: "",
+  wsPath: "/ws",
+  ssMethod: "2022-blake3-aes-128-gcm",
   payloadJson: JSON.stringify(defaultInboundPayload, null, 2)
 };
+
+const GB = 1024 * 1024 * 1024;
+
+const asExpiryTime = (days: number) => {
+  if (!days || days <= 0) return 0;
+  return Date.now() + days * 24 * 60 * 60 * 1000;
+};
+
+const asTrafficLimit = (gb: number) => {
+  if (!gb || gb <= 0) return 0;
+  return Math.round(gb * GB);
+};
+
+const clientBase = (form: ThreeXuiInboundForm) => ({
+  email: form.clientEmail.trim(),
+  limitIp: 0,
+  totalGB: asTrafficLimit(form.totalGb),
+  expiryTime: asExpiryTime(form.expiryDays),
+  enable: form.enable === 1,
+  tgId: "",
+  subId: "",
+  comment: "",
+  reset: 0
+});
+
+const buildInboundPayloadFromForm = (form: ThreeXuiInboundForm) => {
+  const protocol = form.protocol;
+  const sniffing = {
+    enabled: true,
+    destOverride: ["http", "tls", "quic", "fakedns"]
+  };
+  let settings: Record<string, any> = {};
+  let streamSettings: Record<string, any> = {
+    network: form.network,
+    security: form.security
+  };
+
+  if (protocol === "vless") {
+    settings = {
+      clients: [{
+        ...clientBase(form),
+        id: form.clientId.trim(),
+        flow: form.security === "reality" ? form.flow : ""
+      }],
+      decryption: "none",
+      fallbacks: []
+    };
+    streamSettings = {
+      network: "tcp",
+      security: form.security,
+      realitySettings: form.security === "reality" ? {
+        show: false,
+        dest: form.realityDest.trim(),
+        xver: 0,
+        serverNames: [form.sni.trim()].filter(Boolean),
+        privateKey: form.realityPrivateKey.trim(),
+        shortIds: [form.realityShortId.trim()]
+      } : undefined,
+      tlsSettings: form.security === "tls" ? {
+        serverName: form.sni.trim()
+      } : undefined
+    };
+  }
+
+  if (protocol === "vmess") {
+    settings = {
+      clients: [{
+        ...clientBase(form),
+        id: form.clientId.trim(),
+        alterId: 0
+      }],
+      disableInsecureEncryption: false
+    };
+    streamSettings = {
+      network: "ws",
+      security: form.security === "tls" ? "tls" : "none",
+      wsSettings: {
+        path: form.wsPath.trim() || "/ws",
+        headers: form.sni.trim() ? { Host: form.sni.trim() } : {}
+      },
+      tlsSettings: form.security === "tls" ? {
+        serverName: form.sni.trim()
+      } : undefined
+    };
+  }
+
+  if (protocol === "trojan") {
+    settings = {
+      clients: [{
+        ...clientBase(form),
+        password: form.clientPassword.trim()
+      }],
+      fallbacks: []
+    };
+    streamSettings = {
+      network: "tcp",
+      security: form.security === "none" ? "tls" : form.security,
+      tlsSettings: {
+        serverName: form.sni.trim()
+      }
+    };
+  }
+
+  if (protocol === "shadowsocks") {
+    settings = {
+      method: form.ssMethod.trim(),
+      password: form.clientPassword.trim(),
+      network: "tcp,udp"
+    };
+    streamSettings = {
+      network: "tcp",
+      security: "none"
+    };
+  }
+
+  const cleanStreamSettings = JSON.parse(JSON.stringify(streamSettings));
+
+  return {
+    up: 0,
+    down: 0,
+    total: 0,
+    remark: form.remark.trim() || `flux-${protocol}`,
+    enable: form.enable === 1,
+    expiryTime: 0,
+    listen: form.listen.trim(),
+    port: Number(form.port) || 443,
+    protocol,
+    settings: JSON.stringify(settings),
+    streamSettings: JSON.stringify(cleanStreamSettings),
+    sniffing: JSON.stringify(sniffing)
+  };
+};
+
+const inboundPayloadPreview = (form: ThreeXuiInboundForm) => JSON.stringify(buildInboundPayloadFromForm(form), null, 2);
 
 export default function OrchestratorPage() {
   const [loading, setLoading] = useState(true);
@@ -150,6 +327,7 @@ export default function OrchestratorPage() {
   const [servers, setServers] = useState<ControlServer[]>([]);
   const [profiles, setProfiles] = useState<ProtocolProfile[]>([]);
   const [tasks, setTasks] = useState<DeployTask[]>([]);
+  const [trafficSnapshots, setTrafficSnapshots] = useState<ThreeXuiTrafficSnapshot[]>([]);
   const [serverModalOpen, setServerModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [deployModalOpen, setDeployModalOpen] = useState(false);
@@ -389,12 +567,64 @@ export default function OrchestratorPage() {
     }
   };
 
+  const showThreeXuiOutboundTraffic = async (server: ControlServer) => {
+    const res = await getThreeXuiOutboundTraffic(server.id);
+    if (isThreeXuiSuccess(res)) {
+      showThreeXuiResult(`${server.name} 出站流量`, res.data);
+    } else {
+      toast.error(res.msg || res.data?.msg || "读取出站流量失败");
+    }
+  };
+
+  const syncXuiTraffic = async (server: ControlServer) => {
+    const res = await syncThreeXuiTraffic(server.id);
+    if (isThreeXuiSuccess(res)) {
+      toast.success("远端流量已同步入库");
+      showThreeXuiResult(`${server.name} 流量同步结果`, res.data);
+      loadData();
+    } else {
+      toast.error(res.msg || res.data?.msg || "同步流量失败");
+    }
+  };
+
+  const showTrafficSnapshots = async (server: ControlServer) => {
+    const res = await listThreeXuiTraffic({ serverId: server.id, limit: 120 });
+    if (res.code === 0) {
+      const snapshots = res.data || [];
+      setTrafficSnapshots(snapshots);
+      showThreeXuiResult(`${server.name} 本地流量快照`, snapshots);
+    } else {
+      toast.error(res.msg || "读取本地流量快照失败");
+    }
+  };
+
   const openThreeXuiInboundModal = (server: ControlServer) => {
     setThreeXuiInboundForm({
       ...blankThreeXuiInboundForm,
-      serverId: server.id
+      serverId: server.id,
+      payloadJson: inboundPayloadPreview({ ...blankThreeXuiInboundForm, serverId: server.id })
     });
     setThreeXuiInboundModalOpen(true);
+  };
+
+  const patchThreeXuiInboundForm = (patch: Partial<ThreeXuiInboundForm>) => {
+    setThreeXuiInboundForm(prev => {
+      const next = { ...prev, ...patch };
+      return {
+        ...next,
+        payloadJson: next.editMode === "form" ? inboundPayloadPreview(next) : next.payloadJson
+      };
+    });
+  };
+
+  const updateInboundProtocol = (protocol: ThreeXuiInboundForm["protocol"]) => {
+    const defaults: Record<ThreeXuiInboundForm["protocol"], Partial<ThreeXuiInboundForm>> = {
+      vless: { protocol, remark: "flux-vless", port: 443, network: "tcp", security: "reality", flow: "xtls-rprx-vision" },
+      vmess: { protocol, remark: "flux-vmess", port: 2086, network: "ws", security: "none", flow: "" },
+      trojan: { protocol, remark: "flux-trojan", port: 443, network: "tcp", security: "tls", flow: "" },
+      shadowsocks: { protocol, remark: "flux-shadowsocks", port: 8388, network: "tcp", security: "none", flow: "" }
+    };
+    patchThreeXuiInboundForm(defaults[protocol]);
   };
 
   const saveThreeXuiInbound = async () => {
@@ -414,14 +644,16 @@ export default function OrchestratorPage() {
       if (threeXuiInboundForm.mode === "delete") {
         res = await deleteThreeXuiInbound({ serverId: threeXuiInboundForm.serverId, inboundId });
       } else {
-        const payload = JSON.parse(threeXuiInboundForm.payloadJson);
+        const payload = threeXuiInboundForm.editMode === "json"
+          ? JSON.parse(threeXuiInboundForm.payloadJson)
+          : buildInboundPayloadFromForm(threeXuiInboundForm);
         res = threeXuiInboundForm.mode === "add"
           ? await addThreeXuiInbound({ serverId: threeXuiInboundForm.serverId, payload })
           : await updateThreeXuiInbound({ serverId: threeXuiInboundForm.serverId, inboundId, payload });
       }
     } catch (error) {
       setSubmitting(false);
-      toast.error("入站 JSON 格式不正确");
+      toast.error(threeXuiInboundForm.editMode === "json" ? "入站 JSON 格式不正确" : "入站表单内容不完整");
       return;
     }
     setSubmitting(false);
@@ -563,7 +795,7 @@ export default function OrchestratorPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card radius="sm">
             <CardBody>
               <p className="text-sm text-gray-500">服务器</p>
@@ -582,7 +814,14 @@ export default function OrchestratorPage() {
             <CardBody>
               <p className="text-sm text-gray-500">部署任务</p>
               <p className="text-3xl font-bold text-gray-900 dark:text-white">{tasks.length}</p>
-              <p className="text-xs text-gray-500 mt-1">生成脚本后由副控执行</p>
+              <p className="text-xs text-gray-500 mt-1">副控 agent 自动领取</p>
+            </CardBody>
+          </Card>
+          <Card radius="sm">
+            <CardBody>
+              <p className="text-sm text-gray-500">流量快照</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">{trafficSnapshots.length}</p>
+              <p className="text-xs text-gray-500 mt-1">本地最近查询缓存</p>
             </CardBody>
           </Card>
         </div>
@@ -642,6 +881,9 @@ export default function OrchestratorPage() {
                     <Button size="sm" variant="flat" onPress={() => openThreeXuiInboundModal(server)}>入站操作</Button>
                     <Button size="sm" variant="flat" onPress={() => showThreeXuiConfig(server)}>配置</Button>
                     <Button size="sm" variant="flat" onPress={() => showThreeXuiOutbounds(server)}>出站</Button>
+                    <Button size="sm" variant="flat" onPress={() => showThreeXuiOutboundTraffic(server)}>出站流量</Button>
+                    <Button size="sm" variant="flat" onPress={() => syncXuiTraffic(server)}>同步流量</Button>
+                    <Button size="sm" variant="flat" onPress={() => showTrafficSnapshots(server)}>流量快照</Button>
                     <Button size="sm" variant="flat" onPress={() => openXraySettingModal(server)}>保存出站</Button>
                     <Button size="sm" variant="flat" onPress={() => restartXray(server)}>重启 Xray</Button>
                     <Button size="sm" variant="flat" onPress={() => openServerModal(server)}>编辑</Button>
@@ -803,20 +1045,84 @@ export default function OrchestratorPage() {
           <ModalHeader>3x-ui 入站操作</ModalHeader>
           <ModalBody>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Select label="动作" selectedKeys={[threeXuiInboundForm.mode]} onSelectionChange={keys => setThreeXuiInboundForm(prev => ({ ...prev, mode: Array.from(keys)[0] as ThreeXuiInboundForm["mode"] }))} variant="bordered">
+              <Select label="动作" selectedKeys={[threeXuiInboundForm.mode]} onSelectionChange={keys => patchThreeXuiInboundForm({ mode: Array.from(keys)[0] as ThreeXuiInboundForm["mode"] })} variant="bordered">
                 <SelectItem key="add">新增 inbound</SelectItem>
                 <SelectItem key="update">更新 inbound</SelectItem>
                 <SelectItem key="delete">删除 inbound</SelectItem>
               </Select>
-              <Input label="Inbound ID" value={threeXuiInboundForm.inboundId} onChange={e => setThreeXuiInboundForm(prev => ({ ...prev, inboundId: e.target.value }))} variant="bordered" />
+              <Select label="编辑方式" selectedKeys={[threeXuiInboundForm.editMode]} onSelectionChange={keys => patchThreeXuiInboundForm({ editMode: Array.from(keys)[0] as ThreeXuiInboundForm["editMode"] })} variant="bordered">
+                <SelectItem key="form">结构化表单</SelectItem>
+                <SelectItem key="json">高级 JSON</SelectItem>
+              </Select>
               <Input label="服务器 ID" value={threeXuiInboundForm.serverId?.toString() || ""} isReadOnly variant="bordered" />
+              <Input label="Inbound ID" value={threeXuiInboundForm.inboundId} onChange={e => patchThreeXuiInboundForm({ inboundId: e.target.value })} variant="bordered" />
+              <Input label="备注" value={threeXuiInboundForm.remark} onChange={e => patchThreeXuiInboundForm({ remark: e.target.value })} variant="bordered" />
+              <Select label="启用" selectedKeys={[threeXuiInboundForm.enable.toString()]} onSelectionChange={keys => patchThreeXuiInboundForm({ enable: Number(Array.from(keys)[0]) })} variant="bordered">
+                <SelectItem key="1">启用</SelectItem>
+                <SelectItem key="0">停用</SelectItem>
+              </Select>
+              <Input label="监听地址" value={threeXuiInboundForm.listen} onChange={e => patchThreeXuiInboundForm({ listen: e.target.value })} variant="bordered" placeholder="留空监听所有地址" />
+              <Input label="端口" type="number" value={threeXuiInboundForm.port.toString()} onChange={e => patchThreeXuiInboundForm({ port: Number(e.target.value) || 0 })} variant="bordered" />
+              <Select label="协议" selectedKeys={[threeXuiInboundForm.protocol]} onSelectionChange={keys => updateInboundProtocol(Array.from(keys)[0] as ThreeXuiInboundForm["protocol"])} variant="bordered">
+                <SelectItem key="vless">VLESS</SelectItem>
+                <SelectItem key="vmess">VMess</SelectItem>
+                <SelectItem key="trojan">Trojan</SelectItem>
+                <SelectItem key="shadowsocks">Shadowsocks</SelectItem>
+              </Select>
+              <Select label="传输" selectedKeys={[threeXuiInboundForm.network]} onSelectionChange={keys => patchThreeXuiInboundForm({ network: Array.from(keys)[0] as ThreeXuiInboundForm["network"] })} variant="bordered">
+                <SelectItem key="tcp">TCP</SelectItem>
+                <SelectItem key="ws">WebSocket</SelectItem>
+              </Select>
+              <Select label="安全" selectedKeys={[threeXuiInboundForm.security]} onSelectionChange={keys => patchThreeXuiInboundForm({ security: Array.from(keys)[0] as ThreeXuiInboundForm["security"] })} variant="bordered">
+                <SelectItem key="none">None</SelectItem>
+                <SelectItem key="tls">TLS</SelectItem>
+                <SelectItem key="reality">Reality</SelectItem>
+              </Select>
             </div>
+
+            {threeXuiInboundForm.mode !== "delete" && threeXuiInboundForm.editMode === "form" && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Input label="客户端 Email" value={threeXuiInboundForm.clientEmail} onChange={e => patchThreeXuiInboundForm({ clientEmail: e.target.value })} variant="bordered" />
+                  {threeXuiInboundForm.protocol !== "trojan" && threeXuiInboundForm.protocol !== "shadowsocks" && (
+                    <Input label="客户端 UUID" value={threeXuiInboundForm.clientId} onChange={e => patchThreeXuiInboundForm({ clientId: e.target.value })} variant="bordered" />
+                  )}
+                  {(threeXuiInboundForm.protocol === "trojan" || threeXuiInboundForm.protocol === "shadowsocks") && (
+                    <Input label="客户端密码 / PSK" value={threeXuiInboundForm.clientPassword} onChange={e => patchThreeXuiInboundForm({ clientPassword: e.target.value })} variant="bordered" />
+                  )}
+                  {threeXuiInboundForm.protocol === "vless" && (
+                    <Input label="Flow" value={threeXuiInboundForm.flow} onChange={e => patchThreeXuiInboundForm({ flow: e.target.value })} variant="bordered" />
+                  )}
+                  <Input label="流量限制 GB" type="number" value={threeXuiInboundForm.totalGb.toString()} onChange={e => patchThreeXuiInboundForm({ totalGb: Number(e.target.value) || 0 })} variant="bordered" />
+                  <Input label="有效期天数" type="number" value={threeXuiInboundForm.expiryDays.toString()} onChange={e => patchThreeXuiInboundForm({ expiryDays: Number(e.target.value) || 0 })} variant="bordered" />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Input label="SNI / Host" value={threeXuiInboundForm.sni} onChange={e => patchThreeXuiInboundForm({ sni: e.target.value })} variant="bordered" />
+                  {threeXuiInboundForm.protocol === "vless" && threeXuiInboundForm.security === "reality" && (
+                    <>
+                      <Input label="Reality Dest" value={threeXuiInboundForm.realityDest} onChange={e => patchThreeXuiInboundForm({ realityDest: e.target.value })} variant="bordered" />
+                      <Input label="Reality Private Key" value={threeXuiInboundForm.realityPrivateKey} onChange={e => patchThreeXuiInboundForm({ realityPrivateKey: e.target.value })} variant="bordered" />
+                      <Input label="Reality Short ID" value={threeXuiInboundForm.realityShortId} onChange={e => patchThreeXuiInboundForm({ realityShortId: e.target.value })} variant="bordered" />
+                    </>
+                  )}
+                  {threeXuiInboundForm.protocol === "vmess" && (
+                    <Input label="WebSocket Path" value={threeXuiInboundForm.wsPath} onChange={e => patchThreeXuiInboundForm({ wsPath: e.target.value })} variant="bordered" />
+                  )}
+                  {threeXuiInboundForm.protocol === "shadowsocks" && (
+                    <Input label="加密方法" value={threeXuiInboundForm.ssMethod} onChange={e => patchThreeXuiInboundForm({ ssMethod: e.target.value })} variant="bordered" />
+                  )}
+                </div>
+              </div>
+            )}
+
             {threeXuiInboundForm.mode !== "delete" && (
               <Textarea
-                label="Inbound Payload JSON"
-                minRows={18}
-                value={threeXuiInboundForm.payloadJson}
-                onChange={e => setThreeXuiInboundForm(prev => ({ ...prev, payloadJson: e.target.value }))}
+                label={threeXuiInboundForm.editMode === "json" ? "Inbound Payload JSON" : "生成的 Payload 预览"}
+                minRows={14}
+                value={threeXuiInboundForm.editMode === "json" ? threeXuiInboundForm.payloadJson : inboundPayloadPreview(threeXuiInboundForm)}
+                onChange={e => patchThreeXuiInboundForm({ payloadJson: e.target.value })}
+                readOnly={threeXuiInboundForm.editMode === "form"}
                 variant="bordered"
                 classNames={{ input: "font-mono text-xs" }}
               />

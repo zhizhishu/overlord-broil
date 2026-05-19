@@ -1,5 +1,7 @@
 package com.admin.service;
 
+import com.admin.common.dto.AgentTaskClaimDto;
+import com.admin.common.dto.AgentTaskReportDto;
 import com.admin.common.dto.DeployTaskDto;
 import com.admin.common.dto.DeployTaskStateDto;
 import com.admin.common.lang.R;
@@ -15,6 +17,10 @@ public interface DeployTaskService extends IService<DeployTask> {
     R getTaskScript(Long id);
 
     R updateTaskState(DeployTaskStateDto dto);
+
+    R claimAgentTask(AgentTaskClaimDto dto, String token);
+
+    R reportAgentTask(AgentTaskReportDto dto, String token);
 
     R deleteTask(Long id);
 }

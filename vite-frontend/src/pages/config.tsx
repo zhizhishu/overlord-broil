@@ -275,7 +275,7 @@ export default function ConfigPage() {
         return (
           <Switch
             isSelected={configs[item.key] === 'true'}
-            onValueChange={(checked) => handleConfigChange(item.key, checked ? 'true' : 'false')}
+            onValueChange={(checked: boolean) => handleConfigChange(item.key, checked ? 'true' : 'false')}
             color="primary"
             size="md"
             classNames={{
@@ -424,6 +424,6 @@ export default function ConfigPage() {
           </Card>
         )}
       </div>
-    
+
   );
-} 
+}

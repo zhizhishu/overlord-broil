@@ -2,7 +2,7 @@
 
 ## 接力摘要
 
-- 当前目标：补齐真正可操作的 3x-ui 面板出入站管理能力，让主控中心从“任务骨架”推进到“能连接 3x-ui、同步 inbound、提交 inbound/outbound 操作请求”的可用版本。
+- 当前目标：完成 Snell agent 执行、结构化 3x-ui inbound 表单、远端流量同步入库和构建验证收口。
 - 已完成：
   - 从 `zhizhishu/flux-panel` 创建新项目 `flux-panel-3xui-orchestrator`。
   - 将参考仓库 `MHSanaei/3x-ui` 与 `jinqians/snell.sh` 克隆到本地 `_references/`，仅作为本地参考，不推送。
@@ -16,10 +16,17 @@
   - 公开站点 `zhizhishu.github.io` 文案已同步为 3x-ui 出入站代理版本。
   - 补齐主项目 README。
   - 创建公开站点仓库 `zhizhishu/zhizhishu.github.io`，发布静态项目官网到 `https://zhizhishu.github.io/`。
+  - 新增 `POST /api/v1/agent-task/claim` 与 `POST /api/v1/agent-task/report`，副控通过服务器 `apiToken` + `X-Agent-Token` 自动领取和回传部署任务。
+  - 新增 `scripts/flux-agent.sh`，副控可轮询主控、落地任务脚本、执行 Snell/Xray 部署脚本并回传 stdout/stderr/exit code。
+  - 主控中心 inbound 操作从纯 JSON 升级为结构化表单，覆盖 VLESS Reality、VMess WebSocket、Trojan TLS、Shadowsocks，并保留高级 JSON 兜底。
+  - 新增 `three_xui_traffic_snapshot` 本地表及同步接口，可把 3x-ui inbound/client/outbound 流量快照写入本地数据库。
+  - 前端补齐 `@heroui/theme` / `@heroui/system` 兼容版本、移除旧 legacy 插件并显式加入 Tailwind/PostCSS 所需 `jiti`。
+  - 新增 GitHub Actions CI，分别验证后端 Maven package 和前端 npm build。
 - 下一步：
-  - 在具备 Java/Maven 的环境中补跑后端编译。
-  - 处理项目既有 HeroUI 类型依赖不匹配后，补跑完整前端 `npm run build`。
-  - 下一轮可把入站 JSON 编辑器升级成结构化表单，并把远端流量同步进本地表。
+  - 给 `scripts/flux-agent.sh` 补 systemd unit/install helper，方便远端常驻运行。
+  - 增加定时流量同步任务，减少只能手动点“同步流量”的限制。
+  - 增加 Reality key、端口、outbound tag 等协议级校验，降低 3x-ui payload 填错风险。
+  - 为 Snell 二进制下载增加 checksum 校验和版本源锁定。
 - 关键文件：
   - `springboot-backend/src/main/java/com/admin/controller/ControlServerController.java`
   - `springboot-backend/src/main/java/com/admin/controller/ProtocolProfileController.java`
@@ -38,11 +45,13 @@
   - `git diff --check` 已通过。
   - 主项目和站点仓库均已推送，当前分支干净并跟踪各自 `origin/main`。
   - `https://zhizhishu.github.io/` 返回 `200`，页面标题为 `Flux 3x-ui Orchestrator`。
-  - 本机当前没有可用 `java`、`mvn`、`mvnw`；`npm install --legacy-peer-deps` 曾因网络下载过慢超时，已停止相关 npm 进程，完整构建待依赖环境恢复后复跑。
-  - 2026-05-19 本轮用 `node node_modules\typescript\bin\tsc --noEmit` 做前端检查：命令可运行，但仓库原有 HeroUI 类型声明/隐式 any 问题导致全局失败；新增页面相关问题主要沿用同类 HeroUI 类型不匹配，未发现语法级阻塞。
+  - `bash -n scripts/flux-agent.sh` 通过。
+  - 前端已用 Docker Node 20 验证：`npm install --legacy-peer-deps --no-audit --no-fund && npm run build` 通过。
+  - 后端已用 Docker Maven 验证：`mvn -B -DskipTests package` 通过。
+  - 本机仍没有原生 `java`、`mvn`、`mvnw`；本地 Windows `vite-frontend/node_modules` 曾被中断安装破坏，改用 Docker/CI 作为干净构建基线。
 - 风险/待确认：
   - 主仓库保持私有；由于当前 GitHub plan 不支持私有仓库 Pages，官网使用独立公开仓库 `zhizhishu.github.io`。
-  - Snell 第一版仍只生成可审计的非交互脚本，不自动远程执行。
+  - Snell 现在已经可通过副控 agent 自动领取和执行任务，但常驻服务、重试/退避、并发锁和 systemd 安装仍建议继续增强。
   - 3x-ui 各版本 API 可能有差异，本轮按本地 `_references/3x-ui` 的实际路由实现兼容代理，并把风险写进使用说明。
 
 ## 迭代计划
@@ -67,6 +76,7 @@
 - [x] ~~**目标:** 新增 GitHub Pages 项目官网并发布到 `github.io`~~ (创建于: 2026-05-18 23:37:48 | **完成于: 2026-05-18 23:49:41**)
 - [x] ~~**目标:** 修复 `TASK_LOG.md` 编码并补齐 GitHub Pages 发布接力记录~~ (创建于: 2026-05-18 23:53:08 | **完成于: 2026-05-18 23:54:21**)
 - [x] ~~**目标:** 补齐 3x-ui 面板连接、inbound/outbound 管理代理和使用说明~~ (创建于: 2026-05-19 00:07:55 | **完成于: 2026-05-19 00:42:56**)
+- [x] ~~**目标:** 完成 Snell agent 执行、结构化 inbound 表单、远端流量同步和构建验证收口~~ (创建于: 2026-05-19 02:32:57 | **完成于: 2026-05-19 04:39:18**)
 
 ## 推送记录
 
