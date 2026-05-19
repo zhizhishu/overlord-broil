@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Flux 3x-ui Orchestrator</title>
+    <meta name="description" content="基于 Flux Panel 的 3x-ui、Snell、多服务器主控副控编排面板。">
+    <meta property="og:title" content="Flux 3x-ui Orchestrator">
+    <meta property="og:description" content="一个面向多服务器协议节点部署的主控编排面板。">
+    <meta property="og:type" content="website">
+    <meta name="theme-color" content="#0b0f10">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Flux 3x-ui Orchestrator">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>Flux 3x-ui Orchestrator</span>
+      </a>
+      <nav class="nav" aria-label="Primary navigation">
+        <a href="#architecture">架构</a>
+        <a href="#workspace">工作台</a>
+        <a href="#roadmap">路线</a>
+        <a class="repo-link" href="https://github.com/zhizhishu/flux-3xui-orchestrator">GitHub</a>
+      </nav>
+    </header>
+
+    <section id="top" class="hero">
+      <div class="hero-inner">
+        <p class="eyebrow">MASTER / AGENT / XRAY / SNELL</p>
+        <h1>Flux 3x-ui Orchestrator</h1>
+        <p class="hero-copy">
+          一个基于 Flux Panel 的新主控项目：把转发面板的 UI 和节点基础，扩展成可以管理多台服务器、生成协议部署任务、接入 3x-ui/Xray 与 Snell 的控制平面。
+        </p>
+        <div class="hero-actions">
+          <a class="button primary" href="https://github.com/zhizhishu/flux-3xui-orchestrator">查看仓库</a>
+          <a class="button secondary" href="#workspace">看当前进度</a>
+        </div>
+      </div>
+    </section>
+
+    <main class="main">
+      <section id="workspace" class="section">
+        <div class="section-header">
+          <h2>第一版已经有了主控骨架</h2>
+          <p>当前版本先把可持续迭代的地基搭起来：服务器注册、协议模板、部署任务和 Snell 非交互脚本生成。</p>
+        </div>
+        <div class="metric-row" aria-label="Current MVP metrics">
+          <div class="metric">
+            <strong>3</strong>
+            <span>后端资源域</span>
+          </div>
+          <div class="metric">
+            <strong>5</strong>
+            <span>默认协议模板</span>
+          </div>
+          <div class="metric">
+            <strong>1</strong>
+            <span>主控中心页面</span>
+          </div>
+          <div class="metric">
+            <strong>0</strong>
+            <span>默认远程执行副作用</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="architecture" class="section">
+        <div class="section-header">
+          <h2>控制平面拆成清楚的三层</h2>
+          <p>保持 KISS 和 YAGNI：先不硬搬整套 3x-ui，只抽取节点、协议、任务这些最小闭环。</p>
+        </div>
+        <div class="grid three">
+          <article class="card">
+            <h3>Control Server</h3>
+            <p>登记主控/副控服务器，保存 agent token、心跳时间、Xray/Snell 版本、CPU 和内存状态。</p>
+          </article>
+          <article class="card">
+            <h3>Protocol Profile</h3>
+            <p>将 Snell、VLESS、VMess、Trojan、Shadowsocks 作为可下发的模板，而不是散落在页面和脚本里。</p>
+          </article>
+          <article class="card">
+            <h3>Deploy Task</h3>
+            <p>先生成可审计任务和脚本，再交给 agent 执行，避免主控直接对服务器做不可追踪的远程改动。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <h2>部署任务先生成 runbook</h2>
+          <p>Snell 支持来自脚本能力提取，但第一版默认只生成非交互脚本，不自动登录服务器执行。</p>
+        </div>
+        <div class="pipeline">
+          <pre class="runbook"><code>POST /api/v1/deploy-task/create
+protocol: snell
+action: present
+versionFamily: v4
+listenPort: 8388
+
+output:
+  snell.service
+  /etc/snell/users/snell-main.conf
+  install / restart / status / absent</code></pre>
+          <div class="status-list" aria-label="Deployment states">
+            <div class="status-item">
+              <span>生成任务</span>
+              <span class="tag green">generated</span>
+            </div>
+            <div class="status-item">
+              <span>等待 agent</span>
+              <span class="tag amber">next</span>
+            </div>
+            <div class="status-item">
+              <span>远端 inbound 同步</span>
+              <span class="tag cyan">planned</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="roadmap" class="section">
+        <div class="section-header">
+          <h2>接下来做真正的编排</h2>
+          <p>下一步从“能生成任务”推进到“agent 可以执行、上报、同步远端 3x-ui inbound”。</p>
+        </div>
+        <ol class="roadmap">
+          <li>
+            <div>
+              <strong>Agent executor</strong>
+              <span>副控拉取任务、执行脚本、回传日志和状态，主控只保留审计链。</span>
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>3x-ui remote client</strong>
+              <span>封装 Bearer token、basePath、探活、inbound 创建和流量快照同步。</span>
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>Protocol safety</strong>
+              <span>主控解析 Snell 版本、下载地址和 checksum，减少 agent 侧动态抓网页的不确定性。</span>
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>Operational dashboard</strong>
+              <span>把服务器健康、部署历史、协议库存和异常日志放到同一个工作台。</span>
+            </div>
+          </li>
+        </ol>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <strong>Flux 3x-ui Orchestrator</strong>
+        <span>Legal infrastructure orchestration only. Built from Flux Panel, 3x-ui concepts, and Snell deployment references.</span>
+      </div>
+    </footer>
+  </body>
+</html>

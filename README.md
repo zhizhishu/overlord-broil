@@ -4,6 +4,12 @@ Flux 3x-ui Orchestrator is a new control-panel project based on the Flux Panel U
 
 This repository is an independent project. It uses upstream projects as references and foundations, but future development should happen here.
 
+Project site:
+
+```text
+https://zhizhishu.github.io/flux-3xui-orchestrator/
+```
+
 ## Project Direction
 
 - Use `flux-panel` as the UI and forwarding-panel base.

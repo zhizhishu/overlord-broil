@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Flux 3x-ui Orchestrator control plane preview</title>
+  <desc id="desc">A stylized control plane showing one master panel connected to multiple agents, Xray protocols, Snell deployment, traffic forwarding, and status telemetry.</desc>
+  <defs>
+    <linearGradient id="panel" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#14211c"/>
+      <stop offset="0.55" stop-color="#101517"/>
+      <stop offset="1" stop-color="#2a2517"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" x2="1">
+      <stop offset="0" stop-color="#99f6b5"/>
+      <stop offset="1" stop-color="#20d0a1"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" x2="1">
+      <stop offset="0" stop-color="#ffd166"/>
+      <stop offset="1" stop-color="#ff9f1c"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse">
+      <path d="M44 0H0V44" fill="none" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1600" height="900" fill="#0b0f10"/>
+  <rect width="1600" height="900" fill="url(#grid)"/>
+  <path d="M0 690 C260 610 360 770 610 690 S1020 560 1320 640 S1510 740 1600 700 V900 H0Z" fill="#223027" opacity="0.55"/>
+  <path d="M0 140 C260 90 450 170 680 125 S1110 40 1600 135 V0 H0Z" fill="#2d2516" opacity="0.5"/>
+
+  <g filter="url(#shadow)">
+    <rect x="470" y="170" width="660" height="500" rx="22" fill="url(#panel)" stroke="#ffffff" stroke-opacity="0.13"/>
+    <rect x="500" y="205" width="600" height="58" rx="12" fill="#0d1213" stroke="#ffffff" stroke-opacity="0.12"/>
+    <circle cx="532" cy="234" r="7" fill="#ff6b6b"/>
+    <circle cx="558" cy="234" r="7" fill="#ffd166"/>
+    <circle cx="584" cy="234" r="7" fill="#8ce99a"/>
+    <rect x="625" y="224" width="270" height="18" rx="9" fill="#ffffff" opacity="0.14"/>
+    <text x="920" y="239" fill="#cbd7ce" font-family="Segoe UI, sans-serif" font-size="17">main / control plane</text>
+
+    <rect x="520" y="300" width="210" height="120" rx="12" fill="#111a18" stroke="#86efac" stroke-opacity="0.55"/>
+    <text x="545" y="334" fill="#ffffff" font-family="Segoe UI, sans-serif" font-size="22" font-weight="700">Master</text>
+    <text x="545" y="366" fill="#a8b7ad" font-family="Segoe UI, sans-serif" font-size="15">server registry</text>
+    <text x="545" y="390" fill="#a8b7ad" font-family="Segoe UI, sans-serif" font-size="15">deploy tasks</text>
+
+    <rect x="805" y="295" width="255" height="130" rx="12" fill="#151816" stroke="#ffd166" stroke-opacity="0.5"/>
+    <text x="830" y="330" fill="#ffffff" font-family="Segoe UI, sans-serif" font-size="22" font-weight="700">Protocol Catalog</text>
+    <text x="830" y="363" fill="#b9b19f" font-family="Segoe UI, sans-serif" font-size="15">VLESS / VMess / Trojan</text>
+    <text x="830" y="389" fill="#b9b19f" font-family="Segoe UI, sans-serif" font-size="15">Shadowsocks / Snell</text>
+
+    <rect x="540" y="480" width="500" height="115" rx="12" fill="#0f1415" stroke="#ffffff" stroke-opacity="0.13"/>
+    <text x="565" y="516" fill="#ffffff" font-family="Segoe UI, sans-serif" font-size="20" font-weight="700">Generated deployment runbook</text>
+    <rect x="565" y="543" width="88" height="16" rx="8" fill="url(#green)"/>
+    <rect x="670" y="543" width="170" height="16" rx="8" fill="#ffffff" opacity="0.12"/>
+    <rect x="858" y="543" width="122" height="16" rx="8" fill="url(#amber)"/>
+    <text x="565" y="580" fill="#a8b7ad" font-family="Segoe UI, sans-serif" font-size="15">audit first, execute through agent next</text>
+  </g>
+
+  <g stroke-linecap="round" stroke-width="4" fill="none">
+    <path d="M470 360 H285" stroke="#86efac" stroke-opacity="0.7"/>
+    <path d="M1130 360 H1315" stroke="#ffd166" stroke-opacity="0.7"/>
+    <path d="M800 670 V785" stroke="#5eead4" stroke-opacity="0.65"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="110" y="285" width="175" height="150" rx="14" fill="#121918" stroke="#86efac" stroke-opacity="0.35"/>
+    <text x="135" y="326" fill="#ffffff" font-family="Segoe UI, sans-serif" font-size="21" font-weight="700">Agent A</text>
+    <text x="135" y="360" fill="#a8b7ad" font-family="Segoe UI, sans-serif" font-size="15">heartbeat</text>
+    <text x="135" y="385" fill="#a8b7ad" font-family="Segoe UI, sans-serif" font-size="15">Snell v4</text>
+    <rect x="135" y="405" width="92" height="8" rx="4" fill="#86efac"/>
+
+    <rect x="1315" y="285" width="175" height="150" rx="14" fill="#191713" stroke="#ffd166" stroke-opacity="0.35"/>
+    <text x="1340" y="326" fill="#ffffff" font-family="Segoe UI, sans-serif" font-size="21" font-weight="700">Agent B</text>
+    <text x="1340" y="360" fill="#b9b19f" font-family="Segoe UI, sans-serif" font-size="15">Xray inbound</text>
+    <text x="1340" y="385" fill="#b9b19f" font-family="Segoe UI, sans-serif" font-size="15">traffic sync</text>
+    <rect x="1340" y="405" width="112" height="8" rx="4" fill="#ffd166"/>
+
+    <rect x="650" y="785" width="300" height="72" rx="14" fill="#10181a" stroke="#5eead4" stroke-opacity="0.38"/>
+    <text x="680" y="829" fill="#ffffff" font-family="Segoe UI, sans-serif" font-size="22" font-weight="700">Forwarding layer</text>
+  </g>
+</svg>
