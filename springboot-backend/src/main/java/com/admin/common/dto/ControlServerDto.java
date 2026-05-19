@@ -42,4 +42,8 @@ public class ControlServerDto {
     private Integer allowInsecure = 0;
 
     private String agentVersion;
+
+    private String certificateMode;
+
+    private String certificateDomain;
 }

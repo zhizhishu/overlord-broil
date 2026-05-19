@@ -51,6 +51,7 @@ export const ensureDefaultProtocolProfiles = () => Network.post("/protocol-profi
 
 // 多服务器协议部署任务
 export const createDeployTask = (data: any) => Network.post("/deploy-task/create", data);
+export const createOrchestrationTask = (data: any) => Network.post("/deploy-task/orchestrate", data);
 export const getDeployTaskList = () => Network.post("/deploy-task/list");
 export const getDeployTaskScript = (id: number) => Network.post("/deploy-task/script", { id });
 export const updateDeployTaskState = (data: any) => Network.post("/deploy-task/state", data);

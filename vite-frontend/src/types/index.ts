@@ -98,6 +98,13 @@ export interface ControlServer {
   agentVersion?: string;
   xrayVersion?: string;
   snellVersion?: string;
+  xuiServiceStatus?: string;
+  xrayServiceStatus?: string;
+  snellServiceStatus?: string;
+  certificateMode?: string;
+  certificateDomain?: string;
+  certificateStatus?: string;
+  certificateExpireAt?: number;
   lastHeartbeat?: number;
   cpuUsage?: number;
   memoryUsage?: number;

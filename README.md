@@ -27,7 +27,7 @@ The first iteration adds the foundation for:
   - server CRUD
   - agent token generation and rotation
   - heartbeat endpoint
-  - runtime status fields for Xray/Snell/CPU/memory
+  - runtime status fields for 3x-ui/Xray/Snell/certificate/CPU/memory/traffic
   - 3x-ui panel connection fields: endpoint, base path, API token, optional login credentials
 - Protocol profiles:
   - Snell
@@ -35,8 +35,10 @@ The first iteration adds the foundation for:
 - Deployment tasks:
   - generated task records
   - generated Snell install/restart/status/uninstall script
+  - one-click 3x-ui orchestration task for installing/configuring 3x-ui, creating starter protocol nodes, installing Snell and returning connection metadata
   - agent task claim/report API protected by `X-Agent-Token`
   - `scripts/flux-agent.sh` polling executor for副控 servers
+  - `scripts/install-flux-agent.sh` systemd installer for long-running agents
 - 3x-ui remote panel management:
   - test remote 3x-ui connection
   - list inbounds through `/panel/api/inbounds/list`
@@ -45,6 +47,7 @@ The first iteration adds the foundation for:
   - read full Xray config and extract outbounds
   - read outbound traffic through `/panel/xray/getOutboundsTraffic`
   - sync inbound, client and outbound traffic into local `three_xui_traffic_snapshot`
+  - scheduled 5-minute traffic sync for registered servers with 3x-ui API tokens
   - save full Xray / outbound config through 3x-ui login + CSRF when credentials are configured
   - restart remote Xray through `/panel/api/server/restartXrayService`
 - Frontend workspace:
@@ -56,6 +59,8 @@ The first iteration adds the foundation for:
   - advanced JSON fallback for inbound payloads
   - 3x-ui inbound/outbound operation modals
   - remote traffic sync and local traffic snapshot viewer
+  - one-click orchestration modal for 3x-ui, Reality, VMess WS, Trojan TLS, Shadowsocks and Snell
+  - service/certificate/traffic status chips on server cards
   - script, token, inbound and config viewers
 
 ## Repository Layout
@@ -87,6 +92,8 @@ Local-only reference repositories are kept in `_references/` and ignored by Git.
   - `springboot-backend/src/main/java/com/admin/service/impl/DeployTaskServiceImpl.java`
   - `springboot-backend/src/main/java/com/admin/service/impl/SnellTemplateServiceImpl.java`
   - `springboot-backend/src/main/java/com/admin/service/impl/ThreeXuiServiceImpl.java`
+  - `springboot-backend/src/main/java/com/admin/service/impl/XuiOrchestrationScriptServiceImpl.java`
+  - `springboot-backend/src/main/java/com/admin/common/task/ThreeXuiTrafficSyncTask.java`
 - Frontend page:
   - `vite-frontend/src/pages/orchestrator.tsx`
 
@@ -107,7 +114,14 @@ ALTER TABLE `control_server`
   ADD COLUMN `xui_password` varchar(255) DEFAULT NULL AFTER `xui_username`,
   ADD COLUMN `xui_two_factor_code` varchar(50) DEFAULT NULL AFTER `xui_password`,
   ADD COLUMN `xui_allow_insecure` int(1) NOT NULL DEFAULT '0' AFTER `xui_two_factor_code`,
-  ADD COLUMN `xui_last_sync` bigint(20) DEFAULT NULL AFTER `xui_allow_insecure`;
+  ADD COLUMN `xui_last_sync` bigint(20) DEFAULT NULL AFTER `xui_allow_insecure`,
+  ADD COLUMN `xui_service_status` varchar(30) DEFAULT NULL AFTER `snell_version`,
+  ADD COLUMN `xray_service_status` varchar(30) DEFAULT NULL AFTER `xui_service_status`,
+  ADD COLUMN `snell_service_status` varchar(30) DEFAULT NULL AFTER `xray_service_status`,
+  ADD COLUMN `certificate_mode` varchar(30) DEFAULT NULL AFTER `snell_service_status`,
+  ADD COLUMN `certificate_domain` varchar(255) DEFAULT NULL AFTER `certificate_mode`,
+  ADD COLUMN `certificate_status` varchar(30) DEFAULT NULL AFTER `certificate_domain`,
+  ADD COLUMN `certificate_expire_at` bigint(20) DEFAULT NULL AFTER `certificate_status`;
 
 CREATE TABLE `three_xui_traffic_snapshot` (
   `id` int(10) NOT NULL AUTO_INCREMENT,
@@ -160,11 +174,22 @@ Fill:
 - `3x-ui 用户名` and `3x-ui 密码`: optional, but required when saving full Xray/outbound settings and reading outbound traffic because 3x-ui keeps `/panel/xray/*` behind login session + CSRF.
 - `3x-ui TLS 校验`: choose `允许自签名` only when the remote panel uses a self-signed certificate.
 
-### 4. Start a副控 agent for Snell tasks
+### 4. Start a副控 agent
 
 After a server is created, click `Token` on the server card and put the returned token on that server.
 
-Copy `scripts/flux-agent.sh` to the remote server, then run:
+For a long-running agent, copy `scripts/flux-agent.sh` and `scripts/install-flux-agent.sh` to the remote server, then run:
+
+```bash
+export FLUX_PANEL_URL="https://your-master-panel.example.com"
+export FLUX_SERVER_ID="1"
+export FLUX_AGENT_TOKEN="paste-agent-token-here"
+sudo -E bash ./install-flux-agent.sh ./flux-agent.sh
+```
+
+The installer creates `/etc/flux-agent.env`, installs `/usr/local/bin/flux-agent.sh`, enables `flux-agent.service`, and keeps the副控 online through systemd.
+
+For foreground testing:
 
 ```bash
 export FLUX_PANEL_URL="https://your-master-panel.example.com"
@@ -181,7 +206,21 @@ sudo -E bash ./flux-agent.sh --once
 
 The agent polls `POST /api/v1/agent-task/claim`, writes the claimed Snell/Xray script to `/var/lib/flux-agent`, executes it locally, and reports `running/succeeded/failed` plus stdout/stderr through `POST /api/v1/agent-task/report`.
 
-### 5. Manage inbounds
+### 5. One-click 3x-ui orchestration
+
+Open `主控中心`, click `一键编排`, choose one or more servers, then choose:
+
+- whether to install or reuse 3x-ui
+- panel port, username, password and web base path
+- certificate mode: self-signed, ACME HTTP or none
+- protocols to create: VLESS Reality, VMess WebSocket, Trojan TLS and Shadowsocks
+- whether to install Snell
+
+Click `生成一键任务`. The master creates one deployment task per selected server. Each remote agent claims its own task automatically, installs/configures 3x-ui, creates the selected protocol nodes, installs Snell when selected, restarts services, then returns 3x-ui endpoint/base path/API token, service status, certificate status and created inbound metadata. The server card updates after the task report or next heartbeat.
+
+The one-click script validates duplicate ports before it is saved. ACME HTTP mode requires the domain DNS to point at the target server and port `80` to be reachable.
+
+### 6. Manage inbounds
 
 On a server card:
 
@@ -196,7 +235,7 @@ On a server card:
 
 For Reality, generate the private/public key pair in 3x-ui or Xray first, then fill `Reality Private Key`, `SNI`, `Dest`, `Short ID`, UUID, email and port before submitting.
 
-### 6. Manage outbounds and traffic
+### 7. Manage outbounds and traffic
 
 On a server card:
 
@@ -210,9 +249,24 @@ On a server card:
 
 Outbound saving intentionally edits the full Xray config rather than only patching one outbound, because 3x-ui stores outbound/routing/DNS as one Xray template. This keeps the connector simple and avoids silently corrupting related routing rules.
 
-### 7. API endpoints exposed by this project
+Traffic is also synced automatically every 5 minutes for active servers with `3x-ui 面板地址` and `3x-ui API Token` configured.
+
+### 8. API endpoints exposed by this project
 
 ```text
+POST /api/v1/control-server/create
+POST /api/v1/control-server/list
+POST /api/v1/control-server/update
+POST /api/v1/control-server/delete
+POST /api/v1/control-server/token
+POST /api/v1/control-server/rotate-token
+POST /api/v1/control-server/heartbeat
+POST /api/v1/deploy-task/create
+POST /api/v1/deploy-task/orchestrate
+POST /api/v1/deploy-task/list
+POST /api/v1/deploy-task/script
+POST /api/v1/deploy-task/state
+POST /api/v1/deploy-task/delete
 POST /api/v1/agent-task/claim
 POST /api/v1/agent-task/report
 POST /api/v1/three-xui/test
@@ -277,11 +331,10 @@ LOG_DIR
 
 ## Next Steps
 
-1. Add systemd unit templates for `scripts/flux-agent.sh`.
-2. Add scheduled traffic sync jobs instead of only manual sync from the UI.
-3. Add more protocol-specific guardrails, such as Reality key validation and outbound tag checks.
-4. Add server-side checksums for Snell binary downloads.
-5. Expand CI with runtime smoke tests after test fixtures are available.
+1. Add runtime smoke tests against disposable 3x-ui containers once stable fixtures are available.
+2. Add more protocol-specific guardrails, such as Reality public-key display and outbound tag validation.
+3. Add server-side checksums for Snell binary downloads.
+4. Add task retry/backoff policy controls in the UI.
 
 ## Upstream References
 

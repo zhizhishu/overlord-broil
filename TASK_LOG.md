@@ -2,7 +2,7 @@
 
 ## 接力摘要
 
-- 当前目标：完成 Snell agent 执行、结构化 3x-ui inbound 表单、远端流量同步入库和构建验证收口。
+- 当前目标：主控一键选择服务器、自动安装/配置 3x-ui、自动创建多协议节点、自动管理 Snell/Xray/Reality/流量/证书/状态、多服务器统一可视化运维闭环已完成，进入提交推送收口。
 - 已完成：
   - 从 `zhizhishu/flux-panel` 创建新项目 `flux-panel-3xui-orchestrator`。
   - 将参考仓库 `MHSanaei/3x-ui` 与 `jinqians/snell.sh` 克隆到本地 `_references/`，仅作为本地参考，不推送。
@@ -50,11 +50,25 @@
   - 本机前端 `npm run build` 通过，包含 `tsc` 与 Vite production build。
   - 前端已用 Docker Node 20 验证：`npm install --legacy-peer-deps --no-audit --no-fund && npm run build` 通过。
   - 后端已用 Docker Maven 验证：`mvn -B -DskipTests package` 通过。
+  - 补齐一键编排任务：主控可多选服务器，按服务器生成 3x-ui 安装/配置、多协议节点、Snell 安装任务，副控 agent 自动领取执行。
+  - 补齐 agent systemd 安装脚本 `scripts/install-flux-agent.sh`，agent 心跳会上报 CPU/内存/网卡流量、3x-ui/Xray/Snell 服务状态、证书状态。
+  - 补齐服务器证书与服务状态字段、编排结果回写、每 5 分钟自动同步 3x-ui 流量任务。
+  - 前端主控中心新增一键编排弹窗、多服务器选择、服务/证书/流量状态 chips。
+  - README 已补齐数据库升级、agent 常驻安装、一键编排使用方式、自动流量同步和 API 列表。
   - 本机仍没有原生 `java`、`mvn`、`mvnw`；后端使用 Docker Maven 作为本地可复现构建基线。
+  - 2026-05-19 06:14:15：`git diff --check` 通过；`bash -n scripts/flux-agent.sh scripts/install-flux-agent.sh` 通过；`vite-frontend npm run build` 通过；Docker Maven 后端构建容器退出码 `0`，产出 `springboot-backend/target/admin-0.0.1-SNAPSHOT.jar`。
 - 风险/待确认：
   - 主仓库保持私有；由于当前 GitHub plan 不支持私有仓库 Pages，官网使用独立公开仓库 `zhizhishu.github.io`。
-  - Snell 现在已经可通过副控 agent 自动领取和执行任务，但常驻服务、重试/退避、并发锁和 systemd 安装仍建议继续增强。
+  - Snell 现在已经可通过副控 agent 自动领取和执行任务，且已提供 systemd 常驻安装脚本；重试/退避和并发锁仍可继续增强。
   - 3x-ui 各版本 API 可能有差异，本轮按本地 `_references/3x-ui` 的实际路由实现兼容代理，并把风险写进使用说明。
+
+## 本轮执行计划（创建于: 2026-05-19 05:47:16）
+
+1. 补齐后端一键编排任务：安装/配置 3x-ui、创建 VLESS Reality/VMess WS/Trojan TLS/Shadowsocks、安装 Snell，并把执行结果回写服务器记录。
+2. 补齐证书、Xray、Snell、agent、流量和错误状态字段，让服务器卡片能显示统一运维状态。
+3. 增加定时流量同步任务，主控可自动拉取多服务器 3x-ui 流量快照。
+4. 补齐前端一键编排弹窗和多服务器状态视图，让用户从主控页面直接完成选择服务器、配置参数、生成任务。
+5. 补齐 agent systemd 安装说明、README 使用路径和 Docker 构建验证记录。
 
 ## 迭代计划
 
@@ -79,6 +93,7 @@
 - [x] ~~**目标:** 修复 `TASK_LOG.md` 编码并补齐 GitHub Pages 发布接力记录~~ (创建于: 2026-05-18 23:53:08 | **完成于: 2026-05-18 23:54:21**)
 - [x] ~~**目标:** 补齐 3x-ui 面板连接、inbound/outbound 管理代理和使用说明~~ (创建于: 2026-05-19 00:07:55 | **完成于: 2026-05-19 00:42:56**)
 - [x] ~~**目标:** 完成 Snell agent 执行、结构化 inbound 表单、远端流量同步和构建验证收口~~ (创建于: 2026-05-19 02:32:57 | **完成于: 2026-05-19 04:39:18**)
+- [x] ~~**目标:** 完成主控一键安装/配置 3x-ui、多协议节点、证书状态与多服务器统一运维闭环~~ (创建于: 2026-05-19 05:31:55 | **完成于: 2026-05-19 06:14:15**)
 
 ## 推送记录
 

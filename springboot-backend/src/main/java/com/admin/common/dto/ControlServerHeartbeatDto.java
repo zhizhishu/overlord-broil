@@ -16,6 +16,20 @@ public class ControlServerHeartbeatDto {
 
     private String snellVersion;
 
+    private String xuiServiceStatus;
+
+    private String xrayServiceStatus;
+
+    private String snellServiceStatus;
+
+    private String certificateMode;
+
+    private String certificateDomain;
+
+    private String certificateStatus;
+
+    private Long certificateExpireAt;
+
     private Double cpuUsage;
 
     private Double memoryUsage;

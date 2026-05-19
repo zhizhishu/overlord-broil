@@ -7,11 +7,13 @@ import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@herou
 import { Select, SelectItem } from "@heroui/select";
 import { Chip } from "@heroui/chip";
 import { Spinner } from "@heroui/spinner";
+import { Switch } from "@heroui/switch";
 import toast from "react-hot-toast";
 
 import {
   createControlServer,
   createDeployTask,
+  createOrchestrationTask,
   createProtocolProfile,
   deleteControlServer,
   deleteDeployTask,
@@ -80,6 +82,38 @@ interface DeployForm {
   psk: string;
 }
 
+interface OrchestrationForm {
+  serverId: number | null;
+  serverIds: number[];
+  installXui: boolean;
+  configurePanel: boolean;
+  xuiVersion: string;
+  panelPort: number;
+  panelUsername: string;
+  panelPassword: string;
+  webBasePath: string;
+  publicHost: string;
+  listenIp: string;
+  certificateMode: "self-signed" | "acme-http" | "none";
+  certificateDomain: string;
+  acmeEmail: string;
+  createVlessReality: boolean;
+  createVmessWs: boolean;
+  createTrojanTls: boolean;
+  createShadowsocks: boolean;
+  vlessPort: number;
+  vmessPort: number;
+  trojanPort: number;
+  shadowsocksPort: number;
+  realitySni: string;
+  realityDest: string;
+  wsPath: string;
+  ssMethod: string;
+  installSnell: boolean;
+  snellPort: number;
+  snellPsk: string;
+}
+
 interface ThreeXuiInboundForm {
   serverId: number | null;
   inboundId: string;
@@ -143,6 +177,38 @@ const blankDeployForm: DeployForm = {
   exactVersion: "v4.1.1",
   listenPort: 8388,
   psk: ""
+};
+
+const blankOrchestrationForm: OrchestrationForm = {
+  serverId: null,
+  serverIds: [],
+  installXui: true,
+  configurePanel: true,
+  xuiVersion: "",
+  panelPort: 54321,
+  panelUsername: "",
+  panelPassword: "",
+  webBasePath: "flux-control",
+  publicHost: "",
+  listenIp: "0.0.0.0",
+  certificateMode: "self-signed",
+  certificateDomain: "",
+  acmeEmail: "",
+  createVlessReality: true,
+  createVmessWs: true,
+  createTrojanTls: false,
+  createShadowsocks: true,
+  vlessPort: 443,
+  vmessPort: 2086,
+  trojanPort: 8443,
+  shadowsocksPort: 8388,
+  realitySni: "www.cloudflare.com",
+  realityDest: "www.cloudflare.com:443",
+  wsPath: "/ws",
+  ssMethod: "2022-blake3-aes-128-gcm",
+  installSnell: true,
+  snellPort: 8390,
+  snellPsk: ""
 };
 
 const defaultInboundPayload = {
@@ -331,6 +397,7 @@ export default function OrchestratorPage() {
   const [serverModalOpen, setServerModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [deployModalOpen, setDeployModalOpen] = useState(false);
+  const [orchestrationModalOpen, setOrchestrationModalOpen] = useState(false);
   const [scriptModalOpen, setScriptModalOpen] = useState(false);
   const [threeXuiInboundModalOpen, setThreeXuiInboundModalOpen] = useState(false);
   const [xraySettingModalOpen, setXraySettingModalOpen] = useState(false);
@@ -342,11 +409,24 @@ export default function OrchestratorPage() {
   const [serverForm, setServerForm] = useState<ServerForm>(blankServerForm);
   const [profileForm, setProfileForm] = useState<ProfileForm>(blankProfileForm);
   const [deployForm, setDeployForm] = useState<DeployForm>(blankDeployForm);
+  const [orchestrationForm, setOrchestrationForm] = useState<OrchestrationForm>(blankOrchestrationForm);
   const [threeXuiInboundForm, setThreeXuiInboundForm] = useState<ThreeXuiInboundForm>(blankThreeXuiInboundForm);
 
   const onlineServers = useMemo(() => {
     const now = Date.now();
     return servers.filter(server => server.lastHeartbeat && now - server.lastHeartbeat < 90000).length;
+  }, [servers]);
+
+  const runningTasks = useMemo(() => {
+    return tasks.filter(task => ["generated", "claimed", "running"].includes(task.state)).length;
+  }, [tasks]);
+
+  const failedTasks = useMemo(() => {
+    return tasks.filter(task => task.state === "failed").length;
+  }, [tasks]);
+
+  const totalRemoteTraffic = useMemo(() => {
+    return servers.reduce((sum, server) => sum + (server.uploadTraffic || 0) + (server.downloadTraffic || 0), 0);
   }, [servers]);
 
   useEffect(() => {
@@ -430,6 +510,24 @@ export default function OrchestratorPage() {
     setDeployModalOpen(true);
   };
 
+  const openOrchestrationModal = (server?: ControlServer) => {
+    const firstServer = server || servers[0];
+    const host = firstServer?.host || "";
+    setOrchestrationForm({
+      ...blankOrchestrationForm,
+      serverId: firstServer?.id || null,
+      serverIds: firstServer?.id ? [firstServer.id] : [],
+      publicHost: host,
+      certificateDomain: host.includes(".") ? host : "",
+      webBasePath: firstServer?.id ? `flux-${firstServer.id}` : "flux-control"
+    });
+    setOrchestrationModalOpen(true);
+  };
+
+  const patchOrchestrationForm = (patch: Partial<OrchestrationForm>) => {
+    setOrchestrationForm(prev => ({ ...prev, ...patch }));
+  };
+
   const saveServer = async () => {
     if (!serverForm.name.trim() || !serverForm.host.trim()) {
       toast.error("请填写服务器名称和主机地址");
@@ -495,6 +593,68 @@ export default function OrchestratorPage() {
       loadData();
     } else {
       toast.error(res.msg || "生成部署任务失败");
+    }
+  };
+
+  const saveOrchestrationTask = async () => {
+    const targetServerIds = orchestrationForm.serverIds.length > 0
+      ? orchestrationForm.serverIds
+      : orchestrationForm.serverId ? [orchestrationForm.serverId] : [];
+    if (targetServerIds.length === 0) {
+      toast.error("请选择目标服务器");
+      return;
+    }
+    if (orchestrationForm.certificateMode === "acme-http" && !orchestrationForm.certificateDomain.trim()) {
+      toast.error("ACME 证书模式需要填写域名");
+      return;
+    }
+    const ports = [
+      ["面板", orchestrationForm.panelPort, true],
+      ["VLESS Reality", orchestrationForm.vlessPort, orchestrationForm.createVlessReality],
+      ["VMess WS", orchestrationForm.vmessPort, orchestrationForm.createVmessWs],
+      ["Trojan TLS", orchestrationForm.trojanPort, orchestrationForm.createTrojanTls],
+      ["Shadowsocks", orchestrationForm.shadowsocksPort, orchestrationForm.createShadowsocks],
+      ["Snell", orchestrationForm.snellPort, orchestrationForm.installSnell]
+    ] as const;
+    const usedPorts = new Map<number, string>();
+    for (const [name, port, enabled] of ports) {
+      if (!enabled) continue;
+      if (!port || port < 1 || port > 65535) {
+        toast.error(`${name} 端口不合法`);
+        return;
+      }
+      if (usedPorts.has(port)) {
+        toast.error(`${name} 端口与 ${usedPorts.get(port)} 重复`);
+        return;
+      }
+      usedPorts.set(port, name);
+    }
+
+    setSubmitting(true);
+    const results = [];
+    for (const serverId of targetServerIds) {
+      const payload = { ...orchestrationForm } as any;
+      delete payload.serverIds;
+      const targetServer = servers.find(server => server.id === serverId);
+      results.push(await createOrchestrationTask({
+        ...payload,
+        serverId,
+        publicHost: targetServer?.host || orchestrationForm.publicHost,
+        certificateDomain: orchestrationForm.certificateDomain || (targetServer?.host?.includes(".") ? targetServer.host : "")
+      }));
+    }
+    setSubmitting(false);
+
+    const failed = results.find(res => res.code !== 0);
+    if (!failed) {
+      toast.success(`已生成 ${results.length} 个一键编排任务，等待副控 agent 自动领取`);
+      setOrchestrationModalOpen(false);
+      setScriptTitle("一键编排任务");
+      setScriptText(results.map(res => `# Task ${res.data.id} / ${res.data.serverName || res.data.serverId}\n${res.data.script || ""}`).join("\n\n"));
+      setScriptModalOpen(true);
+      loadData();
+    } else {
+      toast.error(failed.msg || "生成一键编排任务失败");
     }
   };
 
@@ -760,6 +920,18 @@ export default function OrchestratorPage() {
     return new Date(time).toLocaleString();
   };
 
+  const formatBytes = (value?: number) => {
+    if (!value) return "0 B";
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let size = value;
+    let unit = 0;
+    while (size >= 1024 && unit < units.length - 1) {
+      size /= 1024;
+      unit += 1;
+    }
+    return `${size.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+  };
+
   const heartbeatColor = (server: ControlServer) => {
     if (server.lastError) return "danger";
     if (!server.lastHeartbeat) return "warning";
@@ -770,6 +942,19 @@ export default function OrchestratorPage() {
     if (server.lastError) return "异常";
     if (!server.lastHeartbeat) return "未连接";
     return Date.now() - server.lastHeartbeat < 90000 ? "在线" : "离线";
+  };
+
+  const serviceColor = (status?: string) => {
+    if (!status) return "default";
+    if (["active", "valid"].includes(status)) return "success";
+    if (["expiring", "unknown", "not-installed"].includes(status)) return "warning";
+    return "danger";
+  };
+
+  const certificateText = (server: ControlServer) => {
+    if (!server.certificateStatus) return "证书 -";
+    const domain = server.certificateDomain ? ` ${server.certificateDomain}` : "";
+    return `${server.certificateStatus}${domain}`;
   };
 
   if (loading) {
@@ -789,6 +974,7 @@ export default function OrchestratorPage() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">服务器编排、3x-ui 协议模板、Snell 部署任务</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button color="primary" onPress={() => openOrchestrationModal()}>一键编排</Button>
             <Button color="primary" onPress={() => openDeployModal()}>新建部署</Button>
             <Button variant="flat" onPress={() => openServerModal()}>添加服务器</Button>
             <Button variant="flat" onPress={() => openProfileModal()}>添加模板</Button>
@@ -814,14 +1000,14 @@ export default function OrchestratorPage() {
             <CardBody>
               <p className="text-sm text-gray-500">部署任务</p>
               <p className="text-3xl font-bold text-gray-900 dark:text-white">{tasks.length}</p>
-              <p className="text-xs text-gray-500 mt-1">副控 agent 自动领取</p>
+              <p className="text-xs text-gray-500 mt-1">{runningTasks} 个等待/运行，{failedTasks} 个失败</p>
             </CardBody>
           </Card>
           <Card radius="sm">
             <CardBody>
-              <p className="text-sm text-gray-500">流量快照</p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">{trafficSnapshots.length}</p>
-              <p className="text-xs text-gray-500 mt-1">本地最近查询缓存</p>
+              <p className="text-sm text-gray-500">统一流量</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">{formatBytes(totalRemoteTraffic)}</p>
+              <p className="text-xs text-gray-500 mt-1">{trafficSnapshots.length} 条本地快照缓存</p>
             </CardBody>
           </Card>
         </div>
@@ -871,10 +1057,27 @@ export default function OrchestratorPage() {
                       <p className="text-gray-500">内存</p>
                       <p>{server.memoryUsage == null ? "-" : `${server.memoryUsage.toFixed(1)}%`}</p>
                     </div>
+                    <div>
+                      <p className="text-gray-500">上传</p>
+                      <p>{formatBytes(server.uploadTraffic)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">下载</p>
+                      <p>{formatBytes(server.downloadTraffic)}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Chip size="sm" variant="flat" color={serviceColor(server.xuiServiceStatus) as any}>3x-ui {server.xuiServiceStatus || "-"}</Chip>
+                    <Chip size="sm" variant="flat" color={serviceColor(server.xrayServiceStatus) as any}>Xray {server.xrayServiceStatus || "-"}</Chip>
+                    <Chip size="sm" variant="flat" color={serviceColor(server.snellServiceStatus) as any}>Snell {server.snellServiceStatus || "-"}</Chip>
+                    <Chip size="sm" variant="flat" color={serviceColor(server.certificateStatus) as any}>{certificateText(server)}</Chip>
                   </div>
                   <p className="text-xs text-gray-500">心跳：{formatTime(server.lastHeartbeat)}</p>
                   <p className="text-xs text-gray-500">3x-ui 同步：{formatTime(server.xuiLastSync)}</p>
+                  {server.certificateExpireAt && <p className="text-xs text-gray-500">证书到期：{formatTime(server.certificateExpireAt)}</p>}
+                  {server.lastError && <p className="text-xs text-danger">最近错误：{server.lastError}</p>}
                   <div className="flex flex-wrap gap-2">
+                    <Button size="sm" color="primary" variant="flat" onPress={() => openOrchestrationModal(server)}>一键编排</Button>
                     <Button size="sm" variant="flat" onPress={() => openDeployModal(server)}>部署</Button>
                     <Button size="sm" variant="flat" onPress={() => testXui(server)}>测 3x-ui</Button>
                     <Button size="sm" variant="flat" onPress={() => showThreeXuiInbounds(server)}>入站</Button>
@@ -1036,6 +1239,94 @@ export default function OrchestratorPage() {
           <ModalFooter>
             <Button variant="light" onPress={() => setDeployModalOpen(false)}>取消</Button>
             <Button color="primary" isLoading={submitting} onPress={saveDeployTask}>生成</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={orchestrationModalOpen} onOpenChange={setOrchestrationModalOpen} size="5xl" scrollBehavior="inside">
+        <ModalContent>
+          <ModalHeader>一键编排 3x-ui / Xray / Snell</ModalHeader>
+          <ModalBody>
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Select
+                  label="目标服务器"
+                  selectionMode="multiple"
+                  selectedKeys={orchestrationForm.serverIds.map(id => id.toString())}
+                  onSelectionChange={keys => {
+                    const serverIds = Array.from(keys).map(key => Number(key)).filter(Boolean);
+                    const serverId = serverIds[0] || null;
+                    const server = servers.find(item => item.id === serverId);
+                    patchOrchestrationForm({
+                      serverId,
+                      serverIds,
+                      publicHost: server?.host || orchestrationForm.publicHost,
+                      certificateDomain: server?.host?.includes(".") ? server.host : orchestrationForm.certificateDomain,
+                      webBasePath: serverId ? `flux-${serverId}` : orchestrationForm.webBasePath
+                    });
+                  }}
+                  variant="bordered"
+                >
+                  {servers.map(server => <SelectItem key={server.id.toString()}>{server.name}</SelectItem>)}
+                </Select>
+                <Input label="公网主机" value={orchestrationForm.publicHost} onChange={e => patchOrchestrationForm({ publicHost: e.target.value })} variant="bordered" />
+                <Input label="3x-ui 版本" value={orchestrationForm.xuiVersion} onChange={e => patchOrchestrationForm({ xuiVersion: e.target.value })} variant="bordered" placeholder="留空使用最新版" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-small border border-default-200 p-4">
+                <Switch isSelected={orchestrationForm.installXui} onValueChange={value => patchOrchestrationForm({ installXui: value })}>安装 3x-ui</Switch>
+                <Switch isSelected={orchestrationForm.configurePanel} onValueChange={value => patchOrchestrationForm({ configurePanel: value })}>配置面板</Switch>
+                <Switch isSelected={orchestrationForm.installSnell} onValueChange={value => patchOrchestrationForm({ installSnell: value })}>安装 Snell</Switch>
+                <Switch isSelected={orchestrationForm.createVlessReality || orchestrationForm.createVmessWs || orchestrationForm.createTrojanTls || orchestrationForm.createShadowsocks} isReadOnly>创建节点</Switch>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Input label="面板端口" type="number" value={orchestrationForm.panelPort.toString()} onChange={e => patchOrchestrationForm({ panelPort: Number(e.target.value) || 54321 })} variant="bordered" />
+                <Input label="面板用户名" value={orchestrationForm.panelUsername} onChange={e => patchOrchestrationForm({ panelUsername: e.target.value })} variant="bordered" placeholder="留空自动生成" />
+                <Input label="面板密码" type="password" value={orchestrationForm.panelPassword} onChange={e => patchOrchestrationForm({ panelPassword: e.target.value })} variant="bordered" placeholder="留空自动生成" />
+                <Input label="Web Base Path" value={orchestrationForm.webBasePath} onChange={e => patchOrchestrationForm({ webBasePath: e.target.value })} variant="bordered" />
+                <Input label="监听 IP" value={orchestrationForm.listenIp} onChange={e => patchOrchestrationForm({ listenIp: e.target.value })} variant="bordered" />
+                <Select label="证书模式" selectedKeys={[orchestrationForm.certificateMode]} onSelectionChange={keys => patchOrchestrationForm({ certificateMode: Array.from(keys)[0] as OrchestrationForm["certificateMode"] })} variant="bordered">
+                  <SelectItem key="self-signed">自签名</SelectItem>
+                  <SelectItem key="acme-http">ACME HTTP</SelectItem>
+                  <SelectItem key="none">不配置</SelectItem>
+                </Select>
+                <Input label="证书域名" value={orchestrationForm.certificateDomain} onChange={e => patchOrchestrationForm({ certificateDomain: e.target.value })} variant="bordered" />
+                <Input label="ACME 邮箱" value={orchestrationForm.acmeEmail} onChange={e => patchOrchestrationForm({ acmeEmail: e.target.value })} variant="bordered" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 rounded-small border border-default-200 p-4">
+                <div className="space-y-3">
+                  <Switch isSelected={orchestrationForm.createVlessReality} onValueChange={value => patchOrchestrationForm({ createVlessReality: value })}>VLESS Reality</Switch>
+                  <Input label="VLESS 端口" type="number" value={orchestrationForm.vlessPort.toString()} onChange={e => patchOrchestrationForm({ vlessPort: Number(e.target.value) || 443 })} variant="bordered" />
+                  <Input label="Reality SNI" value={orchestrationForm.realitySni} onChange={e => patchOrchestrationForm({ realitySni: e.target.value })} variant="bordered" />
+                  <Input label="Reality Dest" value={orchestrationForm.realityDest} onChange={e => patchOrchestrationForm({ realityDest: e.target.value })} variant="bordered" />
+                </div>
+                <div className="space-y-3">
+                  <Switch isSelected={orchestrationForm.createVmessWs} onValueChange={value => patchOrchestrationForm({ createVmessWs: value })}>VMess WS</Switch>
+                  <Input label="VMess 端口" type="number" value={orchestrationForm.vmessPort.toString()} onChange={e => patchOrchestrationForm({ vmessPort: Number(e.target.value) || 2086 })} variant="bordered" />
+                  <Input label="WS Path" value={orchestrationForm.wsPath} onChange={e => patchOrchestrationForm({ wsPath: e.target.value })} variant="bordered" />
+                </div>
+                <div className="space-y-3">
+                  <Switch isSelected={orchestrationForm.createTrojanTls} onValueChange={value => patchOrchestrationForm({ createTrojanTls: value })}>Trojan TLS</Switch>
+                  <Input label="Trojan 端口" type="number" value={orchestrationForm.trojanPort.toString()} onChange={e => patchOrchestrationForm({ trojanPort: Number(e.target.value) || 8443 })} variant="bordered" />
+                </div>
+                <div className="space-y-3">
+                  <Switch isSelected={orchestrationForm.createShadowsocks} onValueChange={value => patchOrchestrationForm({ createShadowsocks: value })}>Shadowsocks</Switch>
+                  <Input label="SS 端口" type="number" value={orchestrationForm.shadowsocksPort.toString()} onChange={e => patchOrchestrationForm({ shadowsocksPort: Number(e.target.value) || 8388 })} variant="bordered" />
+                  <Input label="SS 加密" value={orchestrationForm.ssMethod} onChange={e => patchOrchestrationForm({ ssMethod: e.target.value })} variant="bordered" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input label="Snell 端口" type="number" value={orchestrationForm.snellPort.toString()} onChange={e => patchOrchestrationForm({ snellPort: Number(e.target.value) || 8390 })} variant="bordered" />
+                <Input label="Snell PSK" value={orchestrationForm.snellPsk} onChange={e => patchOrchestrationForm({ snellPsk: e.target.value })} variant="bordered" placeholder="留空自动生成" />
+              </div>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={() => setOrchestrationModalOpen(false)}>取消</Button>
+            <Button color="primary" isLoading={submitting} onPress={saveOrchestrationTask}>生成一键任务</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

@@ -48,4 +48,8 @@ public class ControlServerUpdateDto {
     private Integer status = 1;
 
     private String agentVersion;
+
+    private String certificateMode;
+
+    private String certificateDomain;
 }

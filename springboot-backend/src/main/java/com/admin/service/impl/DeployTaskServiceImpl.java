@@ -5,6 +5,7 @@ import com.admin.common.dto.AgentTaskClaimDto;
 import com.admin.common.dto.AgentTaskReportDto;
 import com.admin.common.dto.DeployTaskDto;
 import com.admin.common.dto.DeployTaskStateDto;
+import com.admin.common.dto.OrchestrationPlanDto;
 import com.admin.common.lang.R;
 import com.admin.entity.ControlServer;
 import com.admin.entity.DeployTask;
@@ -14,6 +15,7 @@ import com.admin.service.ControlServerService;
 import com.admin.service.DeployTaskService;
 import com.admin.service.ProtocolProfileService;
 import com.admin.service.SnellTemplateService;
+import com.admin.service.XuiOrchestrationScriptService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
@@ -21,8 +23,10 @@ import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployTask> implements DeployTaskService {
@@ -42,6 +46,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
 
     @Resource
     private SnellTemplateService snellTemplateService;
+
+    @Resource
+    private XuiOrchestrationScriptService xuiOrchestrationScriptService;
 
     @Override
     public R createTask(DeployTaskDto dto) {
@@ -77,6 +84,90 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         task.setUpdatedTime(now);
 
         return this.save(task) ? R.ok(task) : R.err("deploy task create failed");
+    }
+
+    @Override
+    public R createOrchestrationTask(OrchestrationPlanDto dto) {
+        ControlServer server = controlServerService.getById(dto.getServerId());
+        if (server == null) {
+            return R.err("server not found");
+        }
+        String validationError = validateOrchestration(dto);
+        if (validationError != null) {
+            return R.err(validationError);
+        }
+
+        String script = xuiOrchestrationScriptService.buildScript(dto, server);
+        long now = System.currentTimeMillis();
+        DeployTask task = new DeployTask();
+        task.setServerId(server.getId());
+        task.setServerName(server.getName());
+        task.setProtocol("xui-orchestrator");
+        task.setAction("orchestrate");
+        task.setState(STATE_GENERATED);
+        task.setRequestJson(JSON.toJSONString(dto));
+        task.setScript(script);
+        task.setStatus(STATUS_ACTIVE);
+        task.setCreatedTime(now);
+        task.setUpdatedTime(now);
+
+        return this.save(task) ? R.ok(task) : R.err("orchestration task create failed");
+    }
+
+    private String validateOrchestration(OrchestrationPlanDto dto) {
+        if (dto == null) {
+            return "orchestration plan is required";
+        }
+        if ("acme-http".equalsIgnoreCase(dto.getCertificateMode())
+                && (dto.getCertificateDomain() == null || dto.getCertificateDomain().trim().isEmpty())) {
+            return "certificate domain is required for acme-http mode";
+        }
+        Set<Integer> ports = new HashSet<>();
+        String duplicate = addPort(ports, dto.getPanelPort(), "panelPort");
+        if (duplicate != null) {
+            return duplicate;
+        }
+        if (enabled(dto.getCreateVlessReality())) {
+            duplicate = addPort(ports, dto.getVlessPort(), "vlessPort");
+            if (duplicate != null) return duplicate;
+        }
+        if (enabled(dto.getCreateVmessWs())) {
+            duplicate = addPort(ports, dto.getVmessPort(), "vmessPort");
+            if (duplicate != null) return duplicate;
+        }
+        if (enabled(dto.getCreateTrojanTls())) {
+            duplicate = addPort(ports, dto.getTrojanPort(), "trojanPort");
+            if (duplicate != null) return duplicate;
+        }
+        if (enabled(dto.getCreateShadowsocks())) {
+            duplicate = addPort(ports, dto.getShadowsocksPort(), "shadowsocksPort");
+            if (duplicate != null) return duplicate;
+        }
+        if (enabled(dto.getInstallSnell())) {
+            duplicate = addPort(ports, dto.getSnellPort(), "snellPort");
+            if (duplicate != null) return duplicate;
+        }
+        if (!enabled(dto.getInstallXui()) && !enabled(dto.getConfigurePanel())
+                && !enabled(dto.getCreateVlessReality()) && !enabled(dto.getCreateVmessWs())
+                && !enabled(dto.getCreateTrojanTls()) && !enabled(dto.getCreateShadowsocks())
+                && !enabled(dto.getInstallSnell())) {
+            return "at least one orchestration action is required";
+        }
+        return null;
+    }
+
+    private String addPort(Set<Integer> ports, Integer port, String fieldName) {
+        if (port == null) {
+            return fieldName + " is required";
+        }
+        if (!ports.add(port)) {
+            return "port " + port + " is duplicated in orchestration plan";
+        }
+        return null;
+    }
+
+    private boolean enabled(Boolean value) {
+        return value != null && value;
     }
 
     @Override
@@ -187,7 +278,11 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             task.setFinishedTime(now);
         }
 
-        return this.updateById(task) ? R.ok("agent task report accepted") : R.err("agent task report failed");
+        boolean updated = this.updateById(task);
+        if (updated) {
+            applyAgentResultMetadata(exists, task.getResultJson(), state);
+        }
+        return updated ? R.ok("agent task report accepted") : R.err("agent task report failed");
     }
 
     @Override
@@ -230,6 +325,66 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         result.put("stderr", truncate(dto.getStderr(), 60000));
         result.put("reportedAt", System.currentTimeMillis());
         return JSON.toJSONString(result);
+    }
+
+    private void applyAgentResultMetadata(DeployTask task, String resultJson, String state) {
+        if (!STATE_SUCCEEDED.equals(state) || resultJson == null || resultJson.trim().isEmpty()) {
+            return;
+        }
+        try {
+            com.alibaba.fastjson2.JSONObject root = JSON.parseObject(resultJson);
+            com.alibaba.fastjson2.JSONObject serverMeta = root.getJSONObject("server");
+            if (serverMeta == null) {
+                return;
+            }
+
+            ControlServer update = new ControlServer();
+            update.setId(task.getServerId());
+            update.setUpdatedTime(System.currentTimeMillis());
+            setIfNotBlank(serverMeta.getString("xuiEndpoint"), update::setXuiEndpoint);
+            setIfNotBlank(serverMeta.getString("xuiBasePath"), update::setXuiBasePath);
+            setIfNotBlank(serverMeta.getString("xuiApiToken"), update::setXuiApiToken);
+            setIfNotBlank(serverMeta.getString("xuiUsername"), update::setXuiUsername);
+            setIfNotBlank(serverMeta.getString("xuiPassword"), update::setXuiPassword);
+            Integer xuiAllowInsecure = serverMeta.getInteger("xuiAllowInsecure");
+            if (xuiAllowInsecure != null) {
+                update.setXuiAllowInsecure(xuiAllowInsecure);
+            }
+            setIfNotBlank(serverMeta.getString("agentVersion"), update::setAgentVersion);
+            setIfNotBlank(serverMeta.getString("xrayVersion"), update::setXrayVersion);
+            setIfNotBlank(serverMeta.getString("snellVersion"), update::setSnellVersion);
+
+            com.alibaba.fastjson2.JSONObject serviceMeta = root.getJSONObject("services");
+            if (serviceMeta != null) {
+                setIfNotBlank(serviceMeta.getString("xui"), update::setXuiServiceStatus);
+                setIfNotBlank(serviceMeta.getString("xray"), update::setXrayServiceStatus);
+                setIfNotBlank(serviceMeta.getString("snell"), update::setSnellServiceStatus);
+            }
+
+            com.alibaba.fastjson2.JSONObject certificateMeta = root.getJSONObject("certificate");
+            if (certificateMeta != null) {
+                setIfNotBlank(certificateMeta.getString("mode"), update::setCertificateMode);
+                setIfNotBlank(certificateMeta.getString("domain"), update::setCertificateDomain);
+                setIfNotBlank(certificateMeta.getString("status"), update::setCertificateStatus);
+                Long expireAt = certificateMeta.getLong("expireAt");
+                if (expireAt != null) {
+                    update.setCertificateExpireAt(expireAt);
+                }
+            }
+
+            update.setLastHeartbeat(System.currentTimeMillis());
+            update.setLastError(null);
+            update.setStatus(STATUS_ACTIVE);
+            controlServerService.updateById(update);
+        } catch (Exception ignored) {
+            // Result metadata is best-effort; task logs remain the source of truth when parsing fails.
+        }
+    }
+
+    private void setIfNotBlank(String value, java.util.function.Consumer<String> setter) {
+        if (value != null && !value.trim().isEmpty()) {
+            setter.accept(value.trim());
+        }
     }
 
     private String truncate(String value, int maxLength) {

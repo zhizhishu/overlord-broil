@@ -111,6 +111,13 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         update.setAgentVersion(dto.getAgentVersion());
         update.setXrayVersion(dto.getXrayVersion());
         update.setSnellVersion(dto.getSnellVersion());
+        update.setXuiServiceStatus(dto.getXuiServiceStatus());
+        update.setXrayServiceStatus(dto.getXrayServiceStatus());
+        update.setSnellServiceStatus(dto.getSnellServiceStatus());
+        update.setCertificateMode(dto.getCertificateMode());
+        update.setCertificateDomain(dto.getCertificateDomain());
+        update.setCertificateStatus(dto.getCertificateStatus());
+        update.setCertificateExpireAt(dto.getCertificateExpireAt());
         update.setCpuUsage(dto.getCpuUsage());
         update.setMemoryUsage(dto.getMemoryUsage());
         update.setUploadTraffic(dto.getUploadTraffic());
