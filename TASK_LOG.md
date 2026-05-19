@@ -113,3 +113,4 @@
 - Pages 仓库：`https://github.com/zhizhishu/zhizhishu.github.io`
 - 2026-05-19 04:44:59：官网状态文案已推送到 Pages 仓库 `origin/main`，commit `452442dedee181746c19ffc6cba027ed2cbfbde4`；线上返回 `200`，页面包含 Snell agent 自动执行与远端流量同步入库状态。
 - 说明：主项目仍为私有仓库；因当前 GitHub plan 不支持私有仓库 Pages，官网发布在单独的公开静态站点仓库。
+- 2026-05-19 08:16:06：统一协议节点层已推送到主仓库 `origin/main`，commit `79f8cfd`；GitHub Actions CI run `26106480537` 通过。官网同步说明已推送到 Pages 仓库，commit `660d6ca`；`https://zhizhishu.github.io/` 返回 `200`。
