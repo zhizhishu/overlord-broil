@@ -23,10 +23,13 @@
 - [x] ~~**目标:** 新增主控服务器、协议模板、部署任务与 Snell 安装脚本生成的后端 API 骨架~~ (创建于: 2026-05-18 22:07:56 | **完成于: 2026-05-18 22:44:43**)
 - [x] ~~**目标:** 完成 Git 提交并推送到 GitHub 分支~~ (创建于: 2026-05-18 22:44:43 | **完成于: 2026-05-18 22:46:53**)
 - [x] ~~**目标:** 撤回误推的远端分支并删除 PR 提示记录~~ (创建于: 2026-05-18 23:24:30 | **完成于: 2026-05-18 23:24:30**)
-- [ ] **目标:** 创建自有仓库 `zhizhishu/flux-3xui-orchestrator`，补充 README，并推送当前项目 (创建于: 2026-05-18 23:29:20)
+- [x] ~~**目标:** 创建自有仓库 `zhizhishu/flux-3xui-orchestrator`，补充 README，并推送当前项目~~ (创建于: 2026-05-18 23:29:20 | **完成于: 2026-05-18 23:34:10**)
 
 ## 推送记录
 
 - 已撤回远端分支：`origin/codex/3xui-orchestrator-snell`
 - 说明：没有创建 PR；之前的链接只是 GitHub 在 push 后自动输出的“可创建 PR”提示。
-- 当前状态：本地分支和本地提交保留，等待改推到新的自有仓库/正确远端。
+- 新仓库：`https://github.com/zhizhishu/flux-3xui-orchestrator`
+- 当前 `origin`：`https://github.com/zhizhishu/flux-3xui-orchestrator.git`
+- 原 `flux-panel` 远端已改名为 `upstream`，仅作来源参考。
+- 当前分支：`main`
