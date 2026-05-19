@@ -86,6 +86,8 @@
 - 当前主项目 `origin`：`https://github.com/zhizhishu/flux-3xui-orchestrator.git`
 - 原 `flux-panel` 远端已改名为 `upstream`，仅作来源参考。
 - 当前主项目分支：`main`
+- 2026-05-19 04:44:59：本轮产品化提交已推送到主项目 `origin/main`，commit `2e57363168596a5bfc42108b2bdf23bc2552a771`。
 - GitHub Pages：`https://zhizhishu.github.io/`
 - Pages 仓库：`https://github.com/zhizhishu/zhizhishu.github.io`
+- 2026-05-19 04:44:59：官网状态文案已推送到 Pages 仓库 `origin/main`，commit `452442dedee181746c19ffc6cba027ed2cbfbde4`；线上返回 `200`，页面包含 Snell agent 自动执行与远端流量同步入库状态。
 - 说明：主项目仍为私有仓库；因当前 GitHub plan 不支持私有仓库 Pages，官网发布在单独的公开静态站点仓库。
