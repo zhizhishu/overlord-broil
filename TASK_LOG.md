@@ -118,3 +118,4 @@
 - 2026-05-19 04:44:59：官网状态文案已推送到 Pages 仓库 `origin/main`，commit `452442dedee181746c19ffc6cba027ed2cbfbde4`；线上返回 `200`，页面包含 Snell agent 自动执行与远端流量同步入库状态。
 - 说明：主项目仍为私有仓库；因当前 GitHub plan 不支持私有仓库 Pages，官网发布在单独的公开静态站点仓库。
 - 2026-05-19 08:16:06：统一协议节点层已推送到主仓库 `origin/main`，commit `79f8cfd`；GitHub Actions CI run `26106480537` 通过。官网同步说明已推送到 Pages 仓库，commit `660d6ca`；`https://zhizhishu.github.io/` 返回 `200`。
+- 2026-05-19 10:22:58：远端端口转发、规则总览、MySQL 8 JDBC 兼容修复已推送到主仓库 `origin/main`，commit `f20926c7629dab33beb28a34819a48b0cc853148`；GitHub Actions CI run `26113491240` 通过。官网同步说明已推送到 Pages 仓库，commit `81d6d36193138855ce5368e84185035d9190c9c1`；`https://zhizhishu.github.io/` 返回 `200` 且包含“远端端口转发与规则总览”。
