@@ -2,6 +2,7 @@
 # 操作系统生成的文件
 # ==========================================
 flutter_app/
+_references/
 
 # macOS
 .DS_Store

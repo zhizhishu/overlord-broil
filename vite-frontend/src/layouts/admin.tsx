@@ -87,6 +87,16 @@ export default function AdminLayout({
       adminOnly: true
     },
     {
+      path: '/orchestrator',
+      label: '主控中心',
+      icon: (
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v2a2 2 0 002 2h4v2H6a2 2 0 00-2 2v2a2 2 0 002 2h8a2 2 0 002-2v-2a2 2 0 00-2-2h-2V9h4a2 2 0 002-2V5a2 2 0 00-2-2H4zm0 2h12v2H4V5zm4 8h4v2H8v-2z" clipRule="evenodd" />
+        </svg>
+      ),
+      adminOnly: true
+    },
+    {
       path: '/limit',
       label: '限速管理',
       icon: (

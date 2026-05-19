@@ -77,6 +77,56 @@ export interface SpeedLimit {
   downloadSpeed: number;
 }
 
+export interface ControlServer {
+  id: number;
+  name: string;
+  role: 'master' | 'agent' | string;
+  endpoint?: string;
+  host: string;
+  sshPort?: number;
+  sshUser?: string;
+  apiToken?: string;
+  allowInsecure?: number;
+  agentVersion?: string;
+  xrayVersion?: string;
+  snellVersion?: string;
+  lastHeartbeat?: number;
+  cpuUsage?: number;
+  memoryUsage?: number;
+  uploadTraffic?: number;
+  downloadTraffic?: number;
+  lastError?: string;
+  status: number;
+}
+
+export interface ProtocolProfile {
+  id: number;
+  name: string;
+  protocol: string;
+  versionFamily?: string;
+  listenPort?: number;
+  transport?: string;
+  remark?: string;
+  configJson?: string;
+  status: number;
+}
+
+export interface DeployTask {
+  id: number;
+  serverId: number;
+  serverName?: string;
+  protocol: string;
+  action: string;
+  state: string;
+  requestJson?: string;
+  script?: string;
+  resultJson?: string;
+  startedTime?: number;
+  finishedTime?: number;
+  createdTime?: number;
+  status: number;
+}
+
 export interface Pagination {
   current: number;
   size: number;

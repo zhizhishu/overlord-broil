@@ -34,6 +34,28 @@ export const checkNodeStatus = (nodeId?: number) => {
   return Network.post("/node/check-status", params);
 };
 
+// 主控/副控服务器
+export const createControlServer = (data: any) => Network.post("/control-server/create", data);
+export const getControlServerList = () => Network.post("/control-server/list");
+export const updateControlServer = (data: any) => Network.post("/control-server/update", data);
+export const deleteControlServer = (id: number) => Network.post("/control-server/delete", { id });
+export const getControlServerToken = (id: number) => Network.post("/control-server/token", { id });
+export const rotateControlServerToken = (id: number) => Network.post("/control-server/rotate-token", { id });
+
+// 3x-ui / Snell 协议模板
+export const createProtocolProfile = (data: any) => Network.post("/protocol-profile/create", data);
+export const getProtocolProfileList = () => Network.post("/protocol-profile/list");
+export const updateProtocolProfile = (data: any) => Network.post("/protocol-profile/update", data);
+export const deleteProtocolProfile = (id: number) => Network.post("/protocol-profile/delete", { id });
+export const ensureDefaultProtocolProfiles = () => Network.post("/protocol-profile/ensure-defaults");
+
+// 多服务器协议部署任务
+export const createDeployTask = (data: any) => Network.post("/deploy-task/create", data);
+export const getDeployTaskList = () => Network.post("/deploy-task/list");
+export const getDeployTaskScript = (id: number) => Network.post("/deploy-task/script", { id });
+export const updateDeployTaskState = (data: any) => Network.post("/deploy-task/state", data);
+export const deleteDeployTask = (id: number) => Network.post("/deploy-task/delete", { id });
+
 // 隧道CRUD操作 - 全部使用POST请求
 export const createTunnel = (data: any) => Network.post("/tunnel/create", data);
 export const getTunnelList = () => Network.post("/tunnel/list");
@@ -88,4 +110,4 @@ export const updateConfig = (name: string, value: string) => Network.post("/conf
 // 验证码相关接口
 export const checkCaptcha = () => Network.post("/captcha/check");
 export const generateCaptcha = () => Network.post(`/captcha/generate`);
-export const verifyCaptcha = (data: { captchaId: string; trackData: string }) => Network.post("/captcha/verify", data); 
+export const verifyCaptcha = (data: { captchaId: string; trackData: string }) => Network.post("/captcha/verify", data);

@@ -7,6 +7,7 @@ import DashboardPage from "@/pages/dashboard";
 import ForwardPage from "@/pages/forward";
 import TunnelPage from "@/pages/tunnel";
 import NodePage from "@/pages/node";
+import OrchestratorPage from "@/pages/orchestrator";
 import UserPage from "@/pages/user";
 import ProfilePage from "@/pages/profile";
 import LimitPage from "@/pages/limit";
@@ -189,7 +190,15 @@ function App() {
           </ProtectedRoute>
         } 
       />
-      <Route 
+      <Route
+        path="/orchestrator"
+        element={
+          <ProtectedRoute useSimpleLayout={true}>
+            <OrchestratorPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/user" 
         element={
           <ProtectedRoute useSimpleLayout={true}>

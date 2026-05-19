@@ -72,6 +72,67 @@ CREATE TABLE `node` (
 -- 表的结构 `speed_limit`
 --
 
+CREATE TABLE `control_server` (
+  `id` int(10) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `role` varchar(30) NOT NULL DEFAULT 'agent',
+  `endpoint` varchar(255) DEFAULT NULL,
+  `host` varchar(255) NOT NULL,
+  `ssh_port` int(10) DEFAULT '22',
+  `ssh_user` varchar(100) DEFAULT 'root',
+  `api_token` varchar(100) NOT NULL,
+  `allow_insecure` int(1) NOT NULL DEFAULT '0',
+  `agent_version` varchar(100) DEFAULT NULL,
+  `xray_version` varchar(100) DEFAULT NULL,
+  `snell_version` varchar(100) DEFAULT NULL,
+  `last_heartbeat` bigint(20) DEFAULT NULL,
+  `cpu_usage` double DEFAULT NULL,
+  `memory_usage` double DEFAULT NULL,
+  `upload_traffic` bigint(20) DEFAULT NULL,
+  `download_traffic` bigint(20) DEFAULT NULL,
+  `last_error` longtext,
+  `created_time` bigint(20) NOT NULL,
+  `updated_time` bigint(20) DEFAULT NULL,
+  `status` int(10) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+CREATE TABLE `protocol_profile` (
+  `id` int(10) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `protocol` varchar(50) NOT NULL,
+  `version_family` varchar(50) DEFAULT NULL,
+  `listen_port` int(10) DEFAULT NULL,
+  `transport` varchar(50) DEFAULT NULL,
+  `remark` varchar(255) DEFAULT NULL,
+  `config_json` longtext,
+  `created_time` bigint(20) NOT NULL,
+  `updated_time` bigint(20) DEFAULT NULL,
+  `status` int(10) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+CREATE TABLE `deploy_task` (
+  `id` int(10) NOT NULL,
+  `server_id` int(10) NOT NULL,
+  `server_name` varchar(100) DEFAULT NULL,
+  `protocol` varchar(50) NOT NULL,
+  `action` varchar(50) NOT NULL DEFAULT 'present',
+  `state` varchar(50) NOT NULL DEFAULT 'generated',
+  `request_json` longtext,
+  `script` longtext,
+  `result_json` longtext,
+  `started_time` bigint(20) DEFAULT NULL,
+  `finished_time` bigint(20) DEFAULT NULL,
+  `created_time` bigint(20) NOT NULL,
+  `updated_time` bigint(20) DEFAULT NULL,
+  `status` int(10) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
 CREATE TABLE `speed_limit` (
   `id` int(10) NOT NULL,
   `name` varchar(100) NOT NULL,
@@ -211,6 +272,17 @@ ALTER TABLE `node`
 --
 -- 表的索引 `speed_limit`
 --
+ALTER TABLE `control_server`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `api_token` (`api_token`);
+
+ALTER TABLE `protocol_profile`
+  ADD PRIMARY KEY (`id`);
+
+ALTER TABLE `deploy_task`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `server_id` (`server_id`);
+
 ALTER TABLE `speed_limit`
   ADD PRIMARY KEY (`id`);
 
@@ -253,6 +325,15 @@ ALTER TABLE `vite_config`
 -- 使用表AUTO_INCREMENT `forward`
 --
 ALTER TABLE `forward`
+  MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+
+ALTER TABLE `control_server`
+  MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+
+ALTER TABLE `protocol_profile`
+  MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+
+ALTER TABLE `deploy_task`
   MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
 
 --
