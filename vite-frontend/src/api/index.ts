@@ -57,6 +57,14 @@ export const deleteProtocolNode = (id: number) => Network.post("/protocol-node/d
 export const restartProtocolNode = (id: number) => Network.post("/protocol-node/restart", { id });
 export const syncProtocolNodes = (serverId: number) => Network.post("/protocol-node/sync", { serverId });
 
+// 被控服务器端口转发和规则总览
+export const createServerForwardRule = (data: any) => Network.post("/server-forward/create", data);
+export const getServerForwardRuleList = (data: any = {}) => Network.post("/server-forward/list", data);
+export const updateServerForwardRule = (data: any) => Network.post("/server-forward/update", data);
+export const deleteServerForwardRule = (id: number) => Network.post("/server-forward/delete", { id });
+export const restartServerForwardRule = (id: number) => Network.post("/server-forward/restart", { id });
+export const getServerRuleOverview = (serverId: number) => Network.post("/server-rule/overview", { serverId });
+
 // 多服务器协议部署任务
 export const createDeployTask = (data: any) => Network.post("/deploy-task/create", data);
 export const createOrchestrationTask = (data: any) => Network.post("/deploy-task/orchestrate", data);

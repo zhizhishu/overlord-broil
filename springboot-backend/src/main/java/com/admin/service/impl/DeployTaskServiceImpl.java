@@ -15,6 +15,7 @@ import com.admin.service.ControlServerService;
 import com.admin.service.DeployTaskService;
 import com.admin.service.ProtocolNodeService;
 import com.admin.service.ProtocolProfileService;
+import com.admin.service.ServerForwardRuleService;
 import com.admin.service.SnellTemplateService;
 import com.admin.service.XuiOrchestrationScriptService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -53,6 +54,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
 
     @Resource
     private ProtocolNodeService protocolNodeService;
+
+    @Resource
+    private ServerForwardRuleService serverForwardRuleService;
 
     @Override
     public R createTask(DeployTaskDto dto) {
@@ -337,35 +341,40 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         }
         try {
             com.alibaba.fastjson2.JSONObject root = JSON.parseObject(resultJson);
+            protocolNodeService.applyAgentResultNodes(task, root);
+            serverForwardRuleService.applyAgentResultForwardRules(task, root);
+
             com.alibaba.fastjson2.JSONObject serverMeta = root.getJSONObject("server");
-            if (serverMeta == null) {
+            com.alibaba.fastjson2.JSONObject serviceMeta = root.getJSONObject("services");
+            com.alibaba.fastjson2.JSONObject certificateMeta = root.getJSONObject("certificate");
+            if (serverMeta == null && serviceMeta == null && certificateMeta == null) {
                 return;
             }
 
             ControlServer update = new ControlServer();
             update.setId(task.getServerId());
             update.setUpdatedTime(System.currentTimeMillis());
-            setIfNotBlank(serverMeta.getString("xuiEndpoint"), update::setXuiEndpoint);
-            setIfNotBlank(serverMeta.getString("xuiBasePath"), update::setXuiBasePath);
-            setIfNotBlank(serverMeta.getString("xuiApiToken"), update::setXuiApiToken);
-            setIfNotBlank(serverMeta.getString("xuiUsername"), update::setXuiUsername);
-            setIfNotBlank(serverMeta.getString("xuiPassword"), update::setXuiPassword);
-            Integer xuiAllowInsecure = serverMeta.getInteger("xuiAllowInsecure");
-            if (xuiAllowInsecure != null) {
-                update.setXuiAllowInsecure(xuiAllowInsecure);
+            if (serverMeta != null) {
+                setIfNotBlank(serverMeta.getString("xuiEndpoint"), update::setXuiEndpoint);
+                setIfNotBlank(serverMeta.getString("xuiBasePath"), update::setXuiBasePath);
+                setIfNotBlank(serverMeta.getString("xuiApiToken"), update::setXuiApiToken);
+                setIfNotBlank(serverMeta.getString("xuiUsername"), update::setXuiUsername);
+                setIfNotBlank(serverMeta.getString("xuiPassword"), update::setXuiPassword);
+                Integer xuiAllowInsecure = serverMeta.getInteger("xuiAllowInsecure");
+                if (xuiAllowInsecure != null) {
+                    update.setXuiAllowInsecure(xuiAllowInsecure);
+                }
+                setIfNotBlank(serverMeta.getString("agentVersion"), update::setAgentVersion);
+                setIfNotBlank(serverMeta.getString("xrayVersion"), update::setXrayVersion);
+                setIfNotBlank(serverMeta.getString("snellVersion"), update::setSnellVersion);
             }
-            setIfNotBlank(serverMeta.getString("agentVersion"), update::setAgentVersion);
-            setIfNotBlank(serverMeta.getString("xrayVersion"), update::setXrayVersion);
-            setIfNotBlank(serverMeta.getString("snellVersion"), update::setSnellVersion);
 
-            com.alibaba.fastjson2.JSONObject serviceMeta = root.getJSONObject("services");
             if (serviceMeta != null) {
                 setIfNotBlank(serviceMeta.getString("xui"), update::setXuiServiceStatus);
                 setIfNotBlank(serviceMeta.getString("xray"), update::setXrayServiceStatus);
                 setIfNotBlank(serviceMeta.getString("snell"), update::setSnellServiceStatus);
             }
 
-            com.alibaba.fastjson2.JSONObject certificateMeta = root.getJSONObject("certificate");
             if (certificateMeta != null) {
                 setIfNotBlank(certificateMeta.getString("mode"), update::setCertificateMode);
                 setIfNotBlank(certificateMeta.getString("domain"), update::setCertificateDomain);
@@ -380,7 +389,6 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             update.setLastError(null);
             update.setStatus(STATUS_ACTIVE);
             controlServerService.updateById(update);
-            protocolNodeService.applyAgentResultNodes(task, root);
         } catch (Exception ignored) {
             // Result metadata is best-effort; task logs remain the source of truth when parsing fails.
         }

@@ -152,6 +152,35 @@ export interface ProtocolNode {
   status: number;
 }
 
+export interface ServerForwardRule {
+  id: number;
+  serverId: number;
+  serverName?: string;
+  name: string;
+  protocol: "tcp" | "udp" | string;
+  listenHost?: string;
+  listenPort: number;
+  targetHost: string;
+  targetPort: number;
+  engine?: string;
+  serviceName?: string;
+  state?: string;
+  up?: number;
+  down?: number;
+  lastSync?: number;
+  lastError?: string;
+  createdTime?: number;
+  status: number;
+}
+
+export interface ServerRuleOverview {
+  server?: ControlServer;
+  protocolNodes?: ProtocolNode[];
+  forwardRules?: ServerForwardRule[];
+  xuiInbounds?: any;
+  xuiOutbounds?: any;
+}
+
 export interface DeployTask {
   id: number;
   serverId: number;

@@ -16,10 +16,12 @@ import {
   createProtocolNode,
   createOrchestrationTask,
   createProtocolProfile,
+  createServerForwardRule,
   deleteControlServer,
   deleteDeployTask,
   deleteProtocolNode,
   deleteProtocolProfile,
+  deleteServerForwardRule,
   addThreeXuiInbound,
   deleteThreeXuiInbound,
   ensureDefaultProtocolProfiles,
@@ -29,6 +31,8 @@ import {
   getDeployTaskScript,
   getProtocolNodeList,
   getProtocolProfileList,
+  getServerForwardRuleList,
+  getServerRuleOverview,
   getThreeXuiConfig,
   getThreeXuiOutboundTraffic,
   getThreeXuiOutbounds,
@@ -36,6 +40,7 @@ import {
   listThreeXuiInbounds,
   rotateControlServerToken,
   restartProtocolNode,
+  restartServerForwardRule,
   restartThreeXuiXray,
   saveThreeXuiOutbounds,
   syncThreeXuiTraffic,
@@ -44,9 +49,10 @@ import {
   updateThreeXuiInbound,
   updateControlServer,
   updateProtocolNode,
-  updateProtocolProfile
+  updateProtocolProfile,
+  updateServerForwardRule
 } from "@/api";
-import type { ControlServer, DeployTask, ProtocolNode, ProtocolProfile, ThreeXuiTrafficSnapshot } from "@/types";
+import type { ControlServer, DeployTask, ProtocolNode, ProtocolProfile, ServerForwardRule, ThreeXuiTrafficSnapshot } from "@/types";
 
 interface ServerForm {
   id?: number;
@@ -171,6 +177,17 @@ interface ProtocolNodeForm {
   ssMethod: string;
   snellPsk: string;
   snellVersion: string;
+}
+
+interface ServerForwardRuleForm {
+  id?: number;
+  serverId: number | null;
+  name: string;
+  protocol: "tcp" | "udp";
+  listenHost: string;
+  listenPort: number;
+  targetHost: string;
+  targetPort: number;
 }
 
 const blankServerForm: ServerForm = {
@@ -308,6 +325,16 @@ const blankProtocolNodeForm: ProtocolNodeForm = {
   ssMethod: "2022-blake3-aes-128-gcm",
   snellPsk: "",
   snellVersion: "v4.1.1"
+};
+
+const blankServerForwardRuleForm: ServerForwardRuleForm = {
+  serverId: null,
+  name: "remote-forward",
+  protocol: "tcp",
+  listenHost: "0.0.0.0",
+  listenPort: 10000,
+  targetHost: "127.0.0.1",
+  targetPort: 80
 };
 
 const GB = 1024 * 1024 * 1024;
@@ -472,12 +499,14 @@ export default function OrchestratorPage() {
   const [submitting, setSubmitting] = useState(false);
   const [servers, setServers] = useState<ControlServer[]>([]);
   const [protocolNodes, setProtocolNodes] = useState<ProtocolNode[]>([]);
+  const [forwardRules, setForwardRules] = useState<ServerForwardRule[]>([]);
   const [profiles, setProfiles] = useState<ProtocolProfile[]>([]);
   const [tasks, setTasks] = useState<DeployTask[]>([]);
   const [trafficSnapshots, setTrafficSnapshots] = useState<ThreeXuiTrafficSnapshot[]>([]);
   const [serverModalOpen, setServerModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [protocolNodeModalOpen, setProtocolNodeModalOpen] = useState(false);
+  const [serverForwardModalOpen, setServerForwardModalOpen] = useState(false);
   const [deployModalOpen, setDeployModalOpen] = useState(false);
   const [orchestrationModalOpen, setOrchestrationModalOpen] = useState(false);
   const [scriptModalOpen, setScriptModalOpen] = useState(false);
@@ -491,6 +520,7 @@ export default function OrchestratorPage() {
   const [serverForm, setServerForm] = useState<ServerForm>(blankServerForm);
   const [profileForm, setProfileForm] = useState<ProfileForm>(blankProfileForm);
   const [protocolNodeForm, setProtocolNodeForm] = useState<ProtocolNodeForm>(blankProtocolNodeForm);
+  const [serverForwardRuleForm, setServerForwardRuleForm] = useState<ServerForwardRuleForm>(blankServerForwardRuleForm);
   const [deployForm, setDeployForm] = useState<DeployForm>(blankDeployForm);
   const [orchestrationForm, setOrchestrationForm] = useState<OrchestrationForm>(blankOrchestrationForm);
   const [threeXuiInboundForm, setThreeXuiInboundForm] = useState<ThreeXuiInboundForm>(blankThreeXuiInboundForm);
@@ -512,6 +542,10 @@ export default function OrchestratorPage() {
     return protocolNodes.filter(node => node.engine === "xray").length;
   }, [protocolNodes]);
 
+  const activeForwardRules = useMemo(() => {
+    return forwardRules.filter(rule => rule.state === "active").length;
+  }, [forwardRules]);
+
   const failedTasks = useMemo(() => {
     return tasks.filter(task => task.state === "failed").length;
   }, [tasks]);
@@ -528,18 +562,20 @@ export default function OrchestratorPage() {
     setLoading(true);
     try {
       await ensureDefaultProtocolProfiles();
-      const [serverRes, profileRes, taskRes, nodeRes] = await Promise.all([
+      const [serverRes, profileRes, taskRes, nodeRes, forwardRes] = await Promise.all([
         getControlServerList(),
         getProtocolProfileList(),
         getDeployTaskList(),
-        getProtocolNodeList({ limit: 300 })
+        getProtocolNodeList({ limit: 300 }),
+        getServerForwardRuleList({ limit: 300 })
       ]);
 
       if (serverRes.code === 0) setServers(serverRes.data || []);
       if (profileRes.code === 0) setProfiles(profileRes.data || []);
       if (taskRes.code === 0) setTasks(taskRes.data || []);
       if (nodeRes.code === 0) setProtocolNodes(nodeRes.data || []);
-      if (serverRes.code !== 0 || profileRes.code !== 0 || taskRes.code !== 0 || nodeRes.code !== 0) {
+      if (forwardRes.code === 0) setForwardRules(forwardRes.data || []);
+      if (serverRes.code !== 0 || profileRes.code !== 0 || taskRes.code !== 0 || nodeRes.code !== 0 || forwardRes.code !== 0) {
         toast.error("主控数据加载不完整");
       }
     } catch (error) {
@@ -615,6 +651,28 @@ export default function OrchestratorPage() {
       snell: { protocol, engine: "snell", name: "flux-snell", listen: "::0", port: 8390, transport: "tcp", security: "psk", flow: "" }
     };
     patchProtocolNodeForm(defaults[protocol]);
+  };
+
+  const openServerForwardModal = (server?: ControlServer, rule?: ServerForwardRule) => {
+    setServerForwardRuleForm(rule ? {
+      id: rule.id,
+      serverId: rule.serverId,
+      name: rule.name,
+      protocol: rule.protocol === "udp" ? "udp" : "tcp",
+      listenHost: rule.listenHost || "0.0.0.0",
+      listenPort: rule.listenPort,
+      targetHost: rule.targetHost,
+      targetPort: rule.targetPort
+    } : {
+      ...blankServerForwardRuleForm,
+      serverId: server?.id || servers[0]?.id || null,
+      name: server?.name ? `${server.name}-forward` : "remote-forward"
+    });
+    setServerForwardModalOpen(true);
+  };
+
+  const patchServerForwardRuleForm = (patch: Partial<ServerForwardRuleForm>) => {
+    setServerForwardRuleForm(prev => ({ ...prev, ...patch }));
   };
 
   const selectProfileForDeploy = (profileId: number) => {
@@ -780,6 +838,70 @@ export default function OrchestratorPage() {
       loadData();
     } else {
       toast.error(res.msg || "重启协议节点失败");
+    }
+  };
+
+  const saveServerForwardRule = async () => {
+    if (!serverForwardRuleForm.serverId) {
+      toast.error("请选择目标服务器");
+      return;
+    }
+    if (!serverForwardRuleForm.name.trim() || !serverForwardRuleForm.targetHost.trim()) {
+      toast.error("请填写规则名称和目标地址");
+      return;
+    }
+    if (!serverForwardRuleForm.listenPort || serverForwardRuleForm.listenPort < 1 || serverForwardRuleForm.listenPort > 65535) {
+      toast.error("监听端口不合法");
+      return;
+    }
+    if (!serverForwardRuleForm.targetPort || serverForwardRuleForm.targetPort < 1 || serverForwardRuleForm.targetPort > 65535) {
+      toast.error("目标端口不合法");
+      return;
+    }
+
+    setSubmitting(true);
+    const payload = {
+      ...serverForwardRuleForm,
+      listenHost: serverForwardRuleForm.listenHost || "0.0.0.0"
+    };
+    const res = serverForwardRuleForm.id ? await updateServerForwardRule(payload) : await createServerForwardRule(payload);
+    setSubmitting(false);
+
+    if (res.code === 0) {
+      toast.success("远端端口转发任务已生成");
+      setServerForwardModalOpen(false);
+      loadData();
+    } else {
+      toast.error(res.msg || "保存远端端口转发失败");
+    }
+  };
+
+  const removeServerForwardRule = async (rule: ServerForwardRule) => {
+    const res = await deleteServerForwardRule(rule.id);
+    if (res.code === 0) {
+      toast.success("远端转发删除任务已生成");
+      loadData();
+    } else {
+      toast.error(res.msg || "删除远端转发失败");
+    }
+  };
+
+  const restartForwardRule = async (rule: ServerForwardRule) => {
+    const res = await restartServerForwardRule(rule.id);
+    if (res.code === 0) {
+      toast.success("远端转发重启任务已生成");
+      loadData();
+    } else {
+      toast.error(res.msg || "重启远端转发失败");
+    }
+  };
+
+  const showServerRuleOverview = async (server: ControlServer) => {
+    const res = await getServerRuleOverview(server.id);
+    if (res.code === 0) {
+      showThreeXuiResult(`${server.name} 出入站与转发规则`, res.data);
+    } else {
+      toast.error(res.msg || "读取服务器规则失败");
     }
   };
 
@@ -1219,9 +1341,9 @@ export default function OrchestratorPage() {
           </Card>
           <Card radius="sm">
             <CardBody>
-              <p className="text-sm text-gray-500">统一流量</p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">{formatBytes(totalRemoteTraffic)}</p>
-              <p className="text-xs text-gray-500 mt-1">{trafficSnapshots.length} 条本地快照缓存</p>
+              <p className="text-sm text-gray-500">远端转发</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">{forwardRules.length}</p>
+              <p className="text-xs text-gray-500 mt-1">{activeForwardRules} 条 active，{trafficSnapshots.length} 条快照，流量 {formatBytes(totalRemoteTraffic)}</p>
             </CardBody>
           </Card>
         </div>
@@ -1293,6 +1415,8 @@ export default function OrchestratorPage() {
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" color="primary" variant="flat" onPress={() => openOrchestrationModal(server)}>一键编排</Button>
                     <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal(server)}>新增节点</Button>
+                    <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal(server)}>新增转发</Button>
+                    <Button size="sm" variant="flat" onPress={() => showServerRuleOverview(server)}>规则总览</Button>
                     <Button size="sm" variant="flat" onPress={() => syncServerProtocolNodes(server)}>同步节点</Button>
                     <Button size="sm" variant="flat" onPress={() => openDeployModal(server)}>部署</Button>
                     <Button size="sm" variant="flat" onPress={() => testXui(server)}>测 3x-ui</Button>
@@ -1357,6 +1481,54 @@ export default function OrchestratorPage() {
                     <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(undefined, node)}>编辑</Button>
                     <Button size="sm" variant="flat" onPress={() => restartNode(node)}>重启</Button>
                     <Button size="sm" variant="light" color="danger" onPress={() => removeProtocolNode(node)}>删除</Button>
+                  </div>
+                </CardBody>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">远端端口转发</h2>
+            <Button size="sm" variant="light" onPress={() => openServerForwardModal()}>新增</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {forwardRules.map(rule => (
+              <Card key={rule.id} radius="sm">
+                <CardBody className="space-y-3">
+                  <div className="flex justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-gray-900 dark:text-white">{rule.name}</p>
+                      <p className="text-xs text-gray-500">{rule.serverName || rule.serverId} / {rule.protocol || "tcp"}</p>
+                    </div>
+                    <Chip size="sm" variant="flat" color={serviceColor(rule.state) as any}>{rule.state || "-"}</Chip>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-gray-500">监听</p>
+                      <p>{rule.listenHost || "0.0.0.0"}:{rule.listenPort}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">目标</p>
+                      <p className="truncate">{rule.targetHost}:{rule.targetPort}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">引擎</p>
+                      <p>{rule.engine || "socat"}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">流量</p>
+                      <p>{formatBytes((rule.up || 0) + (rule.down || 0))}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500">服务：{rule.serviceName || "-"}</p>
+                  <p className="text-xs text-gray-500">同步：{formatTime(rule.lastSync)}</p>
+                  {rule.lastError && <p className="text-xs text-danger">错误：{rule.lastError}</p>}
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="flat" onPress={() => openServerForwardModal(undefined, rule)}>编辑</Button>
+                    <Button size="sm" variant="flat" onPress={() => restartForwardRule(rule)}>重启</Button>
+                    <Button size="sm" variant="light" color="danger" onPress={() => removeServerForwardRule(rule)}>删除</Button>
                   </div>
                 </CardBody>
               </Card>
@@ -1559,6 +1731,32 @@ export default function OrchestratorPage() {
           <ModalFooter>
             <Button variant="light" onPress={() => setProtocolNodeModalOpen(false)}>取消</Button>
             <Button color="primary" isLoading={submitting} onPress={saveProtocolNode}>保存</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={serverForwardModalOpen} onOpenChange={setServerForwardModalOpen} size="3xl">
+        <ModalContent>
+          <ModalHeader>{serverForwardRuleForm.id ? "编辑远端端口转发" : "新增远端端口转发"}</ModalHeader>
+          <ModalBody>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Select label="目标服务器" selectedKeys={serverForwardRuleForm.serverId ? [serverForwardRuleForm.serverId.toString()] : []} onSelectionChange={keys => patchServerForwardRuleForm({ serverId: Number(Array.from(keys)[0]) })} variant="bordered">
+                {servers.map(server => <SelectItem key={server.id.toString()}>{server.name}</SelectItem>)}
+              </Select>
+              <Input label="规则名称" value={serverForwardRuleForm.name} onChange={e => patchServerForwardRuleForm({ name: e.target.value })} variant="bordered" />
+              <Select label="协议" selectedKeys={[serverForwardRuleForm.protocol]} onSelectionChange={keys => patchServerForwardRuleForm({ protocol: Array.from(keys)[0] as ServerForwardRuleForm["protocol"] })} variant="bordered">
+                <SelectItem key="tcp">TCP</SelectItem>
+                <SelectItem key="udp">UDP</SelectItem>
+              </Select>
+              <Input label="监听地址" value={serverForwardRuleForm.listenHost} onChange={e => patchServerForwardRuleForm({ listenHost: e.target.value })} variant="bordered" />
+              <Input label="监听端口" type="number" value={serverForwardRuleForm.listenPort.toString()} onChange={e => patchServerForwardRuleForm({ listenPort: Number(e.target.value) || 0 })} variant="bordered" />
+              <Input label="目标地址" value={serverForwardRuleForm.targetHost} onChange={e => patchServerForwardRuleForm({ targetHost: e.target.value })} variant="bordered" />
+              <Input label="目标端口" type="number" value={serverForwardRuleForm.targetPort.toString()} onChange={e => patchServerForwardRuleForm({ targetPort: Number(e.target.value) || 0 })} variant="bordered" />
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={() => setServerForwardModalOpen(false)}>取消</Button>
+            <Button color="primary" isLoading={submitting} onPress={saveServerForwardRule}>保存</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

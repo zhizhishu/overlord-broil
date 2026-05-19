@@ -29,6 +29,7 @@ The first iteration adds the foundation for:
   - heartbeat endpoint
   - runtime status fields for 3x-ui/Xray/Snell/certificate/CPU/memory/traffic
   - 3x-ui panel connection fields: endpoint, base path, API token, optional login credentials
+  - remote server rule overview for 3x-ui inbounds, 3x-ui outbounds, protocol nodes and port forwards
 - Protocol profiles:
   - Snell
   - VLESS / VMess / Trojan / Shadowsocks starter templates
@@ -36,6 +37,7 @@ The first iteration adds the foundation for:
   - generated task records
   - generated Snell install/restart/status/uninstall script
   - unified `protocol_node` records for Xray/3x-ui inbounds and Snell services
+  - remote `server_forward_rule` records that install/update/delete systemd+socat port-forward services on controlled servers
   - one-click 3x-ui orchestration task for installing/configuring 3x-ui, creating starter protocol nodes, installing Snell and returning connection metadata
   - agent task claim/report API protected by `X-Agent-Token`
   - `scripts/flux-agent.sh` polling executor for副控 servers
@@ -55,6 +57,7 @@ The first iteration adds the foundation for:
   - new `主控中心` page
   - server cards
   - unified protocol node cards for Xray and Snell
+  - remote port-forward cards for each controlled server
   - protocol profile cards
   - deployment task cards
   - structured 3x-ui inbound form for VLESS Reality, VMess WS, Trojan TLS and Shadowsocks
@@ -183,6 +186,32 @@ CREATE TABLE `protocol_node` (
   KEY `protocol` (`protocol`),
   KEY `remote_id` (`remote_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `server_forward_rule` (
+  `id` int(10) NOT NULL AUTO_INCREMENT,
+  `server_id` int(10) NOT NULL,
+  `server_name` varchar(100) DEFAULT NULL,
+  `name` varchar(100) NOT NULL,
+  `protocol` varchar(20) NOT NULL DEFAULT 'tcp',
+  `listen_host` varchar(100) DEFAULT '0.0.0.0',
+  `listen_port` int(10) NOT NULL,
+  `target_host` varchar(255) NOT NULL,
+  `target_port` int(10) NOT NULL,
+  `engine` varchar(50) DEFAULT 'socat',
+  `service_name` varchar(100) DEFAULT NULL,
+  `state` varchar(50) DEFAULT NULL,
+  `up` bigint(20) NOT NULL DEFAULT '0',
+  `down` bigint(20) NOT NULL DEFAULT '0',
+  `last_sync` bigint(20) DEFAULT NULL,
+  `last_error` longtext,
+  `created_time` bigint(20) NOT NULL,
+  `updated_time` bigint(20) DEFAULT NULL,
+  `status` int(10) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `server_id` (`server_id`),
+  KEY `listen_port` (`listen_port`),
+  KEY `service_name` (`service_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
 ### 2. Create a 3x-ui API token
@@ -266,7 +295,32 @@ Open `主控中心` and use `新增节点`.
 
 Snell is not a native Xray protocol. This project treats it as the same product-level node type while keeping the runtime adapter separate: Xray nodes go through 3x-ui/Xray, Snell nodes go through the副控 agent and systemd.
 
-### 7. Manage inbounds
+### 7. Manage remote port forwards
+
+Open `主控中心` and use `新增转发`.
+
+- The rule belongs to one controlled server.
+- The agent installs `socat` when needed and creates a systemd service such as `flux-forward-8.service`.
+- A TCP rule uses `TCP-LISTEN:<listenPort>` to forward traffic to `<targetHost>:<targetPort>`.
+- A UDP rule uses `UDP-LISTEN:<listenPort>` with the same target shape.
+- `编辑`, `重启`, and `删除` all generate agent tasks so every remote change is auditable in `部署任务`.
+
+This is separate from the original Flux Panel Gost forwarding model. The original forwarding pages remain available; `server_forward_rule` is the new multi-server controlled-host forwarding layer.
+
+### 8. View server rules
+
+On a server card, click `规则总览`.
+
+The master collects:
+
+- local `protocol_node` rows
+- local `server_forward_rule` rows
+- live 3x-ui inbound list when API token is configured
+- live 3x-ui outbound config when the panel connection is configured
+
+This is the operator view for checking which inbound, outbound and port-forward rules currently belong to a controlled server.
+
+### 9. Manage inbounds
 
 On a server card:
 
@@ -281,7 +335,7 @@ On a server card:
 
 For Reality, generate the private/public key pair in 3x-ui or Xray first, then fill `Reality Private Key`, `SNI`, `Dest`, `Short ID`, UUID, email and port before submitting.
 
-### 8. Manage outbounds and traffic
+### 10. Manage outbounds and traffic
 
 On a server card:
 
@@ -297,7 +351,7 @@ Outbound saving intentionally edits the full Xray config rather than only patchi
 
 Traffic is also synced automatically every 5 minutes for active servers with `3x-ui 面板地址` and `3x-ui API Token` configured.
 
-### 9. API endpoints exposed by this project
+### 11. API endpoints exposed by this project
 
 ```text
 POST /api/v1/control-server/create
@@ -321,6 +375,12 @@ POST /api/v1/protocol-node/list
 POST /api/v1/protocol-node/delete
 POST /api/v1/protocol-node/restart
 POST /api/v1/protocol-node/sync
+POST /api/v1/server-forward/create
+POST /api/v1/server-forward/update
+POST /api/v1/server-forward/list
+POST /api/v1/server-forward/delete
+POST /api/v1/server-forward/restart
+POST /api/v1/server-rule/overview
 POST /api/v1/three-xui/test
 POST /api/v1/three-xui/inbounds/list
 POST /api/v1/three-xui/inbounds/add

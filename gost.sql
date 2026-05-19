@@ -158,6 +158,30 @@ CREATE TABLE `protocol_node` (
 
 -- --------------------------------------------------------
 
+CREATE TABLE `server_forward_rule` (
+  `id` int(10) NOT NULL,
+  `server_id` int(10) NOT NULL,
+  `server_name` varchar(100) DEFAULT NULL,
+  `name` varchar(100) NOT NULL,
+  `protocol` varchar(20) NOT NULL DEFAULT 'tcp',
+  `listen_host` varchar(100) DEFAULT '0.0.0.0',
+  `listen_port` int(10) NOT NULL,
+  `target_host` varchar(255) NOT NULL,
+  `target_port` int(10) NOT NULL,
+  `engine` varchar(50) DEFAULT 'socat',
+  `service_name` varchar(100) DEFAULT NULL,
+  `state` varchar(50) DEFAULT NULL,
+  `up` bigint(20) NOT NULL DEFAULT '0',
+  `down` bigint(20) NOT NULL DEFAULT '0',
+  `last_sync` bigint(20) DEFAULT NULL,
+  `last_error` longtext,
+  `created_time` bigint(20) NOT NULL,
+  `updated_time` bigint(20) DEFAULT NULL,
+  `status` int(10) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
 CREATE TABLE `deploy_task` (
   `id` int(10) NOT NULL,
   `server_id` int(10) NOT NULL,
@@ -355,6 +379,12 @@ ALTER TABLE `protocol_node`
   ADD KEY `protocol` (`protocol`),
   ADD KEY `remote_id` (`remote_id`);
 
+ALTER TABLE `server_forward_rule`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `server_id` (`server_id`),
+  ADD KEY `listen_port` (`listen_port`),
+  ADD KEY `service_name` (`service_name`);
+
 ALTER TABLE `deploy_task`
   ADD PRIMARY KEY (`id`),
   ADD KEY `server_id` (`server_id`);
@@ -416,6 +446,9 @@ ALTER TABLE `protocol_profile`
   MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
 
 ALTER TABLE `protocol_node`
+  MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+
+ALTER TABLE `server_forward_rule`
   MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
 
 ALTER TABLE `deploy_task`

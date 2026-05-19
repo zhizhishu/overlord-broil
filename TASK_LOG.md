@@ -2,7 +2,7 @@
 
 ## 接力摘要
 
-- 当前目标：统一协议节点层已完成，Snell 已从单独部署任务提升为可和 3x-ui/Xray 节点一起管理的节点类型，正在提交并推送主仓库与官网同步说明。
+- 当前目标：主控面板已经从“节点创建/脚本生成”推进到“按被控服务器统一管理规则”，覆盖 3x-ui 出入站查看与调整入口、统一协议节点、Snell 节点、远端端口转发和规则总览。
 - 已完成：
   - 从 `zhizhishu/flux-panel` 创建新项目 `flux-panel-3xui-orchestrator`。
   - 将参考仓库 `MHSanaei/3x-ui` 与 `jinqians/snell.sh` 克隆到本地 `_references/`，仅作为本地参考，不推送。
@@ -60,6 +60,9 @@
   - 2026-05-19 07:12:45：本地 Docker 烟测发现并修复 `/api/v1/agent-task/**` 被 JWT 拦截的问题；修复后通过临时 MySQL + 后端容器验证登录、创建服务器、生成一键编排任务、agent claim、agent report、heartbeat、服务器元数据回写。
   - 2026-05-19 07:12:45：实际运行 `scripts/flux-agent.sh --once` 于 `node:20-bookworm` 临时容器，成功领取安全任务、执行脚本、解析 `FLUX_AGENT_RESULT_JSON`、回传 succeeded，并把服务器 3x-ui/证书/服务状态更新到临时数据库。
   - 2026-05-19 08:12:21：新增 `protocol_node` 统一协议节点层、后端 API、Snell 节点级 agent/systemd 任务、3x-ui inbound 同步入库、前端协议节点管理区和 README/官网说明；`npm run build` 与 Docker Maven 后端构建均通过。
+  - 2026-05-19 10:17:38：新增 `server_forward_rule` 远端端口转发表、后端 API、agent systemd+socat 执行脚本、主控中心“新增转发/远端端口转发/规则总览”入口；规则总览会聚合本地协议节点、本地远端转发、实时 3x-ui inbound 和 3x-ui outbound。
+  - 2026-05-19 10:17:38：修复 MySQL 8 默认认证下 JDBC 连接缺少 `allowPublicKeyRetrieval=true` 的问题。
+  - 2026-05-19 10:17:38：Docker 烟测通过：临时 MySQL + 后端容器完成登录、创建被控服务器、创建远端转发、agent claim、agent report、`server_forward_rule` 状态回写为 `active`、`server-rule/overview` 返回远端转发规则；本轮临时容器和 network 已清理。
 - 风险/待确认：
   - 主仓库保持私有；由于当前 GitHub plan 不支持私有仓库 Pages，官网使用独立公开仓库 `zhizhishu.github.io`。
   - Snell 现在已经可通过副控 agent 自动领取和执行任务，且已提供 systemd 常驻安装脚本；重试/退避和并发锁仍可继续增强。
@@ -87,6 +90,7 @@
 
 ## 任务清单
 
+- [x] ~~**目标:** 落实主控面板统一管理所有被控服务器，覆盖远端端口转发、3x-ui 出入站规则查看与规则调整入口~~ (创建于: 2026-05-19 08:21:27 | **完成于: 2026-05-19 10:17:38**)
 - [x] ~~**目标:** 将 Snell 提升为统一协议节点能力，和 3x-ui/Xray 节点一起完成创建、删除、同步与可视化管理~~ (创建于: 2026-05-19 07:32:51 | **完成于: 2026-05-19 08:12:21**)
 - [x] ~~**目标:** 完成源码勘察、融合范围确认和第一版可执行拆分计划~~ (创建于: 2026-05-18 22:03:49 | **完成于: 2026-05-18 22:07:56**)
 - [x] ~~**目标:** 新增主控服务器、协议模板、部署任务与 Snell 安装脚本生成的后端 API 骨架~~ (创建于: 2026-05-18 22:07:56 | **完成于: 2026-05-18 22:44:43**)
