@@ -24,7 +24,7 @@
 - [x] ~~**目标:** 完成 Git 提交并推送到 GitHub 分支~~ (创建于: 2026-05-18 22:44:43 | **完成于: 2026-05-18 22:46:53**)
 - [x] ~~**目标:** 撤回误推的远端分支并删除 PR 提示记录~~ (创建于: 2026-05-18 23:24:30 | **完成于: 2026-05-18 23:24:30**)
 - [x] ~~**目标:** 创建自有仓库 `zhizhishu/flux-3xui-orchestrator`，补充 README，并推送当前项目~~ (创建于: 2026-05-18 23:29:20 | **完成于: 2026-05-18 23:34:10**)
-- [ ] **目标:** 新增 GitHub Pages 项目官网并发布到 `github.io` (创建于: 2026-05-18 23:37:48)
+- [x] ~~**目标:** 新增 GitHub Pages 项目官网并发布到 `github.io`~~ (创建于: 2026-05-18 23:37:48 | **完成于: 2026-05-18 23:49:41**)
 
 ## 推送记录
 
@@ -34,3 +34,6 @@
 - 当前 `origin`：`https://github.com/zhizhishu/flux-3xui-orchestrator.git`
 - 原 `flux-panel` 远端已改名为 `upstream`，仅作来源参考。
 - 当前分支：`main`
+- GitHub Pages：`https://zhizhishu.github.io/`
+- Pages 仓库：`https://github.com/zhizhishu/zhizhishu.github.io`
+- 说明：主项目仍为私有仓库；因当前 GitHub plan 不支持私有仓库 Pages，官网发布在单独的公开静态站点仓库。
