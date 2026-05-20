@@ -137,3 +137,4 @@
 - 2026-05-19 08:16:06：统一协议节点层已推送到主仓库 `origin/main`，commit `79f8cfd`；GitHub Actions CI run `26106480537` 通过。官网同步说明已推送到 Pages 仓库，commit `660d6ca`；`https://zhizhishu.github.io/` 返回 `200`。
 - 2026-05-19 10:22:58：远端端口转发、规则总览、MySQL 8 JDBC 兼容修复已推送到主仓库 `origin/main`，commit `f20926c7629dab33beb28a34819a48b0cc853148`；GitHub Actions CI run `26113491240` 通过。官网同步说明已推送到 Pages 仓库，commit `81d6d36193138855ce5368e84185035d9190c9c1`；`https://zhizhishu.github.io/` 返回 `200` 且包含“远端端口转发与规则总览”。
 - 2026-05-19 23:24:41：GHCR 镜像构建工作流已推送到主仓库 `origin/main`，commit `32e46cd80d2ababf92963e8266f269254f2313ce`；GitHub Actions `Docker Images` run `26145172883` 通过，`CI` run `26145172938` 通过。
+- 2026-05-20 10:26:10：正式可用硬化第一批主体提交为 `b044d9a`；内容包括主控安装脚本 day-2 运维能力、agent 可靠性增强、可复用 agent mock 测试、CI compose 校验、README/Pages 使用说明。
