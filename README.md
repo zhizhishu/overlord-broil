@@ -10,6 +10,39 @@ Project site:
 https://zhizhishu.github.io/
 ```
 
+## Quick Start
+
+Master panel one-click install, using the GHCR images built by GitHub Actions:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash
+```
+
+If the GHCR packages are still private, pass a GitHub token with `read:packages`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+  | sudo env GHCR_USERNAME="zhizhishu" GHCR_TOKEN="github-token-with-read-packages" bash
+```
+
+Common options:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+  | sudo env FLUX_FRONTEND_PORT="8080" FLUX_BACKEND_PORT="6365" FLUX_NETWORK_STACK="v4" bash
+```
+
+The installer downloads `docker-compose-v4.yml` or `docker-compose-v6.yml`, downloads `gost.sql`, creates `/opt/flux-3xui-orchestrator/.env`, pulls the backend/frontend images and starts the stack.
+
+Controlled server agent one-command install:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
+  | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash
+```
+
+`FLUX_SERVER_ID` and `FLUX_AGENT_TOKEN` come from `主控中心`: create or open the server card, then click `Token`.
+
 ## Project Direction
 
 - Use `flux-panel` as the UI and forwarding-panel base.
@@ -40,8 +73,9 @@ The first iteration adds the foundation for:
   - remote `server_forward_rule` records that install/update/delete systemd+socat port-forward services on controlled servers
   - one-click 3x-ui orchestration task for installing/configuring 3x-ui, creating starter protocol nodes, installing Snell and returning connection metadata
   - agent task claim/report API protected by `X-Agent-Token`
+  - `scripts/install-master.sh` one-click master installer for GHCR + Docker Compose deployment
   - `scripts/flux-agent.sh` polling executor for副控 servers
-  - `scripts/install-flux-agent.sh` systemd installer for long-running agents
+  - `scripts/install-flux-agent.sh` one-command systemd installer for long-running agents
 - 3x-ui remote panel management:
   - test remote 3x-ui connection
   - list inbounds through `/panel/api/inbounds/list`
@@ -78,7 +112,7 @@ The first iteration adds the foundation for:
 .
 ├── springboot-backend/     # Spring Boot backend
 ├── vite-frontend/          # React + Vite + HeroUI frontend
-├── scripts/                # Lightweight flux agent executor
+├── scripts/                # Master installer and lightweight flux agent executor
 ├── go-gost/                # Existing forwarding/node component from Flux Panel
 ├── vitepress/              # Existing documentation site
 ├── gost.sql                # Database schema seed
@@ -245,7 +279,16 @@ Fill:
 
 After a server is created, click `Token` on the server card and put the returned token on that server.
 
-For a long-running agent, copy `scripts/flux-agent.sh` and `scripts/install-flux-agent.sh` to the remote server, then run:
+For a long-running agent, run this on the controlled server:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
+  | sudo env FLUX_PANEL_URL="https://your-master-panel.example.com" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash
+```
+
+The installer downloads `scripts/flux-agent.sh`, creates `/etc/flux-agent.env`, installs `/usr/local/bin/flux-agent.sh`, enables `flux-agent.service`, and keeps the副控 online through systemd. It also installs `curl` and `python3` when the OS package manager is available.
+
+If you already copied the scripts to the server, local install still works:
 
 ```bash
 export FLUX_PANEL_URL="https://your-master-panel.example.com"
@@ -253,8 +296,6 @@ export FLUX_SERVER_ID="1"
 export FLUX_AGENT_TOKEN="paste-agent-token-here"
 sudo -E bash ./install-flux-agent.sh ./flux-agent.sh
 ```
-
-The installer creates `/etc/flux-agent.env`, installs `/usr/local/bin/flux-agent.sh`, enables `flux-agent.service`, and keeps the副控 online through systemd.
 
 For foreground testing:
 
@@ -448,6 +489,12 @@ The compose files now point at these GHCR images:
 ```bash
 docker compose -f docker-compose-v4.yml up -d
 docker compose -f docker-compose-v6.yml up -d
+```
+
+For a fresh server, use the installer instead of preparing the compose files manually:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash
 ```
 
 If the package stays private, log in first:

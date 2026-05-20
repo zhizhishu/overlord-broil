@@ -35,3 +35,10 @@ jobs:
       - name: Build frontend
         working-directory: vite-frontend
         run: npm run build
+
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate shell scripts
+        run: bash -n scripts/*.sh
