@@ -5,6 +5,13 @@ PANEL_URL="${FLUX_PANEL_URL:-}"
 SERVER_ID="${FLUX_SERVER_ID:-}"
 AGENT_TOKEN="${FLUX_AGENT_TOKEN:-}"
 POLL_INTERVAL="${FLUX_POLL_INTERVAL:-20}"
+HTTP_RETRIES="${FLUX_HTTP_RETRIES:-4}"
+HTTP_BACKOFF_BASE="${FLUX_HTTP_BACKOFF_BASE:-2}"
+HTTP_BACKOFF_MAX="${FLUX_HTTP_BACKOFF_MAX:-30}"
+HTTP_CONNECT_TIMEOUT="${FLUX_HTTP_CONNECT_TIMEOUT:-10}"
+HTTP_MAX_TIME="${FLUX_HTTP_MAX_TIME:-60}"
+TASK_TIMEOUT_SECONDS="${FLUX_TASK_TIMEOUT_SECONDS:-7200}"
+TASK_TIMEOUT_KILL_SECONDS="${FLUX_TASK_TIMEOUT_KILL_SECONDS:-30}"
 INSTALL_BIN="${FLUX_AGENT_BIN:-/usr/local/bin/flux-agent.sh}"
 ENV_FILE="${FLUX_AGENT_ENV:-/etc/flux-agent.env}"
 SERVICE_FILE="${FLUX_AGENT_SERVICE:-/etc/systemd/system/flux-agent.service}"
@@ -12,6 +19,22 @@ REPO_RAW_URL="${FLUX_REPO_RAW_URL:-https://raw.githubusercontent.com/zhizhishu/f
 SOURCE_URL="${FLUX_AGENT_SOURCE_URL:-${REPO_RAW_URL}/scripts/flux-agent.sh}"
 SOURCE_SCRIPT="${1:-}"
 GITHUB_TOKEN="${FLUX_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
+
+quote_env_value() {
+  case "$1" in
+    *$'\n'*|*$'\r'*)
+      echo "Environment values cannot contain line breaks." >&2
+      exit 2
+      ;;
+  esac
+  printf '"%s"' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/`/\\`/g' -e 's/\$/\\$/g')"
+}
+
+write_env_line() {
+  local key="$1"
+  local value="$2"
+  printf '%s=%s\n' "$key" "$(quote_env_value "$value")"
+}
 
 install_packages() {
   local missing=()
@@ -73,13 +96,20 @@ else
   chmod 0755 "$INSTALL_BIN"
 fi
 
-cat > "$ENV_FILE" <<ENV
-FLUX_PANEL_URL=${PANEL_URL}
-FLUX_SERVER_ID=${SERVER_ID}
-FLUX_AGENT_TOKEN=${AGENT_TOKEN}
-FLUX_POLL_INTERVAL=${POLL_INTERVAL}
-FLUX_WORK_DIR=/var/lib/flux-agent
-ENV
+{
+  write_env_line "FLUX_PANEL_URL" "$PANEL_URL"
+  write_env_line "FLUX_SERVER_ID" "$SERVER_ID"
+  write_env_line "FLUX_AGENT_TOKEN" "$AGENT_TOKEN"
+  write_env_line "FLUX_POLL_INTERVAL" "$POLL_INTERVAL"
+  write_env_line "FLUX_WORK_DIR" "/var/lib/flux-agent"
+  write_env_line "FLUX_HTTP_RETRIES" "$HTTP_RETRIES"
+  write_env_line "FLUX_HTTP_BACKOFF_BASE" "$HTTP_BACKOFF_BASE"
+  write_env_line "FLUX_HTTP_BACKOFF_MAX" "$HTTP_BACKOFF_MAX"
+  write_env_line "FLUX_HTTP_CONNECT_TIMEOUT" "$HTTP_CONNECT_TIMEOUT"
+  write_env_line "FLUX_HTTP_MAX_TIME" "$HTTP_MAX_TIME"
+  write_env_line "FLUX_TASK_TIMEOUT_SECONDS" "$TASK_TIMEOUT_SECONDS"
+  write_env_line "FLUX_TASK_TIMEOUT_KILL_SECONDS" "$TASK_TIMEOUT_KILL_SECONDS"
+} > "$ENV_FILE"
 chmod 600 "$ENV_FILE"
 
 cat > "$SERVICE_FILE" <<SERVICE

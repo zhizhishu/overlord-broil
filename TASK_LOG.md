@@ -3,6 +3,7 @@
 ## 接力摘要
 
 - 当前目标：主控面板已经从“节点创建/脚本生成”推进到“按被控服务器统一管理规则”，覆盖 3x-ui 出入站查看与调整入口、统一协议节点、Snell 节点、远端端口转发和规则总览。
+- 正式可用硬化方向：优先补齐安装/升级/备份/恢复/卸载、agent 单机任务锁与重试退避、真实部署验证和 CI smoke test；随后推进敏感字段加密、Snell checksum、统一规则中心细节和监控告警。
 - 已完成：
   - 从 `zhizhishu/flux-panel` 创建新项目 `flux-panel-3xui-orchestrator`。
   - 将参考仓库 `MHSanaei/3x-ui` 与 `jinqians/snell.sh` 克隆到本地 `_references/`，仅作为本地参考，不推送。
@@ -22,11 +23,11 @@
   - 新增 `three_xui_traffic_snapshot` 本地表及同步接口，可把 3x-ui inbound/client/outbound 流量快照写入本地数据库。
   - 前端补齐 `@heroui/theme` / `@heroui/system` 兼容版本、移除旧 legacy 插件并显式加入 Tailwind/PostCSS 所需 `jiti`。
   - 新增 GitHub Actions CI，分别验证后端 Maven package 和前端 npm build。
+  - 2026-05-20 10:26:10：完成正式可用硬化第一批。分布式 worker 复核安装脚本、README、Pages、CI 与 agent 脚本后，主线程补齐主控安装脚本 `upgrade/backup/restore/uninstall` 的可靠性校验、agent 任务锁/HTTP 重试/任务超时/结果元数据上报、agent systemd env 安全写入、可复用 agent mock 测试和 CI compose 校验。
 - 下一步：
-  - 给 `scripts/flux-agent.sh` 补 systemd unit/install helper，方便远端常驻运行。
-  - 增加定时流量同步任务，减少只能手动点“同步流量”的限制。
-  - 增加 Reality key、端口、outbound tag 等协议级校验，降低 3x-ui payload 填错风险。
+  - 增加 Reality key、端口、outbound tag、Snell PSK/端口等协议级校验，降低 3x-ui/Snell payload 填错风险。
   - 为 Snell 二进制下载增加 checksum 校验和版本源锁定。
+  - 后续可补 GitHub Actions 的完整 Docker compose smoke test fixture，进一步覆盖真实后端 API 与 agent 联动。
 - 关键文件：
   - `springboot-backend/src/main/java/com/admin/controller/ControlServerController.java`
   - `springboot-backend/src/main/java/com/admin/controller/ProtocolProfileController.java`
@@ -65,9 +66,10 @@
   - 2026-05-19 10:17:38：Docker 烟测通过：临时 MySQL + 后端容器完成登录、创建被控服务器、创建远端转发、agent claim、agent report、`server_forward_rule` 状态回写为 `active`、`server-rule/overview` 返回远端转发规则；本轮临时容器和 network 已清理。
   - 2026-05-19 23:24:41：新增 GitHub Actions 镜像构建工作流，后端和前端镜像已通过 `Docker Images` workflow 构建并推送到 GHCR；compose 镜像地址已切换到 `ghcr.io/zhizhishu/flux-3xui-orchestrator-*`。
   - 2026-05-20 03:57:59：完成本地 Docker compose 全栈烟测，前端 `http://localhost:18080/` 返回 `200`，后端 `/flow/test` 返回 `test`；创建被控服务器、一键编排任务、agent claim/report、服务器状态回写均通过。烟测中修复 MySQL 首次初始化时 socket healthcheck 过早放行后端的问题，改为 TCP 账号 healthcheck；测试容器、卷、网络和端口已清理。
+  - 2026-05-20 10:26:10：本轮硬化验证通过：`bash -n scripts/*.sh`、`bash scripts/test-flux-agent-mock.sh`、`docker compose -f docker-compose-v4.yml config --quiet`、`docker compose -f docker-compose-v6.yml config --quiet`、`vite-frontend npm run build`、Docker Maven `mvn -B -DskipTests package`、`git diff --check` 均通过；agent mock 覆盖 succeeded 与 timeout 两条路径，timeout 会回传 `exitCode=124` 与 `timedOut=true`。
 - 风险/待确认：
   - 主仓库保持私有；由于当前 GitHub plan 不支持私有仓库 Pages，官网使用独立公开仓库 `zhizhishu.github.io`。
-  - Snell 现在已经可通过副控 agent 自动领取和执行任务，且已提供 systemd 常驻安装脚本；重试/退避和并发锁仍可继续增强。
+  - Snell 现在已经可通过副控 agent 自动领取和执行任务，且已提供 systemd 常驻安装脚本；本轮已增强重试/退避、并发锁与超时上报，下一步重点转向 Snell 下载 checksum 和版本锁定。
   - 3x-ui 各版本 API 可能有差异，本轮按本地 `_references/3x-ui` 的实际路由实现兼容代理，并把风险写进使用说明。
 
 ## 本轮执行计划（创建于: 2026-05-19 05:47:16）
@@ -77,6 +79,14 @@
 3. 增加定时流量同步任务，主控可自动拉取多服务器 3x-ui 流量快照。
 4. 补齐前端一键编排弹窗和多服务器状态视图，让用户从主控页面直接完成选择服务器、配置参数、生成任务。
 5. 补齐 agent systemd 安装说明、README 使用路径和 Docker 构建验证记录。
+
+## 本轮正式可用硬化计划（创建于: 2026-05-20 09:39:35）
+
+1. 记录 P0/P1/P2/P3 产品化路线，明确正式可用的剩余风险与优先级。
+2. 脚本运维面：增强主控安装脚本的升级、备份、恢复、卸载能力，并同步 README 与 Pages 使用说明。
+3. agent 可靠性面：增加单机任务锁、任务执行超时、失败重试/退避和更清晰的错误上报。
+4. CI/验证面：补 compose 配置验证、脚本语法验证和可复用本地 smoke test 入口，继续保留 Docker 构建验证。
+5. 收口：本地构建/脚本/compose 验证通过后提交推送，并观察 GitHub Actions。
 
 ## 迭代计划
 
@@ -92,6 +102,7 @@
 
 ## 任务清单
 
+- [x] ~~**目标:** 完成正式可用硬化第一批：安装运维能力、agent 任务可靠性和验证闭环~~ (创建于: 2026-05-20 09:39:35 | **完成于: 2026-05-20 10:26:10**)
 - [x] ~~**目标:** 清理本地换行脏差异并完成架构与可用性复核测试~~ (创建于: 2026-05-20 02:58:42 | **完成于: 2026-05-20 03:57:59**)
 - [x] ~~**目标:** 修复公开仓库 GitHub Pages 配置并更新 README 为公开仓库安装说明~~ (创建于: 2026-05-20 01:11:46 | **完成于: 2026-05-20 01:16:58**)
 - [x] ~~**目标:** 补齐主控一键部署脚本和被控端一条命令安装 agent 的使用入口~~ (创建于: 2026-05-19 23:34:25 | **完成于: 2026-05-19 23:43:32**)

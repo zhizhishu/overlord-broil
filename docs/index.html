@@ -51,12 +51,18 @@
             <h3>主控面板</h3>
             <pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash</code></pre>
             <p>安装脚本会创建 `/opt/flux-3xui-orchestrator/.env`，下载 compose 和 `gost.sql`，然后拉取或构建镜像并启动 MySQL、后端和前端。</p>
+            <pre class="runbook"><code># 显式运维动作
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- upgrade
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- backup
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- restore --backup-file /opt/flux-3xui-orchestrator/backups/flux-master-backup-YYYYMMDD-HHMMSS.tar.gz
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- uninstall --yes</code></pre>
+            <p>`upgrade` 会先备份再刷新 compose/sql 并重启；`uninstall` 只移除容器，保留安装目录和 Docker volumes。</p>
           </article>
           <article class="card">
             <h3>被控服务器 Agent</h3>
             <pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
   | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash</code></pre>
-            <p>agent 会注册为 `flux-agent.service`，自动领取 Snell、3x-ui、Xray 和远端端口转发任务。</p>
+            <p>agent 会注册为 `flux-agent.service`，自动领取 Snell、3x-ui、Xray 和远端端口转发任务；内置单机任务锁、HTTP 重试退避和任务超时上报。</p>
           </article>
         </div>
       </section>

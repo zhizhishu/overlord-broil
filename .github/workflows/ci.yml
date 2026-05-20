@@ -42,3 +42,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate shell scripts
         run: bash -n scripts/*.sh
+      - name: Run agent mock tests
+        run: bash scripts/test-flux-agent-mock.sh
+      - name: Validate compose files
+        env:
+          DB_NAME: gost
+          DB_USER: gost
+          DB_PASSWORD: test-password
+          JWT_SECRET: test-jwt-secret
+          FRONTEND_PORT: "18080"
+          BACKEND_PORT: "16365"
+        run: |
+          docker compose -f docker-compose-v4.yml config --quiet
+          docker compose -f docker-compose-v6.yml config --quiet

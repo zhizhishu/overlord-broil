@@ -21,6 +21,17 @@ Master panel one-click install, using the GHCR images built by GitHub Actions:
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash
 ```
 
+The default action is still `install`. For day-2 operations, pass an explicit action:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- upgrade
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- backup
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- restore --backup-file /opt/flux-3xui-orchestrator/backups/flux-master-backup-YYYYMMDD-HHMMSS.tar.gz
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- uninstall --yes
+```
+
+`upgrade` creates a backup before refreshing compose/sql files and restarting. `backup` stores `.env`, compose, `gost.sql`, and a MySQL logical dump when the database container is running. `uninstall` removes stack containers only; it keeps the install directory and Docker volumes.
+
 If the GHCR packages are not public yet, pass a GitHub token with `read:packages` so Docker can pull the images:
 
 ```bash
@@ -317,6 +328,22 @@ sudo -E bash ./flux-agent.sh --once
 ```
 
 The agent polls `POST /api/v1/agent-task/claim`, writes the claimed Snell/Xray script to `/var/lib/flux-agent`, executes it locally, and reports `running/succeeded/failed` plus stdout/stderr through `POST /api/v1/agent-task/report`.
+
+Useful agent reliability knobs:
+
+```bash
+export FLUX_HTTP_RETRIES=4
+export FLUX_HTTP_BACKOFF_BASE=2
+export FLUX_HTTP_BACKOFF_MAX=30
+export FLUX_HTTP_CONNECT_TIMEOUT=10
+export FLUX_HTTP_MAX_TIME=60
+export FLUX_TASK_TIMEOUT_SECONDS=7200
+export FLUX_TASK_TIMEOUT_KILL_SECONDS=30
+export FLUX_PYTHON_BIN=/usr/bin/python3
+export FLUX_BASH_BIN=/bin/bash
+```
+
+The agent keeps a single-host lock, retries temporary HTTP failures with backoff, reports task stdout/stderr/result metadata, and marks long-running task scripts as failed with `exitCode=124` when they exceed `FLUX_TASK_TIMEOUT_SECONDS`.
 
 ### 5. One-click 3x-ui orchestration
 
