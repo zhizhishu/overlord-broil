@@ -19,6 +19,7 @@
       </a>
       <nav class="nav" aria-label="Primary navigation">
         <a href="#architecture">架构</a>
+        <a href="#install">安装</a>
         <a href="#workspace">工作台</a>
         <a href="#roadmap">路线</a>
         <a class="repo-link" href="https://github.com/zhizhishu/flux-3xui-orchestrator">GitHub</a>
@@ -30,90 +31,144 @@
         <p class="eyebrow">MASTER / AGENT / XRAY / SNELL</p>
         <h1>Flux 3x-ui Orchestrator</h1>
         <p class="hero-copy">
-          一个基于 Flux Panel 的新主控项目：把转发面板的 UI 和节点基础，扩展成可以管理多台服务器、生成协议部署任务、接入 3x-ui/Xray 与 Snell 的控制平面。
+          一个基于 Flux Panel 的新主控项目：在一个工作台里选择多台服务器，自动安装/配置 3x-ui，把 VLESS Reality、VMess WS、Trojan TLS、Shadowsocks、Snell 和远端端口转发放进统一规则视图，并统一回看 Xray、证书、流量与服务状态。
         </p>
         <div class="hero-actions">
           <a class="button primary" href="https://github.com/zhizhishu/flux-3xui-orchestrator">查看仓库</a>
-          <a class="button secondary" href="#workspace">看当前进度</a>
+          <a class="button secondary" href="#install">一键安装</a>
         </div>
       </div>
     </section>
 
     <main class="main">
+      <section id="install" class="section">
+        <div class="section-header">
+          <h2>公开仓库，直接一条命令安装</h2>
+          <p>主控拉取 GitHub Actions 发布到 GHCR 的镜像；被控端只需要主控里的 server id 和 agent token。</p>
+        </div>
+        <div class="grid two">
+          <article class="card">
+            <h3>主控面板</h3>
+            <pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash</code></pre>
+            <p>安装脚本会创建 `/opt/flux-3xui-orchestrator/.env`，下载 compose 和 `gost.sql`，然后启动 MySQL、后端和前端。</p>
+          </article>
+          <article class="card">
+            <h3>被控服务器 Agent</h3>
+            <pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
+  | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash</code></pre>
+            <p>agent 会注册为 `flux-agent.service`，自动领取 Snell、3x-ui、Xray 和远端端口转发任务。</p>
+          </article>
+        </div>
+      </section>
+
       <section id="workspace" class="section">
         <div class="section-header">
-          <h2>第一版已经有了主控骨架</h2>
-          <p>当前版本先把可持续迭代的地基搭起来：服务器注册、协议模板、部署任务和 Snell 非交互脚本生成。</p>
+          <h2>主控一键编排闭环已经打通</h2>
+          <p>当前版本能多选服务器生成编排任务，由副控 agent 自动领取执行；完成后把 3x-ui 连接信息、Xray inbound/outbound、Snell systemd 节点、远端端口转发、证书、服务状态和流量快照回写到主控。</p>
         </div>
         <div class="metric-row" aria-label="Current MVP metrics">
           <div class="metric">
-            <strong>3</strong>
-            <span>后端资源域</span>
+            <strong>multi</strong>
+            <span>服务器一键选择</span>
           </div>
           <div class="metric">
-            <strong>5</strong>
-            <span>默认协议模板</span>
+            <strong>6</strong>
+            <span>协议与转发规则</span>
           </div>
           <div class="metric">
-            <strong>1</strong>
-            <span>主控中心页面</span>
+            <strong>5m</strong>
+            <span>自动流量同步</span>
           </div>
           <div class="metric">
-            <strong>0</strong>
-            <span>默认远程执行副作用</span>
+            <strong>2</strong>
+            <span>Docker 构建通过</span>
           </div>
         </div>
       </section>
 
       <section id="architecture" class="section">
         <div class="section-header">
-          <h2>控制平面拆成清楚的三层</h2>
-          <p>保持 KISS 和 YAGNI：先不硬搬整套 3x-ui，只抽取节点、协议、任务这些最小闭环。</p>
+          <h2>控制平面拆成清楚的四层</h2>
+          <p>保持 KISS 和 YAGNI：不把 Snell 硬塞进 Xray，而是在主控做统一节点抽象，底层分别适配 3x-ui/Xray API 和 Snell agent/systemd。</p>
         </div>
-        <div class="grid three">
+        <div class="grid four">
           <article class="card">
             <h3>Control Server</h3>
-            <p>登记主控/副控服务器，保存 agent token、心跳时间、Xray/Snell 版本、CPU 和内存状态。</p>
+            <p>登记主控/副控服务器，保存 agent token、3x-ui endpoint、API token、证书状态、服务状态、流量和心跳时间。</p>
           </article>
           <article class="card">
-            <h3>Protocol Profile</h3>
-            <p>将 Snell、VLESS、VMess、Trojan、Shadowsocks 作为可下发的模板，而不是散落在页面和脚本里。</p>
+            <h3>Protocol Node</h3>
+            <p>把 Xray inbound 和 Snell 服务记录到 `protocol_node`，同一张节点列表里管理创建、删除、重启、同步和运行状态。</p>
+          </article>
+          <article class="card">
+            <h3>3x-ui Proxy</h3>
+            <p>通过 Bearer token 操作 `/panel/api/inbounds/*`，读取 Xray config/outbounds，并可请求远端 Xray 重启。</p>
+          </article>
+          <article class="card">
+            <h3>Server Forward</h3>
+            <p>把被控机端口转发记录到 `server_forward_rule`，由 agent 创建 systemd+socat 服务，并在规则总览里和出入站一起查看。</p>
           </article>
           <article class="card">
             <h3>Deploy Task</h3>
-            <p>先生成可审计任务和脚本，再交给 agent 执行，避免主控直接对服务器做不可追踪的远程改动。</p>
+            <p>主控生成一键编排脚本；授权副控 agent 拉取、执行、回传日志和元数据，避免不可追踪的远程改动。</p>
           </article>
         </div>
       </section>
 
       <section class="section">
         <div class="section-header">
-          <h2>部署任务先生成 runbook</h2>
-          <p>Snell 支持来自脚本能力提取，但第一版默认只生成非交互脚本，不自动登录服务器执行。</p>
+          <h2>入站和出站都能从主控发起</h2>
+          <p>入站走 3x-ui Bearer API，出站读取从运行配置提取，保存则使用登录态保护的 Xray 模板接口。</p>
         </div>
         <div class="pipeline">
-          <pre class="runbook"><code>POST /api/v1/deploy-task/create
-protocol: snell
-action: present
-versionFamily: v4
-listenPort: 8388
-
-output:
-  snell.service
-  /etc/snell/users/snell-main.conf
-  install / restart / status / absent</code></pre>
+          <pre class="runbook"><code>POST /api/v1/deploy-task/orchestrate
+POST /api/v1/control-server/heartbeat
+POST /api/v1/agent-task/claim
+POST /api/v1/agent-task/report
+POST /api/v1/protocol-node/create
+POST /api/v1/protocol-node/list
+POST /api/v1/protocol-node/sync
+POST /api/v1/protocol-node/restart
+POST /api/v1/protocol-node/delete
+POST /api/v1/server-forward/create
+POST /api/v1/server-forward/update
+POST /api/v1/server-forward/list
+POST /api/v1/server-forward/delete
+POST /api/v1/server-forward/restart
+POST /api/v1/server-rule/overview
+POST /api/v1/three-xui/inbounds/list
+POST /api/v1/three-xui/inbounds/add
+POST /api/v1/three-xui/inbounds/update
+POST /api/v1/three-xui/inbounds/delete
+POST /api/v1/three-xui/outbounds
+POST /api/v1/three-xui/outbounds/traffic
+POST /api/v1/three-xui/traffic/sync
+POST /api/v1/three-xui/outbounds/save
+POST /api/v1/three-xui/restart-xray</code></pre>
           <div class="status-list" aria-label="Deployment states">
             <div class="status-item">
-              <span>生成任务</span>
-              <span class="tag green">generated</span>
+              <span>主控一键编排 3x-ui</span>
+              <span class="tag green">ready</span>
             </div>
             <div class="status-item">
-              <span>等待 agent</span>
-              <span class="tag amber">next</span>
+              <span>统一协议节点层</span>
+              <span class="tag green">ready</span>
             </div>
             <div class="status-item">
-              <span>远端 inbound 同步</span>
-              <span class="tag cyan">planned</span>
+              <span>3x-ui 出站读取/保存</span>
+              <span class="tag green">ready</span>
+            </div>
+            <div class="status-item">
+              <span>远端端口转发与规则总览</span>
+              <span class="tag green">ready</span>
+            </div>
+            <div class="status-item">
+              <span>Snell agent 常驻执行</span>
+              <span class="tag green">ready</span>
+            </div>
+            <div class="status-item">
+              <span>证书/服务/流量状态</span>
+              <span class="tag green">ready</span>
             </div>
           </div>
         </div>
@@ -121,26 +176,20 @@ output:
 
       <section id="roadmap" class="section">
         <div class="section-header">
-          <h2>接下来做真正的编排</h2>
-          <p>下一步从“能生成任务”推进到“agent 可以执行、上报、同步远端 3x-ui inbound”。</p>
+          <h2>接下来做更强的运行保障</h2>
+          <p>核心链路已经落地，后续重点是烟测夹具、任务重试、协议校验和更细的运行态看板。</p>
         </div>
         <ol class="roadmap">
           <li>
             <div>
-              <strong>Agent executor</strong>
-              <span>副控拉取任务、执行脚本、回传日志和状态，主控只保留审计链。</span>
+              <strong>Runtime smoke tests</strong>
+              <span>已用临时 Docker 环境验证主控 API、agent claim/report、远端转发回写和规则总览；后续补完整 3x-ui fixture。</span>
             </div>
           </li>
           <li>
             <div>
-              <strong>3x-ui remote client</strong>
-              <span>封装 Bearer token、basePath、探活、inbound 创建和流量快照同步。</span>
-            </div>
-          </li>
-          <li>
-            <div>
-              <strong>Protocol safety</strong>
-              <span>主控解析 Snell 版本、下载地址和 checksum，减少 agent 侧动态抓网页的不确定性。</span>
+              <strong>Protocol guardrails</strong>
+              <span>继续增加 Reality public key 展示、outbound tag、Snell checksum 和节点端口占用校验。</span>
             </div>
           </li>
           <li>
