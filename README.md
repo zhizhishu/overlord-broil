@@ -18,11 +18,13 @@ Master panel one-click install, using the GHCR images built by GitHub Actions:
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash
 ```
 
-If the GHCR packages are still private, pass a GitHub token with `read:packages`:
+If the repository or GHCR packages are still private, pass a GitHub token with `repo` and `read:packages`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo env GHCR_USERNAME="zhizhishu" GHCR_TOKEN="github-token-with-read-packages" bash
+export GITHUB_TOKEN="github-token-with-repo-and-read-packages"
+curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+  | sudo env FLUX_GITHUB_TOKEN="${GITHUB_TOKEN}" GHCR_USERNAME="zhizhishu" GHCR_TOKEN="${GITHUB_TOKEN}" bash
 ```
 
 Common options:
@@ -39,6 +41,15 @@ Controlled server agent one-command install:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
   | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash
+```
+
+Private repository form:
+
+```bash
+export GITHUB_TOKEN="github-token-with-repo-scope"
+curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
+  | sudo env FLUX_GITHUB_TOKEN="${GITHUB_TOKEN}" FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash
 ```
 
 `FLUX_SERVER_ID` and `FLUX_AGENT_TOKEN` come from `主控中心`: create or open the server card, then click `Token`.
@@ -284,6 +295,15 @@ For a long-running agent, run this on the controlled server:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
   | sudo env FLUX_PANEL_URL="https://your-master-panel.example.com" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash
+```
+
+If this repository is private:
+
+```bash
+export GITHUB_TOKEN="github-token-with-repo-scope"
+curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
+  | sudo env FLUX_GITHUB_TOKEN="${GITHUB_TOKEN}" FLUX_PANEL_URL="https://your-master-panel.example.com" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash
 ```
 
 The installer downloads `scripts/flux-agent.sh`, creates `/etc/flux-agent.env`, installs `/usr/local/bin/flux-agent.sh`, enables `flux-agent.service`, and keeps the副控 online through systemd. It also installs `curl` and `python3` when the OS package manager is available.

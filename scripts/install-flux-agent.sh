@@ -11,6 +11,7 @@ SERVICE_FILE="${FLUX_AGENT_SERVICE:-/etc/systemd/system/flux-agent.service}"
 REPO_RAW_URL="${FLUX_REPO_RAW_URL:-https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main}"
 SOURCE_URL="${FLUX_AGENT_SOURCE_URL:-${REPO_RAW_URL}/scripts/flux-agent.sh}"
 SOURCE_SCRIPT="${1:-}"
+GITHUB_TOKEN="${FLUX_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
 
 install_packages() {
   local missing=()
@@ -53,6 +54,14 @@ fi
 
 install_packages
 
+download_agent() {
+  if [ -n "$GITHUB_TOKEN" ]; then
+    curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" "$SOURCE_URL" -o "$INSTALL_BIN"
+  else
+    curl -fsSL "$SOURCE_URL" -o "$INSTALL_BIN"
+  fi
+}
+
 if [ -n "$SOURCE_SCRIPT" ]; then
   if [ ! -f "$SOURCE_SCRIPT" ]; then
     echo "flux-agent.sh not found at ${SOURCE_SCRIPT}" >&2
@@ -60,7 +69,7 @@ if [ -n "$SOURCE_SCRIPT" ]; then
   fi
   install -m 0755 "$SOURCE_SCRIPT" "$INSTALL_BIN"
 else
-  curl -fsSL "$SOURCE_URL" -o "$INSTALL_BIN"
+  download_agent
   chmod 0755 "$INSTALL_BIN"
 fi
 

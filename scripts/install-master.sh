@@ -15,6 +15,7 @@ JWT_SECRET="${FLUX_JWT_SECRET:-}"
 INSTALL_DOCKER="${FLUX_INSTALL_DOCKER:-1}"
 GHCR_USERNAME="${GHCR_USERNAME:-}"
 GHCR_TOKEN="${GHCR_TOKEN:-}"
+GITHUB_TOKEN="${FLUX_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
 
 usage() {
   cat <<'EOF'
@@ -32,6 +33,7 @@ Options:
   -h, --help              Show this help
 
 Environment:
+  FLUX_GITHUB_TOKEN       Optional token for downloading files from a private repo
   GHCR_USERNAME/GHCR_TOKEN  Optional login for private GHCR packages
   FLUX_DB_PASSWORD          Optional database password; generated when empty
   FLUX_JWT_SECRET           Optional JWT secret; generated when empty
@@ -152,7 +154,11 @@ download_file() {
   local url="$1"
   local output="$2"
   echo "Downloading ${url}"
-  curl -fsSL --retry 3 --connect-timeout 20 "$url" -o "$output"
+  if [ -n "$GITHUB_TOKEN" ]; then
+    curl -fsSL --retry 3 --connect-timeout 20 -H "Authorization: Bearer ${GITHUB_TOKEN}" "$url" -o "$output"
+  else
+    curl -fsSL --retry 3 --connect-timeout 20 "$url" -o "$output"
+  fi
 }
 
 read_env_value() {
