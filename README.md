@@ -67,6 +67,10 @@ The first iteration adds the foundation for:
   - one-click orchestration modal for 3x-ui, Reality, VMess WS, Trojan TLS, Shadowsocks and Snell
   - service/certificate/traffic status chips on server cards
   - script, token, inbound and config viewers
+- GitHub Actions:
+  - CI builds backend Maven package and frontend production bundle
+  - Docker image workflow builds backend and frontend images
+  - pushes images to GitHub Container Registry on `main`, tags and manual dispatch
 
 ## Repository Layout
 
@@ -426,6 +430,30 @@ Verified build commands used for this repository:
 ```bash
 docker run --rm -v "$PWD/springboot-backend:/workspace" -w /workspace maven:3.9-eclipse-temurin-21 mvn -B -DskipTests package
 docker run --rm -v "$PWD:/workspace" -v flux_3xui_frontend_node_modules:/workspace/vite-frontend/node_modules -w /workspace/vite-frontend node:20-bookworm bash -lc "npm install --legacy-peer-deps --no-audit --no-fund && npm run build"
+```
+
+## GitHub Container Images
+
+`.github/workflows/docker-image.yml` builds and pushes two images to GHCR:
+
+```text
+ghcr.io/zhizhishu/flux-3xui-orchestrator-backend:latest
+ghcr.io/zhizhishu/flux-3xui-orchestrator-frontend:latest
+```
+
+Tags are published on `main`, Git tags and manual `workflow_dispatch`. Pull requests build the images without pushing them.
+
+The compose files now point at these GHCR images:
+
+```bash
+docker compose -f docker-compose-v4.yml up -d
+docker compose -f docker-compose-v6.yml up -d
+```
+
+If the package stays private, log in first:
+
+```bash
+echo "$GITHUB_TOKEN" | docker login ghcr.io -u zhizhishu --password-stdin
 ```
 
 ## Environment
