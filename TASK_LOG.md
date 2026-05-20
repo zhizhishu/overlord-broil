@@ -63,6 +63,7 @@
   - 2026-05-19 10:17:38：新增 `server_forward_rule` 远端端口转发表、后端 API、agent systemd+socat 执行脚本、主控中心“新增转发/远端端口转发/规则总览”入口；规则总览会聚合本地协议节点、本地远端转发、实时 3x-ui inbound 和 3x-ui outbound。
   - 2026-05-19 10:17:38：修复 MySQL 8 默认认证下 JDBC 连接缺少 `allowPublicKeyRetrieval=true` 的问题。
   - 2026-05-19 10:17:38：Docker 烟测通过：临时 MySQL + 后端容器完成登录、创建被控服务器、创建远端转发、agent claim、agent report、`server_forward_rule` 状态回写为 `active`、`server-rule/overview` 返回远端转发规则；本轮临时容器和 network 已清理。
+  - 2026-05-19 23:24:41：新增 GitHub Actions 镜像构建工作流，后端和前端镜像已通过 `Docker Images` workflow 构建并推送到 GHCR；compose 镜像地址已切换到 `ghcr.io/zhizhishu/flux-3xui-orchestrator-*`。
 - 风险/待确认：
   - 主仓库保持私有；由于当前 GitHub plan 不支持私有仓库 Pages，官网使用独立公开仓库 `zhizhishu.github.io`。
   - Snell 现在已经可通过副控 agent 自动领取和执行任务，且已提供 systemd 常驻安装脚本；重试/退避和并发锁仍可继续增强。
@@ -90,7 +91,7 @@
 
 ## 任务清单
 
-- [ ] **目标:** 新增 GitHub Actions 镜像构建与 GHCR 推送，覆盖后端和前端 Docker 镜像 (创建于: 2026-05-19 23:15:58)
+- [x] ~~**目标:** 新增 GitHub Actions 镜像构建与 GHCR 推送，覆盖后端和前端 Docker 镜像~~ (创建于: 2026-05-19 23:15:58 | **完成于: 2026-05-19 23:24:41**)
 - [x] ~~**目标:** 落实主控面板统一管理所有被控服务器，覆盖远端端口转发、3x-ui 出入站规则查看与规则调整入口~~ (创建于: 2026-05-19 08:21:27 | **完成于: 2026-05-19 10:17:38**)
 - [x] ~~**目标:** 将 Snell 提升为统一协议节点能力，和 3x-ui/Xray 节点一起完成创建、删除、同步与可视化管理~~ (创建于: 2026-05-19 07:32:51 | **完成于: 2026-05-19 08:12:21**)
 - [x] ~~**目标:** 完成源码勘察、融合范围确认和第一版可执行拆分计划~~ (创建于: 2026-05-18 22:03:49 | **完成于: 2026-05-18 22:07:56**)
@@ -120,3 +121,4 @@
 - 说明：主项目仍为私有仓库；因当前 GitHub plan 不支持私有仓库 Pages，官网发布在单独的公开静态站点仓库。
 - 2026-05-19 08:16:06：统一协议节点层已推送到主仓库 `origin/main`，commit `79f8cfd`；GitHub Actions CI run `26106480537` 通过。官网同步说明已推送到 Pages 仓库，commit `660d6ca`；`https://zhizhishu.github.io/` 返回 `200`。
 - 2026-05-19 10:22:58：远端端口转发、规则总览、MySQL 8 JDBC 兼容修复已推送到主仓库 `origin/main`，commit `f20926c7629dab33beb28a34819a48b0cc853148`；GitHub Actions CI run `26113491240` 通过。官网同步说明已推送到 Pages 仓库，commit `81d6d36193138855ce5368e84185035d9190c9c1`；`https://zhizhishu.github.io/` 返回 `200` 且包含“远端端口转发与规则总览”。
+- 2026-05-19 23:24:41：GHCR 镜像构建工作流已推送到主仓库 `origin/main`，commit `32e46cd80d2ababf92963e8266f269254f2313ce`；GitHub Actions `Docker Images` run `26145172883` 通过，`CI` run `26145172938` 通过。
