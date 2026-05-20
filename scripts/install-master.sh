@@ -5,6 +5,7 @@ REPO="${FLUX_REPO:-zhizhishu/flux-3xui-orchestrator}"
 REF="${FLUX_REF:-main}"
 RAW_BASE="${FLUX_RAW_BASE:-https://raw.githubusercontent.com/${REPO}/${REF}}"
 INSTALL_DIR="${FLUX_INSTALL_DIR:-/opt/flux-3xui-orchestrator}"
+SOURCE_DIR="${FLUX_SOURCE_DIR:-${INSTALL_DIR}/source}"
 NETWORK_STACK="${FLUX_NETWORK_STACK:-v4}"
 FRONTEND_PORT="${FLUX_FRONTEND_PORT:-80}"
 BACKEND_PORT="${FLUX_BACKEND_PORT:-6365}"
@@ -13,6 +14,7 @@ DB_USER="${FLUX_DB_USER:-gost}"
 DB_PASSWORD="${FLUX_DB_PASSWORD:-}"
 JWT_SECRET="${FLUX_JWT_SECRET:-}"
 INSTALL_DOCKER="${FLUX_INSTALL_DOCKER:-1}"
+BUILD_ON_PULL_FAILURE="${FLUX_BUILD_ON_PULL_FAILURE:-1}"
 GHCR_USERNAME="${GHCR_USERNAME:-}"
 GHCR_TOKEN="${GHCR_TOKEN:-}"
 GITHUB_TOKEN="${FLUX_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
@@ -30,6 +32,7 @@ Options:
   --repo OWNER/REPO       GitHub repo, default zhizhishu/flux-3xui-orchestrator
   --ref REF               Git ref to download, default main
   --no-install-docker     Fail instead of installing Docker when it is missing
+  --no-build-fallback     Fail instead of building local images when GHCR pull fails
   -h, --help              Show this help
 
 Environment:
@@ -37,6 +40,7 @@ Environment:
   GHCR_USERNAME/GHCR_TOKEN  Optional login for private GHCR packages
   FLUX_DB_PASSWORD          Optional database password; generated when empty
   FLUX_JWT_SECRET           Optional JWT secret; generated when empty
+  FLUX_BUILD_ON_PULL_FAILURE Build local images after GHCR pull failure, default 1
 EOF
 }
 
@@ -72,6 +76,10 @@ while [ "$#" -gt 0 ]; do
       INSTALL_DOCKER="0"
       shift
       ;;
+    --no-build-fallback)
+      BUILD_ON_PULL_FAILURE="0"
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -95,21 +103,21 @@ if [ "$NETWORK_STACK" != "v4" ] && [ "$NETWORK_STACK" != "v6" ]; then
 fi
 
 install_base_packages() {
-  if command -v curl >/dev/null 2>&1; then
+  if command -v curl >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
     return
   fi
 
   if command -v apt-get >/dev/null 2>&1; then
     apt-get update
-    DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl
+    DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl tar
   elif command -v dnf >/dev/null 2>&1; then
-    dnf install -y ca-certificates curl
+    dnf install -y ca-certificates curl tar
   elif command -v yum >/dev/null 2>&1; then
-    yum install -y ca-certificates curl
+    yum install -y ca-certificates curl tar
   elif command -v apk >/dev/null 2>&1; then
-    apk add --no-cache ca-certificates curl
+    apk add --no-cache ca-certificates curl tar
   else
-    echo "curl is required. Please install curl first." >&2
+    echo "curl and tar are required. Please install them first." >&2
     exit 2
   fi
 }
@@ -159,6 +167,21 @@ download_file() {
   else
     curl -fsSL --retry 3 --connect-timeout 20 "$url" -o "$output"
   fi
+}
+
+download_source() {
+  local archive="/tmp/flux-3xui-orchestrator-${REF}.tar.gz"
+  rm -rf "$SOURCE_DIR"
+  mkdir -p "$SOURCE_DIR"
+  download_file "https://github.com/${REPO}/archive/${REF}.tar.gz" "$archive"
+  tar -xzf "$archive" -C "$SOURCE_DIR" --strip-components=1
+}
+
+build_local_images() {
+  echo "Building backend/frontend images locally from ${REPO}@${REF}..."
+  download_source
+  docker build -t ghcr.io/zhizhishu/flux-3xui-orchestrator-backend:latest "${SOURCE_DIR}/springboot-backend"
+  docker build -t ghcr.io/zhizhishu/flux-3xui-orchestrator-frontend:latest "${SOURCE_DIR}/vite-frontend"
 }
 
 read_env_value() {
@@ -216,7 +239,15 @@ if [ -n "$GHCR_USERNAME" ] || [ -n "$GHCR_TOKEN" ]; then
   echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 fi
 
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" pull
+if ! docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" pull; then
+  if [ "$BUILD_ON_PULL_FAILURE" != "1" ]; then
+    echo "Image pull failed and local build fallback is disabled." >&2
+    exit 2
+  fi
+  echo "Image pull failed. Falling back to local image build from the GitHub source archive."
+  build_local_images
+fi
+
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d
 
 FINAL_FRONTEND_PORT="$(read_env_value FRONTEND_PORT "$ENV_FILE")"

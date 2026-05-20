@@ -44,13 +44,13 @@
       <section id="install" class="section">
         <div class="section-header">
           <h2>公开仓库，直接一条命令安装</h2>
-          <p>主控拉取 GitHub Actions 发布到 GHCR 的镜像；被控端只需要主控里的 server id 和 agent token。</p>
+          <p>主控优先拉取 GitHub Actions 发布到 GHCR 的镜像；如果 GHCR 暂未公开，安装脚本会回退到下载公开源码并本地构建镜像。被控端只需要主控里的 server id 和 agent token。</p>
         </div>
         <div class="grid two">
           <article class="card">
             <h3>主控面板</h3>
             <pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash</code></pre>
-            <p>安装脚本会创建 `/opt/flux-3xui-orchestrator/.env`，下载 compose 和 `gost.sql`，然后启动 MySQL、后端和前端。</p>
+            <p>安装脚本会创建 `/opt/flux-3xui-orchestrator/.env`，下载 compose 和 `gost.sql`，然后拉取或构建镜像并启动 MySQL、后端和前端。</p>
           </article>
           <article class="card">
             <h3>被控服务器 Agent</h3>

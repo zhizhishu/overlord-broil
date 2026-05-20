@@ -64,6 +64,7 @@
   - 2026-05-19 10:17:38：修复 MySQL 8 默认认证下 JDBC 连接缺少 `allowPublicKeyRetrieval=true` 的问题。
   - 2026-05-19 10:17:38：Docker 烟测通过：临时 MySQL + 后端容器完成登录、创建被控服务器、创建远端转发、agent claim、agent report、`server_forward_rule` 状态回写为 `active`、`server-rule/overview` 返回远端转发规则；本轮临时容器和 network 已清理。
   - 2026-05-19 23:24:41：新增 GitHub Actions 镜像构建工作流，后端和前端镜像已通过 `Docker Images` workflow 构建并推送到 GHCR；compose 镜像地址已切换到 `ghcr.io/zhizhishu/flux-3xui-orchestrator-*`。
+  - 2026-05-20 03:57:59：完成本地 Docker compose 全栈烟测，前端 `http://localhost:18080/` 返回 `200`，后端 `/flow/test` 返回 `test`；创建被控服务器、一键编排任务、agent claim/report、服务器状态回写均通过。烟测中修复 MySQL 首次初始化时 socket healthcheck 过早放行后端的问题，改为 TCP 账号 healthcheck；测试容器、卷、网络和端口已清理。
 - 风险/待确认：
   - 主仓库保持私有；由于当前 GitHub plan 不支持私有仓库 Pages，官网使用独立公开仓库 `zhizhishu.github.io`。
   - Snell 现在已经可通过副控 agent 自动领取和执行任务，且已提供 systemd 常驻安装脚本；重试/退避和并发锁仍可继续增强。
@@ -91,6 +92,7 @@
 
 ## 任务清单
 
+- [x] ~~**目标:** 清理本地换行脏差异并完成架构与可用性复核测试~~ (创建于: 2026-05-20 02:58:42 | **完成于: 2026-05-20 03:57:59**)
 - [x] ~~**目标:** 修复公开仓库 GitHub Pages 配置并更新 README 为公开仓库安装说明~~ (创建于: 2026-05-20 01:11:46 | **完成于: 2026-05-20 01:16:58**)
 - [x] ~~**目标:** 补齐主控一键部署脚本和被控端一条命令安装 agent 的使用入口~~ (创建于: 2026-05-19 23:34:25 | **完成于: 2026-05-19 23:43:32**)
 - [x] ~~**目标:** 新增 GitHub Actions 镜像构建与 GHCR 推送，覆盖后端和前端 Docker 镜像~~ (创建于: 2026-05-19 23:15:58 | **完成于: 2026-05-19 23:24:41**)

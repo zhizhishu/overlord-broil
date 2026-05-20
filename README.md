@@ -36,7 +36,7 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
   | sudo env FLUX_FRONTEND_PORT="8080" FLUX_BACKEND_PORT="6365" FLUX_NETWORK_STACK="v4" bash
 ```
 
-The installer downloads `docker-compose-v4.yml` or `docker-compose-v6.yml`, downloads `gost.sql`, creates `/opt/flux-3xui-orchestrator/.env`, pulls the backend/frontend images and starts the stack.
+The installer downloads `docker-compose-v4.yml` or `docker-compose-v6.yml`, downloads `gost.sql`, creates `/opt/flux-3xui-orchestrator/.env`, pulls the backend/frontend images and starts the stack. If GHCR is not public yet or pull fails, it falls back to downloading the public GitHub source archive and building both images locally.
 
 Controlled server agent one-command install:
 
@@ -501,11 +501,13 @@ For a fresh server, use the installer instead of preparing the compose files man
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash
 ```
 
-The repository is public, so `curl` can fetch the install scripts without a token. GHCR package visibility is controlled separately from repository visibility. If the packages stay private, log in first:
+The repository is public, so `curl` can fetch the install scripts without a token. GHCR package visibility is controlled separately from repository visibility. If the packages stay private, either log in first for a faster pull:
 
 ```bash
 echo "$GITHUB_TOKEN" | docker login ghcr.io -u zhizhishu --password-stdin
 ```
+
+or let `scripts/install-master.sh` fall back to local Docker builds from the public source archive.
 
 ## Environment
 
