@@ -628,12 +628,25 @@ LOG_DIR
 3. Add deeper runtime smoke tests against real disposable 3x-ui containers after a stable upstream container fixture is selected.
 4. Split legacy upstream wording/mojibake cleanup into a dedicated documentation pass.
 
-## Upstream References
+## References And Acknowledgements
 
-- Flux Panel: `https://github.com/zhizhishu/flux-panel`
-- 3x-ui: `https://github.com/MHSanaei/3x-ui`
-- Snell script reference: `https://github.com/jinqians/snell.sh`
-- Komari monitor reference: `https://github.com/komari-monitor/komari`
+Flux 3x-ui Orchestrator is an independent project maintained in this repository. It is not an official fork, release or
+distribution of the projects below, but it deliberately studies and builds on ideas from them.
+
+Special thanks to these open-source projects:
+
+- [Flux Panel](https://github.com/zhizhishu/flux-panel): the UI style, forwarding-panel foundation, repository structure
+  and original operational surface that this project uses as its base.
+- [3x-ui](https://github.com/MHSanaei/3x-ui): the Xray/3x-ui protocol-management model and remote panel API behavior
+  used as the primary reference for inbound, client, outbound, traffic and Xray restart management.
+- [snell.sh](https://github.com/jinqians/snell.sh): the Snell installation flow and deployment-script behavior used as
+  the reference for turning Snell into a managed protocol node through the Flux agent.
+- [Komari Monitor](https://github.com/komari-monitor/komari): the master/agent monitoring idea used as a reference for
+  heartbeat, status collection and multi-server operations.
+
+This repository keeps those inspirations visible so users can understand where the architecture came from, while all
+new orchestration code, agent integration, Snell adaptation, 3x-ui proxy APIs, monitor alerts and release workflows live
+in this project.
 
 ## Safety Notice
 
