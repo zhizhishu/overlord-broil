@@ -207,8 +207,8 @@
 
 ## 本轮 0.6.0 任务清单
 
-- [ ] **目标:** 完成 0.6.0 可靠性版第一批：安装矩阵预检、Docker/CI 验证、agent 诊断闭环、Flux UI/文档打磨并推送 (创建于: 2026-05-21 13:21:17)
-- [ ] **目标:** 修复 0.6.0 install-matrix CI：RHEL curl-minimal 包冲突与 Alpine 容器端口预检误判 (创建于: 2026-05-22 05:19:10)
+- [x] ~~**目标:** 完成 0.6.0 可靠性版第一批：安装矩阵预检、Docker/CI 验证、agent 诊断闭环、Flux UI/文档打磨并推送~~ (创建于: 2026-05-21 13:21:17 | **完成于: 2026-05-22 05:26:11**)
+- [x] ~~**目标:** 修复 0.6.0 install-matrix CI：RHEL curl-minimal 包冲突与 Alpine 容器端口预检误判~~ (创建于: 2026-05-22 05:19:10 | **完成于: 2026-05-22 05:26:11**)
 
 ### 2026-05-22 05:09:54 进度记录
 
@@ -216,3 +216,11 @@
 - 已完成本地非 Docker 验证：`bash -n scripts/*.sh`、`sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、`scripts/flux-agent.sh --doctor`、`scripts/install-master.sh doctor`、`scripts/install-flux-agent.sh doctor`、`docker compose -f docker-compose-v4.yml config --quiet`、`docker compose -f docker-compose-v6.yml config --quiet`、`vite-frontend npm run build`、`git diff --check`。
 - 本机限制：当前 Windows Docker Desktop Linux engine 对 `docker version/docker run` 仍返回 500，导致本地 Docker Maven、Docker Node release-check、完整 compose smoke 和 `scripts/test-install-matrix.sh` 不能可靠执行；未关闭 Docker Desktop/WSL 后台进程，等待推送后用 GitHub Actions 完成 Docker/Maven/矩阵验证。
 - 下一步：提交并推送主仓库与 `zhizhishu.github.io` 官网仓库，观察 `CI`、`Docker Images`、Pages 等 GitHub Actions；若 install-matrix 或 Java 编译暴露问题，立即修复并二次推送。
+
+### 2026-05-22 05:26:11 完成记录
+
+- 主仓库已推送 `origin/main`：`c05cd5a`，提交信息 `Fix 0.6.0 install matrix diagnostics`。该提交修复了 RHEL/Rocky 系 `curl-minimal` 与 `curl` 包冲突，并为容器化 doctor 增加 `FLUX_DOCTOR_SKIP_PORT_CHECK=1`，避免 Alpine/CI 预检误判端口占用。
+- GitHub Actions `CI` run `26253894837` 已通过：backend Maven、frontend build、scripts、agent mock、3x-ui fixture、compose config、dry-run compose smoke、完整 compose smoke、Debian/Ubuntu/Alpine/Rocky Linux/Oracle Linux install-matrix 全部成功。
+- GitHub Actions `pages-build-deployment` run `26253893769` 已通过；上一轮 `Docker Images` run `26253407666` 已通过，backend/frontend GHCR 镜像已构建并推送。
+- 本地复核通过：`bash -n scripts/*.sh`、`sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、带占位环境的 `scripts/flux-agent.sh --doctor`、`scripts/install-master.sh doctor`、`scripts/install-flux-agent.sh doctor`、v4/v6 compose config、`vite-frontend npm run build`、`git diff --check`。
+- 本机 Docker Desktop Linux engine 仍对 `docker version` 返回 500；本轮未关闭 Docker Desktop/WSL 后台服务，完整 Docker/Maven/compose/矩阵验证以 GitHub Actions 结果为准。
