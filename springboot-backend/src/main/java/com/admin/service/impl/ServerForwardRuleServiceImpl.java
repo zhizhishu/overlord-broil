@@ -236,7 +236,9 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
         appendVar(script, "TARGET_HOST", rule.getTargetHost());
         script.append("TARGET_PORT=").append(rule.getTargetPort()).append("\n");
         appendVar(script, "SERVICE_NAME", normalizeService(service));
-        script.append("SERVICE_PATH=\"/etc/systemd/system/${SERVICE_NAME}\"\n\n");
+        script.append("SERVICE_BASE=\"${SERVICE_NAME%.service}\"\n");
+        script.append("SYSTEMD_SERVICE_PATH=\"/etc/systemd/system/${SERVICE_NAME}\"\n");
+        script.append("OPENRC_SERVICE_PATH=\"/etc/init.d/${SERVICE_BASE}\"\n\n");
         script.append("""
                 require_root() {
                   if [ "$(id -u)" -ne 0 ]; then
@@ -261,6 +263,32 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
                   fi
                 }
 
+                detect_service_manager() {
+                  if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+                    echo systemd
+                    return
+                  fi
+                  if command -v rc-service >/dev/null 2>&1 && command -v rc-update >/dev/null 2>&1; then
+                    echo openrc
+                    return
+                  fi
+                  echo 'systemd or OpenRC is required for persistent forward services.' >&2
+                  exit 1
+                }
+
+                service_status() {
+                  local manager="$1"
+                  if [ "$manager" = "systemd" ]; then
+                    systemctl is-active "$SERVICE_NAME" 2>/dev/null || echo not-installed
+                  else
+                    if rc-service "$SERVICE_BASE" status >/dev/null 2>&1; then
+                      echo active
+                    else
+                      echo inactive
+                    fi
+                  fi
+                }
+
                 socat_listen_addr() {
                   local proto="$1"
                   if [ "$proto" = "udp" ]; then
@@ -279,11 +307,12 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
                   fi
                 }
 
-                write_service() {
-                  local listen target
+                write_systemd_service() {
+                  local listen target socat_bin
                   listen="$(socat_listen_addr "$PROTOCOL")"
                   target="$(socat_target_addr "$PROTOCOL")"
-                  cat > "$SERVICE_PATH" <<SERVICE
+                  socat_bin="$(command -v socat)"
+                  cat > "$SYSTEMD_SERVICE_PATH" <<SERVICE
                 [Unit]
                 Description=Flux server forward ${RULE_NAME}
                 After=network-online.target
@@ -291,7 +320,7 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
 
                 [Service]
                 Type=simple
-                ExecStart=/usr/bin/socat -d -d ${listen} ${target}
+                ExecStart=${socat_bin} -d -d ${listen} ${target}
                 Restart=always
                 RestartSec=5
                 LimitNOFILE=1048576
@@ -302,26 +331,91 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
                   systemctl daemon-reload
                 }
 
+                write_openrc_service() {
+                  local listen target socat_bin
+                  listen="$(socat_listen_addr "$PROTOCOL")"
+                  target="$(socat_target_addr "$PROTOCOL")"
+                  socat_bin="$(command -v socat)"
+                  cat > "$OPENRC_SERVICE_PATH" <<SERVICE
+                #!/sbin/openrc-run
+                name="Flux server forward ${RULE_NAME}"
+                description="Flux server forward ${RULE_NAME}"
+                command="${socat_bin}"
+                command_args="-d -d ${listen} ${target}"
+                command_background="yes"
+                pidfile="/run/${SERVICE_BASE}.pid"
+                output_log="/var/log/${SERVICE_BASE}.log"
+                error_log="/var/log/${SERVICE_BASE}.err"
+
+                depend() {
+                  need net
+                  after firewall
+                }
+                SERVICE
+                  chmod 0755 "$OPENRC_SERVICE_PATH"
+                }
+
                 install_rule() {
+                  local manager
                   require_root
                   install_deps
-                  write_service
-                  systemctl enable "$SERVICE_NAME"
-                  systemctl restart "$SERVICE_NAME"
-                  systemctl --no-pager --full status "$SERVICE_NAME" || true
+                  manager="$(detect_service_manager)"
+                  if [ "$manager" = "systemd" ]; then
+                    write_systemd_service
+                    systemctl enable "$SERVICE_NAME"
+                    systemctl restart "$SERVICE_NAME"
+                    systemctl --no-pager --full status "$SERVICE_NAME" || true
+                  else
+                    write_openrc_service
+                    rc-update add "$SERVICE_BASE" default
+                    rc-service "$SERVICE_BASE" restart
+                    rc-service "$SERVICE_BASE" status || true
+                  fi
                 }
 
                 remove_rule() {
+                  local manager
                   require_root
-                  systemctl stop "$SERVICE_NAME" 2>/dev/null || true
-                  systemctl disable "$SERVICE_NAME" 2>/dev/null || true
-                  rm -f "$SERVICE_PATH"
-                  systemctl daemon-reload
+                  manager="$(detect_service_manager)"
+                  if [ "$manager" = "systemd" ]; then
+                    systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+                    systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+                    rm -f "$SYSTEMD_SERVICE_PATH"
+                    systemctl daemon-reload
+                  else
+                    rc-service "$SERVICE_BASE" stop 2>/dev/null || true
+                    rc-update del "$SERVICE_BASE" default 2>/dev/null || true
+                    rm -f "$OPENRC_SERVICE_PATH"
+                  fi
+                }
+
+                restart_rule() {
+                  local manager
+                  require_root
+                  manager="$(detect_service_manager)"
+                  if [ "$manager" = "systemd" ]; then
+                    systemctl restart "$SERVICE_NAME"
+                    systemctl --no-pager status "$SERVICE_NAME" || true
+                  else
+                    rc-service "$SERVICE_BASE" restart
+                    rc-service "$SERVICE_BASE" status || true
+                  fi
+                }
+
+                show_rule_status() {
+                  local manager
+                  manager="$(detect_service_manager)"
+                  if [ "$manager" = "systemd" ]; then
+                    systemctl --no-pager status "$SERVICE_NAME" || true
+                  else
+                    rc-service "$SERVICE_BASE" status || true
+                  fi
                 }
 
                 emit_result_marker() {
-                  local service_status state
-                  service_status="$(systemctl is-active "$SERVICE_NAME" 2>/dev/null || echo not-installed)"
+                  local manager service_status state
+                  manager="$(detect_service_manager)"
+                  service_status="$(service_status "$manager")"
                   state="$service_status"
                   if [ "$ACTION" = "absent" ]; then
                     state='deleted'
@@ -349,8 +443,8 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
                 case "$ACTION" in
                   present) install_rule ;;
                   absent) remove_rule ;;
-                  restarted) require_root; systemctl restart "$SERVICE_NAME"; systemctl --no-pager status "$SERVICE_NAME" || true ;;
-                  status) systemctl --no-pager status "$SERVICE_NAME" || true ;;
+                  restarted) restart_rule ;;
+                  status) show_rule_status ;;
                   *) echo "Unsupported action: $ACTION" >&2; exit 1 ;;
                 esac
 

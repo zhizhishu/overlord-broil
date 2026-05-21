@@ -14,7 +14,10 @@ TASK_TIMEOUT_SECONDS="${FLUX_TASK_TIMEOUT_SECONDS:-7200}"
 TASK_TIMEOUT_KILL_SECONDS="${FLUX_TASK_TIMEOUT_KILL_SECONDS:-30}"
 INSTALL_BIN="${FLUX_AGENT_BIN:-/usr/local/bin/flux-agent.sh}"
 ENV_FILE="${FLUX_AGENT_ENV:-/etc/flux-agent.env}"
-SERVICE_FILE="${FLUX_AGENT_SERVICE:-/etc/systemd/system/flux-agent.service}"
+OPENRC_WRAPPER="${FLUX_AGENT_OPENRC_WRAPPER:-/usr/local/bin/flux-agent-openrc-wrapper.sh}"
+SERVICE_MANAGER="${FLUX_SERVICE_MANAGER:-auto}"
+SYSTEMD_SERVICE_FILE="${FLUX_AGENT_SYSTEMD_SERVICE:-/etc/systemd/system/flux-agent.service}"
+OPENRC_SERVICE_FILE="${FLUX_AGENT_OPENRC_SERVICE:-/etc/init.d/flux-agent}"
 REPO_RAW_URL="${FLUX_REPO_RAW_URL:-https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main}"
 SOURCE_URL="${FLUX_AGENT_SOURCE_URL:-${REPO_RAW_URL}/scripts/flux-agent.sh}"
 SOURCE_SCRIPT="${1:-}"
@@ -38,6 +41,7 @@ write_env_line() {
 
 install_packages() {
   local missing=()
+  command -v bash >/dev/null 2>&1 || missing+=("bash")
   command -v curl >/dev/null 2>&1 || missing+=("curl")
   command -v python3 >/dev/null 2>&1 || missing+=("python3")
 
@@ -60,6 +64,47 @@ install_packages() {
   fi
 }
 
+detect_os_name() {
+  if [ -r /etc/os-release ]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    echo "${PRETTY_NAME:-${NAME:-unknown}}"
+    return
+  fi
+  uname -s
+}
+
+detect_service_manager() {
+  case "$SERVICE_MANAGER" in
+    auto)
+      if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+        SERVICE_MANAGER="systemd"
+      elif command -v rc-service >/dev/null 2>&1 && command -v rc-update >/dev/null 2>&1; then
+        SERVICE_MANAGER="openrc"
+      else
+        echo "systemd or OpenRC is required for the long-running agent service." >&2
+        exit 2
+      fi
+      ;;
+    systemd)
+      if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then
+        echo "FLUX_SERVICE_MANAGER=systemd was requested, but a running systemd host is not available." >&2
+        exit 2
+      fi
+      ;;
+    openrc)
+      if ! command -v rc-service >/dev/null 2>&1 || ! command -v rc-update >/dev/null 2>&1; then
+        echo "FLUX_SERVICE_MANAGER=openrc was requested, but rc-service/rc-update is not available." >&2
+        exit 2
+      fi
+      ;;
+    *)
+      echo "FLUX_SERVICE_MANAGER must be auto, systemd or openrc." >&2
+      exit 2
+      ;;
+  esac
+}
+
 if [ "$(id -u)" -ne 0 ]; then
   echo "Please run this installer as root." >&2
   exit 2
@@ -70,12 +115,10 @@ if [ -z "$PANEL_URL" ] || [ -z "$SERVER_ID" ] || [ -z "$AGENT_TOKEN" ]; then
   exit 2
 fi
 
-if ! command -v systemctl >/dev/null 2>&1; then
-  echo "systemd is required for the long-running agent service." >&2
-  exit 2
-fi
-
 install_packages
+detect_service_manager
+echo "Detected OS: $(detect_os_name)"
+echo "Using service manager: ${SERVICE_MANAGER}"
 
 download_agent() {
   if [ -n "$GITHUB_TOKEN" ]; then
@@ -112,7 +155,8 @@ fi
 } > "$ENV_FILE"
 chmod 600 "$ENV_FILE"
 
-cat > "$SERVICE_FILE" <<SERVICE
+install_systemd_service() {
+  cat > "$SYSTEMD_SERVICE_FILE" <<SERVICE
 [Unit]
 Description=Flux 3x-ui Orchestrator Agent
 After=network-online.target
@@ -131,8 +175,51 @@ WorkingDirectory=/var/lib/flux-agent
 WantedBy=multi-user.target
 SERVICE
 
+  systemctl daemon-reload
+  systemctl enable flux-agent
+  systemctl restart flux-agent
+  systemctl --no-pager status flux-agent || true
+}
+
+install_openrc_service() {
+  cat > "$OPENRC_WRAPPER" <<WRAPPER
+#!/usr/bin/env sh
+set -a
+. "${ENV_FILE}"
+set +a
+exec "${INSTALL_BIN}"
+WRAPPER
+  chmod 0755 "$OPENRC_WRAPPER"
+
+  cat > "$OPENRC_SERVICE_FILE" <<SERVICE
+#!/sbin/openrc-run
+name="Flux 3x-ui Orchestrator Agent"
+description="Flux 3x-ui Orchestrator Agent"
+command="${OPENRC_WRAPPER}"
+command_background="yes"
+pidfile="/run/flux-agent.pid"
+output_log="/var/log/flux-agent.log"
+error_log="/var/log/flux-agent.err"
+directory="/var/lib/flux-agent"
+
+depend() {
+  need net
+  after firewall
+}
+
+start_pre() {
+  checkpath --directory --mode 0755 /var/lib/flux-agent
+}
+SERVICE
+
+  chmod 0755 "$OPENRC_SERVICE_FILE"
+  rc-update add flux-agent default
+  rc-service flux-agent restart
+  rc-service flux-agent status || true
+}
+
 mkdir -p /var/lib/flux-agent
-systemctl daemon-reload
-systemctl enable flux-agent
-systemctl restart flux-agent
-systemctl --no-pager status flux-agent || true
+case "$SERVICE_MANAGER" in
+  systemd) install_systemd_service ;;
+  openrc) install_openrc_service ;;
+esac

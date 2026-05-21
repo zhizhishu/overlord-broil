@@ -170,4 +170,22 @@
 
 ## 本轮任务清单
 
+- [ ] **目标:** 推进到可上架正式版：补齐发布清单、修正正式版文档口径、处理 Actions Node 24 兼容提示、完成完整验证并推送发布就绪提交 (创建于: 2026-05-21 11:19:29)
 - [x] ~~**目标:** 分布式完成主控自控安全、凭据加密、3x-ui 回归增强和前端生成辅助，并完成验证、提交、推送~~ (创建于: 2026-05-21 01:48:00 | **完成于: 2026-05-21 02:54:48**)
+
+## 本轮正式上架硬化计划（创建于: 2026-05-21 12:13:22）
+1. 安装兼容性：增强主控与被控脚本在 Debian/Ubuntu、Alpine、Rocky Linux、Oracle Linux 上的包管理器、Docker/Compose、systemd/OpenRC 适配与失败提示。
+2. 主控/被控可靠性：补安装前端口占用、环境变量、服务状态、日志与卸载/升级路径检查，降低一键安装失败和误操作风险。
+3. Flux 风格 UI：继续把主控中心打磨成密集、清晰、运维控制台式布局，重点优化服务器卡片操作分组、状态可读性和上架观感。
+4. README/运维文档：补正式版安装矩阵、端口占用、防火墙建议、Agent 服务管理和常见排障。
+5. 验证与发布：运行脚本语法、agent mock、3x-ui fixture、前端构建、Docker Maven、compose/smoke、diff 检查，清理资源后提交推送并观察 GitHub Actions。
+
+## 本轮正式上架任务清单
+
+- [ ] **目标:** 完成正式上架硬化：Linux 安装适配、Flux UI 打磨、主控/被控可靠性、README/运维文档、完整验证和 GitHub 推送 (创建于: 2026-05-21 12:13:22)
+
+### 2026-05-21 13:02:34 进度记录
+
+- 已完成实现与本地验证：Debian/Ubuntu、Rocky/Oracle Linux、Alpine/OpenRC 分层支持矩阵；新增 POSIX bootstrap 安装器；agent/OpenRC、Snell/OpenRC、远端转发 OpenRC 支持；3x-ui 完整安装编排增加 systemd preflight；主控页服务器卡片操作分组已按 Flux 运维控制台方向打磨；README、Operations、Release Notes、项目 docs 官网和独立 `zhizhishu.github.io` 官网已同步正式版使用说明。
+- 本地已通过：`bash -n scripts/*.sh`、`sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、`docker compose -f docker-compose-v4.yml config --quiet`、`docker compose -f docker-compose-v6.yml config --quiet`、`vite-frontend npm run build`、`git diff --check`。
+- 本机 Docker Desktop engine 当前对 `docker run` / `docker ps` 返回 500，导致 Docker Maven 和完整 compose smoke 无法在本机继续跑；推送后由 GitHub Actions 的 backend、scripts compose smoke 和 Docker Images workflow 做最终验证。

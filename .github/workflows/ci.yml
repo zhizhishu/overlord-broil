@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -29,7 +32,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: vite-frontend/package.json
       - name: Install frontend dependencies
@@ -44,7 +47,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Validate shell scripts
-        run: bash -n scripts/*.sh
+        run: |
+          bash -n scripts/*.sh
+          sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh
       - name: Run agent mock tests
         run: bash scripts/test-flux-agent-mock.sh
       - name: Run 3x-ui fixture tests
@@ -55,8 +60,10 @@ jobs:
           DB_USER: gost
           DB_PASSWORD: test-password
           JWT_SECRET: test-jwt-secret
+          SECRET_ENCRYPTION_KEY: test-secret-encryption-key
           FRONTEND_PORT: "18080"
           BACKEND_PORT: "16365"
+          PHPMYADMIN_PORT: "18066"
         run: |
           docker compose -f docker-compose-v4.yml config --quiet
           docker compose -f docker-compose-v6.yml config --quiet

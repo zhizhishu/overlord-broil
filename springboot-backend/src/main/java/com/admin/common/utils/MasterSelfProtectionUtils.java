@@ -70,6 +70,7 @@ public final class MasterSelfProtectionUtils {
         ports.put(22, "SSH 管理端口");
         putEnvPort(ports, "FRONTEND_PORT", "FRONTEND_PORT 前端端口");
         putEnvPort(ports, "BACKEND_PORT", "BACKEND_PORT 后端端口");
+        putEnvPort(ports, "PHPMYADMIN_PORT", "PHPMYADMIN_PORT phpMyAdmin 端口");
         return ports;
     }
 

@@ -1,6 +1,6 @@
 # Flux 3x-ui Orchestrator
 
-Flux 3x-ui Orchestrator is a new control-panel project based on the Flux Panel UI and forwarding-panel foundation. The goal is to evolve it into a master/agent orchestration panel that can manage multiple servers, deploy 3x-ui compatible protocol nodes, and add Snell deployment support.
+Flux 3x-ui Orchestrator is a control-panel project based on the Flux Panel UI and forwarding-panel foundation. It provides a master/agent orchestration panel for managing multiple servers, deploying 3x-ui compatible protocol nodes, and operating Snell alongside Xray-based nodes.
 
 This repository is an independent project. It uses upstream projects as references and foundations, but future development should happen here.
 
@@ -11,12 +11,53 @@ https://zhizhishu.github.io/flux-3xui-orchestrator/
 https://zhizhishu.github.io/
 ```
 
-Current release: `0.4.0` (pre-1.0 public productization batch).
+Current release: `0.5.0` (public production-ready milestone for small master/agent deployments).
 
 Release and operations docs:
 
 - [Release notes](docs/RELEASE_NOTES.md)
 - [Operations checklist](docs/OPERATIONS.md)
+
+## Production Release Gate
+
+Before publishing a release tag or installing on a live host, run:
+
+```bash
+bash scripts/release-check.sh --full
+```
+
+The release gate validates shell scripts, agent task execution, tokenized 3x-ui fixture routes, compose v4/v6 config, frontend production build, Docker Maven backend build, a disposable compose smoke stack and `git diff --check`.
+
+Formal runtime assumptions for this release:
+
+- Use a fresh Linux host or a host where ports `80`, `6365` and `8066` are either free or intentionally remapped.
+- Supported master hosts are Docker-capable Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux. Minimal hosts without `bash` can use the bootstrap commands below.
+- Full 3x-ui install/configure orchestration requires a normal systemd host, such as Debian, Ubuntu, Rocky Linux or Oracle Linux. Alpine/OpenRC is supported for the Flux agent, Snell tasks and remote port-forward tasks, but not for upstream 3x-ui service installation.
+- Keep `/opt/flux-3xui-orchestrator/.env` and backups private; it contains `DB_PASSWORD`, `JWT_SECRET` and `SECRET_ENCRYPTION_KEY`.
+- Keep `SECRET_ENCRYPTION_KEY` stable. It encrypts stored agent tokens and 3x-ui API/password/2FA fields.
+- Restrict `8066` phpMyAdmin with a firewall or remove the published port in production.
+- Register controlled servers only when you own or are authorized to administer them.
+
+Default master ports:
+
+| Port | Component | Notes |
+| --- | --- | --- |
+| `80` | Frontend panel | Change with `FLUX_FRONTEND_PORT`. |
+| `6365` | Backend API / agent callback | Change with `FLUX_BACKEND_PORT`. |
+| `8066` | phpMyAdmin | Change with `FLUX_PHPMYADMIN_PORT` or `--phpmyadmin-port`; restrict before production exposure. |
+| `3306` | MySQL | Container-internal only; not published to the host. |
+
+Controlled-server ports are created by your orchestration choices: 3x-ui panel port, Xray inbound ports, Snell listen ports, remote-forward listen ports and ACME HTTP `80` when that certificate mode is used.
+
+Linux support matrix:
+
+| Target | Debian / Ubuntu | Rocky / Oracle Linux | Alpine / OpenRC |
+| --- | --- | --- | --- |
+| Master Docker stack | Supported via `apt-get` + Docker install | Supported via `dnf`/`yum` + Docker install | Supported via `apk` + OpenRC Docker service |
+| Agent service | systemd | systemd | OpenRC |
+| Snell node tasks | systemd service | systemd service | OpenRC service |
+| Remote forwarding tasks | systemd + `socat` | systemd + `socat` | OpenRC + `socat` |
+| Full 3x-ui install/configure | Supported | Supported | Not supported in `0.5.0`; use a systemd host for this part |
 
 ## Quick Start
 
@@ -26,6 +67,12 @@ Master panel one-click install, using the GHCR images built by GitHub Actions:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash
+```
+
+On Alpine or a very small image that does not have `bash` yet, use the POSIX bootstrap first:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master-bootstrap.sh | sudo sh
 ```
 
 The default action is still `install`. For day-2 operations, pass an explicit action:
@@ -51,7 +98,7 @@ Common options:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo env FLUX_FRONTEND_PORT="8080" FLUX_BACKEND_PORT="6365" FLUX_NETWORK_STACK="v4" bash
+  | sudo env FLUX_FRONTEND_PORT="8080" FLUX_BACKEND_PORT="6365" FLUX_PHPMYADMIN_PORT="18066" FLUX_NETWORK_STACK="v4" bash
 ```
 
 The installer downloads `docker-compose-v4.yml` or `docker-compose-v6.yml`, downloads `gost.sql`, creates `/opt/flux-3xui-orchestrator/.env`, pulls the backend/frontend images and starts the stack. If GHCR is not public yet or pull fails, it falls back to downloading the public GitHub source archive and building both images locally.
@@ -61,6 +108,13 @@ Controlled server agent one-command install:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
   | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash
+```
+
+Alpine or minimal controlled hosts can use the agent bootstrap:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent-bootstrap.sh \
+  | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" sh
 ```
 
 `FLUX_SERVER_ID` and `FLUX_AGENT_TOKEN` come from `主控中心`: create or open the server card, then click `Token`.
@@ -74,9 +128,9 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
 - Add Snell support through non-interactive deployment scripts and a lightweight agent executor.
 - Keep deployment workflows auditable: generate tasks on the master side, then let an authorized agent pull, execute, and report results.
 
-## Current MVP
+## Current Release Scope
 
-The first iteration adds the foundation for:
+The current public release includes:
 
 - Control server registry:
   - server CRUD
@@ -92,12 +146,12 @@ The first iteration adds the foundation for:
   - generated task records
   - generated Snell install/restart/status/uninstall script
   - unified `protocol_node` records for Xray/3x-ui inbounds and Snell services
-  - remote `server_forward_rule` records that install/update/delete systemd+socat port-forward services on controlled servers
+  - remote `server_forward_rule` records that install/update/delete systemd/OpenRC + `socat` port-forward services on controlled servers
   - one-click 3x-ui orchestration task for installing/configuring 3x-ui, creating starter protocol nodes, installing Snell and returning connection metadata
   - agent task claim/report API protected by `X-Agent-Token`
   - `scripts/install-master.sh` one-click master installer for GHCR + Docker Compose deployment
   - `scripts/flux-agent.sh` polling executor for副控 servers
-  - `scripts/install-flux-agent.sh` one-command systemd installer for long-running agents
+  - `scripts/install-flux-agent.sh` one-command systemd/OpenRC installer for long-running agents
 - 3x-ui remote panel management:
   - test remote 3x-ui connection
   - list inbounds through `/panel/api/inbounds/list`
@@ -138,10 +192,10 @@ The first iteration adds the foundation for:
 | Master install | One-command GitHub raw installer, default install path `/opt/flux-3xui-orchestrator`. |
 | Master runtime | Docker Compose stack with MySQL, backend, frontend and optional phpMyAdmin. |
 | Images | GHCR backend/frontend images with local source-build fallback when package pulls are unavailable. |
-| Agent install | One-command systemd installer; config in `/etc/flux-agent.env`, runner at `/usr/local/bin/flux-agent.sh`. |
+| Agent install | One-command systemd/OpenRC installer; config in `/etc/flux-agent.env`, runner at `/usr/local/bin/flux-agent.sh`. |
 | Agent tasks | Poll, execute, timeout, retry and report flow for Snell, 3x-ui orchestration and port-forward tasks. |
 | 3x-ui | Connection test, inbound/client operations, Xray config/outbound reads, traffic sync and Xray restart. |
-| Snell | Managed as a product-level protocol node through agent-generated systemd services. |
+| Snell | Managed as a product-level protocol node through agent-generated systemd/OpenRC services. |
 | Port forwards | Controlled-host `socat` services created through auditable deployment tasks. |
 | Verification | Maven package, Vite build, agent mock test, tokenized 3x-ui fixture, compose config and disposable compose smoke test. |
 
@@ -357,7 +411,7 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
   | sudo env FLUX_PANEL_URL="https://your-master-panel.example.com" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash
 ```
 
-The installer downloads `scripts/flux-agent.sh`, creates `/etc/flux-agent.env`, installs `/usr/local/bin/flux-agent.sh`, enables `flux-agent.service`, and keeps the副控 online through systemd. It also installs `curl` and `python3` when the OS package manager is available.
+The installer downloads `scripts/flux-agent.sh`, creates `/etc/flux-agent.env`, installs `/usr/local/bin/flux-agent.sh`, and keeps the副控 online through systemd or OpenRC. It also installs `bash`, `curl` and `python3` when the OS package manager is available.
 
 If you already copied the scripts to the server, local install still works:
 
@@ -401,6 +455,19 @@ export FLUX_BASH_BIN=/bin/bash
 
 The agent keeps a single-host lock, retries temporary HTTP failures with backoff, reports task stdout/stderr/result metadata, and marks long-running task scripts as failed with `exitCode=124` when they exceed `FLUX_TASK_TIMEOUT_SECONDS`.
 
+Service commands:
+
+```bash
+# systemd hosts: Debian, Ubuntu, Rocky Linux, Oracle Linux
+systemctl status flux-agent.service
+journalctl -u flux-agent.service -n 100 --no-pager
+
+# OpenRC hosts: Alpine
+rc-service flux-agent status
+tail -n 100 /var/log/flux-agent.log
+tail -n 100 /var/log/flux-agent.err
+```
+
 ### 5. One-click 3x-ui orchestration
 
 Open `主控中心`, click `一键编排`, choose one or more servers, then choose:
@@ -413,26 +480,28 @@ Open `主控中心`, click `一键编排`, choose one or more servers, then choo
 
 Click `生成一键任务`. The master creates one deployment task per selected server. Each remote agent claims its own task automatically, installs/configures 3x-ui, creates the selected protocol nodes, installs Snell when selected, restarts services, then returns 3x-ui endpoint/base path/API token, service status, certificate status and created inbound metadata. The server card updates after the task report or next heartbeat.
 
-The one-click script validates duplicate ports before it is saved. ACME HTTP mode requires the domain DNS to point at the target server and port `80` to be reachable.
+The one-click 3x-ui script validates duplicate ports before it is saved and requires a running systemd host because upstream 3x-ui ships systemd service units. Use Debian, Ubuntu, Rocky Linux or Oracle Linux for full 3x-ui installation/configuration. Alpine/OpenRC can still run the Flux agent, Snell node tasks and remote forwarding tasks, but the full 3x-ui install step is intentionally blocked with a clear preflight error.
+
+ACME HTTP mode requires the domain DNS to point at the target server and port `80` to be reachable. The current script uses standalone HTTP validation and expects the host firewall/cloud firewall to allow the challenge traffic.
 
 ### 6. Manage unified protocol nodes
 
 Open `主控中心` and use `新增节点`.
 
 - VLESS / VMess / Trojan / Shadowsocks nodes are created through the remote 3x-ui inbound API and stored locally in `protocol_node`.
-- Snell nodes are stored in `protocol_node`, then the master creates an agent task. The remote agent installs or updates a node-specific Snell systemd service such as `snell-node-12.service`, writes `/etc/snell/users/node-12.conf`, starts the service, and reports the final service status plus generated PSK back to the master.
+- Snell nodes are stored in `protocol_node`, then the master creates an agent task. The remote agent installs or updates a node-specific Snell systemd/OpenRC service such as `snell-node-12.service`, writes `/etc/snell/users/node-12.conf`, starts the service, and reports the final service status plus generated PSK back to the master.
 - `同步节点` pulls existing 3x-ui inbounds into `protocol_node` so the unified list can show nodes that were created outside this panel.
 - `重启` restarts Snell by generating an agent task. For Xray-backed nodes it requests a remote Xray restart through 3x-ui.
 - `删除` deletes Xray inbounds through 3x-ui. For Snell it generates an agent task that removes the node service and config.
 
-Snell is not a native Xray protocol. This project treats it as the same product-level node type while keeping the runtime adapter separate: Xray nodes go through 3x-ui/Xray, Snell nodes go through the副控 agent and systemd.
+Snell is not a native Xray protocol. This project treats it as the same product-level node type while keeping the runtime adapter separate: Xray nodes go through 3x-ui/Xray, Snell nodes go through the副控 agent and systemd/OpenRC.
 
 ### 7. Manage remote port forwards
 
 Open `主控中心` and use `新增转发`.
 
 - The rule belongs to one controlled server.
-- The agent installs `socat` when needed and creates a systemd service such as `flux-forward-8.service`.
+- The agent installs `socat` when needed and creates a systemd/OpenRC service such as `flux-forward-8.service`.
 - A TCP rule uses `TCP-LISTEN:<listenPort>` to forward traffic to `<targetHost>:<targetPort>`.
 - A UDP rule uses `UDP-LISTEN:<listenPort>` with the same target shape.
 - `编辑`, `重启`, and `删除` all generate agent tasks so every remote change is auditable in `部署任务`.
@@ -571,12 +640,14 @@ Verified build commands used for this repository:
 
 ```bash
 docker run --rm -v "$PWD/springboot-backend:/workspace" -w /workspace maven:3.9-eclipse-temurin-21 mvn -B -DskipTests package
-docker run --rm -v "$PWD:/workspace" -v flux_3xui_frontend_node_modules:/workspace/vite-frontend/node_modules -w /workspace/vite-frontend node:20-bookworm bash -lc "npm install --legacy-peer-deps --no-audit --no-fund && npm run build"
+docker run --rm -v "$PWD:/workspace" -v flux_3xui_frontend_node_modules:/workspace/vite-frontend/node_modules -w /workspace/vite-frontend node:22-bookworm bash -lc "npm install --legacy-peer-deps --no-audit --no-fund && npm run build"
 ```
 
 Reusable smoke checks:
 
 ```bash
+bash scripts/release-check.sh
+bash scripts/release-check.sh --full
 bash scripts/test-flux-agent-mock.sh
 bash scripts/test-three-xui-fixture.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
@@ -635,8 +706,8 @@ LOG_DIR
 
 ## Next Steps
 
-1. Document key-rotation and restore drills for encrypted 3x-ui credentials and API tokens.
-2. Add deeper runtime smoke tests against real disposable 3x-ui containers after a stable upstream container fixture is selected.
+1. Add deeper runtime smoke tests against real disposable 3x-ui containers after a stable upstream container fixture is selected.
+2. Document a planned key-rotation migration for encrypted 3x-ui credentials and API tokens.
 3. Split legacy upstream wording/mojibake cleanup into a dedicated documentation pass.
 
 ## References And Acknowledgements

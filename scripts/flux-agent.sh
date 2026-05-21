@@ -383,9 +383,19 @@ net_bytes() {
 
 service_status() {
   local service="$1"
-  if command -v systemctl >/dev/null 2>&1; then
+  if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
     systemctl is-active "$service" 2>/dev/null || true
+    return
   fi
+  if command -v rc-service >/dev/null 2>&1; then
+    if rc-service "${service%.service}" status >/dev/null 2>&1; then
+      echo active
+    else
+      echo inactive
+    fi
+    return
+  fi
+  echo unknown
 }
 
 xray_status() {

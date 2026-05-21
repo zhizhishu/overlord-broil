@@ -43,14 +43,16 @@
     <main class="main">
       <section id="install" class="section">
         <div class="section-header">
-          <h2>公开仓库，直接一条命令安装</h2>
-          <p>主控优先拉取 GitHub Actions 发布到 GHCR 的镜像；如果 GHCR 暂未公开，安装脚本会回退到下载公开源码并本地构建镜像。被控端只需要主控里的 server id 和 agent token。</p>
+          <h2>0.5.0 可公开上架，直接一条命令安装</h2>
+          <p>主控优先拉取 GitHub Actions 发布到 GHCR 的镜像；如果 GHCR 暂未公开，安装脚本会回退到下载公开源码并本地构建镜像。默认端口是前端 80、后端/agent 回调 6365、phpMyAdmin 8066，均可在安装时改写。</p>
         </div>
         <div class="grid two">
           <article class="card">
             <h3>主控面板</h3>
             <pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash</code></pre>
             <p>安装脚本会创建 `/opt/flux-3xui-orchestrator/.env`，下载 compose 和 `gost.sql`，然后拉取或构建镜像并启动 MySQL、后端和前端。</p>
+            <pre class="runbook"><code># Alpine / 极简系统没有 bash 时
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master-bootstrap.sh | sudo sh</code></pre>
             <pre class="runbook"><code># 显式运维动作
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- upgrade
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- backup
@@ -62,17 +64,34 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
             <h3>被控服务器 Agent</h3>
             <pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
   | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash</code></pre>
-            <p>agent 会注册为 `flux-agent.service`，自动领取 Snell、3x-ui、Xray 和远端端口转发任务；内置单机任务锁、HTTP 重试退避和任务超时上报。</p>
+            <p>agent 会注册为 systemd 或 OpenRC 服务，自动领取 Snell、3x-ui、Xray 和远端端口转发任务；内置单机任务锁、HTTP 重试退避和任务超时上报。</p>
+            <pre class="runbook"><code># Alpine / 极简系统没有 bash 时
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent-bootstrap.sh \
+  | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" sh</code></pre>
           </article>
+        </div>
+        <div class="status-list" aria-label="Linux support">
+          <div class="status-item">
+            <span>Debian / Ubuntu / Rocky / Oracle Linux</span>
+            <span class="tag green">主控 + agent + 3x-ui</span>
+          </div>
+          <div class="status-item">
+            <span>Alpine / OpenRC</span>
+            <span class="tag">agent + Snell + 转发</span>
+          </div>
+          <div class="status-item">
+            <span>发布门禁</span>
+            <span class="tag green">release-check --full</span>
+          </div>
         </div>
       </section>
 
       <section id="workspace" class="section">
         <div class="section-header">
           <h2>主控一键编排闭环已经打通</h2>
-          <p>当前版本能多选服务器生成编排任务，由副控 agent 自动领取执行；完成后把 3x-ui 连接信息、Xray inbound/outbound、Snell systemd 节点、远端端口转发、证书、服务状态和流量快照回写到主控。</p>
+          <p>当前版本能多选服务器生成编排任务，由副控 agent 自动领取执行；完成后把 3x-ui 连接信息、Xray inbound/outbound、Snell 节点、远端端口转发、证书、服务状态和流量快照回写到主控。完整 3x-ui 安装编排要求 systemd 主机；Alpine/OpenRC 用于 agent、Snell 和转发任务。</p>
         </div>
-        <div class="metric-row" aria-label="Current MVP metrics">
+        <div class="metric-row" aria-label="Current release metrics">
           <div class="metric">
             <strong>multi</strong>
             <span>服务器一键选择</span>
@@ -95,7 +114,7 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
       <section id="architecture" class="section">
         <div class="section-header">
           <h2>控制平面拆成清楚的四层</h2>
-          <p>保持 KISS 和 YAGNI：不把 Snell 硬塞进 Xray，而是在主控做统一节点抽象，底层分别适配 3x-ui/Xray API 和 Snell agent/systemd。</p>
+          <p>保持 KISS 和 YAGNI：不把 Snell 硬塞进 Xray，而是在主控做统一节点抽象，底层分别适配 3x-ui/Xray API 和 Snell agent/systemd/OpenRC。</p>
         </div>
         <div class="grid four">
           <article class="card">
@@ -112,7 +131,7 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
           </article>
           <article class="card">
             <h3>Server Forward</h3>
-            <p>把被控机端口转发记录到 `server_forward_rule`，由 agent 创建 systemd+socat 服务，并在规则总览里和出入站一起查看。</p>
+            <p>把被控机端口转发记录到 `server_forward_rule`，由 agent 创建 systemd/OpenRC + socat 服务，并在规则总览里和出入站一起查看。</p>
           </article>
           <article class="card">
             <h3>Deploy Task</h3>
@@ -182,26 +201,26 @@ POST /api/v1/three-xui/restart-xray</code></pre>
 
       <section id="roadmap" class="section">
         <div class="section-header">
-          <h2>接下来做更强的运行保障</h2>
-          <p>核心链路已经落地，后续重点是烟测夹具、任务重试、协议校验和更细的运行态看板。</p>
+          <h2>上架后继续增强运行保障</h2>
+          <p>核心链路已经落地并进入 0.5.0 公开可用里程碑；后续重点是更真实的 3x-ui 容器烟测、密钥轮换迁移和遗留文案清理。</p>
         </div>
         <ol class="roadmap">
           <li>
             <div>
-              <strong>Runtime smoke tests</strong>
-              <span>已用临时 Docker 环境验证主控 API、agent claim/report、远端转发回写和规则总览；后续补完整 3x-ui fixture。</span>
+              <strong>Real 3x-ui smoke</strong>
+              <span>现有 release gate 已覆盖 API fixture、agent mock 和一次性 compose 烟测；后续接入真实 3x-ui 容器夹具。</span>
             </div>
           </li>
           <li>
             <div>
-              <strong>Protocol guardrails</strong>
-              <span>继续增加 Reality public key 展示、outbound tag、Snell checksum 和节点端口占用校验。</span>
+              <strong>Key rotation</strong>
+              <span>凭据已经加密存储；后续补计划内密钥轮换迁移，避免误换 `SECRET_ENCRYPTION_KEY` 后丢失可读性。</span>
             </div>
           </li>
           <li>
             <div>
-              <strong>Operational dashboard</strong>
-              <span>把服务器健康、部署历史、协议库存和异常日志放到同一个工作台。</span>
+              <strong>Docs polish</strong>
+              <span>集中清理历史 Flux Panel 遗留措辞和旧注释乱码，不影响 0.5.0 安装、编排和验证路径。</span>
             </div>
           </li>
         </ol>

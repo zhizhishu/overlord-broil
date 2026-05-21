@@ -79,6 +79,13 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                   fi
                 }
 
+                require_systemd_host() {
+                  if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then
+                    echo '3x-ui orchestration requires a Linux host with running systemd. Use Debian, Ubuntu, Rocky Linux or Oracle Linux for full 3x-ui install/configure tasks; Alpine/OpenRC is supported only for the Flux agent, Snell node tasks and remote forwarding tasks.' >&2
+                    exit 1
+                  fi
+                }
+
                 detect_os() {
                   if [ -f /etc/os-release ]; then
                     . /etc/os-release
@@ -378,7 +385,6 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                 [Service]
                 Type=simple
                 User=nobody
-                Group=nogroup
                 ExecStart=${binary} -c ${config_path}
                 Restart=on-failure
                 RestartSec=5
@@ -732,6 +738,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                 }
 
                 require_root
+                require_systemd_host
                 install_deps
                 install_xui
                 configure_xui_panel

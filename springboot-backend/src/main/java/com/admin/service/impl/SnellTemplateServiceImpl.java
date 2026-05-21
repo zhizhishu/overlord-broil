@@ -53,7 +53,9 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
         script.append("CONFIG_DIR='/etc/snell'\n");
         script.append("USERS_DIR='/etc/snell/users'\n");
         script.append("MAIN_CONFIG_PATH=\"${USERS_DIR}/${CONFIG_NAME}\"\n");
-        script.append("SERVICE_PATH=\"/etc/systemd/system/${SERVICE_NAME}\"\n\n");
+        script.append("SERVICE_BASE=\"${SERVICE_NAME%.service}\"\n");
+        script.append("SYSTEMD_SERVICE_PATH=\"/etc/systemd/system/${SERVICE_NAME}\"\n");
+        script.append("OPENRC_SERVICE_PATH=\"/etc/init.d/${SERVICE_BASE}\"\n\n");
         script.append(body());
         return script.toString();
     }
@@ -87,6 +89,34 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
                     yum install -y curl wget unzip python3 openssl
                   elif command -v dnf >/dev/null 2>&1; then
                     dnf install -y curl wget unzip python3 openssl
+                  elif command -v apk >/dev/null 2>&1; then
+                    apk add --no-cache curl wget unzip python3 openssl
+                  fi
+                }
+
+                detect_service_manager() {
+                  if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+                    echo systemd
+                    return
+                  fi
+                  if command -v rc-service >/dev/null 2>&1 && command -v rc-update >/dev/null 2>&1; then
+                    echo openrc
+                    return
+                  fi
+                  echo 'systemd or OpenRC is required for persistent Snell services.' >&2
+                  exit 1
+                }
+
+                service_status() {
+                  local manager="$1"
+                  if [ "$manager" = "systemd" ]; then
+                    systemctl is-active "$SERVICE_NAME" 2>/dev/null || echo not-installed
+                  else
+                    if rc-service "$SERVICE_BASE" status >/dev/null 2>&1; then
+                      echo active
+                    else
+                      echo inactive
+                    fi
                   fi
                 }
 
@@ -156,8 +186,8 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
                   chmod 600 "$MAIN_CONFIG_PATH"
                 }
 
-                write_service() {
-                  cat > "$SERVICE_PATH" <<SNELL_SERVICE
+                write_systemd_service() {
+                  cat > "$SYSTEMD_SERVICE_PATH" <<SNELL_SERVICE
                 [Unit]
                 Description=Snell Proxy Node ${NODE_NAME}
                 After=network.target
@@ -165,7 +195,6 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
                 [Service]
                 Type=simple
                 User=nobody
-                Group=nogroup
                 ExecStart=${BINARY_PATH} -c ${MAIN_CONFIG_PATH}
                 Restart=on-failure
                 RestartSec=5
@@ -177,29 +206,92 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
                   systemctl daemon-reload
                 }
 
+                write_openrc_service() {
+                  cat > "$OPENRC_SERVICE_PATH" <<SNELL_SERVICE
+                #!/sbin/openrc-run
+                name="Snell Proxy Node ${NODE_NAME}"
+                description="Snell Proxy Node ${NODE_NAME}"
+                command="${BINARY_PATH}"
+                command_args="-c ${MAIN_CONFIG_PATH}"
+                command_background="yes"
+                command_user="nobody"
+                pidfile="/run/${SERVICE_BASE}.pid"
+                output_log="/var/log/${SERVICE_BASE}.log"
+                error_log="/var/log/${SERVICE_BASE}.err"
+
+                depend() {
+                  need net
+                  after firewall
+                }
+                SNELL_SERVICE
+                  chmod 0755 "$OPENRC_SERVICE_PATH"
+                }
+
                 install_snell() {
+                  local manager
                   require_root
                   install_deps
                   download_snell
                   write_config
-                  write_service
-                  systemctl enable "$SERVICE_NAME"
-                  systemctl restart "$SERVICE_NAME"
-                  systemctl --no-pager --full status "$SERVICE_NAME" || true
+                  manager="$(detect_service_manager)"
+                  if [ "$manager" = "systemd" ]; then
+                    write_systemd_service
+                    systemctl enable "$SERVICE_NAME"
+                    systemctl restart "$SERVICE_NAME"
+                    systemctl --no-pager --full status "$SERVICE_NAME" || true
+                  else
+                    write_openrc_service
+                    rc-update add "$SERVICE_BASE" default
+                    rc-service "$SERVICE_BASE" restart
+                    rc-service "$SERVICE_BASE" status || true
+                  fi
                 }
 
                 uninstall_snell() {
+                  local manager
                   require_root
-                  systemctl stop "$SERVICE_NAME" 2>/dev/null || true
-                  systemctl disable "$SERVICE_NAME" 2>/dev/null || true
-                  rm -f "$SERVICE_PATH" "$MAIN_CONFIG_PATH"
-                  systemctl daemon-reload
+                  manager="$(detect_service_manager)"
+                  if [ "$manager" = "systemd" ]; then
+                    systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+                    systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+                    rm -f "$SYSTEMD_SERVICE_PATH"
+                    systemctl daemon-reload
+                  else
+                    rc-service "$SERVICE_BASE" stop 2>/dev/null || true
+                    rc-update del "$SERVICE_BASE" default 2>/dev/null || true
+                    rm -f "$OPENRC_SERVICE_PATH"
+                  fi
+                  rm -f "$MAIN_CONFIG_PATH"
                   echo "Snell node removed. Config path was ${MAIN_CONFIG_PATH}."
                 }
 
+                restart_snell() {
+                  local manager
+                  require_root
+                  manager="$(detect_service_manager)"
+                  if [ "$manager" = "systemd" ]; then
+                    systemctl restart "$SERVICE_NAME"
+                    systemctl --no-pager status "$SERVICE_NAME" || true
+                  else
+                    rc-service "$SERVICE_BASE" restart
+                    rc-service "$SERVICE_BASE" status || true
+                  fi
+                }
+
+                show_snell_status() {
+                  local manager
+                  manager="$(detect_service_manager)"
+                  if [ "$manager" = "systemd" ]; then
+                    systemctl --no-pager status "$SERVICE_NAME" || true
+                  else
+                    rc-service "$SERVICE_BASE" status || true
+                  fi
+                }
+
                 emit_result_marker() {
-                  local service_status snell_version node_state arch download_url checksum_sha
-                  service_status="$(systemctl is-active "$SERVICE_NAME" 2>/dev/null || echo not-installed)"
+                  local manager service_status snell_version node_state arch download_url checksum_sha
+                  manager="$(detect_service_manager)"
+                  service_status="$(service_status "$manager")"
                   snell_version=''
                   if command -v snell-server >/dev/null 2>&1; then
                     snell_version="$(snell-server -v 2>&1 | head -n 1 || true)"
@@ -254,8 +346,8 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
                 case "$ACTION" in
                   present) install_snell ;;
                   absent) uninstall_snell ;;
-                  restarted) require_root; systemctl restart "$SERVICE_NAME"; systemctl --no-pager status "$SERVICE_NAME" || true ;;
-                  status) systemctl --no-pager status "$SERVICE_NAME" || true ;;
+                  restarted) restart_snell ;;
+                  status) show_snell_status ;;
                   *) echo "Unsupported action: $ACTION" >&2; exit 1 ;;
                 esac
 

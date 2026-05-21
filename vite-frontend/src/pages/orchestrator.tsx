@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
@@ -444,6 +444,15 @@ const protocolNodePayloadPreview = (form: ProtocolNodeForm) => JSON.stringify(
 const MasterRiskNotice = ({ context }: { context: string }) => (
   <div className="rounded-small border border-warning-300 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
     <span className="font-semibold">主控高风险：</span>{context}会作用在控制面服务器上，建议确认 API、3x-ui、Xray 以及证书任务不会影响现有编排。
+  </div>
+);
+
+const ServerActionGroup = ({ title, children }: { title: string; children: ReactNode }) => (
+  <div className="rounded-small border border-default-200 bg-white/60 p-2.5 dark:bg-default-50/5">
+    <p className="mb-2 text-[11px] font-semibold uppercase tracking-normal text-gray-500">{title}</p>
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3">
+      {children}
+    </div>
   </div>
 );
 
@@ -1877,27 +1886,35 @@ export default function OrchestratorPage() {
                   <p className="text-xs text-gray-500">3x-ui 同步：{formatTime(server.xuiLastSync)}</p>
                   {server.certificateExpireAt && <p className="text-xs text-gray-500">证书到期：{formatTime(server.certificateExpireAt)}</p>}
                   {server.lastError && <p className="text-xs text-danger">最近错误：{server.lastError}</p>}
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" color="primary" variant="flat" onPress={() => openOrchestrationModal(server)}>一键编排</Button>
-                    <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal(server)}>新增节点</Button>
-                    <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal(server)}>新增转发</Button>
-                    <Button size="sm" variant="flat" onPress={() => showServerRuleOverview(server)}>规则总览</Button>
-                    <Button size="sm" variant="flat" onPress={() => syncServerProtocolNodes(server)}>同步节点</Button>
-                    <Button size="sm" variant="flat" onPress={() => openDeployModal(server)}>部署</Button>
-                    <Button size="sm" variant="flat" onPress={() => testXui(server)}>测 3x-ui</Button>
-                    <Button size="sm" variant="flat" onPress={() => showThreeXuiInbounds(server)}>入站</Button>
-                    <Button size="sm" variant="flat" onPress={() => openThreeXuiInboundModal(server)}>入站操作</Button>
-                    <Button size="sm" variant="flat" onPress={() => showThreeXuiConfig(server)}>配置</Button>
-                    <Button size="sm" variant="flat" onPress={() => showThreeXuiOutbounds(server)}>出站</Button>
-                    <Button size="sm" variant="flat" onPress={() => showThreeXuiOutboundTraffic(server)}>出站流量</Button>
-                    <Button size="sm" variant="flat" onPress={() => syncXuiTraffic(server)}>同步流量</Button>
-                    <Button size="sm" variant="flat" onPress={() => showTrafficSnapshots(server)}>流量快照</Button>
-                    <Button size="sm" variant="flat" onPress={() => openXraySettingModal(server)}>保存出站</Button>
-                    <Button size="sm" variant="flat" onPress={() => restartXray(server)}>重启 Xray</Button>
-                    <Button size="sm" variant="flat" onPress={() => openServerModal(server)}>编辑</Button>
-                    <Button size="sm" variant="flat" onPress={() => showServerToken(server)}>Token</Button>
-                    <Button size="sm" variant="flat" color="warning" onPress={() => showServerToken(server, true)}>轮换</Button>
-                    <Button size="sm" variant="light" color="danger" onPress={() => removeServer(server)}>删除</Button>
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <ServerActionGroup title="编排">
+                      <Button size="sm" color="primary" variant="flat" onPress={() => openOrchestrationModal(server)}>一键编排</Button>
+                      <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal(server)}>新增节点</Button>
+                      <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal(server)}>新增转发</Button>
+                      <Button size="sm" variant="flat" onPress={() => openDeployModal(server)}>部署</Button>
+                    </ServerActionGroup>
+                    <ServerActionGroup title="规则流量">
+                      <Button size="sm" variant="flat" onPress={() => showServerRuleOverview(server)}>规则总览</Button>
+                      <Button size="sm" variant="flat" onPress={() => syncServerProtocolNodes(server)}>同步节点</Button>
+                      <Button size="sm" variant="flat" onPress={() => syncXuiTraffic(server)}>同步流量</Button>
+                      <Button size="sm" variant="flat" onPress={() => showTrafficSnapshots(server)}>流量快照</Button>
+                    </ServerActionGroup>
+                    <ServerActionGroup title="3x-ui">
+                      <Button size="sm" variant="flat" onPress={() => testXui(server)}>测 3x-ui</Button>
+                      <Button size="sm" variant="flat" onPress={() => showThreeXuiInbounds(server)}>入站</Button>
+                      <Button size="sm" variant="flat" onPress={() => openThreeXuiInboundModal(server)}>入站操作</Button>
+                      <Button size="sm" variant="flat" onPress={() => showThreeXuiConfig(server)}>配置</Button>
+                      <Button size="sm" variant="flat" onPress={() => showThreeXuiOutbounds(server)}>出站</Button>
+                      <Button size="sm" variant="flat" onPress={() => showThreeXuiOutboundTraffic(server)}>出站流量</Button>
+                      <Button size="sm" variant="flat" onPress={() => openXraySettingModal(server)}>保存出站</Button>
+                      <Button size="sm" variant="flat" onPress={() => restartXray(server)}>重启 Xray</Button>
+                    </ServerActionGroup>
+                    <ServerActionGroup title="管理">
+                      <Button size="sm" variant="flat" onPress={() => openServerModal(server)}>编辑</Button>
+                      <Button size="sm" variant="flat" onPress={() => showServerToken(server)}>Token</Button>
+                      <Button size="sm" variant="flat" color="warning" onPress={() => showServerToken(server, true)}>轮换</Button>
+                      <Button size="sm" variant="light" color="danger" onPress={() => removeServer(server)}>删除</Button>
+                    </ServerActionGroup>
                   </div>
                 </CardBody>
               </Card>

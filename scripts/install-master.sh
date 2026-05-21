@@ -9,6 +9,7 @@ SOURCE_DIR="${FLUX_SOURCE_DIR:-${INSTALL_DIR}/source}"
 NETWORK_STACK="${FLUX_NETWORK_STACK:-v4}"
 FRONTEND_PORT="${FLUX_FRONTEND_PORT:-80}"
 BACKEND_PORT="${FLUX_BACKEND_PORT:-6365}"
+PHPMYADMIN_PORT="${FLUX_PHPMYADMIN_PORT:-8066}"
 DB_NAME="${FLUX_DB_NAME:-gost}"
 DB_USER="${FLUX_DB_USER:-gost}"
 DB_PASSWORD="${FLUX_DB_PASSWORD:-}"
@@ -43,6 +44,7 @@ Options:
   --stack v4|v6           Compose network stack, default v4
   --frontend-port PORT    Public frontend port, default 80
   --backend-port PORT     Public backend API port, default 6365
+  --phpmyadmin-port PORT  Public phpMyAdmin port, default 8066
   --backup-dir PATH       Backup output directory, default /opt/flux-3xui-orchestrator/backups
   --backup-file PATH      Backup archive used by restore
   --repo OWNER/REPO       GitHub repo, default zhizhishu/flux-3xui-orchestrator
@@ -58,6 +60,7 @@ Environment:
   FLUX_DB_PASSWORD          Optional database password; generated when empty
   FLUX_JWT_SECRET           Optional JWT secret; generated when empty
   FLUX_SECRET_ENCRYPTION_KEY Optional credential encryption key; generated when empty
+  FLUX_PHPMYADMIN_PORT       Optional phpMyAdmin public port, default 8066
   FLUX_BACKUP_DIR           Optional backup output directory
   FLUX_BACKUP_FILE          Optional restore archive path
   FLUX_BUILD_ON_PULL_FAILURE Build local images after GHCR pull failure, default 1
@@ -91,6 +94,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --backend-port)
       BACKEND_PORT="$2"
+      shift 2
+      ;;
+    --phpmyadmin-port)
+      PHPMYADMIN_PORT="$2"
       shift 2
       ;;
     --backup-dir)
@@ -149,24 +156,42 @@ BACKUP_DIR="${BACKUP_DIR:-${INSTALL_DIR}/backups}"
 COMPOSE_FILE="docker-compose-${NETWORK_STACK}.yml"
 ENV_FILE=".env"
 
-install_base_packages() {
-  if command -v curl >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
+detect_os_name() {
+  if [ -r /etc/os-release ]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    echo "${PRETTY_NAME:-${NAME:-unknown}}"
+    return
+  fi
+  uname -s
+}
+
+install_packages() {
+  local missing=("$@")
+  if [ "${#missing[@]}" -eq 0 ]; then
     return
   fi
 
   if command -v apt-get >/dev/null 2>&1; then
     apt-get update
-    DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl tar
+    DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates "${missing[@]}"
   elif command -v dnf >/dev/null 2>&1; then
-    dnf install -y ca-certificates curl tar
+    dnf install -y ca-certificates "${missing[@]}"
   elif command -v yum >/dev/null 2>&1; then
-    yum install -y ca-certificates curl tar
+    yum install -y ca-certificates "${missing[@]}"
   elif command -v apk >/dev/null 2>&1; then
-    apk add --no-cache ca-certificates curl tar
+    apk add --no-cache ca-certificates "${missing[@]}"
   else
-    echo "curl and tar are required. Please install them first." >&2
+    echo "Missing package(s): ${missing[*]}. Please install them first." >&2
     exit 2
   fi
+}
+
+install_base_packages() {
+  local missing=()
+  command -v curl >/dev/null 2>&1 || missing+=("curl")
+  command -v tar >/dev/null 2>&1 || missing+=("tar")
+  install_packages "${missing[@]}"
 }
 
 random_hex() {
@@ -176,6 +201,17 @@ random_hex() {
   else
     dd if=/dev/urandom bs="$bytes" count=1 2>/dev/null | od -An -tx1 | tr -d ' \n'
     echo
+  fi
+}
+
+start_docker_service() {
+  if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+    systemctl enable --now docker || true
+  elif command -v rc-update >/dev/null 2>&1 && command -v rc-service >/dev/null 2>&1; then
+    rc-update add docker default >/dev/null 2>&1 || true
+    rc-service docker start || true
+  elif command -v service >/dev/null 2>&1; then
+    service docker start || true
   fi
 }
 
@@ -190,14 +226,13 @@ ensure_docker() {
   fi
 
   echo "Docker is missing or docker compose is unavailable. Installing Docker..."
-  curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
-  sh /tmp/get-docker.sh
-
-  if command -v systemctl >/dev/null 2>&1; then
-    systemctl enable --now docker || true
-  elif command -v service >/dev/null 2>&1; then
-    service docker start || true
+  if command -v apk >/dev/null 2>&1; then
+    install_packages docker docker-cli-compose
+  else
+    curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+    sh /tmp/get-docker.sh
   fi
+  start_docker_service
 
   if ! docker compose version >/dev/null 2>&1; then
     echo "Docker compose plugin is still unavailable after Docker installation." >&2
@@ -247,7 +282,7 @@ require_env_values() {
     exit 2
   fi
 
-  for key in DB_NAME DB_USER DB_PASSWORD JWT_SECRET SECRET_ENCRYPTION_KEY FRONTEND_PORT BACKEND_PORT; do
+  for key in DB_NAME DB_USER DB_PASSWORD JWT_SECRET SECRET_ENCRYPTION_KEY FRONTEND_PORT BACKEND_PORT PHPMYADMIN_PORT; do
     value="$(read_env_value "$key" "$file")"
     if [ -z "$value" ]; then
       missing="${missing} ${key}"
@@ -296,6 +331,7 @@ detect_host() {
 
   curl -fsS --max-time 3 https://api.ipify.org 2>/dev/null \
     || hostname -I 2>/dev/null | awk '{print $1}' \
+    || ip route get 1.1.1.1 2>/dev/null | awk '/src/ {for (i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}' \
     || hostname
 }
 
@@ -308,6 +344,7 @@ load_existing_env() {
     DB_NAME="${DB_NAME:-gost}"
     DB_USER="${DB_USER:-gost}"
     DB_PASSWORD="${DB_PASSWORD:-}"
+    PHPMYADMIN_PORT="${PHPMYADMIN_PORT:-8066}"
   fi
 }
 
@@ -330,6 +367,8 @@ wait_for_mysql() {
 download_runtime_files() {
   download_file "${RAW_BASE}/${COMPOSE_FILE}" "$COMPOSE_FILE"
   download_file "${RAW_BASE}/gost.sql" "gost.sql"
+  download_file "${RAW_BASE}/scripts/install-master.sh" "install-master.sh"
+  chmod 0755 "install-master.sh"
 }
 
 ensure_env_file() {
@@ -346,6 +385,7 @@ JWT_SECRET=${JWT_SECRET}
 SECRET_ENCRYPTION_KEY=${SECRET_ENCRYPTION_KEY}
 FRONTEND_PORT=${FRONTEND_PORT}
 BACKEND_PORT=${BACKEND_PORT}
+PHPMYADMIN_PORT=${PHPMYADMIN_PORT}
 ENV
     chmod 600 "$ENV_FILE"
     echo "Generated ${INSTALL_DIR}/${ENV_FILE}"
@@ -358,7 +398,83 @@ ENV
       chmod 600 "$ENV_FILE"
       echo "Added SECRET_ENCRYPTION_KEY to existing ${INSTALL_DIR}/${ENV_FILE}"
     fi
+    if [ -z "$(read_env_value PHPMYADMIN_PORT "$ENV_FILE")" ]; then
+      printf '\nPHPMYADMIN_PORT=%s\n' "$PHPMYADMIN_PORT" >> "$ENV_FILE"
+      chmod 600 "$ENV_FILE"
+      echo "Added PHPMYADMIN_PORT to existing ${INSTALL_DIR}/${ENV_FILE}"
+    fi
   fi
+}
+
+validate_port_number() {
+  local name="$1"
+  local value="$2"
+  case "$value" in
+    ''|*[!0-9]*)
+      echo "${name} must be an integer port, got '${value}'." >&2
+      exit 2
+      ;;
+  esac
+  if [ "$value" -lt 1 ] || [ "$value" -gt 65535 ]; then
+    echo "${name} must be between 1 and 65535, got '${value}'." >&2
+    exit 2
+  fi
+}
+
+port_owned_by_flux_container() {
+  local port="$1"
+  local container
+  for container in vite-frontend springboot-backend gost-phpmyadmin; do
+    if docker port "$container" 2>/dev/null | grep -Eq ":${port}$"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+port_is_listening() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltnH 2>/dev/null | awk '{print $4}' | grep -Eq "(:|\\.)${port}$" && return 0
+  fi
+  if command -v netstat >/dev/null 2>&1; then
+    netstat -ltn 2>/dev/null | awk 'NR>2 {print $4}' | grep -Eq "(:|\\.)${port}$" && return 0
+  fi
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1 && return 0
+  fi
+  return 1
+}
+
+preflight_ports() {
+  load_existing_env
+  local final_frontend final_backend final_phpmyadmin
+  final_frontend="$(read_env_value FRONTEND_PORT "$ENV_FILE")"
+  final_backend="$(read_env_value BACKEND_PORT "$ENV_FILE")"
+  final_phpmyadmin="$(read_env_value PHPMYADMIN_PORT "$ENV_FILE")"
+  final_phpmyadmin="${final_phpmyadmin:-8066}"
+
+  validate_port_number FRONTEND_PORT "$final_frontend"
+  validate_port_number BACKEND_PORT "$final_backend"
+  validate_port_number PHPMYADMIN_PORT "$final_phpmyadmin"
+
+  if [ "$final_frontend" = "$final_backend" ] || [ "$final_frontend" = "$final_phpmyadmin" ] || [ "$final_backend" = "$final_phpmyadmin" ]; then
+    echo "FRONTEND_PORT, BACKEND_PORT and PHPMYADMIN_PORT must be different." >&2
+    exit 2
+  fi
+
+  local label port
+  for label in FRONTEND_PORT BACKEND_PORT PHPMYADMIN_PORT; do
+    case "$label" in
+      FRONTEND_PORT) port="$final_frontend" ;;
+      BACKEND_PORT) port="$final_backend" ;;
+      PHPMYADMIN_PORT) port="$final_phpmyadmin" ;;
+    esac
+    if port_is_listening "$port" && ! port_owned_by_flux_container "$port"; then
+      echo "${label}=${port} is already listening on this host. Set a different FLUX_${label} or stop the conflicting service." >&2
+      exit 2
+    fi
+  done
 }
 
 docker_login_if_configured() {
@@ -385,6 +501,8 @@ pull_or_build_images() {
 print_success() {
   FINAL_FRONTEND_PORT="$(read_env_value FRONTEND_PORT "$ENV_FILE")"
   FINAL_BACKEND_PORT="$(read_env_value BACKEND_PORT "$ENV_FILE")"
+  FINAL_PHPMYADMIN_PORT="$(read_env_value PHPMYADMIN_PORT "$ENV_FILE")"
+  FINAL_PHPMYADMIN_PORT="${FINAL_PHPMYADMIN_PORT:-8066}"
   PANEL_HOST="$(detect_host)"
 
   cat <<EOF
@@ -394,6 +512,7 @@ Flux 3x-ui Orchestrator is running.
 Install dir: ${INSTALL_DIR}
 Frontend:    http://${PANEL_HOST}:${FINAL_FRONTEND_PORT}
 Backend API: http://${PANEL_HOST}:${FINAL_BACKEND_PORT}
+phpMyAdmin:  http://${PANEL_HOST}:${FINAL_PHPMYADMIN_PORT}  (restrict by firewall in production)
 
 Default login from gost.sql:
   username: admin_user
@@ -486,6 +605,8 @@ restore_backup() {
 install_or_upgrade() {
   download_runtime_files
   ensure_env_file
+  require_env_values "$ENV_FILE"
+  preflight_ports
   docker_login_if_configured
   pull_or_build_images
   compose_cmd up -d
@@ -507,6 +628,7 @@ uninstall_stack() {
 }
 
 install_base_packages
+echo "Detected OS: $(detect_os_name)"
 ensure_docker
 
 mkdir -p "$INSTALL_DIR"
