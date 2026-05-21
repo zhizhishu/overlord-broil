@@ -127,7 +127,7 @@ The first iteration adds the foundation for:
   - script, token, inbound and config viewers
 - GitHub Actions:
   - CI builds backend Maven package and frontend production bundle
-  - CI runs agent mock tests, compose validation and a disposable Docker compose smoke test built from the current checkout
+  - CI runs agent mock tests, tokenized 3x-ui fixture checks, compose validation and a disposable Docker compose smoke test built from the current checkout
   - Docker image workflow builds backend and frontend images
   - pushes images to GitHub Container Registry on `main`, tags and manual dispatch
 
@@ -143,7 +143,7 @@ The first iteration adds the foundation for:
 | 3x-ui | Connection test, inbound/client operations, Xray config/outbound reads, traffic sync and Xray restart. |
 | Snell | Managed as a product-level protocol node through agent-generated systemd services. |
 | Port forwards | Controlled-host `socat` services created through auditable deployment tasks. |
-| Verification | Maven package, Vite build, agent mock test, compose config and disposable compose smoke test. |
+| Verification | Maven package, Vite build, agent mock test, tokenized 3x-ui fixture, compose config and disposable compose smoke test. |
 
 ## Repository Layout
 
@@ -191,10 +191,10 @@ For an existing database created before the 3x-ui connector fields were added, r
 ALTER TABLE `control_server`
   ADD COLUMN `xui_endpoint` varchar(255) DEFAULT NULL AFTER `host`,
   ADD COLUMN `xui_base_path` varchar(100) DEFAULT NULL AFTER `xui_endpoint`,
-  ADD COLUMN `xui_api_token` varchar(255) DEFAULT NULL AFTER `xui_base_path`,
+  ADD COLUMN `xui_api_token` varchar(512) DEFAULT NULL AFTER `xui_base_path`,
   ADD COLUMN `xui_username` varchar(100) DEFAULT NULL AFTER `xui_api_token`,
-  ADD COLUMN `xui_password` varchar(255) DEFAULT NULL AFTER `xui_username`,
-  ADD COLUMN `xui_two_factor_code` varchar(50) DEFAULT NULL AFTER `xui_password`,
+  ADD COLUMN `xui_password` varchar(512) DEFAULT NULL AFTER `xui_username`,
+  ADD COLUMN `xui_two_factor_code` varchar(255) DEFAULT NULL AFTER `xui_password`,
   ADD COLUMN `xui_allow_insecure` int(1) NOT NULL DEFAULT '0' AFTER `xui_two_factor_code`,
   ADD COLUMN `xui_last_sync` bigint(20) DEFAULT NULL AFTER `xui_allow_insecure`,
   ADD COLUMN `xui_service_status` varchar(30) DEFAULT NULL AFTER `snell_version`,
@@ -312,6 +312,15 @@ CREATE TABLE `server_forward_rule` (
   KEY `listen_port` (`listen_port`),
   KEY `service_name` (`service_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+If those 3x-ui columns already exist from an older checkout, widen the encrypted fields before saving new credentials:
+
+```sql
+ALTER TABLE `control_server`
+  MODIFY COLUMN `xui_api_token` varchar(512) DEFAULT NULL,
+  MODIFY COLUMN `xui_password` varchar(512) DEFAULT NULL,
+  MODIFY COLUMN `xui_two_factor_code` varchar(255) DEFAULT NULL;
 ```
 
 ### 2. Create a 3x-ui API token
@@ -574,7 +583,7 @@ bash scripts/test-compose-smoke.sh --build-local --dry-run
 bash scripts/test-compose-smoke.sh --build-local
 ```
 
-`scripts/test-three-xui-fixture.sh` starts a local stateful 3x-ui API fixture and covers inbound CRUD, client operations, Xray config/outbound/traffic reads and restart routes. `scripts/test-compose-smoke.sh --build-local` builds backend/frontend images from the current checkout, starts disposable MySQL/backend/frontend services, checks `GET /flow/test` and the frontend `/`, then removes the smoke containers, volumes and network. It avoids depending on local GHCR pull permissions.
+`scripts/test-three-xui-fixture.sh` starts a local stateful 3x-ui API fixture and covers Bearer-token success, missing-token and wrong-token paths plus inbound CRUD, client operations, Xray config/outbound/traffic reads and restart routes. `scripts/test-compose-smoke.sh --build-local` builds backend/frontend images from the current checkout, starts disposable MySQL/backend/frontend services, checks `GET /flow/test` and the frontend `/`, then removes the smoke containers, volumes and network. It avoids depending on local GHCR pull permissions.
 
 ## GitHub Container Images
 
@@ -618,15 +627,17 @@ DB_NAME
 DB_USER
 DB_PASSWORD
 JWT_SECRET
+SECRET_ENCRYPTION_KEY
 LOG_DIR
 ```
 
+`SECRET_ENCRYPTION_KEY` should be a stable high-entropy value used for sensitive 3x-ui credentials and API-token encryption; keep it backed up with `.env` and do not rotate it without a migration plan. Current hardening also includes master self-control protection: a `role=master` server can be selected for deliberate self-management, but destructive actions and protected listen ports such as frontend/backend/MySQL/SSH are blocked.
+
 ## Next Steps
 
-1. Add UI-side helpers for Reality public/private key display, Snell PSK generation and outbound tag selection.
-2. Add sensitive field encryption for stored 3x-ui credentials and API tokens.
-3. Add deeper runtime smoke tests against real disposable 3x-ui containers after a stable upstream container fixture is selected.
-4. Split legacy upstream wording/mojibake cleanup into a dedicated documentation pass.
+1. Document key-rotation and restore drills for encrypted 3x-ui credentials and API tokens.
+2. Add deeper runtime smoke tests against real disposable 3x-ui containers after a stable upstream container fixture is selected.
+3. Split legacy upstream wording/mojibake cleanup into a dedicated documentation pass.
 
 ## References And Acknowledgements
 

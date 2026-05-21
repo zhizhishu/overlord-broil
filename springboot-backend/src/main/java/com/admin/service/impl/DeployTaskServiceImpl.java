@@ -7,7 +7,9 @@ import com.admin.common.dto.DeployTaskDto;
 import com.admin.common.dto.DeployTaskStateDto;
 import com.admin.common.dto.OrchestrationPlanDto;
 import com.admin.common.lang.R;
+import com.admin.common.utils.MasterSelfProtectionUtils;
 import com.admin.common.utils.ProtocolValidationUtils;
+import com.admin.common.utils.SecretCryptoUtils;
 import com.admin.entity.ControlServer;
 import com.admin.entity.DeployTask;
 import com.admin.entity.ProtocolProfile;
@@ -64,6 +66,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
     @Resource
     private MonitorAlertService monitorAlertService;
 
+    @Resource
+    private SecretCryptoUtils secretCryptoUtils;
+
     @Override
     public R createTask(DeployTaskDto dto) {
         ControlServer server = controlServerService.getById(dto.getServerId());
@@ -83,6 +88,12 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         String validationError = validateDeployTask(dto, profile, protocol);
         if (validationError != null) {
             return R.err(validationError);
+        }
+        Integer listenPort = dto.getListenPort() != null ? dto.getListenPort() : profile == null ? null : profile.getListenPort();
+        String masterGuardError = MasterSelfProtectionUtils.validateListenPortAndAction(
+                server, listenPort, dto.getAction(), "部署任务", "协议监听端口");
+        if (masterGuardError != null) {
+            return R.err(masterGuardError);
         }
         String script = "snell".equals(protocol)
                 ? snellTemplateService.buildScript(dto, profile)
@@ -110,7 +121,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         if (server == null) {
             return R.err("server not found");
         }
-        String validationError = validateOrchestration(dto);
+        String validationError = validateOrchestration(dto, server);
         if (validationError != null) {
             return R.err(validationError);
         }
@@ -132,7 +143,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         return this.save(task) ? R.ok(task) : R.err("orchestration task create failed");
     }
 
-    private String validateOrchestration(OrchestrationPlanDto dto) {
+    private String validateOrchestration(OrchestrationPlanDto dto, ControlServer server) {
         if (dto == null) {
             return "orchestration plan is required";
         }
@@ -151,27 +162,39 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             return "snell psk is invalid";
         }
         Set<Integer> ports = new HashSet<>();
+        String guard = MasterSelfProtectionUtils.validateListenPort(server, dto.getPanelPort(), "面板端口");
+        if (guard != null) return guard;
         String duplicate = addPort(ports, dto.getPanelPort(), "panelPort");
         if (duplicate != null) {
             return duplicate;
         }
         if (enabled(dto.getCreateVlessReality())) {
+            guard = MasterSelfProtectionUtils.validateListenPort(server, dto.getVlessPort(), "VLESS Reality 端口");
+            if (guard != null) return guard;
             duplicate = addPort(ports, dto.getVlessPort(), "vlessPort");
             if (duplicate != null) return duplicate;
         }
         if (enabled(dto.getCreateVmessWs())) {
+            guard = MasterSelfProtectionUtils.validateListenPort(server, dto.getVmessPort(), "VMess WS 端口");
+            if (guard != null) return guard;
             duplicate = addPort(ports, dto.getVmessPort(), "vmessPort");
             if (duplicate != null) return duplicate;
         }
         if (enabled(dto.getCreateTrojanTls())) {
+            guard = MasterSelfProtectionUtils.validateListenPort(server, dto.getTrojanPort(), "Trojan TLS 端口");
+            if (guard != null) return guard;
             duplicate = addPort(ports, dto.getTrojanPort(), "trojanPort");
             if (duplicate != null) return duplicate;
         }
         if (enabled(dto.getCreateShadowsocks())) {
+            guard = MasterSelfProtectionUtils.validateListenPort(server, dto.getShadowsocksPort(), "Shadowsocks 端口");
+            if (guard != null) return guard;
             duplicate = addPort(ports, dto.getShadowsocksPort(), "shadowsocksPort");
             if (duplicate != null) return duplicate;
         }
         if (enabled(dto.getInstallSnell())) {
+            guard = MasterSelfProtectionUtils.validateListenPort(server, dto.getSnellPort(), "Snell 端口");
+            if (guard != null) return guard;
             duplicate = addPort(ports, dto.getSnellPort(), "snellPort");
             if (duplicate != null) return duplicate;
         }
@@ -270,7 +293,6 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         if (server == null) {
             return R.err(401, "invalid agent token");
         }
-
         QueryWrapper<DeployTask> query = new QueryWrapper<>();
         query.eq("server_id", server.getId())
                 .eq("status", STATUS_ACTIVE)
@@ -357,7 +379,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             return null;
         }
         ControlServer server = controlServerService.getById(serverId);
-        if (server == null || server.getApiToken() == null || !server.getApiToken().equals(token)) {
+        if (server == null || server.getApiToken() == null || !secretCryptoUtils.decryptIfNeeded(server.getApiToken()).equals(token)) {
             return null;
         }
         return server;
@@ -409,9 +431,10 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             if (serverMeta != null) {
                 setIfNotBlank(serverMeta.getString("xuiEndpoint"), update::setXuiEndpoint);
                 setIfNotBlank(serverMeta.getString("xuiBasePath"), update::setXuiBasePath);
-                setIfNotBlank(serverMeta.getString("xuiApiToken"), update::setXuiApiToken);
+                setIfNotBlank(serverMeta.getString("xuiApiToken"), value -> update.setXuiApiToken(secretCryptoUtils.encryptIfNeeded(value)));
                 setIfNotBlank(serverMeta.getString("xuiUsername"), update::setXuiUsername);
-                setIfNotBlank(serverMeta.getString("xuiPassword"), update::setXuiPassword);
+                setIfNotBlank(serverMeta.getString("xuiPassword"), value -> update.setXuiPassword(secretCryptoUtils.encryptIfNeeded(value)));
+                setIfNotBlank(serverMeta.getString("xuiTwoFactorCode"), value -> update.setXuiTwoFactorCode(secretCryptoUtils.encryptIfNeeded(value)));
                 Integer xuiAllowInsecure = serverMeta.getInteger("xuiAllowInsecure");
                 if (xuiAllowInsecure != null) {
                     update.setXuiAllowInsecure(xuiAllowInsecure);

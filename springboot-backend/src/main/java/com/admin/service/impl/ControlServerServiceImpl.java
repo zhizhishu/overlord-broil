@@ -5,6 +5,7 @@ import com.admin.common.dto.ControlServerDto;
 import com.admin.common.dto.ControlServerHeartbeatDto;
 import com.admin.common.dto.ControlServerUpdateDto;
 import com.admin.common.lang.R;
+import com.admin.common.utils.SecretCryptoUtils;
 import com.admin.entity.ControlServer;
 import com.admin.mapper.ControlServerMapper;
 import com.admin.service.ControlServerService;
@@ -26,6 +27,9 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
     @Resource
     private MonitorAlertService monitorAlertService;
 
+    @Resource
+    private SecretCryptoUtils secretCryptoUtils;
+
     @Override
     public R createServer(ControlServerDto dto) {
         long now = System.currentTimeMillis();
@@ -35,6 +39,7 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         server.setStatus(STATUS_ACTIVE);
         server.setCreatedTime(now);
         server.setUpdatedTime(now);
+        encryptSecrets(server);
 
         return this.save(server) ? R.ok(maskToken(server)) : R.err("server create failed");
     }
@@ -59,6 +64,7 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         server.setApiToken(null);
         preserveMaskedXuiSecrets(dto, exists, server);
         server.setUpdatedTime(System.currentTimeMillis());
+        encryptSecrets(server);
 
         return this.updateById(server) ? R.ok("server updated") : R.err("server update failed");
     }
@@ -89,7 +95,7 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         if (server == null) {
             return R.err("server not found");
         }
-        return R.ok(server.getApiToken());
+        return R.ok(secretCryptoUtils.decryptIfNeeded(server.getApiToken()));
     }
 
     @Override
@@ -98,15 +104,16 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         if (server == null) {
             return R.err("server not found");
         }
-        server.setApiToken(IdUtil.simpleUUID());
+        String token = IdUtil.simpleUUID();
+        server.setApiToken(secretCryptoUtils.encryptIfNeeded(token));
         server.setUpdatedTime(System.currentTimeMillis());
-        return this.updateById(server) ? R.ok(server.getApiToken()) : R.err("server token rotate failed");
+        return this.updateById(server) ? R.ok(token) : R.err("server token rotate failed");
     }
 
     @Override
     public R heartbeat(ControlServerHeartbeatDto dto, String token) {
         ControlServer server = this.getById(dto.getServerId());
-        if (server == null || server.getApiToken() == null || !server.getApiToken().equals(token)) {
+        if (server == null || server.getApiToken() == null || !secretCryptoUtils.decryptIfNeeded(server.getApiToken()).equals(token)) {
             return R.err(401, "invalid agent token");
         }
 
@@ -142,14 +149,9 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
     private ControlServer maskToken(ControlServer server) {
         ControlServer copy = new ControlServer();
         BeanUtils.copyProperties(server, copy);
-        String token = copy.getApiToken();
-        if (token != null && token.length() > 8) {
-            copy.setApiToken(token.substring(0, 4) + "****" + token.substring(token.length() - 4));
-        }
-        String xuiToken = copy.getXuiApiToken();
-        if (xuiToken != null && xuiToken.length() > 8) {
-            copy.setXuiApiToken(xuiToken.substring(0, 4) + "****" + xuiToken.substring(xuiToken.length() - 4));
-        }
+        decryptSecrets(copy);
+        copy.setApiToken(maskSecret(copy.getApiToken(), "****"));
+        copy.setXuiApiToken(maskSecret(copy.getXuiApiToken(), "****"));
         if (copy.getXuiPassword() != null && !copy.getXuiPassword().isEmpty()) {
             copy.setXuiPassword("********");
         }
@@ -157,5 +159,35 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
             copy.setXuiTwoFactorCode("******");
         }
         return copy;
+    }
+
+    private String maskSecret(String value, String fallback) {
+        if (value == null || value.isEmpty()) {
+            return value;
+        }
+        if (value.length() <= 8) {
+            return fallback;
+        }
+        return value.substring(0, 4) + "****" + value.substring(value.length() - 4);
+    }
+
+    private void encryptSecrets(ControlServer server) {
+        if (server == null) {
+            return;
+        }
+        server.setApiToken(secretCryptoUtils.encryptIfNeeded(server.getApiToken()));
+        server.setXuiApiToken(secretCryptoUtils.encryptIfNeeded(server.getXuiApiToken()));
+        server.setXuiPassword(secretCryptoUtils.encryptIfNeeded(server.getXuiPassword()));
+        server.setXuiTwoFactorCode(secretCryptoUtils.encryptIfNeeded(server.getXuiTwoFactorCode()));
+    }
+
+    private void decryptSecrets(ControlServer server) {
+        if (server == null) {
+            return;
+        }
+        server.setApiToken(secretCryptoUtils.decryptIfNeeded(server.getApiToken()));
+        server.setXuiApiToken(secretCryptoUtils.decryptIfNeeded(server.getXuiApiToken()));
+        server.setXuiPassword(secretCryptoUtils.decryptIfNeeded(server.getXuiPassword()));
+        server.setXuiTwoFactorCode(secretCryptoUtils.decryptIfNeeded(server.getXuiTwoFactorCode()));
     }
 }

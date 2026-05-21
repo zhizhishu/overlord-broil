@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import signal
 import sys
@@ -162,6 +163,7 @@ class FixtureState:
 
 class Handler(BaseHTTPRequestHandler):
     state = FixtureState()
+    api_token = ""
 
     def log_message(self, fmt: str, *args: Any) -> None:
         return
@@ -176,10 +178,14 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         parts = [unquote(part) for part in parsed.path.strip("/").split("/") if part]
         body = self._read_json()
+        body_map = body if isinstance(body, dict) else {}
         method = self.command.upper()
 
         if parsed.path in ("/", "/healthz"):
             self._ok({"fixture": "3x-ui", "ok": True})
+            return
+
+        if Handler.api_token and parts[:1] == ["panel"] and not self._authorized():
             return
 
         if parts == ["panel", "api", "server", "status"]:
@@ -191,11 +197,11 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if parts == ["panel", "api", "inbounds", "add"] and method == "POST":
-            self._ok(Handler.state.add_inbound(body))
+            self._ok(Handler.state.add_inbound(body_map))
             return
 
         if len(parts) == 5 and parts[:4] == ["panel", "api", "inbounds", "update"] and method == "POST":
-            self._maybe_found(Handler.state.update_inbound(self._int(parts[4]), body))
+            self._maybe_found(Handler.state.update_inbound(self._int(parts[4]), body_map))
             return
 
         if len(parts) == 5 and parts[:4] == ["panel", "api", "inbounds", "del"] and method == "POST":
@@ -203,17 +209,17 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if len(parts) == 5 and parts[:4] == ["panel", "api", "inbounds", "setEnable"] and method == "POST":
-            enabled = body.get("enable", body.get("enabled", True))
+            enabled = body_map.get("enable", body_map.get("enabled", True))
             self._maybe_found(Handler.state.set_enabled(self._int(parts[4]), bool(enabled)))
             return
 
         if parts == ["panel", "api", "inbounds", "addClient"] and method == "POST":
-            inbound_id = self._int(str(body.get("id") or body.get("inboundId") or 1))
-            self._maybe_found(Handler.state.add_client(inbound_id, body))
+            inbound_id = self._int(str(body_map.get("id") or body_map.get("inboundId") or 1))
+            self._maybe_found(Handler.state.add_client(inbound_id, body_map))
             return
 
         if len(parts) == 5 and parts[:4] == ["panel", "api", "inbounds", "updateClient"] and method == "POST":
-            self._maybe_found(Handler.state.update_client(parts[4], body))
+            self._maybe_found(Handler.state.update_client(parts[4], body_map))
             return
 
         if len(parts) >= 5 and parts[:4] == ["panel", "api", "inbounds", "delClient"] and method == "POST":
@@ -237,15 +243,24 @@ class Handler(BaseHTTPRequestHandler):
             ["panel", "api", "xray", "outbounds"],
             ["panel", "api", "xray", "outbound"],
             ["panel", "api", "server", "outbounds"],
+            ["panel", "xray", "outbounds"],
+            ["panel", "xray", "getOutbounds"],
         ):
             if method == "POST":
-                Handler.state.outbounds = body.get("outbounds", body if isinstance(body, list) else Handler.state.outbounds)
+                next_outbounds = body_map.get("outbounds", body if isinstance(body, list) else Handler.state.outbounds)
+                if isinstance(next_outbounds, list):
+                    Handler.state.outbounds = next_outbounds
             self._ok(Handler.state.outbounds)
             return
 
-        if parts in (["panel", "api", "xray", "config"], ["panel", "api", "server", "config"]):
+        if parts in (
+            ["panel", "api", "xray", "config"],
+            ["panel", "api", "server", "config"],
+            ["panel", "xray", "config"],
+            ["panel", "xray", "getXrayConfig"],
+        ):
             if method == "POST":
-                Handler.state.xray_config = body
+                Handler.state.xray_config = body_map
             self._ok(Handler.state.xray_config)
             return
 
@@ -253,18 +268,35 @@ class Handler(BaseHTTPRequestHandler):
             ["panel", "api", "server", "traffic"],
             ["panel", "api", "xray", "traffic"],
             ["panel", "api", "server", "getDb"],
+            ["panel", "xray", "getOutboundsTraffic"],
         ):
             self._ok(Handler.state.traffic)
             return
 
-        if parts in (["panel", "api", "server", "restart"], ["panel", "api", "xray", "restart"]) and method == "POST":
+        if parts in (
+            ["panel", "api", "server", "restart"],
+            ["panel", "api", "server", "restartXrayService"],
+            ["panel", "api", "xray", "restart"],
+            ["panel", "xray", "restart"],
+        ) and method == "POST":
             Handler.state.restart_count += 1
             self._ok({"restarted": True, "restartCount": Handler.state.restart_count})
             return
 
         self._send(404, {"success": False, "msg": f"fixture route not found: {method} {parsed.path}", "obj": None})
 
-    def _read_json(self) -> dict[str, Any]:
+    def _authorized(self) -> bool:
+        auth = self.headers.get("Authorization", "").strip()
+        scheme, _, value = auth.partition(" ")
+        if not auth:
+            self._send(401, {"success": False, "msg": "missing bearer token", "obj": None})
+            return False
+        if scheme.lower() != "bearer" or value.strip() != Handler.api_token:
+            self._send(403, {"success": False, "msg": "invalid bearer token", "obj": None})
+            return False
+        return True
+
+    def _read_json(self) -> Any:
         length = int(self.headers.get("Content-Length", "0") or "0")
         if length <= 0:
             return {}
@@ -275,7 +307,7 @@ class Handler(BaseHTTPRequestHandler):
             value = json.loads(raw)
         except json.JSONDecodeError:
             return {}
-        return value if isinstance(value, dict) else {"value": value}
+        return value
 
     def _ok(self, obj: Any) -> None:
         self._send(200, {"success": True, "msg": "", "obj": obj})
@@ -313,8 +345,10 @@ def main() -> int:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--ready-file", default="")
+    parser.add_argument("--api-token", default=os.environ.get("THREE_XUI_FIXTURE_TOKEN", ""))
     args = parser.parse_args()
 
+    Handler.api_token = args.api_token
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     host, port = server.server_address[:2]
 

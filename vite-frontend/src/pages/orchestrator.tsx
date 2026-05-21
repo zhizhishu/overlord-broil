@@ -177,6 +177,7 @@ interface ProtocolNodeForm {
   realityShortId: string;
   wsPath: string;
   ssMethod: string;
+  outboundTag: string;
   snellPsk: string;
   snellVersion: string;
 }
@@ -350,6 +351,7 @@ const blankProtocolNodeForm: ProtocolNodeForm = {
   realityShortId: "",
   wsPath: "/ws",
   ssMethod: "2022-blake3-aes-128-gcm",
+  outboundTag: "",
   snellPsk: "",
   snellVersion: "v4.1.1"
 };
@@ -365,6 +367,85 @@ const blankServerForwardRuleForm: ServerForwardRuleForm = {
 };
 
 const GB = 1024 * 1024 * 1024;
+const DEFAULT_OUTBOUND_TAGS = ["direct", "block", "dns"];
+
+const uniqueStrings = (values: string[]) => Array.from(new Set(values.map(value => value.trim()).filter(Boolean)));
+
+const randomBytes = (length: number) => {
+  const bytes = new Uint8Array(length);
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+    return bytes;
+  }
+  return bytes.map(() => Math.floor(Math.random() * 256));
+};
+
+const randomHex = (length: number) => Array.from(randomBytes(length))
+  .map(byte => byte.toString(16).padStart(2, "0"))
+  .join("");
+
+const randomToken = (length = 32) => {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_";
+  return Array.from(randomBytes(length))
+    .map(byte => alphabet[byte % alphabet.length])
+    .join("");
+};
+
+const base64Url = (bytes: Uint8Array) => btoa(String.fromCharCode(...Array.from(bytes)))
+  .replace(/\+/g, "-")
+  .replace(/\//g, "_")
+  .replace(/=+$/g, "");
+
+const randomRealityPrivateKey = () => base64Url(randomBytes(32));
+
+const randomUuid = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  const hex = randomHex(16);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${((parseInt(hex.slice(16, 18), 16) & 0x3f) | 0x80).toString(16)}${hex.slice(18, 20)}-${hex.slice(20, 32)}`;
+};
+
+const safeJsonParse = (value?: string) => {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    return null;
+  }
+};
+
+const collectOutboundTags = (value: any): string[] => {
+  if (!value) return [];
+  const parsed = typeof value === "string" ? safeJsonParse(value) : value;
+  if (!parsed) return [];
+  if (Array.isArray(parsed)) {
+    return uniqueStrings(parsed.flatMap(item => collectOutboundTags(item)));
+  }
+  if (typeof parsed !== "object") return [];
+
+  const directTags = Array.isArray(parsed.outbounds)
+    ? parsed.outbounds.map((item: any) => item?.tag).filter((tag: any): tag is string => typeof tag === "string")
+    : [];
+  const wrappedTags = collectOutboundTags(parsed.obj || parsed.data || parsed.settings);
+
+  return uniqueStrings([...directTags, ...wrappedTags]);
+};
+
+const withOutboundTag = (payload: any, outboundTag: string) => {
+  const tag = outboundTag.trim();
+  return tag ? { ...payload, outboundTag: tag } : payload;
+};
+
+const protocolNodePayloadPreview = (form: ProtocolNodeForm) => JSON.stringify(
+  withOutboundTag(buildInboundPayloadFromForm(inboundFormFromNodeForm(form)), form.outboundTag),
+  null,
+  2
+);
+
+const MasterRiskNotice = ({ context }: { context: string }) => (
+  <div className="rounded-small border border-warning-300 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
+    <span className="font-semibold">主控高风险：</span>{context}会作用在控制面服务器上，建议确认 API、3x-ui、Xray 以及证书任务不会影响现有编排。
+  </div>
+);
 
 const asExpiryTime = (days: number) => {
   if (!days || days <= 0) return 0;
@@ -545,6 +626,7 @@ export default function OrchestratorPage() {
   const [xraySettingServerId, setXraySettingServerId] = useState<number | null>(null);
   const [xraySettingText, setXraySettingText] = useState("");
   const [outboundTestUrl, setOutboundTestUrl] = useState("https://www.google.com/generate_204");
+  const [outboundTagHints, setOutboundTagHints] = useState<string[]>(DEFAULT_OUTBOUND_TAGS);
   const [serverForm, setServerForm] = useState<ServerForm>(blankServerForm);
   const [profileForm, setProfileForm] = useState<ProfileForm>(blankProfileForm);
   const [protocolNodeForm, setProtocolNodeForm] = useState<ProtocolNodeForm>(blankProtocolNodeForm);
@@ -595,6 +677,53 @@ export default function OrchestratorPage() {
   }, [monitorAlerts]);
 
   const recentAlerts = useMemo(() => monitorAlerts.slice(0, 5), [monitorAlerts]);
+
+  const outboundTagOptions = useMemo(() => uniqueStrings([
+    ...DEFAULT_OUTBOUND_TAGS,
+    ...outboundTagHints,
+    ...trafficSnapshots
+      .filter(snapshot => snapshot.sourceType === "outbound")
+      .map(snapshot => snapshot.tag || ""),
+    ...collectOutboundTags(xraySettingText)
+  ]), [outboundTagHints, trafficSnapshots, xraySettingText]);
+
+  const selectedProtocolServer = useMemo(() => {
+    return servers.find(server => server.id === protocolNodeForm.serverId);
+  }, [protocolNodeForm.serverId, servers]);
+
+  const selectedOrchestrationServers = useMemo(() => {
+    return servers.filter(server => orchestrationForm.serverIds.includes(server.id));
+  }, [orchestrationForm.serverIds, servers]);
+
+  const selectedOrchestrationHasMaster = selectedOrchestrationServers.some(server => server.role === "master");
+
+  const selectedInboundServer = useMemo(() => {
+    return servers.find(server => server.id === threeXuiInboundForm.serverId);
+  }, [servers, threeXuiInboundForm.serverId]);
+
+  const rememberOutboundTags = (source: any) => {
+    const tags = collectOutboundTags(source);
+    if (tags.length > 0) {
+      setOutboundTagHints(prev => uniqueStrings([...prev, ...tags]));
+    }
+  };
+
+  const renderServerOptions = () => servers.map(server => (
+    <SelectItem key={server.id.toString()} textValue={server.name}>
+      {server.role === "master" ? `${server.name} · 主控高风险` : server.name}
+    </SelectItem>
+  ));
+
+  const renderOutboundTagButtons = (onSelect: (tag: string) => void) => (
+    <div className="flex flex-wrap gap-2">
+      {outboundTagOptions.map(tag => (
+        <Button key={tag} size="sm" variant="flat" onPress={() => onSelect(tag)}>
+          {tag}
+        </Button>
+      ))}
+      <Button size="sm" variant="light" onPress={() => onSelect("")}>清空</Button>
+    </div>
+  );
 
   const unifiedRuleRows = useMemo<UnifiedRuleRow[]>(() => {
     const serverName = (serverId?: number, fallback?: string) => fallback || servers.find(server => server.id === serverId)?.name || (serverId ? `#${serverId}` : "-");
@@ -758,6 +887,7 @@ export default function OrchestratorPage() {
   const openProtocolNodeModal = (server?: ControlServer, node?: ProtocolNode) => {
     const protocol = (node?.protocol || "vless") as ProtocolNodeForm["protocol"];
     const engine = (node?.engine || (protocol === "snell" ? "snell" : "xray")) as ProtocolNodeForm["engine"];
+    const savedConfig = safeJsonParse(node?.configJson);
     setProtocolNodeForm({
       ...blankProtocolNodeForm,
       id: node?.id,
@@ -768,7 +898,8 @@ export default function OrchestratorPage() {
       listen: node?.listen || (protocol === "snell" ? "::0" : ""),
       port: node?.port || (protocol === "snell" ? 8390 : protocol === "vmess" ? 2086 : protocol === "shadowsocks" ? 8388 : 443),
       transport: node?.transport === "ws" ? "ws" : "tcp",
-      security: (node?.security as ProtocolNodeForm["security"]) || (protocol === "snell" ? "psk" : protocol === "vless" ? "reality" : protocol === "trojan" ? "tls" : "none")
+      security: (node?.security as ProtocolNodeForm["security"]) || (protocol === "snell" ? "psk" : protocol === "vless" ? "reality" : protocol === "trojan" ? "tls" : "none"),
+      outboundTag: typeof savedConfig?.outboundTag === "string" ? savedConfig.outboundTag : ""
     });
     setProtocolNodeModalOpen(true);
   };
@@ -904,7 +1035,10 @@ export default function OrchestratorPage() {
     }
 
     const isSnell = protocolNodeForm.protocol === "snell";
-    const payload = isSnell ? undefined : buildInboundPayloadFromForm(inboundFormFromNodeForm(protocolNodeForm));
+    const payload = isSnell ? undefined : withOutboundTag(
+      buildInboundPayloadFromForm(inboundFormFromNodeForm(protocolNodeForm)),
+      protocolNodeForm.outboundTag
+    );
     const requestPayload = isSnell ? {
       id: protocolNodeForm.id,
       serverId: protocolNodeForm.serverId,
@@ -1191,6 +1325,7 @@ export default function OrchestratorPage() {
   const showThreeXuiOutbounds = async (server: ControlServer) => {
     const res = await getThreeXuiOutbounds(server.id);
     if (isThreeXuiSuccess(res)) {
+      rememberOutboundTags(res.data);
       showThreeXuiResult(`${server.name} 出站配置`, res.data);
     } else {
       toast.error(res.msg || res.data?.msg || "读取出站失败");
@@ -1307,6 +1442,7 @@ export default function OrchestratorPage() {
     const config = res.data?.obj || res.data;
     setXraySettingServerId(server.id);
     setXraySettingText(typeof config === "string" ? config : JSON.stringify(config, null, 2));
+    rememberOutboundTags(config);
     setOutboundTestUrl("https://www.google.com/generate_204");
     setXraySettingModalOpen(true);
   };
@@ -1682,9 +1818,17 @@ export default function OrchestratorPage() {
                     <p className="font-semibold text-gray-900 dark:text-white">{server.name}</p>
                     <p className="text-xs text-gray-500">{server.host}:{server.sshPort || 22}</p>
                   </div>
-                  <Chip color={heartbeatColor(server) as any} variant="flat" size="sm">{heartbeatText(server)}</Chip>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Chip color={server.role === "master" ? "warning" : "default"} variant="flat" size="sm">
+                      {server.role === "master" ? "主控" : "副控"}
+                    </Chip>
+                    <Chip color={heartbeatColor(server) as any} variant="flat" size="sm">{heartbeatText(server)}</Chip>
+                  </div>
                 </CardHeader>
                 <CardBody className="space-y-4">
+                  {server.role === "master" && (
+                    <MasterRiskNotice context="在该卡片执行一键编排、入站/出站保存或重启" />
+                  )}
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <p className="text-gray-500">入口</p>
@@ -1940,6 +2084,9 @@ export default function OrchestratorPage() {
                 <SelectItem key="1">允许自签名</SelectItem>
               </Select>
             </div>
+            {serverForm.role === "master" && (
+              <MasterRiskNotice context="保存 role=master" />
+            )}
           </ModalBody>
           <ModalFooter>
             <Button variant="light" onPress={() => setServerModalOpen(false)}>取消</Button>
@@ -1976,7 +2123,7 @@ export default function OrchestratorPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Select label="目标服务器" selectedKeys={protocolNodeForm.serverId ? [protocolNodeForm.serverId.toString()] : []} onSelectionChange={keys => patchProtocolNodeForm({ serverId: Number(Array.from(keys)[0]) })} variant="bordered">
-                  {servers.map(server => <SelectItem key={server.id.toString()}>{server.name}</SelectItem>)}
+                  {renderServerOptions()}
                 </Select>
                 <Input label="节点名称" value={protocolNodeForm.name} onChange={e => patchProtocolNodeForm({ name: e.target.value })} variant="bordered" />
                 <Select label="协议" selectedKeys={[protocolNodeForm.protocol]} onSelectionChange={keys => updateProtocolNodeProtocol(Array.from(keys)[0] as ProtocolNodeForm["protocol"])} variant="bordered">
@@ -1999,10 +2146,16 @@ export default function OrchestratorPage() {
                   <SelectItem key="psk">PSK</SelectItem>
                 </Select>
               </div>
+              {selectedProtocolServer?.role === "master" && (
+                <MasterRiskNotice context="保存该协议节点" />
+              )}
 
               {protocolNodeForm.protocol === "snell" ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input label="Snell PSK" value={protocolNodeForm.snellPsk} onChange={e => patchProtocolNodeForm({ snellPsk: e.target.value })} variant="bordered" placeholder="留空自动生成" />
+                  <div className="space-y-2">
+                    <Input label="Snell PSK" value={protocolNodeForm.snellPsk} onChange={e => patchProtocolNodeForm({ snellPsk: e.target.value })} variant="bordered" placeholder="留空自动生成" />
+                    <Button size="sm" variant="flat" onPress={() => patchProtocolNodeForm({ snellPsk: randomToken(32) })}>生成 PSK</Button>
+                  </div>
                   <Input label="Snell 版本" value={protocolNodeForm.snellVersion} onChange={e => patchProtocolNodeForm({ snellVersion: e.target.value })} variant="bordered" />
                 </div>
               ) : (
@@ -2010,7 +2163,10 @@ export default function OrchestratorPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Input label="客户端 Email" value={protocolNodeForm.clientEmail} onChange={e => patchProtocolNodeForm({ clientEmail: e.target.value })} variant="bordered" />
                     {protocolNodeForm.protocol !== "trojan" && protocolNodeForm.protocol !== "shadowsocks" && (
-                      <Input label="客户端 UUID" value={protocolNodeForm.clientId} onChange={e => patchProtocolNodeForm({ clientId: e.target.value })} variant="bordered" />
+                      <div className="space-y-2">
+                        <Input label="客户端 UUID" value={protocolNodeForm.clientId} onChange={e => patchProtocolNodeForm({ clientId: e.target.value })} variant="bordered" />
+                        <Button size="sm" variant="flat" onPress={() => patchProtocolNodeForm({ clientId: randomUuid() })}>生成 UUID</Button>
+                      </div>
                     )}
                     {(protocolNodeForm.protocol === "trojan" || protocolNodeForm.protocol === "shadowsocks") && (
                       <Input label="客户端密码 / PSK" value={protocolNodeForm.clientPassword} onChange={e => patchProtocolNodeForm({ clientPassword: e.target.value })} variant="bordered" />
@@ -2026,8 +2182,14 @@ export default function OrchestratorPage() {
                     {protocolNodeForm.protocol === "vless" && protocolNodeForm.security === "reality" && (
                       <>
                         <Input label="Reality Dest" value={protocolNodeForm.realityDest} onChange={e => patchProtocolNodeForm({ realityDest: e.target.value })} variant="bordered" />
-                        <Input label="Reality Private Key" value={protocolNodeForm.realityPrivateKey} onChange={e => patchProtocolNodeForm({ realityPrivateKey: e.target.value })} variant="bordered" />
-                        <Input label="Reality Short ID" value={protocolNodeForm.realityShortId} onChange={e => patchProtocolNodeForm({ realityShortId: e.target.value })} variant="bordered" />
+                        <div className="space-y-2">
+                          <Input label="Reality Private Key" value={protocolNodeForm.realityPrivateKey} onChange={e => patchProtocolNodeForm({ realityPrivateKey: e.target.value })} variant="bordered" />
+                          <Button size="sm" variant="flat" onPress={() => patchProtocolNodeForm({ realityPrivateKey: randomRealityPrivateKey() })}>生成私钥</Button>
+                        </div>
+                        <div className="space-y-2">
+                          <Input label="Reality Short ID" value={protocolNodeForm.realityShortId} onChange={e => patchProtocolNodeForm({ realityShortId: e.target.value })} variant="bordered" />
+                          <Button size="sm" variant="flat" onPress={() => patchProtocolNodeForm({ realityShortId: randomHex(8) })}>生成 Short ID</Button>
+                        </div>
                       </>
                     )}
                     {protocolNodeForm.protocol === "vmess" && (
@@ -2037,10 +2199,14 @@ export default function OrchestratorPage() {
                       <Input label="加密方法" value={protocolNodeForm.ssMethod} onChange={e => patchProtocolNodeForm({ ssMethod: e.target.value })} variant="bordered" />
                     )}
                   </div>
+                  <div className="space-y-2">
+                    <Input label="Outbound Tag" value={protocolNodeForm.outboundTag} onChange={e => patchProtocolNodeForm({ outboundTag: e.target.value })} variant="bordered" placeholder="留空使用默认路由" />
+                    {renderOutboundTagButtons(tag => patchProtocolNodeForm({ outboundTag: tag }))}
+                  </div>
                   <Textarea
                     label="Inbound Payload 预览"
                     minRows={10}
-                    value={inboundPayloadPreview(inboundFormFromNodeForm(protocolNodeForm))}
+                    value={protocolNodePayloadPreview(protocolNodeForm)}
                     readOnly
                     variant="bordered"
                     classNames={{ input: "font-mono text-xs" }}
@@ -2062,7 +2228,7 @@ export default function OrchestratorPage() {
           <ModalBody>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Select label="目标服务器" selectedKeys={serverForwardRuleForm.serverId ? [serverForwardRuleForm.serverId.toString()] : []} onSelectionChange={keys => patchServerForwardRuleForm({ serverId: Number(Array.from(keys)[0]) })} variant="bordered">
-                {servers.map(server => <SelectItem key={server.id.toString()}>{server.name}</SelectItem>)}
+                {renderServerOptions()}
               </Select>
               <Input label="规则名称" value={serverForwardRuleForm.name} onChange={e => patchServerForwardRuleForm({ name: e.target.value })} variant="bordered" />
               <Select label="协议" selectedKeys={[serverForwardRuleForm.protocol]} onSelectionChange={keys => patchServerForwardRuleForm({ protocol: Array.from(keys)[0] as ServerForwardRuleForm["protocol"] })} variant="bordered">
@@ -2088,7 +2254,7 @@ export default function OrchestratorPage() {
           <ModalBody>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Select label="目标服务器" selectedKeys={deployForm.serverId ? [deployForm.serverId.toString()] : []} onSelectionChange={keys => setDeployForm(prev => ({ ...prev, serverId: Number(Array.from(keys)[0]) }))} variant="bordered">
-                {servers.map(server => <SelectItem key={server.id.toString()}>{server.name}</SelectItem>)}
+                {renderServerOptions()}
               </Select>
               <Select label="协议模板" selectedKeys={deployForm.profileId ? [deployForm.profileId.toString()] : []} onSelectionChange={keys => selectProfileForDeploy(Number(Array.from(keys)[0]))} variant="bordered">
                 {profiles.map(profile => <SelectItem key={profile.id.toString()}>{profile.name}</SelectItem>)}
@@ -2103,7 +2269,10 @@ export default function OrchestratorPage() {
               <Input label="版本族" value={deployForm.versionFamily} onChange={e => setDeployForm(prev => ({ ...prev, versionFamily: e.target.value }))} variant="bordered" />
               <Input label="固定版本" value={deployForm.exactVersion} onChange={e => setDeployForm(prev => ({ ...prev, exactVersion: e.target.value }))} variant="bordered" />
               <Input label="监听端口" type="number" value={deployForm.listenPort.toString()} onChange={e => setDeployForm(prev => ({ ...prev, listenPort: Number(e.target.value) || 0 }))} variant="bordered" />
-              <Input label="Snell PSK" value={deployForm.psk} onChange={e => setDeployForm(prev => ({ ...prev, psk: e.target.value }))} variant="bordered" />
+              <div className="space-y-2">
+                <Input label="Snell PSK" value={deployForm.psk} onChange={e => setDeployForm(prev => ({ ...prev, psk: e.target.value }))} variant="bordered" />
+                <Button size="sm" variant="flat" onPress={() => setDeployForm(prev => ({ ...prev, psk: randomToken(32) }))}>生成 PSK</Button>
+              </div>
             </div>
           </ModalBody>
           <ModalFooter>
@@ -2137,11 +2306,14 @@ export default function OrchestratorPage() {
                   }}
                   variant="bordered"
                 >
-                  {servers.map(server => <SelectItem key={server.id.toString()}>{server.name}</SelectItem>)}
+                  {renderServerOptions()}
                 </Select>
                 <Input label="公网主机" value={orchestrationForm.publicHost} onChange={e => patchOrchestrationForm({ publicHost: e.target.value })} variant="bordered" />
                 <Input label="3x-ui 版本" value={orchestrationForm.xuiVersion} onChange={e => patchOrchestrationForm({ xuiVersion: e.target.value })} variant="bordered" placeholder="留空使用最新版" />
               </div>
+              {selectedOrchestrationHasMaster && (
+                <MasterRiskNotice context="生成一键编排任务" />
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-small border border-default-200 p-4">
                 <Switch isSelected={orchestrationForm.installXui} onValueChange={value => patchOrchestrationForm({ installXui: value })}>安装 3x-ui</Switch>
@@ -2190,7 +2362,10 @@ export default function OrchestratorPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="Snell 端口" type="number" value={orchestrationForm.snellPort.toString()} onChange={e => patchOrchestrationForm({ snellPort: Number(e.target.value) || 8390 })} variant="bordered" />
-                <Input label="Snell PSK" value={orchestrationForm.snellPsk} onChange={e => patchOrchestrationForm({ snellPsk: e.target.value })} variant="bordered" placeholder="留空自动生成" />
+                <div className="space-y-2">
+                  <Input label="Snell PSK" value={orchestrationForm.snellPsk} onChange={e => patchOrchestrationForm({ snellPsk: e.target.value })} variant="bordered" placeholder="留空自动生成" />
+                  <Button size="sm" variant="flat" onPress={() => patchOrchestrationForm({ snellPsk: randomToken(32) })}>生成 PSK</Button>
+                </div>
               </div>
             </div>
           </ModalBody>
@@ -2240,13 +2415,19 @@ export default function OrchestratorPage() {
                 <SelectItem key="reality">Reality</SelectItem>
               </Select>
             </div>
+            {selectedInboundServer?.role === "master" && (
+              <MasterRiskNotice context="提交 3x-ui 入站操作" />
+            )}
 
             {threeXuiInboundForm.mode !== "delete" && threeXuiInboundForm.editMode === "form" && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Input label="客户端 Email" value={threeXuiInboundForm.clientEmail} onChange={e => patchThreeXuiInboundForm({ clientEmail: e.target.value })} variant="bordered" />
                   {threeXuiInboundForm.protocol !== "trojan" && threeXuiInboundForm.protocol !== "shadowsocks" && (
-                    <Input label="客户端 UUID" value={threeXuiInboundForm.clientId} onChange={e => patchThreeXuiInboundForm({ clientId: e.target.value })} variant="bordered" />
+                    <div className="space-y-2">
+                      <Input label="客户端 UUID" value={threeXuiInboundForm.clientId} onChange={e => patchThreeXuiInboundForm({ clientId: e.target.value })} variant="bordered" />
+                      <Button size="sm" variant="flat" onPress={() => patchThreeXuiInboundForm({ clientId: randomUuid() })}>生成 UUID</Button>
+                    </div>
                   )}
                   {(threeXuiInboundForm.protocol === "trojan" || threeXuiInboundForm.protocol === "shadowsocks") && (
                     <Input label="客户端密码 / PSK" value={threeXuiInboundForm.clientPassword} onChange={e => patchThreeXuiInboundForm({ clientPassword: e.target.value })} variant="bordered" />
@@ -2263,8 +2444,14 @@ export default function OrchestratorPage() {
                   {threeXuiInboundForm.protocol === "vless" && threeXuiInboundForm.security === "reality" && (
                     <>
                       <Input label="Reality Dest" value={threeXuiInboundForm.realityDest} onChange={e => patchThreeXuiInboundForm({ realityDest: e.target.value })} variant="bordered" />
-                      <Input label="Reality Private Key" value={threeXuiInboundForm.realityPrivateKey} onChange={e => patchThreeXuiInboundForm({ realityPrivateKey: e.target.value })} variant="bordered" />
-                      <Input label="Reality Short ID" value={threeXuiInboundForm.realityShortId} onChange={e => patchThreeXuiInboundForm({ realityShortId: e.target.value })} variant="bordered" />
+                      <div className="space-y-2">
+                        <Input label="Reality Private Key" value={threeXuiInboundForm.realityPrivateKey} onChange={e => patchThreeXuiInboundForm({ realityPrivateKey: e.target.value })} variant="bordered" />
+                        <Button size="sm" variant="flat" onPress={() => patchThreeXuiInboundForm({ realityPrivateKey: randomRealityPrivateKey() })}>生成私钥</Button>
+                      </div>
+                      <div className="space-y-2">
+                        <Input label="Reality Short ID" value={threeXuiInboundForm.realityShortId} onChange={e => patchThreeXuiInboundForm({ realityShortId: e.target.value })} variant="bordered" />
+                        <Button size="sm" variant="flat" onPress={() => patchThreeXuiInboundForm({ realityShortId: randomHex(8) })}>生成 Short ID</Button>
+                      </div>
                     </>
                   )}
                   {threeXuiInboundForm.protocol === "vmess" && (

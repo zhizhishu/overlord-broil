@@ -102,7 +102,9 @@ FLUX_TASK_TIMEOUT_KILL_SECONDS=30
 
 ## Operational Checklist
 
-- Confirm `.env` has non-default `DB_PASSWORD` and `JWT_SECRET`.
+- Confirm `.env` has non-default `DB_PASSWORD`, `JWT_SECRET` and `SECRET_ENCRYPTION_KEY`.
+- Back up `SECRET_ENCRYPTION_KEY` with `.env`; encrypted 3x-ui credentials and API tokens cannot be restored safely if the key is lost or rotated without planning.
+- Keep controlled-server agents off the master host unless you are deliberately testing self-control behavior. A `role=master` server can self-manage safe tasks, while destructive actions and protected listen ports such as frontend/backend/MySQL/SSH are blocked.
 - Confirm the frontend and backend ports are reachable only from the intended networks.
 - Confirm `docker compose ps` shows healthy `mysql`, `backend` and `frontend` services.
 - Check `GET /flow/test` through the backend port after every upgrade.
@@ -129,4 +131,4 @@ bash scripts/test-compose-smoke.sh --build-local --dry-run
 bash scripts/test-compose-smoke.sh --build-local
 ```
 
-The 3x-ui fixture test uses a short-lived local Python HTTP server and exits without leaving ports open. The full compose smoke test should remove its disposable containers, network and volumes when it exits. If it is interrupted, inspect Docker resources manually before rerunning.
+The 3x-ui fixture test uses a short-lived local Python HTTP server, checks Bearer-token success/missing/wrong-token paths plus inbound/outbound/config/traffic/restart routes, and exits without leaving ports open. The full compose smoke test should remove its disposable containers, network and volumes when it exits. If it is interrupted, inspect Docker resources manually before rerunning.

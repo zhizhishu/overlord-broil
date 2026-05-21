@@ -160,3 +160,14 @@
 - 2026-05-19 10:22:58：远端端口转发、规则总览、MySQL 8 JDBC 兼容修复已推送到主仓库 `origin/main`，commit `f20926c7629dab33beb28a34819a48b0cc853148`；GitHub Actions CI run `26113491240` 通过。官网同步说明已推送到 Pages 仓库，commit `81d6d36193138855ce5368e84185035d9190c9c1`；`https://zhizhishu.github.io/` 返回 `200` 且包含“远端端口转发与规则总览”。
 - 2026-05-19 23:24:41：GHCR 镜像构建工作流已推送到主仓库 `origin/main`，commit `32e46cd80d2ababf92963e8266f269254f2313ce`；GitHub Actions `Docker Images` run `26145172883` 通过，`CI` run `26145172938` 通过。
 - 2026-05-20 10:26:10：正式可用硬化第一批主体提交为 `b044d9a`；内容包括主控安装脚本 day-2 运维能力、agent 可靠性增强、可复用 agent mock 测试、CI compose 校验、README/Pages 使用说明。
+
+## 本轮分布式硬化计划（创建于: 2026-05-21 01:48:00）
+1. 后端主控自控安全模式：以 `control_server.role=master` 为主控自身标识，集中拦截会占用主控保护端口或破坏主控栈的编排、协议节点和远端转发操作。
+2. 后端凭据加密：新增兼容旧明文数据的 3x-ui/API token 加密读写能力，运行时自动解密，接口输出继续只返回掩码。
+3. 3x-ui 回归测试增强：让 fixture 更贴近真实鉴权/响应形态，并补 CI 可复用 smoke 入口。
+4. 前端运维辅助：在 Flux 风格主控页里补 Reality shortId、Snell PSK、UUID、outbound tag 等生成/选择辅助，并提示 master 服务器风险。
+5. 验证与发布：运行脚本、前端构建、Docker Maven 构建、compose 配置/smoke、`git diff --check`，清理本轮启动资源后提交并推送 `origin/main`，观察 GitHub Actions。
+
+## 本轮任务清单
+
+- [x] ~~**目标:** 分布式完成主控自控安全、凭据加密、3x-ui 回归增强和前端生成辅助，并完成验证、提交、推送~~ (创建于: 2026-05-21 01:48:00 | **完成于: 2026-05-21 02:54:48**)

@@ -8,6 +8,8 @@ import com.admin.common.dto.ThreeXuiServerDto;
 import com.admin.common.dto.ThreeXuiTrafficQueryDto;
 import com.admin.common.dto.ThreeXuiXraySettingDto;
 import com.admin.common.lang.R;
+import com.admin.common.utils.MasterSelfProtectionUtils;
+import com.admin.common.utils.SecretCryptoUtils;
 import com.admin.config.RestTemplateConfig;
 import com.admin.entity.ControlServer;
 import com.admin.entity.ThreeXuiTrafficSnapshot;
@@ -41,6 +43,9 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     @Resource
     private ThreeXuiTrafficSnapshotMapper trafficSnapshotMapper;
 
+    @Resource
+    private SecretCryptoUtils secretCryptoUtils;
+
     @Override
     public R testConnection(ThreeXuiServerDto dto) {
         return apiGet(resolveServer(dto.getServerId()), "/panel/api/server/status", true);
@@ -55,7 +60,12 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
 
     @Override
     public R addInbound(ThreeXuiInboundDto dto) {
-        return apiPostForm(resolveServer(dto.getServerId()), "/panel/api/inbounds/add", payloadToForm(dto.getPayload()), true);
+        ControlServer server = resolveServer(dto.getServerId());
+        String guard = guardInboundPort(server, dto.getPayload());
+        if (guard != null) {
+            return R.err(guard);
+        }
+        return apiPostForm(server, "/panel/api/inbounds/add", payloadToForm(dto.getPayload()), true);
     }
 
     @Override
@@ -63,9 +73,14 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
         if (dto.getInboundId() == null) {
             return R.err("inbound id is required");
         }
+        ControlServer server = resolveServer(dto.getServerId());
         Map<String, Object> payload = new LinkedHashMap<>(safePayload(dto.getPayload()));
         payload.putIfAbsent("id", dto.getInboundId());
-        return apiPostForm(resolveServer(dto.getServerId()), "/panel/api/inbounds/update/" + dto.getInboundId(), payloadToForm(payload), true);
+        String guard = guardInboundPort(server, payload);
+        if (guard != null) {
+            return R.err(guard);
+        }
+        return apiPostForm(server, "/panel/api/inbounds/update/" + dto.getInboundId(), payloadToForm(payload), true);
     }
 
     @Override
@@ -336,7 +351,37 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
         if (serverId == null) {
             return null;
         }
-        return controlServerService.getById(serverId);
+        return decryptServerSecrets(controlServerService.getById(serverId));
+    }
+
+    private String guardInboundPort(ControlServer server, Map<String, Object> payload) {
+        Integer port = payloadPort(payload);
+        return MasterSelfProtectionUtils.validateListenPort(server, port, "3x-ui inbound 端口");
+    }
+
+    private Integer payloadPort(Map<String, Object> payload) {
+        Object value = payload == null ? null : payload.get("port");
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        if (value instanceof String) {
+            try {
+                return Integer.valueOf(((String) value).trim());
+            } catch (Exception ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private ControlServer decryptServerSecrets(ControlServer server) {
+        if (server == null) {
+            return null;
+        }
+        server.setXuiApiToken(secretCryptoUtils.decryptIfNeeded(server.getXuiApiToken()));
+        server.setXuiPassword(secretCryptoUtils.decryptIfNeeded(server.getXuiPassword()));
+        server.setXuiTwoFactorCode(secretCryptoUtils.decryptIfNeeded(server.getXuiTwoFactorCode()));
+        return server;
     }
 
     private void markSynced(Long serverId, R result) {

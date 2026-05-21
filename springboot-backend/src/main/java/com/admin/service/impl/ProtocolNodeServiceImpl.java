@@ -8,6 +8,7 @@ import com.admin.common.dto.ProtocolNodeQueryDto;
 import com.admin.common.dto.ThreeXuiInboundDto;
 import com.admin.common.dto.ThreeXuiServerDto;
 import com.admin.common.lang.R;
+import com.admin.common.utils.MasterSelfProtectionUtils;
 import com.admin.common.utils.ProtocolValidationUtils;
 import com.admin.entity.ControlServer;
 import com.admin.entity.DeployTask;
@@ -55,6 +56,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         }
         String protocol = normalize(dto.getProtocol(), "vless");
         String engine = normalize(dto.getEngine(), inferEngine(protocol));
+        String action = normalize(dto.getAction(), "present");
         long now = System.currentTimeMillis();
 
         ProtocolNode node = new ProtocolNode();
@@ -71,6 +73,11 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         node.setUpdatedTime(now);
 
         if (ENGINE_SNELL.equals(engine)) {
+            String masterGuardError = MasterSelfProtectionUtils.validateListenPortAndAction(
+                    server, node.getPort(), action, "协议节点", "协议监听端口");
+            if (masterGuardError != null) {
+                return R.err(masterGuardError);
+            }
             String validation = validateSnellNode(node);
             if (validation != null) {
                 return R.err(validation);
@@ -80,7 +87,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
             }
             fillSnellDefaults(node);
             this.updateById(node);
-            DeployTask task = createSnellTask(server, node, normalize(dto.getAction(), "present"));
+            DeployTask task = createSnellTask(server, node, action);
             return R.ok(result(node, task));
         }
 
@@ -91,6 +98,12 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         String localValidation = validateXrayNodeFields(node);
         if (localValidation != null) {
             return R.err(localValidation);
+        }
+        String masterGuardError = MasterSelfProtectionUtils.validateListenPortAndAction(
+                server, MasterSelfProtectionUtils.firstPort(payloadPort(payload), node.getPort()),
+                action, "协议节点", "协议监听端口");
+        if (masterGuardError != null) {
+            return R.err(masterGuardError);
         }
         String validation = validateXrayNode(node, payload);
         if (validation != null) {
@@ -124,10 +137,16 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         if (server == null) {
             return R.err("server not found");
         }
+        String action = normalize(dto.getAction(), "present");
 
         copyDtoToNode(dto, exists);
         exists.setUpdatedTime(System.currentTimeMillis());
         if (ENGINE_SNELL.equals(normalize(exists.getEngine(), inferEngine(exists.getProtocol())))) {
+            String masterGuardError = MasterSelfProtectionUtils.validateListenPortAndAction(
+                    server, exists.getPort(), action, "协议节点", "协议监听端口");
+            if (masterGuardError != null) {
+                return R.err(masterGuardError);
+            }
             String validation = validateSnellNode(exists);
             if (validation != null) {
                 return R.err(validation);
@@ -135,7 +154,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
             fillSnellDefaults(exists);
             exists.setState("pending");
             this.updateById(exists);
-            DeployTask task = createSnellTask(server, exists, normalize(dto.getAction(), "present"));
+            DeployTask task = createSnellTask(server, exists, action);
             return R.ok(result(exists, task));
         }
 
@@ -144,6 +163,15 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
             return R.err(localValidation);
         }
         Map<String, Object> payload = payloadFrom(dto);
+        Integer listenPort = exists.getPort();
+        if (payload != null && !payload.isEmpty()) {
+            listenPort = MasterSelfProtectionUtils.firstPort(payloadPort(payload), listenPort);
+        }
+        String masterGuardError = MasterSelfProtectionUtils.validateListenPortAndAction(
+                server, listenPort, action, "协议节点", "协议监听端口");
+        if (masterGuardError != null) {
+            return R.err(masterGuardError);
+        }
         if (payload != null && !payload.isEmpty() && !isBlank(exists.getRemoteId())) {
             String validation = validateXrayNode(exists, payload);
             if (validation != null) {
@@ -201,6 +229,10 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         if (server == null) {
             return R.err("server not found");
         }
+        String masterGuardError = MasterSelfProtectionUtils.validateAction(server, "absent", "协议节点");
+        if (masterGuardError != null) {
+            return R.err(masterGuardError);
+        }
 
         if (ENGINE_SNELL.equals(node.getEngine())) {
             node.setState("deleting");
@@ -234,6 +266,10 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         ControlServer server = resolveServer(node.getServerId());
         if (server == null) {
             return R.err("server not found");
+        }
+        String masterGuardError = MasterSelfProtectionUtils.validateAction(server, "restarted", "协议节点");
+        if (masterGuardError != null) {
+            return R.err(masterGuardError);
         }
         if (ENGINE_SNELL.equals(node.getEngine())) {
             DeployTask task = createSnellTask(server, node, "restarted");

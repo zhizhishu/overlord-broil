@@ -6,6 +6,10 @@ This is the first public-facing productization milestone for Flux 3x-ui Orchestr
 
 ### Highlights
 
+- Hardening update: `role=master` servers can be selected intentionally, while destructive actions and protected listen ports such as frontend/backend/MySQL/SSH are blocked.
+- Sensitive stored agent tokens and 3x-ui API/password/2FA fields are encrypted through `SECRET_ENCRYPTION_KEY`, with plaintext legacy rows still readable.
+- The 3x-ui fixture now covers Bearer token success, missing-token and wrong-token paths in addition to inbound/outbound/config/traffic/restart routes.
+- Frontend forms include compact helpers for UUID, Reality private key/shortId, Snell PSK and outbound tag choices.
 - Master panel installer for public GitHub raw files and GHCR images, with source-build fallback when GHCR pulls are unavailable.
 - Controlled-server agent installer and systemd runner for claiming deployment tasks, executing scripts and reporting results.
 - Multi-server orchestration workspace for registered servers, 3x-ui connection settings, protocol nodes, Snell nodes, port forwards, deployment tasks and traffic snapshots.
@@ -31,7 +35,7 @@ This is the first public-facing productization milestone for Flux 3x-ui Orchestr
 | Port forwarding | Remote `socat` systemd services through auditable agent tasks. |
 | Traffic | Manual and scheduled 3x-ui traffic sync into local snapshots. |
 | Monitor alerts | Agent offline, service failure, certificate expiry, task failure/timeout and traffic anomaly alerts with acknowledgement API. |
-| 3x-ui regression | Local Python fixture and shell test covering core 3x-ui proxy routes. |
+| 3x-ui regression | Local Python fixture and shell test covering tokenized core 3x-ui proxy routes. |
 | CI verification | Backend/frontend build, agent mock test, 3x-ui fixture test, compose dry run and disposable compose smoke test. |
 
 ### Verification Commands

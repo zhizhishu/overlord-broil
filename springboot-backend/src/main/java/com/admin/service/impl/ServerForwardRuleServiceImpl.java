@@ -6,6 +6,7 @@ import com.alibaba.fastjson2.JSONObject;
 import com.admin.common.dto.ServerForwardRuleDto;
 import com.admin.common.dto.ServerForwardRuleQueryDto;
 import com.admin.common.lang.R;
+import com.admin.common.utils.MasterSelfProtectionUtils;
 import com.admin.common.utils.ProtocolValidationUtils;
 import com.admin.entity.ControlServer;
 import com.admin.entity.DeployTask;
@@ -43,6 +44,11 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
         String validation = validate(dto);
         if (validation != null) {
             return R.err(validation);
+        }
+        String masterGuardError = MasterSelfProtectionUtils.validateListenPortAndAction(
+                server, dto.getListenPort(), "present", "远端转发规则", "转发监听端口");
+        if (masterGuardError != null) {
+            return R.err(masterGuardError);
         }
 
         long now = System.currentTimeMillis();
@@ -83,6 +89,12 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
         String validation = validateForUpdate(dto, rule);
         if (validation != null) {
             return R.err(validation);
+        }
+        Integer listenPort = dto.getListenPort() == null ? rule.getListenPort() : dto.getListenPort();
+        String masterGuardError = MasterSelfProtectionUtils.validateListenPortAndAction(
+                server, listenPort, normalizeAction(dto.getAction(), "present"), "远端转发规则", "转发监听端口");
+        if (masterGuardError != null) {
+            return R.err(masterGuardError);
         }
 
         copyDto(dto, rule);
@@ -127,6 +139,10 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
         if (server == null) {
             return R.err("server not found");
         }
+        String masterGuardError = MasterSelfProtectionUtils.validateAction(server, "absent", "远端转发规则");
+        if (masterGuardError != null) {
+            return R.err(masterGuardError);
+        }
         rule.setState("deleting");
         rule.setUpdatedTime(System.currentTimeMillis());
         this.updateById(rule);
@@ -146,6 +162,10 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
         ControlServer server = resolveServer(rule.getServerId());
         if (server == null) {
             return R.err("server not found");
+        }
+        String masterGuardError = MasterSelfProtectionUtils.validateAction(server, "restarted", "远端转发规则");
+        if (masterGuardError != null) {
+            return R.err(masterGuardError);
         }
         DeployTask task = createTask(server, rule, "restarted");
         rule.setState("pending");

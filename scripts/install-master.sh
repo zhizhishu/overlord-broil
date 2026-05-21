@@ -13,6 +13,7 @@ DB_NAME="${FLUX_DB_NAME:-gost}"
 DB_USER="${FLUX_DB_USER:-gost}"
 DB_PASSWORD="${FLUX_DB_PASSWORD:-}"
 JWT_SECRET="${FLUX_JWT_SECRET:-}"
+SECRET_ENCRYPTION_KEY="${FLUX_SECRET_ENCRYPTION_KEY:-}"
 INSTALL_DOCKER="${FLUX_INSTALL_DOCKER:-1}"
 BUILD_ON_PULL_FAILURE="${FLUX_BUILD_ON_PULL_FAILURE:-1}"
 GHCR_USERNAME="${GHCR_USERNAME:-}"
@@ -56,6 +57,7 @@ Environment:
   GHCR_USERNAME/GHCR_TOKEN  Optional login for private GHCR packages
   FLUX_DB_PASSWORD          Optional database password; generated when empty
   FLUX_JWT_SECRET           Optional JWT secret; generated when empty
+  FLUX_SECRET_ENCRYPTION_KEY Optional credential encryption key; generated when empty
   FLUX_BACKUP_DIR           Optional backup output directory
   FLUX_BACKUP_FILE          Optional restore archive path
   FLUX_BUILD_ON_PULL_FAILURE Build local images after GHCR pull failure, default 1
@@ -245,7 +247,7 @@ require_env_values() {
     exit 2
   fi
 
-  for key in DB_NAME DB_USER DB_PASSWORD JWT_SECRET FRONTEND_PORT BACKEND_PORT; do
+  for key in DB_NAME DB_USER DB_PASSWORD JWT_SECRET SECRET_ENCRYPTION_KEY FRONTEND_PORT BACKEND_PORT; do
     value="$(read_env_value "$key" "$file")"
     if [ -z "$value" ]; then
       missing="${missing} ${key}"
@@ -334,12 +336,14 @@ ensure_env_file() {
   if [ ! -f "$ENV_FILE" ]; then
     DB_PASSWORD="${DB_PASSWORD:-$(random_hex 24)}"
     JWT_SECRET="${JWT_SECRET:-$(random_hex 32)}"
+    SECRET_ENCRYPTION_KEY="${SECRET_ENCRYPTION_KEY:-$(random_hex 32)}"
     umask 077
     cat > "$ENV_FILE" <<ENV
 DB_NAME=${DB_NAME}
 DB_USER=${DB_USER}
 DB_PASSWORD=${DB_PASSWORD}
 JWT_SECRET=${JWT_SECRET}
+SECRET_ENCRYPTION_KEY=${SECRET_ENCRYPTION_KEY}
 FRONTEND_PORT=${FRONTEND_PORT}
 BACKEND_PORT=${BACKEND_PORT}
 ENV
@@ -347,6 +351,13 @@ ENV
     echo "Generated ${INSTALL_DIR}/${ENV_FILE}"
   else
     echo "Keeping existing ${INSTALL_DIR}/${ENV_FILE}"
+    if [ -z "$(read_env_value SECRET_ENCRYPTION_KEY "$ENV_FILE")" ]; then
+      SECRET_ENCRYPTION_KEY="${SECRET_ENCRYPTION_KEY:-$(random_hex 32)}"
+      umask 077
+      printf '\nSECRET_ENCRYPTION_KEY=%s\n' "$SECRET_ENCRYPTION_KEY" >> "$ENV_FILE"
+      chmod 600 "$ENV_FILE"
+      echo "Added SECRET_ENCRYPTION_KEY to existing ${INSTALL_DIR}/${ENV_FILE}"
+    fi
   fi
 }
 
