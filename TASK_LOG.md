@@ -170,7 +170,7 @@
 
 ## 本轮任务清单
 
-- [ ] **目标:** 推进到可上架正式版：补齐发布清单、修正正式版文档口径、处理 Actions Node 24 兼容提示、完成完整验证并推送发布就绪提交 (创建于: 2026-05-21 11:19:29)
+- [x] ~~**目标:** 推进到可上架正式版：补齐发布清单、修正正式版文档口径、处理 Actions Node 24 兼容提示、完成完整验证并推送发布就绪提交~~ (创建于: 2026-05-21 11:19:29 | **完成于: 2026-05-21 13:08:00**)
 - [x] ~~**目标:** 分布式完成主控自控安全、凭据加密、3x-ui 回归增强和前端生成辅助，并完成验证、提交、推送~~ (创建于: 2026-05-21 01:48:00 | **完成于: 2026-05-21 02:54:48**)
 
 ## 本轮正式上架硬化计划（创建于: 2026-05-21 12:13:22）
@@ -182,10 +182,17 @@
 
 ## 本轮正式上架任务清单
 
-- [ ] **目标:** 完成正式上架硬化：Linux 安装适配、Flux UI 打磨、主控/被控可靠性、README/运维文档、完整验证和 GitHub 推送 (创建于: 2026-05-21 12:13:22)
+- [x] ~~**目标:** 完成正式上架硬化：Linux 安装适配、Flux UI 打磨、主控/被控可靠性、README/运维文档、完整验证和 GitHub 推送~~ (创建于: 2026-05-21 12:13:22 | **完成于: 2026-05-21 13:08:00**)
 
 ### 2026-05-21 13:02:34 进度记录
 
 - 已完成实现与本地验证：Debian/Ubuntu、Rocky/Oracle Linux、Alpine/OpenRC 分层支持矩阵；新增 POSIX bootstrap 安装器；agent/OpenRC、Snell/OpenRC、远端转发 OpenRC 支持；3x-ui 完整安装编排增加 systemd preflight；主控页服务器卡片操作分组已按 Flux 运维控制台方向打磨；README、Operations、Release Notes、项目 docs 官网和独立 `zhizhishu.github.io` 官网已同步正式版使用说明。
 - 本地已通过：`bash -n scripts/*.sh`、`sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、`docker compose -f docker-compose-v4.yml config --quiet`、`docker compose -f docker-compose-v6.yml config --quiet`、`vite-frontend npm run build`、`git diff --check`。
 - 本机 Docker Desktop engine 当前对 `docker run` / `docker ps` 返回 500，导致 Docker Maven 和完整 compose smoke 无法在本机继续跑；推送后由 GitHub Actions 的 backend、scripts compose smoke 和 Docker Images workflow 做最终验证。
+
+### 2026-05-21 13:08:00 完成记录
+
+- 主项目已推送 `origin/main`：`5a3d755`，提交信息 `Prepare 0.5.0 production release`。
+- 官网仓库已推送 `origin/main`：`f8c2fea`，提交信息 `Update Flux 3x-ui Orchestrator site for 0.5.0`。
+- GitHub Actions 验证通过：主项目 `CI` run `26250075134` 通过，覆盖 backend Maven、frontend build、脚本校验、agent mock、3x-ui fixture、compose config、dry-run compose smoke、完整 compose smoke；`Docker Images` run `26250075225` 通过，backend/frontend GHCR 镜像均构建并推送；主项目 Pages run `26250074383` 通过；官网 Pages run `26250155252` 通过。
+- 本轮资源清理：未保留本轮启动的 dev server、测试 watcher 或浏览器页签；本机 Docker Desktop engine 自身仍异常返回 500，但本轮启动的挂起 docker CLI 已清理，未关闭 Docker Desktop/WSL 后台服务。
