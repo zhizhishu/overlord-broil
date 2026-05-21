@@ -6,6 +6,7 @@ import com.alibaba.fastjson2.JSONObject;
 import com.admin.common.dto.ServerForwardRuleDto;
 import com.admin.common.dto.ServerForwardRuleQueryDto;
 import com.admin.common.lang.R;
+import com.admin.common.utils.ProtocolValidationUtils;
 import com.admin.entity.ControlServer;
 import com.admin.entity.DeployTask;
 import com.admin.entity.ServerForwardRule;
@@ -341,15 +342,22 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
     private String validate(ServerForwardRuleDto dto) {
         if (dto == null) return "forward rule is required";
         if (dto.getServerId() == null) return "server id is required";
+        if (!ProtocolValidationUtils.isValidProtocol(dto.getProtocol())) return "forward protocol is invalid";
+        if (!isBlank(dto.getListenHost()) && !ProtocolValidationUtils.isValidHost(dto.getListenHost())) {
+            return "listen host is invalid";
+        }
         if (isBlank(dto.getTargetHost())) return "target host is required";
-        if (!validPort(dto.getListenPort())) return "listen port is invalid";
-        if (!validPort(dto.getTargetPort())) return "target port is invalid";
+        if (!ProtocolValidationUtils.isValidHost(dto.getTargetHost())) return "target host is invalid";
+        if (!ProtocolValidationUtils.isValidPort(dto.getListenPort())) return "listen port is invalid";
+        if (!ProtocolValidationUtils.isValidPort(dto.getTargetPort())) return "target port is invalid";
         return null;
     }
 
     private String validateForUpdate(ServerForwardRuleDto dto, ServerForwardRule rule) {
         ServerForwardRuleDto merged = new ServerForwardRuleDto();
         merged.setServerId(rule.getServerId());
+        merged.setProtocol(firstNotBlank(dto.getProtocol(), rule.getProtocol()));
+        merged.setListenHost(firstNotBlank(dto.getListenHost(), rule.getListenHost()));
         merged.setTargetHost(firstNotBlank(dto.getTargetHost(), rule.getTargetHost()));
         merged.setListenPort(dto.getListenPort() == null ? rule.getListenPort() : dto.getListenPort());
         merged.setTargetPort(dto.getTargetPort() == null ? rule.getTargetPort() : dto.getTargetPort());
@@ -390,10 +398,6 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
 
     private ControlServer resolveServer(Long serverId) {
         return serverId == null ? null : controlServerService.getById(serverId);
-    }
-
-    private boolean validPort(Integer port) {
-        return port != null && port > 0 && port < 65536;
     }
 
     private String normalizeProtocol(String protocol) {

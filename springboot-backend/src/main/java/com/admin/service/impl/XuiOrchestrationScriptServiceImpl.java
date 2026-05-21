@@ -51,6 +51,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
         appendVar(script, "INSTALL_SNELL", enabled(dto.getInstallSnell()) ? "1" : "0");
         appendVar(script, "SNELL_PORT", String.valueOf(firstNotNull(dto.getSnellPort(), 8390)));
         appendVar(script, "SNELL_PSK", snellPsk);
+        appendVar(script, "SNELL_VERSION", "v4.1.1");
         script.append('\n');
         script.append(body());
         return script.toString();
@@ -303,6 +304,26 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                   echo "$key"
                 }
 
+                snell_expected_sha() {
+                  case "$1:$2" in
+                    v4.1.1:amd64) echo 'cc2271b79c7506888b34e651e8741b3aa7fc7d5f60aa65ef8bb096f3313a193b' ;;
+                    v4.1.1:i386) echo '09579fceebf69ff291453b8e252a9f74c7ca82246ec8572a6e2376008df25ae1' ;;
+                    v4.1.1:aarch64) echo '38d4cdc03dcdb3608af8594df83e1795265167fafc5d802f815148908902d758' ;;
+                    v4.1.1:armv7l) echo 'd00b98ed803be4039f0f0630b810932cd3d3d87ee3e6ed224106fdc63347d8e6' ;;
+                    *) return 1 ;;
+                  esac
+                }
+
+                map_snell_arch() {
+                  case "$(uname -m)" in
+                    x86_64|amd64) echo 'amd64' ;;
+                    i386|i686) echo 'i386' ;;
+                    aarch64|arm64) echo 'aarch64' ;;
+                    armv7l|armv7) echo 'armv7l' ;;
+                    *) return 1 ;;
+                  esac
+                }
+
                 wait_for_panel() {
                   local base attempt
                   base="${LOCAL_SCHEME}://127.0.0.1:${PANEL_PORT}/${WEB_BASE_PATH#/}"
@@ -317,23 +338,28 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                 }
 
                 install_snell() {
-                  local arch url tmp binary config_dir config_path service_path
-                  arch="$(uname -m)"
-                  case "$arch" in
-                    x86_64|amd64) arch='amd64' ;;
-                    i386|i686) arch='i386' ;;
-                    aarch64|arm64) arch='aarch64' ;;
-                    armv7l|armv7) arch='armv7l' ;;
-                    *) echo "Unsupported Snell architecture: $arch" >&2; return 1 ;;
-                  esac
-                  url="https://dl.nssurge.com/snell/snell-server-v4.1.1-linux-${arch}.zip"
+                  local arch url tmp binary config_dir config_path service_path expected_sha actual_sha
+                  arch="$(map_snell_arch)" || { echo "Unsupported Snell architecture: $(uname -m)" >&2; return 1; }
+                  expected_sha="$(snell_expected_sha "$SNELL_VERSION" "$arch")" || {
+                    echo "Unsupported Snell version/architecture checksum: ${SNELL_VERSION}/${arch}" >&2
+                    return 1
+                  }
+                  url="https://dl.nssurge.com/snell/snell-server-${SNELL_VERSION}-linux-${arch}.zip"
                   tmp="$(mktemp -d)"
                   binary='/usr/local/bin/snell-server'
                   config_dir='/etc/snell/users'
                   config_path="${config_dir}/snell-main.conf"
                   service_path='/etc/systemd/system/snell.service'
-                  log "Installing Snell on ${SNELL_PORT}"
+                  log "Installing Snell ${SNELL_VERSION} on ${SNELL_PORT}"
                   curl -fsSL "$url" -o "${tmp}/snell.zip"
+                  actual_sha="$(sha256_file "${tmp}/snell.zip")"
+                  if [ "$actual_sha" != "$expected_sha" ]; then
+                    echo "Snell checksum verification failed for ${url}" >&2
+                    echo "Expected: ${expected_sha}" >&2
+                    echo "Actual:   ${actual_sha}" >&2
+                    return 1
+                  fi
+                  log "Verified Snell ${SNELL_VERSION} ${arch} sha256 ${actual_sha}"
                   unzip -o "${tmp}/snell.zip" -d "$tmp"
                   install -m 0755 "${tmp}/snell-server" "$binary"
                   mkdir -p "$config_dir"
@@ -365,6 +391,19 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                   systemctl enable snell
                   systemctl restart snell
                   rm -rf "$tmp"
+                }
+
+                sha256_file() {
+                  if command -v sha256sum >/dev/null 2>&1; then
+                    sha256sum "$1" | awk '{print $1}'
+                    return
+                  fi
+                  if command -v openssl >/dev/null 2>&1; then
+                    openssl dgst -sha256 "$1" | awk '{print $2}'
+                    return
+                  fi
+                  echo 'sha256sum or openssl is required for Snell checksum verification.' >&2
+                  return 1
                 }
 
                 create_inbounds() {
@@ -585,8 +624,16 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                 build_result_marker() {
                   local xray_bin xray_version snell_version endpoint base_path api_token
                   local xui_service_status xray_service_status snell_service_status cert_status cert_expire_at now_ts
+                  local snell_arch snell_download_url snell_checksum_sha
                   xray_version=''
                   snell_version=''
+                  snell_arch="$(map_snell_arch 2>/dev/null || true)"
+                  snell_download_url=''
+                  snell_checksum_sha=''
+                  if [ -n "$snell_arch" ]; then
+                    snell_download_url="https://dl.nssurge.com/snell/snell-server-${SNELL_VERSION}-linux-${snell_arch}.zip"
+                    snell_checksum_sha="$(snell_expected_sha "$SNELL_VERSION" "$snell_arch" 2>/dev/null || true)"
+                  fi
                   if xray_bin="$(find_xray_bin 2>/dev/null)"; then
                     xray_version="$("$xray_bin" version 2>/dev/null | head -n 1 || true)"
                   fi
@@ -624,7 +671,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                   base_path="/${WEB_BASE_PATH#/}"
                   endpoint="${LOCAL_SCHEME}://${PUBLIC_HOST}:${PANEL_PORT}"
                   api_token="$API_TOKEN"
-                  XUI_ENDPOINT="$endpoint" XUI_BASE_PATH="$base_path" XUI_API_TOKEN="$api_token" XUI_USERNAME="$PANEL_USERNAME" XUI_PASSWORD="$PANEL_PASSWORD" XUI_ALLOW_INSECURE="$XUI_ALLOW_INSECURE" XRAY_VERSION="$xray_version" SNELL_VERSION="$snell_version" XUI_SERVICE_STATUS="$xui_service_status" XRAY_SERVICE_STATUS="$xray_service_status" SNELL_SERVICE_STATUS="$snell_service_status" CERT_STATUS="$cert_status" CERT_EXPIRE_AT="$cert_expire_at" INSTALL_SNELL="$INSTALL_SNELL" SNELL_PORT="$SNELL_PORT" SNELL_PSK="$SNELL_PSK" python3 <<'PY'
+                  XUI_ENDPOINT="$endpoint" XUI_BASE_PATH="$base_path" XUI_API_TOKEN="$api_token" XUI_USERNAME="$PANEL_USERNAME" XUI_PASSWORD="$PANEL_PASSWORD" XUI_ALLOW_INSECURE="$XUI_ALLOW_INSECURE" XRAY_VERSION="$xray_version" SNELL_RUNTIME_VERSION="$snell_version" XUI_SERVICE_STATUS="$xui_service_status" XRAY_SERVICE_STATUS="$xray_service_status" SNELL_SERVICE_STATUS="$snell_service_status" CERT_STATUS="$cert_status" CERT_EXPIRE_AT="$cert_expire_at" INSTALL_SNELL="$INSTALL_SNELL" SNELL_PORT="$SNELL_PORT" SNELL_PSK="$SNELL_PSK" SNELL_VERSION="$SNELL_VERSION" SNELL_DOWNLOAD_URL="$snell_download_url" SNELL_CHECKSUM_SHA256="$snell_checksum_sha" python3 <<'PY'
                 import json
                 import os
 
@@ -641,7 +688,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                     "xuiPassword": os.environ.get("XUI_PASSWORD"),
                     "xuiAllowInsecure": int(os.environ.get("XUI_ALLOW_INSECURE", "0")),
                     "xrayVersion": os.environ.get("XRAY_VERSION"),
-                    "snellVersion": os.environ.get("SNELL_VERSION"),
+                    "snellVersion": os.environ.get("SNELL_RUNTIME_VERSION"),
                     "agentVersion": os.environ.get("FLUX_AGENT_VERSION"),
                 }
                 result["certificate"] = {
@@ -670,7 +717,12 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                         "transport": "tcp",
                         "security": "psk",
                         "credential": {"psk": os.environ.get("SNELL_PSK")},
-                        "config": {"configPath": "/etc/snell/users/snell-main.conf", "version": "v4.1.1"},
+                        "config": {
+                            "configPath": "/etc/snell/users/snell-main.conf",
+                            "version": os.environ.get("SNELL_VERSION"),
+                            "downloadUrl": os.environ.get("SNELL_DOWNLOAD_URL"),
+                            "checksumSha256": os.environ.get("SNELL_CHECKSUM_SHA256"),
+                        },
                         "remoteId": "snell.service",
                         "serviceName": "snell.service",
                         "state": os.environ.get("SNELL_SERVICE_STATUS"),
@@ -692,7 +744,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                 export API_TOKEN RESULT_FILE CERTIFICATE_DOMAIN PUBLIC_HOST REALITY_DEST REALITY_SNI WS_PATH SS_METHOD
                 export CREATE_VLESS_REALITY CREATE_VMESS_WS CREATE_TROJAN_TLS CREATE_SHADOWSOCKS
                 export VLESS_PORT VMESS_PORT TROJAN_PORT SHADOWSOCKS_PORT
-                export FLUX_AGENT_VERSION CERTIFICATE_MODE
+                export FLUX_AGENT_VERSION CERTIFICATE_MODE SNELL_VERSION
                 wait_for_panel
                 create_inbounds
                 if [ "$INSTALL_SNELL" = "1" ]; then

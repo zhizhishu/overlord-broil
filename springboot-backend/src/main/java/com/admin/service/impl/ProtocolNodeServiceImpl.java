@@ -8,6 +8,7 @@ import com.admin.common.dto.ProtocolNodeQueryDto;
 import com.admin.common.dto.ThreeXuiInboundDto;
 import com.admin.common.dto.ThreeXuiServerDto;
 import com.admin.common.lang.R;
+import com.admin.common.utils.ProtocolValidationUtils;
 import com.admin.entity.ControlServer;
 import com.admin.entity.DeployTask;
 import com.admin.entity.ProtocolNode;
@@ -70,8 +71,9 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         node.setUpdatedTime(now);
 
         if (ENGINE_SNELL.equals(engine)) {
-            if (node.getPort() == null) {
-                return R.err("snell port is required");
+            String validation = validateSnellNode(node);
+            if (validation != null) {
+                return R.err(validation);
             }
             if (!this.save(node)) {
                 return R.err("protocol node create failed");
@@ -85,6 +87,14 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         Map<String, Object> payload = payloadFrom(dto);
         if (payload == null || payload.isEmpty()) {
             return R.err("xray node payload is required");
+        }
+        String localValidation = validateXrayNodeFields(node);
+        if (localValidation != null) {
+            return R.err(localValidation);
+        }
+        String validation = validateXrayNode(node, payload);
+        if (validation != null) {
+            return R.err(validation);
         }
         ThreeXuiInboundDto inboundDto = new ThreeXuiInboundDto();
         inboundDto.setServerId(server.getId());
@@ -118,6 +128,10 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         copyDtoToNode(dto, exists);
         exists.setUpdatedTime(System.currentTimeMillis());
         if (ENGINE_SNELL.equals(normalize(exists.getEngine(), inferEngine(exists.getProtocol())))) {
+            String validation = validateSnellNode(exists);
+            if (validation != null) {
+                return R.err(validation);
+            }
             fillSnellDefaults(exists);
             exists.setState("pending");
             this.updateById(exists);
@@ -125,8 +139,16 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
             return R.ok(result(exists, task));
         }
 
+        String localValidation = validateXrayNodeFields(exists);
+        if (localValidation != null) {
+            return R.err(localValidation);
+        }
         Map<String, Object> payload = payloadFrom(dto);
         if (payload != null && !payload.isEmpty() && !isBlank(exists.getRemoteId())) {
+            String validation = validateXrayNode(exists, payload);
+            if (validation != null) {
+                return R.err(validation);
+            }
             ThreeXuiInboundDto inboundDto = new ThreeXuiInboundDto();
             inboundDto.setServerId(server.getId());
             inboundDto.setInboundId(parseInt(exists.getRemoteId()));
@@ -295,6 +317,97 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         task.setUpdatedTime(now);
         deployTaskMapper.insert(task);
         return task;
+    }
+
+    private String validateSnellNode(ProtocolNode node) {
+        if (!ProtocolValidationUtils.isValidPort(node.getPort())) {
+            return "snell port is invalid";
+        }
+        String psk = extractPsk(node.getCredentialJson());
+        if (!isBlank(psk) && !ProtocolValidationUtils.isValidPsk(psk)) {
+            return "snell psk is invalid";
+        }
+        return null;
+    }
+
+    private String validateXrayNodeFields(ProtocolNode node) {
+        if (node.getPort() != null && !ProtocolValidationUtils.isValidPort(node.getPort())) {
+            return "xray port is invalid";
+        }
+        String outboundTagError = ProtocolValidationUtils.validateOutboundTags(node.getConfigJson());
+        if (outboundTagError != null) {
+            return outboundTagError;
+        }
+        return null;
+    }
+
+    private String validateXrayNode(ProtocolNode node, Map<String, Object> payload) {
+        Integer port = payloadPort(payload);
+        if (port == null) {
+            port = node.getPort();
+        }
+        if (port != null && !ProtocolValidationUtils.isValidPort(port)) {
+            return "xray port is invalid";
+        }
+        String outboundTagError = ProtocolValidationUtils.validateOutboundTags(payload);
+        if (outboundTagError != null) {
+            return outboundTagError;
+        }
+        JSONObject stream = ProtocolValidationUtils.toObject(payload.get("streamSettings"));
+        if (stream == null) {
+            return null;
+        }
+        JSONObject reality = ProtocolValidationUtils.toObject(stream.get("realitySettings"));
+        boolean realitySecurity = "reality".equalsIgnoreCase(stream.getString("security"));
+        if (reality == null && !realitySecurity) {
+            return null;
+        }
+        if (reality == null) {
+            return "reality settings are required";
+        }
+        String dest = reality == null ? null : reality.getString("dest");
+        if (isBlank(dest)) {
+            return "reality dest is required";
+        }
+        if (!hasRealityServerName(reality)) {
+            return "reality serverName is required";
+        }
+        return ProtocolValidationUtils.validateReality(null, dest, reality);
+    }
+
+    private boolean hasRealityServerName(JSONObject reality) {
+        if (!isBlank(reality.getString("serverName"))) {
+            return true;
+        }
+        Object serverNames = reality.get("serverNames");
+        if (serverNames instanceof JSONArray) {
+            for (Object value : (JSONArray) serverNames) {
+                if (value != null && !isBlank(String.valueOf(value))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private Integer payloadPort(Map<String, Object> payload) {
+        Object value = payload == null ? null : payload.get("port");
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        if (value instanceof String) {
+            try {
+                return Integer.valueOf(((String) value).trim());
+            } catch (NumberFormatException ignored) {
+                return -1;
+            }
+        }
+        return null;
+    }
+
+    private String extractPsk(String credentialJson) {
+        JSONObject credential = ProtocolValidationUtils.parseObject(credentialJson);
+        return credential == null ? null : credential.getString("psk");
     }
 
     private void upsertXrayInbound(ControlServer server, JSONObject inbound, long now) {

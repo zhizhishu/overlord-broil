@@ -7,6 +7,7 @@ import com.admin.common.dto.DeployTaskDto;
 import com.admin.common.dto.DeployTaskStateDto;
 import com.admin.common.dto.OrchestrationPlanDto;
 import com.admin.common.lang.R;
+import com.admin.common.utils.ProtocolValidationUtils;
 import com.admin.entity.ControlServer;
 import com.admin.entity.DeployTask;
 import com.admin.entity.ProtocolProfile;
@@ -74,6 +75,10 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         }
 
         String protocol = dto.getProtocol().trim().toLowerCase();
+        String validationError = validateDeployTask(dto, profile, protocol);
+        if (validationError != null) {
+            return R.err(validationError);
+        }
         String script = "snell".equals(protocol)
                 ? snellTemplateService.buildScript(dto, profile)
                 : buildXrayAgentPayload(dto, profile, server);
@@ -130,6 +135,16 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 && (dto.getCertificateDomain() == null || dto.getCertificateDomain().trim().isEmpty())) {
             return "certificate domain is required for acme-http mode";
         }
+        if (enabled(dto.getCreateVlessReality())) {
+            String realityError = ProtocolValidationUtils.validateReality(dto.getRealitySni(), dto.getRealityDest(), null);
+            if (realityError != null) {
+                return realityError;
+            }
+        }
+        if (enabled(dto.getInstallSnell()) && dto.getSnellPsk() != null
+                && !ProtocolValidationUtils.isValidPsk(dto.getSnellPsk())) {
+            return "snell psk is invalid";
+        }
         Set<Integer> ports = new HashSet<>();
         String duplicate = addPort(ports, dto.getPanelPort(), "panelPort");
         if (duplicate != null) {
@@ -164,9 +179,29 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         return null;
     }
 
+    private String validateDeployTask(DeployTaskDto dto, ProtocolProfile profile, String protocol) {
+        Integer listenPort = dto.getListenPort() != null ? dto.getListenPort() : profile == null ? null : profile.getListenPort();
+        if (listenPort != null && !ProtocolValidationUtils.isValidPort(listenPort)) {
+            return "listen port is invalid";
+        }
+        if ("snell".equals(protocol) && dto.getPsk() != null && !ProtocolValidationUtils.isValidPsk(dto.getPsk())) {
+            return "snell psk is invalid";
+        }
+        if (profile != null) {
+            String outboundTagError = ProtocolValidationUtils.validateOutboundTags(profile.getConfigJson());
+            if (outboundTagError != null) {
+                return outboundTagError;
+            }
+        }
+        return null;
+    }
+
     private String addPort(Set<Integer> ports, Integer port, String fieldName) {
         if (port == null) {
             return fieldName + " is required";
+        }
+        if (!ProtocolValidationUtils.isValidPort(port)) {
+            return fieldName + " is invalid";
         }
         if (!ports.add(port)) {
             return "port " + port + " is duplicated in orchestration plan";

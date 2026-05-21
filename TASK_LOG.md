@@ -24,6 +24,7 @@
   - 前端补齐 `@heroui/theme` / `@heroui/system` 兼容版本、移除旧 legacy 插件并显式加入 Tailwind/PostCSS 所需 `jiti`。
   - 新增 GitHub Actions CI，分别验证后端 Maven package 和前端 npm build。
   - 2026-05-20 10:26:10：完成正式可用硬化第一批。分布式 worker 复核安装脚本、README、Pages、CI 与 agent 脚本后，主线程补齐主控安装脚本 `upgrade/backup/restore/uninstall` 的可靠性校验、agent 任务锁/HTTP 重试/任务超时/结果元数据上报、agent systemd env 安全写入、可复用 agent mock 测试和 CI compose 校验。
+  - 2026-05-20 21:03:36：完成产品化收尾第二批。分布式 worker 分别完成 Snell 供应链 checksum/版本锁、协议级 guardrails、CI compose smoke；主线程集成复查后补齐 Xray 本地字段校验、host-only/host:port 拆分、`gost-phpmyadmin` 资源保护和 `--build-local` smoke，避免本地/CI 依赖 GHCR 拉取权限。
 - 下一步：
   - 增加 Reality key、端口、outbound tag、Snell PSK/端口等协议级校验，降低 3x-ui/Snell payload 填错风险。
   - 为 Snell 二进制下载增加 checksum 校验和版本源锁定。
@@ -67,9 +68,10 @@
   - 2026-05-19 23:24:41：新增 GitHub Actions 镜像构建工作流，后端和前端镜像已通过 `Docker Images` workflow 构建并推送到 GHCR；compose 镜像地址已切换到 `ghcr.io/zhizhishu/flux-3xui-orchestrator-*`。
   - 2026-05-20 03:57:59：完成本地 Docker compose 全栈烟测，前端 `http://localhost:18080/` 返回 `200`，后端 `/flow/test` 返回 `test`；创建被控服务器、一键编排任务、agent claim/report、服务器状态回写均通过。烟测中修复 MySQL 首次初始化时 socket healthcheck 过早放行后端的问题，改为 TCP 账号 healthcheck；测试容器、卷、网络和端口已清理。
   - 2026-05-20 10:26:10：本轮硬化验证通过：`bash -n scripts/*.sh`、`bash scripts/test-flux-agent-mock.sh`、`docker compose -f docker-compose-v4.yml config --quiet`、`docker compose -f docker-compose-v6.yml config --quiet`、`vite-frontend npm run build`、Docker Maven `mvn -B -DskipTests package`、`git diff --check` 均通过；agent mock 覆盖 succeeded 与 timeout 两条路径，timeout 会回传 `exitCode=124` 与 `timedOut=true`。
+  - 2026-05-20 21:03:36：产品化收尾第二批验证通过：`bash -n scripts/*.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-compose-smoke.sh --build-local --dry-run`、`bash scripts/test-compose-smoke.sh --compose-file docker-compose-v6.yml --dry-run`、`npm run build`、Docker Maven `mvn -B -DskipTests package`、`git diff --check` 和本地 Docker `bash scripts/test-compose-smoke.sh --build-local` 全栈烟测均通过。完整 smoke 从当前源码构建 backend/frontend 镜像，启动 MySQL/后端/前端，验证 `/flow/test` 与前端首页 `200`，结束后已清理容器、卷、网络、临时 Maven cache volume 和本地测试镜像。
 - 风险/待确认：
   - 主仓库保持私有；由于当前 GitHub plan 不支持私有仓库 Pages，官网使用独立公开仓库 `zhizhishu.github.io`。
-  - Snell 现在已经可通过副控 agent 自动领取和执行任务，且已提供 systemd 常驻安装脚本；本轮已增强重试/退避、并发锁与超时上报，下一步重点转向 Snell 下载 checksum 和版本锁定。
+  - Snell 现在已经可通过副控 agent 自动领取和执行任务，且已提供 systemd 常驻安装脚本；本轮已完成 Snell 下载来源、版本和 sha256 checksum 锁定，安装脚本下载后先校验再落地。
   - 3x-ui 各版本 API 可能有差异，本轮按本地 `_references/3x-ui` 的实际路由实现兼容代理，并把风险写进使用说明。
 
 ## 本轮执行计划（创建于: 2026-05-19 05:47:16）
@@ -88,6 +90,14 @@
 4. CI/验证面：补 compose 配置验证、脚本语法验证和可复用本地 smoke test 入口，继续保留 Docker 构建验证。
 5. 收口：本地构建/脚本/compose 验证通过后提交推送，并观察 GitHub Actions。
 
+## 本轮产品化收尾计划（创建于: 2026-05-20 20:04:50）
+
+1. P0 Snell 供应链收口：锁定 Snell 下载版本、来源和 sha256 checksum；agent 任务脚本下载后先校验再安装，失败时明确回报。
+2. P1 协议级校验：在后端生成任务/创建节点/创建远端转发前校验端口范围、端口重复、Reality 关键字段、Snell PSK、outbound tag 和转发目标，减少错误配置下发。
+3. P2 CI 完整 smoke：新增 GitHub Actions 可复用 compose smoke 入口，自动启动临时主控栈并验证基础 API/agent mock 链路，结束后清理容器和卷。
+4. P3 Pages 兼容维护：处理 GitHub Pages Node 20 deprecation 提示，补 workflow 环境变量或 action 升级说明，避免后续 runner 默认切换时突然失败。
+5. 分布式执行方式：主线程维护 `TASK_LOG.md`、集成 diff 和最终验证；worker 分别负责 Snell/协议校验/CI 文档等不重叠写入范围；所有结果由主线程汇总提交推送。
+
 ## 迭代计划
 
 1. 确认三套源码的技术栈、入口和可复用能力边界。
@@ -102,6 +112,7 @@
 
 ## 任务清单
 
+- [x] ~~**目标:** 完成产品化收尾第二批：Snell checksum、协议级校验、CI smoke 和 Pages 兼容维护~~ (创建于: 2026-05-20 20:04:50 | **完成于: 2026-05-20 21:03:36**)
 - [x] ~~**目标:** 完成正式可用硬化第一批：安装运维能力、agent 任务可靠性和验证闭环~~ (创建于: 2026-05-20 09:39:35 | **完成于: 2026-05-20 10:26:10**)
 - [x] ~~**目标:** 清理本地换行脏差异并完成架构与可用性复核测试~~ (创建于: 2026-05-20 02:58:42 | **完成于: 2026-05-20 03:57:59**)
 - [x] ~~**目标:** 修复公开仓库 GitHub Pages 配置并更新 README 为公开仓库安装说明~~ (创建于: 2026-05-20 01:11:46 | **完成于: 2026-05-20 01:16:58**)

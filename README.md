@@ -118,6 +118,7 @@ The first iteration adds the foundation for:
   - script, token, inbound and config viewers
 - GitHub Actions:
   - CI builds backend Maven package and frontend production bundle
+  - CI runs agent mock tests, compose validation and a disposable Docker compose smoke test built from the current checkout
   - Docker image workflow builds backend and frontend images
   - pushes images to GitHub Container Registry on `main`, tags and manual dispatch
 
@@ -504,6 +505,16 @@ docker run --rm -v "$PWD/springboot-backend:/workspace" -w /workspace maven:3.9-
 docker run --rm -v "$PWD:/workspace" -v flux_3xui_frontend_node_modules:/workspace/vite-frontend/node_modules -w /workspace/vite-frontend node:20-bookworm bash -lc "npm install --legacy-peer-deps --no-audit --no-fund && npm run build"
 ```
 
+Reusable smoke checks:
+
+```bash
+bash scripts/test-flux-agent-mock.sh
+bash scripts/test-compose-smoke.sh --build-local --dry-run
+bash scripts/test-compose-smoke.sh --build-local
+```
+
+`scripts/test-compose-smoke.sh --build-local` builds backend/frontend images from the current checkout, starts disposable MySQL/backend/frontend services, checks `GET /flow/test` and the frontend `/`, then removes the smoke containers, volumes and network. It avoids depending on local GHCR pull permissions.
+
 ## GitHub Container Images
 
 `.github/workflows/docker-image.yml` builds and pushes two images to GHCR:
@@ -552,9 +563,9 @@ LOG_DIR
 ## Next Steps
 
 1. Add runtime smoke tests against disposable 3x-ui containers once stable fixtures are available.
-2. Add more protocol-specific guardrails, such as Reality public-key display and outbound tag validation.
-3. Add server-side checksums for Snell binary downloads.
-4. Add task retry/backoff policy controls in the UI.
+2. Add UI-side helpers for Reality public/private key display, Snell PSK generation and outbound tag selection.
+3. Add sensitive field encryption for stored 3x-ui credentials and API tokens.
+4. Add monitor alerts for agent offline, certificate expiry, Snell/Xray service failure and abnormal traffic.
 
 ## Upstream References
 
