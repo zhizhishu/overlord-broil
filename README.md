@@ -11,7 +11,7 @@ https://zhizhishu.github.io/flux-3xui-orchestrator/
 https://zhizhishu.github.io/
 ```
 
-Current release: `0.5.0` (public production-ready milestone for small master/agent deployments).
+Current release: `0.6.0` (reliability release candidate for public trial and small master/agent deployments).
 
 Release and operations docs:
 
@@ -26,7 +26,7 @@ Before publishing a release tag or installing on a live host, run:
 bash scripts/release-check.sh --full
 ```
 
-The release gate validates shell scripts, agent task execution, tokenized 3x-ui fixture routes, compose v4/v6 config, frontend production build, Docker Maven backend build, a disposable compose smoke stack and `git diff --check`.
+The release gate validates shell scripts, agent task execution, tokenized 3x-ui fixture routes, compose v4/v6 config, frontend production build, Docker Maven backend build, multi-distribution installer diagnostics, a disposable compose smoke stack and `git diff --check`.
 
 Formal runtime assumptions for this release:
 
@@ -57,7 +57,7 @@ Linux support matrix:
 | Agent service | systemd | systemd | OpenRC |
 | Snell node tasks | systemd service | systemd service | OpenRC service |
 | Remote forwarding tasks | systemd + `socat` | systemd + `socat` | OpenRC + `socat` |
-| Full 3x-ui install/configure | Supported | Supported | Not supported in `0.5.0`; use a systemd host for this part |
+| Full 3x-ui install/configure | Supported | Supported | Not supported in `0.6.0`; use a systemd host for this part |
 
 ## Quick Start
 
@@ -103,6 +103,19 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
 
 The installer downloads `docker-compose-v4.yml` or `docker-compose-v6.yml`, downloads `gost.sql`, creates `/opt/flux-3xui-orchestrator/.env`, pulls the backend/frontend images and starts the stack. If GHCR is not public yet or pull fails, it falls back to downloading the public GitHub source archive and building both images locally.
 
+Before installing on a live host, run the non-destructive master preflight:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+  | sudo bash -s -- doctor
+```
+
+The doctor checks OS/package manager detection, Docker/Compose availability, Docker daemon reachability, requested ports and existing `.env` values. In CI or a container where Docker is intentionally unavailable:
+
+```bash
+FLUX_DOCTOR_REQUIRE_DOCKER=0 bash scripts/install-master.sh doctor
+```
+
 Controlled server agent one-command install:
 
 ```bash
@@ -118,6 +131,20 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
 ```
 
 `FLUX_SERVER_ID` and `FLUX_AGENT_TOKEN` come from `主控中心`: create or open the server card, then click `Token`.
+
+Before installing a controlled host, run the agent preflight:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
+  | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
+```
+
+After install, the local agent can diagnose itself:
+
+```bash
+sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" \
+  /usr/local/bin/flux-agent.sh --doctor
+```
 
 ## Project Direction
 
@@ -152,6 +179,8 @@ The current public release includes:
   - `scripts/install-master.sh` one-click master installer for GHCR + Docker Compose deployment
   - `scripts/flux-agent.sh` polling executor for副控 servers
   - `scripts/install-flux-agent.sh` one-command systemd/OpenRC installer for long-running agents
+  - `doctor` preflight commands for master installer, agent installer and the local agent runtime
+  - agent maintenance tasks for remote `doctor`, `logs`, `restart-agent` and `upgrade-agent` actions through the existing claim/report channel
 - 3x-ui remote panel management:
   - test remote 3x-ui connection
   - list inbounds through `/panel/api/inbounds/list`
@@ -176,6 +205,7 @@ The current public release includes:
   - remote traffic sync and local traffic snapshot viewer
   - one-click orchestration modal for 3x-ui, Reality, VMess WS, Trojan TLS, Shadowsocks and Snell
   - service/certificate/traffic status chips on server cards
+  - server-card `Agent` action group for remote diagnostics, logs, restart and upgrade tasks
   - monitor alert center for agent offline, certificate expiry, service failures, task failures/timeouts and traffic anomalies
   - unified rule center for protocol nodes, remote forwards and 3x-ui traffic snapshots with search and filters
   - script, token, inbound and config viewers
@@ -194,10 +224,11 @@ The current public release includes:
 | Images | GHCR backend/frontend images with local source-build fallback when package pulls are unavailable. |
 | Agent install | One-command systemd/OpenRC installer; config in `/etc/flux-agent.env`, runner at `/usr/local/bin/flux-agent.sh`. |
 | Agent tasks | Poll, execute, timeout, retry and report flow for Snell, 3x-ui orchestration and port-forward tasks. |
+| Agent maintenance | Remote doctor/log/restart/upgrade task generation from the server card. |
 | 3x-ui | Connection test, inbound/client operations, Xray config/outbound reads, traffic sync and Xray restart. |
 | Snell | Managed as a product-level protocol node through agent-generated systemd/OpenRC services. |
 | Port forwards | Controlled-host `socat` services created through auditable deployment tasks. |
-| Verification | Maven package, Vite build, agent mock test, tokenized 3x-ui fixture, compose config and disposable compose smoke test. |
+| Verification | Maven package, Vite build, agent mock test, tokenized 3x-ui fixture, compose config, multi-distribution install doctor matrix and disposable compose smoke test. |
 
 ## Repository Layout
 
@@ -439,6 +470,13 @@ sudo -E bash ./flux-agent.sh --once
 
 The agent polls `POST /api/v1/agent-task/claim`, writes the claimed Snell/Xray script to `/var/lib/flux-agent`, executes it locally, and reports `running/succeeded/failed` plus stdout/stderr through `POST /api/v1/agent-task/report`.
 
+The master can also generate agent maintenance tasks from each server card:
+
+- `诊断`: runs `/usr/local/bin/flux-agent.sh --doctor` remotely and reports structured status.
+- `日志`: collects recent systemd/OpenRC logs and recent `/var/lib/flux-agent/task-*.out|err` files.
+- `重启`: schedules a delayed `flux-agent` service restart so the task can report before the daemon restarts.
+- `升级`: downloads the current `scripts/flux-agent.sh` from this repository, syntax-checks it, replaces the local runner and schedules a restart.
+
 Useful agent reliability knobs:
 
 ```bash
@@ -652,9 +690,10 @@ bash scripts/test-flux-agent-mock.sh
 bash scripts/test-three-xui-fixture.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
 bash scripts/test-compose-smoke.sh --build-local
+bash scripts/test-install-matrix.sh
 ```
 
-`scripts/test-three-xui-fixture.sh` starts a local stateful 3x-ui API fixture and covers Bearer-token success, missing-token and wrong-token paths plus inbound CRUD, client operations, Xray config/outbound/traffic reads and restart routes. `scripts/test-compose-smoke.sh --build-local` builds backend/frontend images from the current checkout, starts disposable MySQL/backend/frontend services, checks `GET /flow/test` and the frontend `/`, then removes the smoke containers, volumes and network. It avoids depending on local GHCR pull permissions.
+`scripts/test-three-xui-fixture.sh` starts a local stateful 3x-ui API fixture and covers Bearer-token success, missing-token and wrong-token paths plus inbound CRUD, client operations, Xray config/outbound/traffic reads and restart routes. `scripts/test-install-matrix.sh` runs non-destructive master/agent/agent-runtime doctor checks inside Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux containers. `scripts/test-compose-smoke.sh --build-local` builds backend/frontend images from the current checkout, starts disposable MySQL/backend/frontend services, checks `GET /flow/test` and the frontend `/`, then removes the smoke containers, volumes and network. It avoids depending on local GHCR pull permissions.
 
 ## GitHub Container Images
 
@@ -708,7 +747,8 @@ LOG_DIR
 
 1. Add deeper runtime smoke tests against real disposable 3x-ui containers after a stable upstream container fixture is selected.
 2. Document a planned key-rotation migration for encrypted 3x-ui credentials and API tokens.
-3. Split legacy upstream wording/mojibake cleanup into a dedicated documentation pass.
+3. Run a real VPS matrix for Debian, Ubuntu, Rocky Linux, Oracle Linux and Alpine from master install through node creation, certificate, restart and uninstall.
+4. Split legacy upstream wording/mojibake cleanup into a dedicated documentation pass.
 
 ## References And Acknowledgements
 

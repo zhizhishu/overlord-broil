@@ -43,8 +43,8 @@
     <main class="main">
       <section id="install" class="section">
         <div class="section-header">
-          <h2>0.5.0 可公开上架，直接一条命令安装</h2>
-          <p>主控优先拉取 GitHub Actions 发布到 GHCR 的镜像；如果 GHCR 暂未公开，安装脚本会回退到下载公开源码并本地构建镜像。默认端口是前端 80、后端/agent 回调 6365、phpMyAdmin 8066，均可在安装时改写。</p>
+          <h2>0.6.0 reliability gate，公开试用前先预检</h2>
+          <p>主控优先拉取 GitHub Actions 发布到 GHCR 的镜像；如果 GHCR 暂未公开，安装脚本会回退到下载公开源码并本地构建镜像。默认端口是前端 80、后端/agent 回调 6365、phpMyAdmin 8066，均可在安装时改写。0.6.0 新增主控/被控 doctor 和 Docker/CI 多发行版安装矩阵。</p>
         </div>
         <div class="grid two">
           <article class="card">
@@ -54,11 +54,12 @@
             <pre class="runbook"><code># Alpine / 极简系统没有 bash 时
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master-bootstrap.sh | sudo sh</code></pre>
             <pre class="runbook"><code># 显式运维动作
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- doctor
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- upgrade
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- backup
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- restore --backup-file /opt/flux-3xui-orchestrator/backups/flux-master-backup-YYYYMMDD-HHMMSS.tar.gz
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- uninstall --yes</code></pre>
-            <p>`upgrade` 会先备份再刷新 compose/sql 并重启；`uninstall` 只移除容器，保留安装目录和 Docker volumes。</p>
+            <p>`doctor` 会先检查 Docker/Compose、端口占用和 `.env`；`upgrade` 会先备份再刷新 compose/sql 并重启；`uninstall` 只移除容器，保留安装目录和 Docker volumes。</p>
           </article>
           <article class="card">
             <h3>被控服务器 Agent</h3>
@@ -68,6 +69,10 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
             <pre class="runbook"><code># Alpine / 极简系统没有 bash 时
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent-bootstrap.sh \
   | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" sh</code></pre>
+            <pre class="runbook"><code># 被控端预检 / 已安装 agent 自检
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
+  | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
+sudo -E /usr/local/bin/flux-agent.sh --doctor</code></pre>
           </article>
         </div>
         <div class="status-list" aria-label="Linux support">
@@ -81,7 +86,7 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
           </div>
           <div class="status-item">
             <span>发布门禁</span>
-            <span class="tag green">release-check --full</span>
+            <span class="tag green">release-check + install matrix</span>
           </div>
         </div>
       </section>
@@ -89,7 +94,7 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
       <section id="workspace" class="section">
         <div class="section-header">
           <h2>主控一键编排闭环已经打通</h2>
-          <p>当前版本能多选服务器生成编排任务，由副控 agent 自动领取执行；完成后把 3x-ui 连接信息、Xray inbound/outbound、Snell 节点、远端端口转发、证书、服务状态和流量快照回写到主控。完整 3x-ui 安装编排要求 systemd 主机；Alpine/OpenRC 用于 agent、Snell 和转发任务。</p>
+          <p>当前版本能多选服务器生成编排任务，由副控 agent 自动领取执行；完成后把 3x-ui 连接信息、Xray inbound/outbound、Snell 节点、远端端口转发、证书、服务状态和流量快照回写到主控。服务器卡片现在也能生成 Agent 诊断、日志、重启和升级任务。完整 3x-ui 安装编排要求 systemd 主机；Alpine/OpenRC 用于 agent、Snell 和转发任务。</p>
         </div>
         <div class="metric-row" aria-label="Current release metrics">
           <div class="metric">
@@ -105,8 +110,8 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
             <span>自动流量同步</span>
           </div>
           <div class="metric">
-            <strong>2</strong>
-            <span>Docker 构建通过</span>
+            <strong>5</strong>
+            <span>发行版预检矩阵</span>
           </div>
         </div>
       </section>
@@ -150,6 +155,7 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
 POST /api/v1/control-server/heartbeat
 POST /api/v1/agent-task/claim
 POST /api/v1/agent-task/report
+POST /api/v1/deploy-task/create
 POST /api/v1/protocol-node/create
 POST /api/v1/protocol-node/list
 POST /api/v1/protocol-node/sync
@@ -192,6 +198,10 @@ POST /api/v1/three-xui/restart-xray</code></pre>
               <span class="tag green">ready</span>
             </div>
             <div class="status-item">
+              <span>Agent 诊断/日志/重启/升级</span>
+              <span class="tag green">ready</span>
+            </div>
+            <div class="status-item">
               <span>证书/服务/流量状态</span>
               <span class="tag green">ready</span>
             </div>
@@ -201,14 +211,14 @@ POST /api/v1/three-xui/restart-xray</code></pre>
 
       <section id="roadmap" class="section">
         <div class="section-header">
-          <h2>上架后继续增强运行保障</h2>
-          <p>核心链路已经落地并进入 0.5.0 公开可用里程碑；后续重点是更真实的 3x-ui 容器烟测、密钥轮换迁移和遗留文案清理。</p>
+          <h2>0.6.0 之后继续补真实运行保障</h2>
+          <p>核心链路已经进入 0.6.0 reliability gate：Docker/CI 会跑安装矩阵、fixture、agent mock 和 compose smoke。下一步重点是真实 VPS 矩阵、真实 3x-ui 端到端、密钥轮换和更完整的安全治理。</p>
         </div>
         <ol class="roadmap">
           <li>
             <div>
               <strong>Real 3x-ui smoke</strong>
-              <span>现有 release gate 已覆盖 API fixture、agent mock 和一次性 compose 烟测；后续接入真实 3x-ui 容器夹具。</span>
+              <span>现有 release gate 已覆盖 API fixture、agent mock、安装矩阵和一次性 compose 烟测；后续接入真实 3x-ui 容器或 VPS 端到端。</span>
             </div>
           </li>
           <li>
@@ -219,8 +229,14 @@ POST /api/v1/three-xui/restart-xray</code></pre>
           </li>
           <li>
             <div>
+              <strong>VPS matrix</strong>
+              <span>Debian、Ubuntu、Rocky、Oracle Linux、Alpine 真机从安装、节点创建、证书、重启到卸载跑完整闭环。</span>
+            </div>
+          </li>
+          <li>
+            <div>
               <strong>Docs polish</strong>
-              <span>集中清理历史 Flux Panel 遗留措辞和旧注释乱码，不影响 0.5.0 安装、编排和验证路径。</span>
+              <span>集中清理历史 Flux Panel 遗留措辞和旧注释乱码，不影响 0.6.0 安装、编排和验证路径。</span>
             </div>
           </li>
         </ol>

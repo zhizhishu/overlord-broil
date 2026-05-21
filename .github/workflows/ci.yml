@@ -72,3 +72,19 @@ jobs:
       - name: Run compose smoke test
         timeout-minutes: 25
         run: bash scripts/test-compose-smoke.sh --build-local
+
+  install-matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - debian:12-slim
+          - ubuntu:24.04
+          - alpine:3.20
+          - rockylinux:9
+          - oraclelinux:9-slim
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run installer diagnostics in ${{ matrix.image }}
+        run: bash scripts/test-install-matrix.sh --image "${{ matrix.image }}"

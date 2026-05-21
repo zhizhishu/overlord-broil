@@ -95,16 +95,21 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         if (masterGuardError != null) {
             return R.err(masterGuardError);
         }
-        String script = "snell".equals(protocol)
-                ? snellTemplateService.buildScript(dto, profile)
-                : buildXrayAgentPayload(dto, profile, server);
+        String script;
+        if ("snell".equals(protocol)) {
+            script = snellTemplateService.buildScript(dto, profile);
+        } else if ("agent-maintenance".equals(protocol)) {
+            script = buildAgentMaintenanceScript(dto, server);
+        } else {
+            script = buildXrayAgentPayload(dto, profile, server);
+        }
 
         long now = System.currentTimeMillis();
         DeployTask task = new DeployTask();
         task.setServerId(server.getId());
         task.setServerName(server.getName());
         task.setProtocol(protocol);
-        task.setAction(dto.getAction() == null ? "present" : dto.getAction().trim().toLowerCase());
+        task.setAction(normalizeTaskAction(protocol, dto.getAction()));
         task.setState(STATE_GENERATED);
         task.setRequestJson(dto.getRequestJson() == null ? JSON.toJSONString(dto) : dto.getRequestJson());
         task.setScript(script);
@@ -208,6 +213,13 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
     }
 
     private String validateDeployTask(DeployTaskDto dto, ProtocolProfile profile, String protocol) {
+        if ("agent-maintenance".equals(protocol)) {
+            String action = dto.getAction() == null || dto.getAction().trim().isEmpty()
+                    ? "doctor"
+                    : dto.getAction().trim().toLowerCase();
+            Set<String> allowedActions = new HashSet<>(Arrays.asList("doctor", "status", "logs", "restart-agent", "upgrade-agent"));
+            return allowedActions.contains(action) ? null : "unsupported agent maintenance action";
+        }
         Integer listenPort = dto.getListenPort() != null ? dto.getListenPort() : profile == null ? null : profile.getListenPort();
         if (listenPort != null && !ProtocolValidationUtils.isValidPort(listenPort)) {
             return "listen port is invalid";
@@ -239,6 +251,13 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
 
     private boolean enabled(Boolean value) {
         return value != null && value;
+    }
+
+    private String normalizeTaskAction(String protocol, String action) {
+        if (action != null && !action.trim().isEmpty()) {
+            return action.trim().toLowerCase();
+        }
+        return "agent-maintenance".equals(protocol) ? "doctor" : "present";
     }
 
     @Override
@@ -499,5 +518,201 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 + json + "\n"
                 + "FLUX_XRAY_PAYLOAD\n"
                 + "echo 'Xray/3x-ui agent payload generated. Send it to the flux agent in the next integration step.'\n";
+    }
+
+    private String buildAgentMaintenanceScript(DeployTaskDto dto, ControlServer server) {
+        String action = dto.getAction() == null || dto.getAction().trim().isEmpty()
+                ? "doctor"
+                : dto.getAction().trim().toLowerCase();
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("serverId", server.getId());
+        request.put("serverName", server.getName());
+        request.put("action", action);
+        request.put("exactVersion", dto.getExactVersion());
+        request.put("requestJson", dto.getRequestJson());
+        String requestJson = JSON.toJSONString(request);
+
+        return "#!/usr/bin/env bash\n"
+                + "set -euo pipefail\n\n"
+                + "ACTION='" + escapeShell(action) + "'\n"
+                + "REQUEST_JSON='" + escapeShell(requestJson) + "'\n"
+                + "AGENT_BIN='${FLUX_AGENT_BIN:-/usr/local/bin/flux-agent.sh}'\n"
+                + "AGENT_ENV='${FLUX_AGENT_ENV:-/etc/flux-agent.env}'\n"
+                + "REPO_RAW_URL='${FLUX_REPO_RAW_URL:-https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main}'\n"
+                + "SOURCE_URL='${FLUX_AGENT_SOURCE_URL:-${REPO_RAW_URL}/scripts/flux-agent.sh}'\n"
+                + "LOG_LINES='${FLUX_MAINTENANCE_LOG_LINES:-160}'\n\n"
+                + agentMaintenanceBody();
+    }
+
+    private String agentMaintenanceBody() {
+        return """
+                log() {
+                  printf '[flux-maintenance] %s\\n' "$*"
+                }
+
+                detect_service_manager() {
+                  if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+                    echo systemd
+                    return
+                  fi
+                  if command -v rc-service >/dev/null 2>&1 && command -v rc-update >/dev/null 2>&1; then
+                    echo openrc
+                    return
+                  fi
+                  echo unknown
+                }
+
+                run_agent_doctor() {
+                  if [ -x "$AGENT_BIN" ]; then
+                    "$AGENT_BIN" --doctor
+                    return
+                  fi
+                  echo "agent binary not found or not executable: ${AGENT_BIN}" >&2
+                  return 1
+                }
+
+                service_status() {
+                  local manager
+                  manager="$(detect_service_manager)"
+                  case "$manager" in
+                    systemd)
+                      systemctl is-active flux-agent 2>/dev/null || true
+                      ;;
+                    openrc)
+                      if rc-service flux-agent status >/dev/null 2>&1; then
+                        echo active
+                      else
+                        echo inactive
+                      fi
+                      ;;
+                    *)
+                      echo unknown
+                      ;;
+                  esac
+                }
+
+                tail_agent_logs() {
+                  local manager
+                  manager="$(detect_service_manager)"
+                  echo "== service manager: ${manager}"
+                  case "$manager" in
+                    systemd)
+                      journalctl -u flux-agent.service -n "$LOG_LINES" --no-pager 2>/dev/null || true
+                      ;;
+                    openrc)
+                      tail -n "$LOG_LINES" /var/log/flux-agent.log 2>/dev/null || true
+                      tail -n "$LOG_LINES" /var/log/flux-agent.err 2>/dev/null || true
+                      ;;
+                    *)
+                      echo "no systemd/OpenRC logs available"
+                      ;;
+                  esac
+                  echo "== recent task logs"
+                  task_files="$(ls -t /var/lib/flux-agent/task-*.out /var/lib/flux-agent/task-*.err 2>/dev/null || true)"
+                  if [ -z "$task_files" ]; then
+                    echo "no recent task logs"
+                    return
+                  fi
+                  printf '%s\\n' "$task_files" \\
+                    | head -n 6 \\
+                    | while read -r file; do
+                        echo "--- ${file}"
+                        tail -n 80 "$file" 2>/dev/null || true
+                      done
+                }
+
+                schedule_agent_restart() {
+                  local manager
+                  manager="$(detect_service_manager)"
+                  case "$manager" in
+                    systemd)
+                      nohup sh -c 'sleep 3; systemctl restart flux-agent.service' >/tmp/flux-agent-restart.log 2>&1 &
+                      ;;
+                    openrc)
+                      nohup sh -c 'sleep 3; rc-service flux-agent restart' >/tmp/flux-agent-restart.log 2>&1 &
+                      ;;
+                    *)
+                      echo 'systemd or OpenRC is required to restart the long-running agent service.' >&2
+                      return 1
+                      ;;
+                  esac
+                  echo "agent restart scheduled via ${manager}"
+                }
+
+                upgrade_agent() {
+                  local tmp
+                  command -v curl >/dev/null 2>&1 || { echo 'curl is required for agent upgrade.' >&2; return 1; }
+                  tmp="$(mktemp)"
+                  curl -fsSL --retry 3 "$SOURCE_URL" -o "$tmp"
+                  bash -n "$tmp"
+                  install -m 0755 "$tmp" "$AGENT_BIN"
+                  rm -f "$tmp"
+                  echo "agent binary updated from ${SOURCE_URL}"
+                  schedule_agent_restart
+                }
+
+                emit_result() {
+                  local action="$1"
+                  local status="$2"
+                  local manager
+                  local python_bin
+                  manager="$(detect_service_manager)"
+                  if command -v python3 >/dev/null 2>&1; then
+                    python_bin="$(command -v python3)"
+                  elif command -v python >/dev/null 2>&1; then
+                    python_bin="$(command -v python)"
+                  else
+                    echo "python3 or python is unavailable; skipping structured maintenance metadata." >&2
+                    return 0
+                  fi
+                  "$python_bin" - "$action" "$status" "$manager" "$(service_status)" "$AGENT_BIN" <<'PY' || true
+                import json
+                import sys
+                import time
+
+                print("FLUX_AGENT_RESULT_JSON=" + json.dumps({
+                    "maintenance": {
+                        "action": sys.argv[1],
+                        "status": sys.argv[2],
+                        "serviceManager": sys.argv[3],
+                        "agentServiceStatus": sys.argv[4],
+                        "agentBinary": sys.argv[5],
+                        "reportedAt": int(time.time() * 1000),
+                    }
+                }, ensure_ascii=False))
+                PY
+                }
+
+                case "$ACTION" in
+                  doctor|status)
+                    run_agent_doctor
+                    emit_result "$ACTION" "checked"
+                    ;;
+                  logs)
+                    tail_agent_logs
+                    emit_result "$ACTION" "collected"
+                    ;;
+                  restart-agent)
+                    run_agent_doctor || true
+                    schedule_agent_restart
+                    emit_result "$ACTION" "scheduled"
+                    ;;
+                  upgrade-agent)
+                    upgrade_agent
+                    emit_result "$ACTION" "upgraded"
+                    ;;
+                  *)
+                    echo "unsupported agent maintenance action: ${ACTION}" >&2
+                    exit 2
+                    ;;
+                esac
+                """;
+    }
+
+    private String escapeShell(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("'", "'\"'\"'");
     }
 }

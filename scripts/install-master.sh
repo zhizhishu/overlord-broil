@@ -33,6 +33,7 @@ Usage:
   install-master.sh [action] [options]
 
 Actions:
+  doctor                  Run non-destructive host diagnostics and exit
   install                 Install or repair the master stack (default)
   upgrade                 Back up, refresh compose/sql files, pull images and restart
   backup                  Create a tar.gz backup of config files and a MySQL dump when running
@@ -64,12 +65,13 @@ Environment:
   FLUX_BACKUP_DIR           Optional backup output directory
   FLUX_BACKUP_FILE          Optional restore archive path
   FLUX_BUILD_ON_PULL_FAILURE Build local images after GHCR pull failure, default 1
+  FLUX_DOCTOR_REQUIRE_DOCKER Require Docker daemon during doctor, default 1
 EOF
 }
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    install|upgrade|backup|restore|uninstall)
+    doctor|install|upgrade|backup|restore|uninstall)
       if [ "$ACTION_SET" = "1" ]; then
         echo "Only one action can be specified." >&2
         usage >&2
@@ -142,7 +144,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-if [ "$(id -u)" -ne 0 ]; then
+if [ "$(id -u)" -ne 0 ] && [ "$ACTION" != "doctor" ]; then
   echo "Please run this installer as root." >&2
   exit 2
 fi
@@ -179,6 +181,9 @@ install_packages() {
     dnf install -y ca-certificates "${missing[@]}"
   elif command -v yum >/dev/null 2>&1; then
     yum install -y ca-certificates "${missing[@]}"
+  elif command -v microdnf >/dev/null 2>&1; then
+    microdnf install -y ca-certificates "${missing[@]}"
+    microdnf clean all || true
   elif command -v apk >/dev/null 2>&1; then
     apk add --no-cache ca-certificates "${missing[@]}"
   else
@@ -522,6 +527,151 @@ Change the default password after first login.
 EOF
 }
 
+doctor_failed=0
+
+doctor_item() {
+  local status="$1"
+  local label="$2"
+  local detail="$3"
+  printf '[%s] %s: %s\n' "$status" "$label" "$detail"
+  if [ "$status" = "fail" ]; then
+    doctor_failed=1
+  fi
+}
+
+detect_package_manager() {
+  if command -v apt-get >/dev/null 2>&1; then
+    echo apt
+  elif command -v dnf >/dev/null 2>&1; then
+    echo dnf
+  elif command -v yum >/dev/null 2>&1; then
+    echo yum
+  elif command -v microdnf >/dev/null 2>&1; then
+    echo microdnf
+  elif command -v apk >/dev/null 2>&1; then
+    echo apk
+  else
+    echo unknown
+  fi
+}
+
+detect_service_manager_hint() {
+  if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+    echo systemd
+  elif command -v rc-service >/dev/null 2>&1 && command -v rc-update >/dev/null 2>&1; then
+    echo openrc
+  elif command -v service >/dev/null 2>&1; then
+    echo service
+  else
+    echo unknown
+  fi
+}
+
+doctor_command() {
+  local command_name="$1"
+  local required="$2"
+  if command -v "$command_name" >/dev/null 2>&1; then
+    doctor_item ok "$command_name" "$(command -v "$command_name")"
+  elif [ "$required" = "1" ]; then
+    doctor_item fail "$command_name" "missing"
+  else
+    doctor_item warn "$command_name" "missing"
+  fi
+}
+
+doctor_valid_port() {
+  local value="$1"
+  case "$value" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  [ "$value" -ge 1 ] && [ "$value" -le 65535 ]
+}
+
+doctor_port() {
+  local label="$1"
+  local port="$2"
+  if ! doctor_valid_port "$port"; then
+    doctor_item fail "$label" "invalid port '${port}'"
+    return
+  fi
+  if port_is_listening "$port"; then
+    if command -v docker >/dev/null 2>&1 && port_owned_by_flux_container "$port"; then
+      doctor_item ok "$label" "${port} is already owned by a Flux container"
+    else
+      doctor_item fail "$label" "${port} is already listening; set FLUX_${label} or stop the conflicting service"
+    fi
+  else
+    doctor_item ok "$label" "${port} is available"
+  fi
+}
+
+run_master_doctor() {
+  local require_docker="${FLUX_DOCTOR_REQUIRE_DOCKER:-1}"
+  local frontend_port="${FRONTEND_PORT}"
+  local backend_port="${BACKEND_PORT}"
+  local phpmyadmin_port="${PHPMYADMIN_PORT}"
+
+  echo "Flux master doctor"
+  doctor_item ok "os" "$(detect_os_name)"
+  doctor_item ok "arch" "$(uname -m)"
+  doctor_item ok "package-manager" "$(detect_package_manager)"
+  doctor_item ok "service-manager" "$(detect_service_manager_hint)"
+
+  if [ "$(id -u)" -eq 0 ]; then
+    doctor_item ok "root" "running as root"
+  else
+    doctor_item warn "root" "not root; install/upgrade/restore/uninstall require root"
+  fi
+
+  doctor_command curl 1
+  doctor_command tar 1
+  doctor_command docker "$require_docker"
+
+  if command -v docker >/dev/null 2>&1; then
+    if docker compose version >/dev/null 2>&1; then
+      doctor_item ok "docker-compose" "$(docker compose version 2>/dev/null | head -n 1)"
+    else
+      doctor_item fail "docker-compose" "docker compose plugin is unavailable"
+    fi
+    if [ "$require_docker" = "1" ]; then
+      if docker info >/dev/null 2>&1; then
+        doctor_item ok "docker-daemon" "reachable"
+      else
+        doctor_item fail "docker-daemon" "not reachable; start Docker before installing the master"
+      fi
+    else
+      doctor_item warn "docker-daemon" "not required for this doctor run"
+    fi
+  fi
+
+  if [ -f "${INSTALL_DIR}/${ENV_FILE}" ]; then
+    frontend_port="$(read_env_value FRONTEND_PORT "${INSTALL_DIR}/${ENV_FILE}")"
+    backend_port="$(read_env_value BACKEND_PORT "${INSTALL_DIR}/${ENV_FILE}")"
+    phpmyadmin_port="$(read_env_value PHPMYADMIN_PORT "${INSTALL_DIR}/${ENV_FILE}")"
+    phpmyadmin_port="${phpmyadmin_port:-8066}"
+    doctor_item ok "env-file" "found ${INSTALL_DIR}/${ENV_FILE}"
+  else
+    doctor_item warn "env-file" "not found yet; using requested/default ports"
+  fi
+
+  doctor_port FRONTEND_PORT "$frontend_port"
+  doctor_port BACKEND_PORT "$backend_port"
+  doctor_port PHPMYADMIN_PORT "$phpmyadmin_port"
+
+  if [ "$frontend_port" = "$backend_port" ] || [ "$frontend_port" = "$phpmyadmin_port" ] || [ "$backend_port" = "$phpmyadmin_port" ]; then
+    doctor_item fail "port-matrix" "FRONTEND_PORT, BACKEND_PORT and PHPMYADMIN_PORT must be different"
+  else
+    doctor_item ok "port-matrix" "frontend=${frontend_port}, backend=${backend_port}, phpmyadmin=${phpmyadmin_port}"
+  fi
+
+  if [ "$doctor_failed" -eq 0 ]; then
+    echo "Master doctor passed."
+    return 0
+  fi
+  echo "Master doctor found blocking issue(s)." >&2
+  return 1
+}
+
 create_backup() {
   mkdir -p "$BACKUP_DIR"
   local stamp
@@ -626,6 +776,11 @@ uninstall_stack() {
     echo "No compose/env files found in ${INSTALL_DIR}; nothing to uninstall."
   fi
 }
+
+if [ "$ACTION" = "doctor" ]; then
+  run_master_doctor
+  exit $?
+fi
 
 install_base_packages
 echo "Detected OS: $(detect_os_name)"

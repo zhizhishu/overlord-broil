@@ -30,7 +30,7 @@ This checklist is for running the public Flux 3x-ui Orchestrator repo as a small
 | Agent service | systemd | systemd | OpenRC |
 | Snell node tasks | systemd | systemd | OpenRC |
 | Remote forwarding tasks | systemd + `socat` | systemd + `socat` | OpenRC + `socat` |
-| Full 3x-ui install/configure | Supported | Supported | Not supported in `0.5.0`; use a systemd host |
+| Full 3x-ui install/configure | Supported | Supported | Not supported in `0.6.0`; use a systemd host |
 
 The master installer and agent installer are bash scripts. On minimal systems, use the `*-bootstrap.sh` installers; they run under `/bin/sh`, install `bash` plus base dependencies, then hand off to the normal installer.
 
@@ -65,6 +65,40 @@ sudo bash /opt/flux-3xui-orchestrator/install-master.sh uninstall --yes
 ```
 
 If the installer script is not present locally, use the same raw GitHub command with `bash -s -- <action>`.
+
+## Doctor Preflight
+
+Run the master doctor before installing on a new host or changing ports:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+  | sudo bash -s -- doctor
+```
+
+It checks OS/package-manager detection, root status, Docker/Compose, Docker daemon reachability, existing `.env` values and whether frontend/backend/phpMyAdmin ports are already occupied. For CI/container checks where Docker is intentionally unavailable:
+
+```bash
+FLUX_DOCTOR_REQUIRE_DOCKER=0 \
+FLUX_FRONTEND_PORT=18080 \
+FLUX_BACKEND_PORT=16365 \
+FLUX_PHPMYADMIN_PORT=18066 \
+  bash scripts/install-master.sh doctor
+```
+
+Run the agent installer doctor before installing a controlled host:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
+  | sudo env FLUX_PANEL_URL="https://your-master-panel.example.com" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
+```
+
+After an agent is installed, run the local runtime doctor:
+
+```bash
+sudo -E /usr/local/bin/flux-agent.sh --doctor
+```
+
+The runtime doctor checks the panel URL, server id, token presence, writable work directory, Python/Bash/Curl dependencies, procfs counters and service-manager availability.
 
 ## Docker And GHCR Notes
 
@@ -111,6 +145,7 @@ Useful checks:
 ```bash
 systemctl status flux-agent.service
 journalctl -u flux-agent.service -n 100 --no-pager
+sudo -E /usr/local/bin/flux-agent.sh --doctor
 sudo -E /usr/local/bin/flux-agent.sh --once
 
 # Alpine / OpenRC
@@ -130,6 +165,15 @@ FLUX_HTTP_MAX_TIME=60
 FLUX_TASK_TIMEOUT_SECONDS=7200
 FLUX_TASK_TIMEOUT_KILL_SECONDS=30
 ```
+
+Remote maintenance from the master panel:
+
+| Server-card action | What it does |
+| --- | --- |
+| `Agent / 诊断` | Creates an `agent-maintenance` task that runs `/usr/local/bin/flux-agent.sh --doctor` on the controlled host. |
+| `Agent / 日志` | Collects recent systemd/OpenRC logs plus recent `/var/lib/flux-agent/task-*.out|err` task logs. |
+| `Agent / 重启` | Runs the doctor, then schedules a delayed `flux-agent` service restart so the report can return before restart. |
+| `Agent / 升级` | Downloads the latest `scripts/flux-agent.sh`, runs `bash -n`, installs it and schedules a service restart. |
 
 ## Operational Checklist
 
@@ -165,8 +209,10 @@ Release readiness means:
 - Docker Images workflow is green on `main` and GHCR has fresh backend/frontend images.
 - `scripts/install-master.sh` succeeds on a clean Linux host or falls back to local source builds when GHCR pulls are unavailable.
 - `scripts/install-master-bootstrap.sh` and `scripts/install-flux-agent-bootstrap.sh` are syntax-checked so minimal Alpine-style hosts can install base dependencies before handing off to bash installers.
+- `scripts/test-install-matrix.sh` passes on Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux container images.
 - `.env` and backup handling are understood before the first live install.
 - Public firewall rules intentionally expose only the frontend/API ports needed for your environment.
+- The release notes clearly state whether the release was verified through Docker/CI only or through real VPS hosts.
 
 Default master ports:
 
@@ -190,8 +236,9 @@ bash scripts/release-check.sh
 bash scripts/release-check.sh --full
 bash scripts/test-flux-agent-mock.sh
 bash scripts/test-three-xui-fixture.sh
+bash scripts/test-install-matrix.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
 bash scripts/test-compose-smoke.sh --build-local
 ```
 
-The 3x-ui fixture test uses a short-lived local Python HTTP server, checks Bearer-token success/missing/wrong-token paths plus inbound/outbound/config/traffic/restart routes, and exits without leaving ports open. The full compose smoke test should remove its disposable containers, network and volumes when it exits. If it is interrupted, inspect Docker resources manually before rerunning.
+The 3x-ui fixture test uses a short-lived local Python HTTP server, checks Bearer-token success/missing/wrong-token paths plus inbound/outbound/config/traffic/restart routes, and exits without leaving ports open. The install matrix runs non-destructive doctor checks in Docker containers; it is useful coverage for shell portability and package-manager detection, but it is not a substitute for a real VPS matrix with systemd/OpenRC, cloud firewall and public DNS. The full compose smoke test should remove its disposable containers, network and volumes when it exits. If it is interrupted, inspect Docker resources manually before rerunning.

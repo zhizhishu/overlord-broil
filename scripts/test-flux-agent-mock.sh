@@ -168,6 +168,13 @@ detect_python
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
+FLUX_PANEL_URL="http://127.0.0.1:1" \
+FLUX_SERVER_ID="1" \
+FLUX_AGENT_TOKEN="test-agent-token" \
+FLUX_WORK_DIR="${TMP_DIR}/doctor-work" \
+FLUX_AGENT_LOCK_FILE="${TMP_DIR}/doctor.lock" \
+  bash "${PROJECT_ROOT}/scripts/flux-agent.sh" --doctor >/dev/null
+
 run_case "success" $'echo hello-agent\nprintf "%s\\n" '\''FLUX_AGENT_RESULT_JSON={"node":"ok"}'\''' "10" "succeeded" "0" "false"
 run_case "timeout" $'sleep 5\necho should-not-finish' "1" "failed" "124" "true"
 

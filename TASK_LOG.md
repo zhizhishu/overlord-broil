@@ -196,3 +196,22 @@
 - 官网仓库已推送 `origin/main`：`f8c2fea`，提交信息 `Update Flux 3x-ui Orchestrator site for 0.5.0`。
 - GitHub Actions 验证通过：主项目 `CI` run `26250075134` 通过，覆盖 backend Maven、frontend build、脚本校验、agent mock、3x-ui fixture、compose config、dry-run compose smoke、完整 compose smoke；`Docker Images` run `26250075225` 通过，backend/frontend GHCR 镜像均构建并推送；主项目 Pages run `26250074383` 通过；官网 Pages run `26250155252` 通过。
 - 本轮资源清理：未保留本轮启动的 dev server、测试 watcher 或浏览器页签；本机 Docker Desktop engine 自身仍异常返回 500，但本轮启动的挂起 docker CLI 已清理，未关闭 Docker Desktop/WSL 后台服务。
+
+## 本轮 0.6.0 可靠性版计划（创建于: 2026-05-21 13:21:17）
+1. 安装矩阵诊断：为主控和 agent 安装器增加非破坏性的 `doctor`/预检入口，覆盖 OS、包管理器、Docker/Compose、systemd/OpenRC、端口和关键环境变量提示。
+2. Docker/CI 验证：新增可复用的多发行版 Docker 矩阵脚本，在 Debian、Ubuntu、Alpine、Rocky Linux、Oracle Linux 容器内执行安装器预检和 bootstrap 语法检查；本机 Docker 不可用时由 GitHub Actions 跑完整矩阵。
+3. 运维闭环增强：补 agent 健康检查、远端日志/状态诊断任务和更清晰的失败诊断，减少用户不知道怎么修的情况。
+4. 3x-ui/Snell/证书边界：继续强化真实 3x-ui API fixture、ACME HTTP/DNS/端口提示、Snell 产品层统一但运行层分离的说明。
+5. Flux UI 打磨：优化主控中心的上架观感、状态空态、错误态、诊断入口和移动端/小屏布局。
+6. 文档与发布：更新 README、Operations、Release Notes、官网，运行本地可用验证与 GitHub Actions，清理资源后提交并推送。
+
+## 本轮 0.6.0 任务清单
+
+- [ ] **目标:** 完成 0.6.0 可靠性版第一批：安装矩阵预检、Docker/CI 验证、agent 诊断闭环、Flux UI/文档打磨并推送 (创建于: 2026-05-21 13:21:17)
+
+### 2026-05-22 05:09:54 进度记录
+
+- 已完成 0.6.0 第一批本地实现：主控/agent/agent runtime `doctor` 预检、Debian/Ubuntu/Alpine/Rocky/Oracle Linux Docker 安装矩阵脚本、CI install-matrix job、`release-check --full` 安装矩阵接入、agent 远程维护任务（诊断/日志/重启/升级）、主控中心服务器卡片 Agent 操作组、README/Operations/Release Notes/官网 0.6.0 文档口径。
+- 已完成本地非 Docker 验证：`bash -n scripts/*.sh`、`sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、`scripts/flux-agent.sh --doctor`、`scripts/install-master.sh doctor`、`scripts/install-flux-agent.sh doctor`、`docker compose -f docker-compose-v4.yml config --quiet`、`docker compose -f docker-compose-v6.yml config --quiet`、`vite-frontend npm run build`、`git diff --check`。
+- 本机限制：当前 Windows Docker Desktop Linux engine 对 `docker version/docker run` 仍返回 500，导致本地 Docker Maven、Docker Node release-check、完整 compose smoke 和 `scripts/test-install-matrix.sh` 不能可靠执行；未关闭 Docker Desktop/WSL 后台进程，等待推送后用 GitHub Actions 完成 Docker/Maven/矩阵验证。
+- 下一步：提交并推送主仓库与 `zhizhishu.github.io` 官网仓库，观察 `CI`、`Docker Images`、Pages 等 GitHub Actions；若 install-matrix 或 Java 编译暴露问题，立即修复并二次推送。

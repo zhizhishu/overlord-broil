@@ -15,10 +15,26 @@ HTTP_CONNECT_TIMEOUT="${FLUX_HTTP_CONNECT_TIMEOUT:-10}"
 HTTP_MAX_TIME="${FLUX_HTTP_MAX_TIME:-60}"
 TASK_TIMEOUT_SECONDS="${FLUX_TASK_TIMEOUT_SECONDS:-7200}"
 TASK_TIMEOUT_KILL_SECONDS="${FLUX_TASK_TIMEOUT_KILL_SECONDS:-30}"
-RUN_ONCE="${1:-}"
+AGENT_COMMAND="${1:-}"
 PYTHON_BIN="${FLUX_PYTHON_BIN:-}"
 BASH_BIN="${FLUX_BASH_BIN:-}"
 FALLBACK_LOCK_DIR=""
+
+usage() {
+  cat <<'EOF'
+Usage:
+  flux-agent.sh [--once|--doctor]
+
+Commands:
+  --once       Send one heartbeat, claim at most one task, then exit.
+  --doctor     Run local, non-destructive agent diagnostics and exit.
+
+Required environment:
+  FLUX_PANEL_URL
+  FLUX_SERVER_ID
+  FLUX_AGENT_TOKEN
+EOF
+}
 
 log() {
   local level="$1"
@@ -29,6 +45,117 @@ log() {
 info() { log info "$*"; }
 warn() { log warn "$*"; }
 error() { log error "$*"; }
+
+doctor_failed=0
+
+doctor_item() {
+  local status="$1"
+  local label="$2"
+  local detail="$3"
+  printf '[%s] %s: %s\n' "$status" "$label" "$detail"
+  if [ "$status" = "fail" ]; then
+    doctor_failed=1
+  fi
+}
+
+doctor_command() {
+  local command_name="$1"
+  local required="$2"
+  if command -v "$command_name" >/dev/null 2>&1; then
+    doctor_item ok "$command_name" "$(command -v "$command_name")"
+  elif [ "$required" = "1" ]; then
+    doctor_item fail "$command_name" "missing"
+  else
+    doctor_item warn "$command_name" "missing"
+  fi
+}
+
+doctor_python() {
+  if [ -n "$PYTHON_BIN" ]; then
+    if command -v "$PYTHON_BIN" >/dev/null 2>&1 && "$PYTHON_BIN" -c 'import json, time' >/dev/null 2>&1; then
+      doctor_item ok "python" "$PYTHON_BIN"
+    else
+      doctor_item fail "python" "FLUX_PYTHON_BIN is not a working Python interpreter"
+    fi
+    return
+  fi
+
+  if command -v python3 >/dev/null 2>&1 && python3 -c 'import json, time' >/dev/null 2>&1; then
+    doctor_item ok "python" "$(command -v python3)"
+    return
+  fi
+
+  if command -v python >/dev/null 2>&1 && python -c 'import json, time' >/dev/null 2>&1; then
+    doctor_item ok "python" "$(command -v python)"
+    return
+  fi
+
+  doctor_item fail "python" "python3 or python is required for JSON parsing and task reports"
+}
+
+run_agent_doctor() {
+  echo "Flux agent doctor"
+  if [ -r /etc/os-release ]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    doctor_item ok "os" "${PRETTY_NAME:-${NAME:-unknown}}"
+  else
+    doctor_item warn "os" "$(uname -s)"
+  fi
+  doctor_item ok "arch" "$(uname -m)"
+  doctor_command curl 1
+  doctor_python
+  doctor_command bash 1
+  doctor_command flock 0
+  doctor_command openssl 0
+
+  if [ -n "$PANEL_URL" ]; then
+    case "$PANEL_URL" in
+      http://*|https://*) doctor_item ok "panel-url" "${PANEL_URL%/}" ;;
+      *) doctor_item fail "panel-url" "must start with http:// or https://" ;;
+    esac
+  else
+    doctor_item fail "panel-url" "FLUX_PANEL_URL is required"
+  fi
+
+  case "$SERVER_ID" in
+    ''|*[!0-9]*) doctor_item fail "server-id" "FLUX_SERVER_ID must be a numeric id" ;;
+    *) doctor_item ok "server-id" "$SERVER_ID" ;;
+  esac
+
+  if [ -n "$AGENT_TOKEN" ]; then
+    doctor_item ok "agent-token" "provided"
+  else
+    doctor_item fail "agent-token" "FLUX_AGENT_TOKEN is required"
+  fi
+
+  if mkdir -p "$WORK_DIR" 2>/dev/null && [ -w "$WORK_DIR" ]; then
+    doctor_item ok "work-dir" "$WORK_DIR is writable"
+  else
+    doctor_item fail "work-dir" "$WORK_DIR is not writable"
+  fi
+
+  if [ -f /proc/meminfo ] && [ -f /proc/stat ] && [ -f /proc/net/dev ]; then
+    doctor_item ok "procfs" "memory/cpu/network counters available"
+  else
+    doctor_item warn "procfs" "some runtime counters may be unavailable"
+  fi
+
+  if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+    doctor_item ok "service-manager" "systemd"
+  elif command -v rc-service >/dev/null 2>&1; then
+    doctor_item ok "service-manager" "OpenRC"
+  else
+    doctor_item warn "service-manager" "no active systemd/OpenRC; polling can run manually but installer service mode may be unavailable"
+  fi
+
+  if [ "$doctor_failed" -eq 0 ]; then
+    echo "Agent doctor passed."
+    return 0
+  fi
+  echo "Agent doctor found blocking issue(s)." >&2
+  return 1
+}
 
 now_ms() {
   "$PYTHON_BIN" - <<'PY'
@@ -128,6 +255,25 @@ require_positive_int() {
     exit 2
   fi
 }
+
+case "$AGENT_COMMAND" in
+  ""|--once|--doctor)
+    ;;
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  *)
+    error "Unknown command: ${AGENT_COMMAND}"
+    usage >&2
+    exit 2
+    ;;
+esac
+
+if [ "$AGENT_COMMAND" = "--doctor" ]; then
+  run_agent_doctor
+  exit $?
+fi
 
 if [ -z "$PANEL_URL" ] || [ -z "$SERVER_ID" ] || [ -z "$AGENT_TOKEN" ]; then
   error "FLUX_PANEL_URL, FLUX_SERVER_ID and FLUX_AGENT_TOKEN are required."
@@ -676,7 +822,7 @@ while true; do
     run_task "$response" || true
   fi
 
-  if [ "$RUN_ONCE" = "--once" ]; then
+  if [ "$AGENT_COMMAND" = "--once" ]; then
     break
   fi
   sleep "$POLL_INTERVAL"

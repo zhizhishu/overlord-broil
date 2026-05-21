@@ -24,6 +24,9 @@ install_base_packages() {
     dnf install -y ca-certificates bash curl python3
   elif command -v yum >/dev/null 2>&1; then
     yum install -y ca-certificates bash curl python3
+  elif command -v microdnf >/dev/null 2>&1; then
+    microdnf install -y ca-certificates bash curl python3
+    microdnf clean all || true
   elif command -v apk >/dev/null 2>&1; then
     apk add --no-cache ca-certificates bash curl python3
   else

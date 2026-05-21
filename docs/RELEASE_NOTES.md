@@ -1,5 +1,39 @@
 # Release Notes
 
+## 0.6.0 - reliability gate
+
+This release moves the project from the first public production milestone into a reliability-focused release candidate. It is still below a `1.0` compatibility promise, but the installer, agent and CI checks now catch more real-world setup problems before users send tasks to live servers.
+
+### Reliability Additions
+
+- Added non-destructive `doctor` commands for the master installer, agent installer and local agent runtime.
+- Added `scripts/test-install-matrix.sh` to run installer diagnostics inside Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux containers.
+- Added a CI `install-matrix` job that runs the same diagnostics per image.
+- Extended `scripts/release-check.sh --full` so the release gate includes the install matrix before the disposable compose smoke test.
+- Added `microdnf` support to master/agent installers and bootstrap scripts for Oracle Linux slim-style images.
+- Added agent maintenance deployment tasks for remote `doctor`, `logs`, `restart-agent` and `upgrade-agent` actions through the existing task claim/report channel.
+- Added a server-card `Agent` action group in the orchestrator UI for diagnostics, logs, restart and upgrade.
+- Strengthened agent diagnostics so Python is treated as a blocking runtime dependency instead of a soft warning.
+
+### 0.6.0 Capability Matrix
+
+| Area | 0.6.0 stance |
+| --- | --- |
+| Master install | Same one-command installer as 0.5.0, now with a pre-install doctor for ports, Docker/Compose and `.env` checks. |
+| Agent install | systemd/OpenRC installer plus preflight doctor and local runtime doctor. |
+| Agent maintenance | Remote diagnostics, log collection, restart and upgrade tasks generated from the master panel. |
+| Linux coverage | Docker/CI diagnostics cover Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux userspaces. |
+| 3x-ui | API fixture remains API-level; full 3x-ui install/configure still targets systemd hosts. |
+| Snell | Product-level protocol node with separate systemd/OpenRC runtime, not a native Xray/3x-ui core protocol. |
+| Verification | Shell syntax, agent mock, 3x-ui fixture, frontend build, backend Maven build, install matrix and compose smoke. |
+
+### Honest Boundaries
+
+- The Linux matrix in this release is Docker/CI preflight coverage. It is not yet the full real-VPS matrix with public DNS, cloud firewall, ACME HTTP validation and real service managers.
+- The included 3x-ui fixture is API-level. A real 3x-ui container or VPS end-to-end smoke test is still the next reliability milestone.
+- Snell is unified at the product/control-plane layer. It remains a separate runtime service managed by the Flux agent rather than a native Xray protocol inside 3x-ui.
+- Enterprise-grade governance is still future work: RBAC, full audit log views, key-rotation migration, agent token expiry/revocation and dangerous-operation confirmation.
+
 ## 0.5.0 - production-ready public milestone
 
 This release is the first version intended to be listed and installed as a small production master/agent deployment. It keeps the project below a broad `1.0` compatibility promise, but the install, runtime, CI, image and release-check paths are now explicit enough for public use.

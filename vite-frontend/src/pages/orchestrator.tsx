@@ -196,6 +196,7 @@ interface ServerForwardRuleForm {
 type RuleKindFilter = "all" | "protocol" | "forward" | "xui";
 type RuleHealthFilter = "all" | "healthy" | "warning" | "error";
 type RuleHealth = Exclude<RuleHealthFilter, "all">;
+type AgentMaintenanceAction = "doctor" | "logs" | "restart-agent" | "upgrade-agent";
 
 interface UnifiedRuleRow {
   id: string;
@@ -1209,6 +1210,39 @@ export default function OrchestratorPage() {
     }
   };
 
+  const createAgentMaintenance = async (server: ControlServer, action: AgentMaintenanceAction) => {
+    const actionName: Record<AgentMaintenanceAction, string> = {
+      doctor: "诊断",
+      logs: "日志",
+      "restart-agent": "重启 agent",
+      "upgrade-agent": "升级 agent"
+    };
+
+    setSubmitting(true);
+    const res = await createDeployTask({
+      serverId: server.id,
+      protocol: "agent-maintenance",
+      action,
+      requestJson: JSON.stringify({
+        source: "orchestrator-ui",
+        serverId: server.id,
+        serverName: server.name,
+        action
+      })
+    });
+    setSubmitting(false);
+
+    if (res.code === 0) {
+      toast.success(`${server.name} ${actionName[action]}任务已生成`);
+      setScriptTitle(`任务 #${res.data.id} / ${server.name} / ${actionName[action]}`);
+      setScriptText(res.data.script || "");
+      setScriptModalOpen(true);
+      loadData();
+    } else {
+      toast.error(res.msg || `${actionName[action]}任务生成失败`);
+    }
+  };
+
   const saveOrchestrationTask = async () => {
     const targetServerIds = orchestrationForm.serverIds.length > 0
       ? orchestrationForm.serverIds
@@ -1908,6 +1942,12 @@ export default function OrchestratorPage() {
                       <Button size="sm" variant="flat" onPress={() => showThreeXuiOutboundTraffic(server)}>出站流量</Button>
                       <Button size="sm" variant="flat" onPress={() => openXraySettingModal(server)}>保存出站</Button>
                       <Button size="sm" variant="flat" onPress={() => restartXray(server)}>重启 Xray</Button>
+                    </ServerActionGroup>
+                    <ServerActionGroup title="Agent">
+                      <Button size="sm" variant="flat" onPress={() => createAgentMaintenance(server, "doctor")}>诊断</Button>
+                      <Button size="sm" variant="flat" onPress={() => createAgentMaintenance(server, "logs")}>日志</Button>
+                      <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "restart-agent")}>重启</Button>
+                      <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "upgrade-agent")}>升级</Button>
                     </ServerActionGroup>
                     <ServerActionGroup title="管理">
                       <Button size="sm" variant="flat" onPress={() => openServerModal(server)}>编辑</Button>

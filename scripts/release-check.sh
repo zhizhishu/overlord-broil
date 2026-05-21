@@ -21,6 +21,7 @@ Default checks:
 
 With --full:
   - Docker Maven backend package build
+  - installer diagnostics in Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux containers
   - disposable compose smoke test built from the current checkout
 EOF
 }
@@ -112,6 +113,9 @@ if [ "$FULL" = "true" ]; then
     -w /workspace \
     maven:3.9-eclipse-temurin-21 \
     mvn -B -DskipTests package
+
+  step "Run Linux install matrix diagnostics"
+  bash scripts/test-install-matrix.sh
 
   step "Run disposable compose smoke test"
   bash scripts/test-compose-smoke.sh --build-local

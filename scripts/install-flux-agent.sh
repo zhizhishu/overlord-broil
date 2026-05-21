@@ -22,6 +22,36 @@ REPO_RAW_URL="${FLUX_REPO_RAW_URL:-https://raw.githubusercontent.com/zhizhishu/f
 SOURCE_URL="${FLUX_AGENT_SOURCE_URL:-${REPO_RAW_URL}/scripts/flux-agent.sh}"
 SOURCE_SCRIPT="${1:-}"
 GITHUB_TOKEN="${FLUX_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
+ACTION="install"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  install-flux-agent.sh [doctor]
+  install-flux-agent.sh [path/to/flux-agent.sh]
+
+Actions:
+  install                 Install or repair the long-running agent service (default)
+  doctor                  Run non-destructive controlled-host diagnostics and exit
+
+Required for install:
+  FLUX_PANEL_URL          Master panel URL, for example https://master.example.com
+  FLUX_SERVER_ID          Server id from the master panel
+  FLUX_AGENT_TOKEN        Agent token from the master panel
+
+Doctor environment:
+  FLUX_DOCTOR_REQUIRE_SERVICE_MANAGER  Require systemd/OpenRC during doctor, default 1
+  FLUX_DOCTOR_REQUIRE_AGENT_ENV        Require FLUX_PANEL_URL/SERVER_ID/AGENT_TOKEN during doctor, default 1
+EOF
+}
+
+if [ "$SOURCE_SCRIPT" = "doctor" ]; then
+  ACTION="doctor"
+  SOURCE_SCRIPT=""
+elif [ "$SOURCE_SCRIPT" = "-h" ] || [ "$SOURCE_SCRIPT" = "--help" ]; then
+  usage
+  exit 0
+fi
 
 quote_env_value() {
   case "$1" in
@@ -56,6 +86,9 @@ install_packages() {
     dnf install -y ca-certificates "${missing[@]}"
   elif command -v yum >/dev/null 2>&1; then
     yum install -y ca-certificates "${missing[@]}"
+  elif command -v microdnf >/dev/null 2>&1; then
+    microdnf install -y ca-certificates "${missing[@]}"
+    microdnf clean all || true
   elif command -v apk >/dev/null 2>&1; then
     apk add --no-cache ca-certificates "${missing[@]}"
   else
@@ -104,6 +137,115 @@ detect_service_manager() {
       ;;
   esac
 }
+
+doctor_failed=0
+
+doctor_item() {
+  local status="$1"
+  local label="$2"
+  local detail="$3"
+  printf '[%s] %s: %s\n' "$status" "$label" "$detail"
+  if [ "$status" = "fail" ]; then
+    doctor_failed=1
+  fi
+}
+
+doctor_command() {
+  local command_name="$1"
+  local required="$2"
+  if command -v "$command_name" >/dev/null 2>&1; then
+    doctor_item ok "$command_name" "$(command -v "$command_name")"
+  elif [ "$required" = "1" ]; then
+    doctor_item fail "$command_name" "missing"
+  else
+    doctor_item warn "$command_name" "missing"
+  fi
+}
+
+detect_package_manager() {
+  if command -v apt-get >/dev/null 2>&1; then
+    echo apt
+  elif command -v dnf >/dev/null 2>&1; then
+    echo dnf
+  elif command -v yum >/dev/null 2>&1; then
+    echo yum
+  elif command -v microdnf >/dev/null 2>&1; then
+    echo microdnf
+  elif command -v apk >/dev/null 2>&1; then
+    echo apk
+  else
+    echo unknown
+  fi
+}
+
+detect_service_manager_hint() {
+  if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+    echo systemd
+  elif command -v rc-service >/dev/null 2>&1 && command -v rc-update >/dev/null 2>&1; then
+    echo openrc
+  else
+    echo unknown
+  fi
+}
+
+doctor_agent_env() {
+  local require_env="${FLUX_DOCTOR_REQUIRE_AGENT_ENV:-1}"
+  local missing=""
+  [ -n "$PANEL_URL" ] || missing="${missing} FLUX_PANEL_URL"
+  [ -n "$SERVER_ID" ] || missing="${missing} FLUX_SERVER_ID"
+  [ -n "$AGENT_TOKEN" ] || missing="${missing} FLUX_AGENT_TOKEN"
+  if [ -n "$missing" ]; then
+    if [ "$require_env" = "1" ]; then
+      doctor_item fail "agent-env" "missing:${missing}"
+    else
+      doctor_item warn "agent-env" "missing:${missing}"
+    fi
+  else
+    doctor_item ok "agent-env" "panel=${PANEL_URL}, server=${SERVER_ID}, token=provided"
+  fi
+}
+
+run_agent_installer_doctor() {
+  local require_service="${FLUX_DOCTOR_REQUIRE_SERVICE_MANAGER:-1}"
+  local manager
+
+  echo "Flux agent installer doctor"
+  doctor_item ok "os" "$(detect_os_name)"
+  doctor_item ok "arch" "$(uname -m)"
+  doctor_item ok "package-manager" "$(detect_package_manager)"
+  doctor_command bash 1
+  doctor_command curl 1
+  doctor_command python3 1
+
+  manager="$(detect_service_manager_hint)"
+  if [ "$manager" = "unknown" ] && [ "$require_service" = "1" ]; then
+    doctor_item fail "service-manager" "running systemd or OpenRC is required for a persistent agent service"
+  elif [ "$manager" = "unknown" ]; then
+    doctor_item warn "service-manager" "not available in this environment; acceptable for container syntax/preflight tests"
+  else
+    doctor_item ok "service-manager" "$manager"
+  fi
+
+  if [ "$(id -u)" -eq 0 ]; then
+    doctor_item ok "root" "running as root"
+  else
+    doctor_item warn "root" "not root; install requires root"
+  fi
+
+  doctor_agent_env
+
+  if [ "$doctor_failed" -eq 0 ]; then
+    echo "Agent installer doctor passed."
+    return 0
+  fi
+  echo "Agent installer doctor found blocking issue(s)." >&2
+  return 1
+}
+
+if [ "$ACTION" = "doctor" ]; then
+  run_agent_installer_doctor
+  exit $?
+fi
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "Please run this installer as root." >&2
