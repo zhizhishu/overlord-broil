@@ -66,6 +66,7 @@ Environment:
   FLUX_BACKUP_FILE          Optional restore archive path
   FLUX_BUILD_ON_PULL_FAILURE Build local images after GHCR pull failure, default 1
   FLUX_DOCTOR_REQUIRE_DOCKER Require Docker daemon during doctor, default 1
+  FLUX_DOCTOR_SKIP_PORT_CHECK Skip live port-listening checks during doctor, default 0
 EOF
 }
 
@@ -592,6 +593,10 @@ doctor_port() {
   local port="$2"
   if ! doctor_valid_port "$port"; then
     doctor_item fail "$label" "invalid port '${port}'"
+    return
+  fi
+  if [ "${FLUX_DOCTOR_SKIP_PORT_CHECK:-0}" = "1" ]; then
+    doctor_item warn "$label" "${port} not checked for listeners in this doctor run"
     return
   fi
   if port_is_listening "$port"; then

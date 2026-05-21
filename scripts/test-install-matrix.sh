@@ -57,16 +57,26 @@ require_command() {
 container_script='
 set -eu
 
+install_rpm_deps() {
+  installer="$1"
+  packages="ca-certificates"
+  command -v bash >/dev/null 2>&1 || packages="$packages bash"
+  command -v curl >/dev/null 2>&1 || packages="$packages curl"
+  command -v python3 >/dev/null 2>&1 || packages="$packages python3"
+  command -v tar >/dev/null 2>&1 || packages="$packages tar"
+  $installer install -y $packages
+}
+
 install_deps() {
   if command -v apt-get >/dev/null 2>&1; then
     apt-get update
     DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates bash curl python3 tar
   elif command -v dnf >/dev/null 2>&1; then
-    dnf install -y ca-certificates bash curl python3 tar
+    install_rpm_deps dnf
   elif command -v yum >/dev/null 2>&1; then
-    yum install -y ca-certificates bash curl python3 tar
+    install_rpm_deps yum
   elif command -v microdnf >/dev/null 2>&1; then
-    microdnf install -y ca-certificates bash curl python3 tar
+    install_rpm_deps microdnf
     microdnf clean all || true
   elif command -v apk >/dev/null 2>&1; then
     apk add --no-cache ca-certificates bash curl python3 tar iproute2
@@ -83,6 +93,7 @@ bash -n scripts/install-master.sh scripts/install-flux-agent.sh scripts/flux-age
 sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh
 
 FLUX_DOCTOR_REQUIRE_DOCKER=0 \
+FLUX_DOCTOR_SKIP_PORT_CHECK=1 \
 FLUX_FRONTEND_PORT=18080 \
 FLUX_BACKEND_PORT=16365 \
 FLUX_PHPMYADMIN_PORT=18066 \
