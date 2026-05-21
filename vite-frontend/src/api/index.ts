@@ -73,6 +73,10 @@ export const getDeployTaskScript = (id: number) => Network.post("/deploy-task/sc
 export const updateDeployTaskState = (data: any) => Network.post("/deploy-task/state", data);
 export const deleteDeployTask = (id: number) => Network.post("/deploy-task/delete", { id });
 
+// 主控监控告警
+export const listMonitorAlerts = (data: any = {}) => Network.post("/monitor-alert/list", data);
+export const acknowledgeMonitorAlert = (id: number) => Network.post("/monitor-alert/ack", { id });
+
 // 3x-ui 远端面板出入站管理
 export const testThreeXuiConnection = (serverId: number) => Network.post("/three-xui/test", { serverId });
 export const listThreeXuiInbounds = (serverId: number) => Network.post("/three-xui/inbounds/list", { serverId });

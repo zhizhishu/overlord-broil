@@ -219,6 +219,23 @@ export interface ThreeXuiTrafficSnapshot {
   status: number;
 }
 
+export interface MonitorAlert {
+  id: number;
+  serverId: number;
+  serverName?: string;
+  alertType: string;
+  severity: "warning" | "critical" | string;
+  source: string;
+  message: string;
+  detailJson?: string;
+  firstSeenAt?: number;
+  lastSeenAt?: number;
+  acknowledged?: number;
+  acknowledgedTime?: number;
+  createdTime?: number;
+  status: number;
+}
+
 export interface Pagination {
   current: number;
   size: number;

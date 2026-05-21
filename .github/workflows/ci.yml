@@ -47,6 +47,8 @@ jobs:
         run: bash -n scripts/*.sh
       - name: Run agent mock tests
         run: bash scripts/test-flux-agent-mock.sh
+      - name: Run 3x-ui fixture tests
+        run: bash scripts/test-three-xui-fixture.sh
       - name: Validate compose files
         env:
           DB_NAME: gost

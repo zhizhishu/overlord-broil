@@ -14,6 +14,7 @@ import com.admin.entity.ProtocolProfile;
 import com.admin.mapper.DeployTaskMapper;
 import com.admin.service.ControlServerService;
 import com.admin.service.DeployTaskService;
+import com.admin.service.MonitorAlertService;
 import com.admin.service.ProtocolNodeService;
 import com.admin.service.ProtocolProfileService;
 import com.admin.service.ServerForwardRuleService;
@@ -40,6 +41,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
     private static final String STATE_RUNNING = "running";
     private static final String STATE_SUCCEEDED = "succeeded";
     private static final String STATE_FAILED = "failed";
+    private static final String STATE_TIMEOUT = "timeout";
 
     @Resource
     private ControlServerService controlServerService;
@@ -58,6 +60,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
 
     @Resource
     private ServerForwardRuleService serverForwardRuleService;
+
+    @Resource
+    private MonitorAlertService monitorAlertService;
 
     @Override
     public R createTask(DeployTaskDto dto) {
@@ -233,21 +238,30 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         if (exists == null) {
             return R.err("deploy task not found");
         }
+        String state = normalizeTaskState(dto.getState());
+        if (state == null) {
+            return R.err("unsupported deploy task state");
+        }
 
         long now = System.currentTimeMillis();
         DeployTask task = new DeployTask();
         task.setId(dto.getId());
-        task.setState(dto.getState());
+        task.setState(state);
         task.setResultJson(dto.getResultJson());
         task.setUpdatedTime(now);
-        if ("running".equals(dto.getState())) {
+        if (STATE_RUNNING.equals(state)) {
             task.setStartedTime(now);
         }
-        if ("succeeded".equals(dto.getState()) || "failed".equals(dto.getState())) {
+        if (STATE_SUCCEEDED.equals(state) || STATE_FAILED.equals(state) || STATE_TIMEOUT.equals(state)) {
             task.setFinishedTime(now);
         }
 
-        return this.updateById(task) ? R.ok("deploy task state updated") : R.err("deploy task state update failed");
+        boolean updated = this.updateById(task);
+        if (updated) {
+            monitorAlertService.handleTaskFailed(exists.getServerId(), exists.getServerName(), exists.getId(),
+                    state, dto.getResultJson(), now);
+        }
+        return updated ? R.ok("deploy task state updated") : R.err("deploy task state update failed");
     }
 
     @Override
@@ -303,7 +317,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             return R.err(401, "invalid agent token");
         }
 
-        String state = normalizeAgentState(dto.getState());
+        String state = normalizeTaskState(dto.getState());
         if (state == null) {
             return R.err("unsupported agent task state");
         }
@@ -317,12 +331,14 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         if (STATE_RUNNING.equals(state) && exists.getStartedTime() == null) {
             task.setStartedTime(now);
         }
-        if (STATE_SUCCEEDED.equals(state) || STATE_FAILED.equals(state)) {
+        if (STATE_SUCCEEDED.equals(state) || STATE_FAILED.equals(state) || STATE_TIMEOUT.equals(state)) {
             task.setFinishedTime(now);
         }
 
         boolean updated = this.updateById(task);
         if (updated) {
+            monitorAlertService.handleTaskFailed(exists.getServerId(), exists.getServerName(), exists.getId(),
+                    state, task.getResultJson(), now);
             applyAgentResultMetadata(exists, task.getResultJson(), state);
         }
         return updated ? R.ok("agent task report accepted") : R.err("agent task report failed");
@@ -347,12 +363,13 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         return server;
     }
 
-    private String normalizeAgentState(String state) {
+    private String normalizeTaskState(String state) {
         if (state == null) {
             return null;
         }
         String normalized = state.trim().toLowerCase();
-        if (STATE_RUNNING.equals(normalized) || STATE_SUCCEEDED.equals(normalized) || STATE_FAILED.equals(normalized)) {
+        if (STATE_RUNNING.equals(normalized) || STATE_SUCCEEDED.equals(normalized)
+                || STATE_FAILED.equals(normalized) || STATE_TIMEOUT.equals(normalized)) {
             return normalized;
         }
         return null;

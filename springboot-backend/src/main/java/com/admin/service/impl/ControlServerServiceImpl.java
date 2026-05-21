@@ -8,10 +8,12 @@ import com.admin.common.lang.R;
 import com.admin.entity.ControlServer;
 import com.admin.mapper.ControlServerMapper;
 import com.admin.service.ControlServerService;
+import com.admin.service.MonitorAlertService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -20,6 +22,9 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
 
     private static final int STATUS_ACTIVE = 1;
     private static final int STATUS_ERROR = -1;
+
+    @Resource
+    private MonitorAlertService monitorAlertService;
 
     @Override
     public R createServer(ControlServerDto dto) {
@@ -127,7 +132,11 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         update.setStatus(dto.getLastError() == null || dto.getLastError().isEmpty() ? STATUS_ACTIVE : STATUS_ERROR);
         update.setUpdatedTime(now);
 
-        return this.updateById(update) ? R.ok("heartbeat accepted") : R.err("heartbeat update failed");
+        boolean updated = this.updateById(update);
+        if (updated) {
+            monitorAlertService.handleHeartbeat(server, dto, now);
+        }
+        return updated ? R.ok("heartbeat accepted") : R.err("heartbeat update failed");
     }
 
     private ControlServer maskToken(ControlServer server) {

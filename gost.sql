@@ -201,6 +201,26 @@ CREATE TABLE `deploy_task` (
 
 -- --------------------------------------------------------
 
+CREATE TABLE `monitor_alert` (
+  `id` int(10) NOT NULL,
+  `server_id` int(10) NOT NULL,
+  `server_name` varchar(100) DEFAULT NULL,
+  `alert_type` varchar(50) NOT NULL,
+  `severity` varchar(30) NOT NULL DEFAULT 'warning',
+  `source` varchar(50) NOT NULL,
+  `message` varchar(255) NOT NULL,
+  `detail_json` longtext,
+  `first_seen_at` bigint(20) NOT NULL,
+  `last_seen_at` bigint(20) NOT NULL,
+  `acknowledged` int(1) NOT NULL DEFAULT '0',
+  `acknowledged_time` bigint(20) DEFAULT NULL,
+  `created_time` bigint(20) NOT NULL,
+  `updated_time` bigint(20) DEFAULT NULL,
+  `status` int(10) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
 CREATE TABLE `three_xui_traffic_snapshot` (
   `id` int(10) NOT NULL,
   `server_id` int(10) NOT NULL,
@@ -389,6 +409,13 @@ ALTER TABLE `deploy_task`
   ADD PRIMARY KEY (`id`),
   ADD KEY `server_id` (`server_id`);
 
+ALTER TABLE `monitor_alert`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `server_id` (`server_id`),
+  ADD KEY `alert_type` (`alert_type`),
+  ADD KEY `acknowledged` (`acknowledged`),
+  ADD KEY `last_seen_at` (`last_seen_at`);
+
 ALTER TABLE `three_xui_traffic_snapshot`
   ADD PRIMARY KEY (`id`),
   ADD KEY `server_id` (`server_id`),
@@ -452,6 +479,9 @@ ALTER TABLE `server_forward_rule`
   MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
 
 ALTER TABLE `deploy_task`
+  MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+
+ALTER TABLE `monitor_alert`
   MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
 
 ALTER TABLE `three_xui_traffic_snapshot`

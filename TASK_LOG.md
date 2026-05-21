@@ -25,6 +25,7 @@
   - 新增 GitHub Actions CI，分别验证后端 Maven package 和前端 npm build。
   - 2026-05-20 10:26:10：完成正式可用硬化第一批。分布式 worker 复核安装脚本、README、Pages、CI 与 agent 脚本后，主线程补齐主控安装脚本 `upgrade/backup/restore/uninstall` 的可靠性校验、agent 任务锁/HTTP 重试/任务超时/结果元数据上报、agent systemd env 安全写入、可复用 agent mock 测试和 CI compose 校验。
   - 2026-05-20 21:03:36：完成产品化收尾第二批。分布式 worker 分别完成 Snell 供应链 checksum/版本锁、协议级 guardrails、CI compose smoke；主线程集成复查后补齐 Xray 本地字段校验、host-only/host:port 拆分、`gost-phpmyadmin` 资源保护和 `--build-local` smoke，避免本地/CI 依赖 GHCR 拉取权限。
+  - 2026-05-20 22:26:22：完成 P1-P4 正式产品化。P1 主控中心新增统一规则中心、搜索/筛选/复制和运维入口；P2 新增 `monitor_alert` 后端模型/API、心跳/证书/服务/任务/流量告警和前端确认入口；P3 新增 3x-ui API fixture 与 CI 回归脚本；P4 补齐 `VERSION`、Release notes、Operations、README 发布与使用说明。验证通过：`bash -n scripts/*.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、`npm run build`、Docker Maven `mvn -B -DskipTests package`、`docker compose` v4/v6 config、`bash scripts/test-compose-smoke.sh --build-local --dry-run`、完整 `bash scripts/test-compose-smoke.sh --build-local`、`git diff --check`。
 - 下一步：
   - 增加 Reality key、端口、outbound tag、Snell PSK/端口等协议级校验，降低 3x-ui/Snell payload 填错风险。
   - 为 Snell 二进制下载增加 checksum 校验和版本源锁定。
@@ -98,6 +99,14 @@
 4. P3 Pages 兼容维护：处理 GitHub Pages Node 20 deprecation 提示，补 workflow 环境变量或 action 升级说明，避免后续 runner 默认切换时突然失败。
 5. 分布式执行方式：主线程维护 `TASK_LOG.md`、集成 diff 和最终验证；worker 分别负责 Snell/协议校验/CI 文档等不重叠写入范围；所有结果由主线程汇总提交推送。
 
+## 本轮 P1-P4 正式产品化计划（创建于: 2026-05-20 21:43:19）
+
+1. P1 规则中心增强：在主控中心把 3x-ui inbound/outbound、Snell、远端转发和本地规则汇总成更清晰的统一规则视图，支持筛选、刷新、复制关键配置、快速定位状态和任务入口。
+2. P2 监控告警：新增服务端告警模型/API，基于 agent 心跳、证书、Xray/Snell/3x-ui 服务状态、任务失败和流量异常生成站内告警，供主控统一查看与确认。
+3. P3 真实 3x-ui 回归夹具：新增可复用的 3x-ui API mock/fixture 与脚本，覆盖连接测试、inbound 列表/新增/更新/删除、outbound/config/traffic/restart 等代理链路，并纳入 CI。
+4. P4 发布体验：补齐版本/Release notes/安装与验证说明，把当前正式可用能力、CI smoke、镜像与安装路径写清楚，方便公开仓库使用和后续发版。
+5. 分布式执行方式：主线程维护 `TASK_LOG.md`、集成 diff、跑完整验证和推送；worker 分别负责 P1 前端、P2 后端告警、P3 测试夹具、P4 文档发版，写入范围互斥。
+
 ## 迭代计划
 
 1. 确认三套源码的技术栈、入口和可复用能力边界。
@@ -112,6 +121,7 @@
 
 ## 任务清单
 
+- [x] ~~**目标:** 分布式完成 P1-P4 正式产品化：规则中心、监控告警、3x-ui 回归夹具和发布体验~~ (创建于: 2026-05-20 21:43:19 | **完成于: 2026-05-20 22:26:22**)
 - [x] ~~**目标:** 完成产品化收尾第二批：Snell checksum、协议级校验、CI smoke 和 Pages 兼容维护~~ (创建于: 2026-05-20 20:04:50 | **完成于: 2026-05-20 21:03:36**)
 - [x] ~~**目标:** 完成正式可用硬化第一批：安装运维能力、agent 任务可靠性和验证闭环~~ (创建于: 2026-05-20 09:39:35 | **完成于: 2026-05-20 10:26:10**)
 - [x] ~~**目标:** 清理本地换行脏差异并完成架构与可用性复核测试~~ (创建于: 2026-05-20 02:58:42 | **完成于: 2026-05-20 03:57:59**)

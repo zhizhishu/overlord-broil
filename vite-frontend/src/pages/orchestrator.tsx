@@ -11,6 +11,7 @@ import { Switch } from "@heroui/switch";
 import toast from "react-hot-toast";
 
 import {
+  acknowledgeMonitorAlert,
   createControlServer,
   createDeployTask,
   createProtocolNode,
@@ -29,6 +30,7 @@ import {
   getControlServerToken,
   getDeployTaskList,
   getDeployTaskScript,
+  listMonitorAlerts,
   getProtocolNodeList,
   getProtocolProfileList,
   getServerForwardRuleList,
@@ -52,7 +54,7 @@ import {
   updateProtocolProfile,
   updateServerForwardRule
 } from "@/api";
-import type { ControlServer, DeployTask, ProtocolNode, ProtocolProfile, ServerForwardRule, ThreeXuiTrafficSnapshot } from "@/types";
+import type { ControlServer, DeployTask, MonitorAlert, ProtocolNode, ProtocolProfile, ServerForwardRule, ThreeXuiTrafficSnapshot } from "@/types";
 
 interface ServerForm {
   id?: number;
@@ -188,6 +190,31 @@ interface ServerForwardRuleForm {
   listenPort: number;
   targetHost: string;
   targetPort: number;
+}
+
+type RuleKindFilter = "all" | "protocol" | "forward" | "xui";
+type RuleHealthFilter = "all" | "healthy" | "warning" | "error";
+type RuleHealth = Exclude<RuleHealthFilter, "all">;
+
+interface UnifiedRuleRow {
+  id: string;
+  kind: Exclude<RuleKindFilter, "all">;
+  title: string;
+  serverId?: number;
+  serverName: string;
+  protocol: string;
+  endpoint: string;
+  target: string;
+  status: string;
+  health: RuleHealth;
+  port?: number;
+  traffic: number;
+  syncedAt?: number;
+  detail: string;
+  error?: string;
+  node?: ProtocolNode;
+  rule?: ServerForwardRule;
+  snapshot?: ThreeXuiTrafficSnapshot;
 }
 
 const blankServerForm: ServerForm = {
@@ -503,6 +530,7 @@ export default function OrchestratorPage() {
   const [profiles, setProfiles] = useState<ProtocolProfile[]>([]);
   const [tasks, setTasks] = useState<DeployTask[]>([]);
   const [trafficSnapshots, setTrafficSnapshots] = useState<ThreeXuiTrafficSnapshot[]>([]);
+  const [monitorAlerts, setMonitorAlerts] = useState<MonitorAlert[]>([]);
   const [serverModalOpen, setServerModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [protocolNodeModalOpen, setProtocolNodeModalOpen] = useState(false);
@@ -524,6 +552,10 @@ export default function OrchestratorPage() {
   const [deployForm, setDeployForm] = useState<DeployForm>(blankDeployForm);
   const [orchestrationForm, setOrchestrationForm] = useState<OrchestrationForm>(blankOrchestrationForm);
   const [threeXuiInboundForm, setThreeXuiInboundForm] = useState<ThreeXuiInboundForm>(blankThreeXuiInboundForm);
+  const [ruleSearch, setRuleSearch] = useState("");
+  const [ruleKindFilter, setRuleKindFilter] = useState<RuleKindFilter>("all");
+  const [ruleServerFilter, setRuleServerFilter] = useState("all");
+  const [ruleHealthFilter, setRuleHealthFilter] = useState<RuleHealthFilter>("all");
 
   const onlineServers = useMemo(() => {
     const now = Date.now();
@@ -547,12 +579,113 @@ export default function OrchestratorPage() {
   }, [forwardRules]);
 
   const failedTasks = useMemo(() => {
-    return tasks.filter(task => task.state === "failed").length;
+    return tasks.filter(task => ["failed", "timeout"].includes(task.state)).length;
   }, [tasks]);
 
   const totalRemoteTraffic = useMemo(() => {
     return servers.reduce((sum, server) => sum + (server.uploadTraffic || 0) + (server.downloadTraffic || 0), 0);
   }, [servers]);
+
+  const activeAlerts = useMemo(() => {
+    return monitorAlerts.filter(alert => alert.acknowledged !== 1).length;
+  }, [monitorAlerts]);
+
+  const criticalAlerts = useMemo(() => {
+    return monitorAlerts.filter(alert => alert.acknowledged !== 1 && alert.severity === "critical").length;
+  }, [monitorAlerts]);
+
+  const recentAlerts = useMemo(() => monitorAlerts.slice(0, 5), [monitorAlerts]);
+
+  const unifiedRuleRows = useMemo<UnifiedRuleRow[]>(() => {
+    const serverName = (serverId?: number, fallback?: string) => fallback || servers.find(server => server.id === serverId)?.name || (serverId ? `#${serverId}` : "-");
+    const healthOf = (status?: string, error?: string): RuleHealth => {
+      const normalized = (status || "").toLowerCase();
+      if (error || ["failed", "error", "inactive", "disabled"].includes(normalized)) return "error";
+      if (!normalized || ["unknown", "not-installed", "pending", "generated", "claimed"].includes(normalized)) return "warning";
+      return "healthy";
+    };
+
+    const nodeRows = protocolNodes.map(node => ({
+      id: `protocol-${node.id}`,
+      kind: "protocol" as const,
+      title: node.name,
+      serverId: node.serverId,
+      serverName: serverName(node.serverId, node.serverName),
+      protocol: [node.engine, node.protocol, node.transport, node.security].filter(Boolean).join(" / "),
+      endpoint: `${node.listen || "*"}:${node.port || "-"}`,
+      target: node.remoteId || node.serviceName || "-",
+      status: node.state || "-",
+      health: healthOf(node.state, node.lastError),
+      port: node.port,
+      traffic: node.total || ((node.up || 0) + (node.down || 0)),
+      syncedAt: node.lastSync,
+      detail: `${node.direction || "inbound"} / ${node.serviceName || node.remoteId || "local"}`,
+      error: node.lastError,
+      node
+    }));
+
+    const forwardRows = forwardRules.map(rule => ({
+      id: `forward-${rule.id}`,
+      kind: "forward" as const,
+      title: rule.name,
+      serverId: rule.serverId,
+      serverName: serverName(rule.serverId, rule.serverName),
+      protocol: `${rule.engine || "socat"} / ${rule.protocol || "tcp"}`,
+      endpoint: `${rule.listenHost || "0.0.0.0"}:${rule.listenPort}`,
+      target: `${rule.targetHost}:${rule.targetPort}`,
+      status: rule.state || "-",
+      health: healthOf(rule.state, rule.lastError),
+      port: rule.listenPort,
+      traffic: (rule.up || 0) + (rule.down || 0),
+      syncedAt: rule.lastSync,
+      detail: rule.serviceName || "远端转发",
+      error: rule.lastError,
+      rule
+    }));
+
+    const xuiRows = trafficSnapshots.map(snapshot => ({
+      id: `xui-${snapshot.id}`,
+      kind: "xui" as const,
+      title: snapshot.inboundRemark || snapshot.email || snapshot.tag || `${snapshot.sourceType} #${snapshot.inboundId || snapshot.id}`,
+      serverId: snapshot.serverId,
+      serverName: serverName(snapshot.serverId, snapshot.serverName),
+      protocol: [snapshot.sourceType, snapshot.protocol].filter(Boolean).join(" / "),
+      endpoint: snapshot.inboundId ? `inbound #${snapshot.inboundId}` : snapshot.tag || "-",
+      target: snapshot.email || snapshot.clientId || snapshot.tag || "-",
+      status: snapshot.enable === 0 ? "disabled" : "synced",
+      health: snapshot.enable === 0 ? "error" as const : "healthy" as const,
+      traffic: snapshot.total || ((snapshot.up || 0) + (snapshot.down || 0)),
+      syncedAt: snapshot.syncedTime,
+      detail: snapshot.expiryTime ? `到期 ${new Date(snapshot.expiryTime).toLocaleString()}` : "3x-ui 流量快照",
+      snapshot
+    }));
+
+    return [...nodeRows, ...forwardRows, ...xuiRows];
+  }, [forwardRules, protocolNodes, servers, trafficSnapshots]);
+
+  const filteredRuleRows = useMemo(() => {
+    const query = ruleSearch.trim().toLowerCase();
+    return unifiedRuleRows.filter(row => {
+      if (ruleKindFilter !== "all" && row.kind !== ruleKindFilter) return false;
+      if (ruleHealthFilter !== "all" && row.health !== ruleHealthFilter) return false;
+      if (ruleServerFilter !== "all" && row.serverId?.toString() !== ruleServerFilter) return false;
+      if (!query) return true;
+      return [row.title, row.serverName, row.protocol, row.endpoint, row.target, row.status, row.detail]
+        .some(value => value.toLowerCase().includes(query));
+    });
+  }, [ruleHealthFilter, ruleKindFilter, ruleSearch, ruleServerFilter, unifiedRuleRows]);
+
+  const ruleHealthCounts = useMemo(() => {
+    return unifiedRuleRows.reduce((counts, row) => {
+      counts[row.health] += 1;
+      return counts;
+    }, { healthy: 0, warning: 0, error: 0 });
+  }, [unifiedRuleRows]);
+
+  const ruleServerOptions = useMemo(() => {
+    return [{ id: "all", name: "全部服务器" }, ...servers.map(server => ({ id: server.id.toString(), name: server.name }))];
+  }, [servers]);
+
 
   useEffect(() => {
     loadData();
@@ -562,12 +695,13 @@ export default function OrchestratorPage() {
     setLoading(true);
     try {
       await ensureDefaultProtocolProfiles();
-      const [serverRes, profileRes, taskRes, nodeRes, forwardRes] = await Promise.all([
+      const [serverRes, profileRes, taskRes, nodeRes, forwardRes, alertRes] = await Promise.all([
         getControlServerList(),
         getProtocolProfileList(),
         getDeployTaskList(),
         getProtocolNodeList({ limit: 300 }),
-        getServerForwardRuleList({ limit: 300 })
+        getServerForwardRuleList({ limit: 300 }),
+        listMonitorAlerts({ acknowledged: 0, limit: 100 })
       ]);
 
       if (serverRes.code === 0) setServers(serverRes.data || []);
@@ -575,7 +709,8 @@ export default function OrchestratorPage() {
       if (taskRes.code === 0) setTasks(taskRes.data || []);
       if (nodeRes.code === 0) setProtocolNodes(nodeRes.data || []);
       if (forwardRes.code === 0) setForwardRules(forwardRes.data || []);
-      if (serverRes.code !== 0 || profileRes.code !== 0 || taskRes.code !== 0 || nodeRes.code !== 0 || forwardRes.code !== 0) {
+      if (alertRes.code === 0) setMonitorAlerts(alertRes.data || []);
+      if (serverRes.code !== 0 || profileRes.code !== 0 || taskRes.code !== 0 || nodeRes.code !== 0 || forwardRes.code !== 0 || alertRes.code !== 0) {
         toast.error("主控数据加载不完整");
       }
     } catch (error) {
@@ -1220,6 +1355,30 @@ export default function OrchestratorPage() {
     toast.success("已复制");
   };
 
+  const copyRuleData = async (row: UnifiedRuleRow) => {
+    const payload = [
+      `名称=${row.title}`,
+      `类型=${row.kind}`,
+      `服务器=${row.serverName}`,
+      `协议=${row.protocol}`,
+      `入口=${row.endpoint}`,
+      `目标=${row.target}`,
+      `状态=${row.status}`
+    ].join("\n");
+    await navigator.clipboard.writeText(payload);
+    toast.success("规则信息已复制");
+  };
+
+  const acknowledgeAlert = async (alert: MonitorAlert) => {
+    const res = await acknowledgeMonitorAlert(alert.id);
+    if (res.code === 0) {
+      toast.success("告警已确认");
+      loadData();
+    } else {
+      toast.error(res.msg || "确认告警失败");
+    }
+  };
+
   const removeServer = async (server: ControlServer) => {
     const res = await deleteControlServer(server.id);
     if (res.code === 0) {
@@ -1281,9 +1440,16 @@ export default function OrchestratorPage() {
 
   const serviceColor = (status?: string) => {
     if (!status) return "default";
-    if (["active", "valid"].includes(status)) return "success";
-    if (["expiring", "unknown", "not-installed"].includes(status)) return "warning";
+    const normalized = status.toLowerCase();
+    if (["active", "valid", "running", "healthy", "ok", "success", "succeeded", "synced"].includes(normalized)) return "success";
+    if (["expiring", "unknown", "not-installed", "pending", "generated", "claimed"].includes(normalized)) return "warning";
     return "danger";
+  };
+
+  const alertSeverityColor = (severity?: string) => {
+    if (severity === "critical") return "danger";
+    if (severity === "warning") return "warning";
+    return "default";
   };
 
   const certificateText = (server: ControlServer) => {
@@ -1347,6 +1513,161 @@ export default function OrchestratorPage() {
             </CardBody>
           </Card>
         </div>
+
+        <section>
+          <Card radius="sm">
+            <CardHeader className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">监控告警</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  {activeAlerts} 条待确认，{criticalAlerts} 条严重，来自 agent 心跳、证书、服务状态、任务和流量异常
+                </p>
+              </div>
+              <Button size="sm" variant="light" onPress={loadData}>刷新</Button>
+            </CardHeader>
+            <CardBody className="space-y-3">
+              {monitorAlerts.length === 0 && (
+                <div className="rounded-small border border-dashed border-default-300 p-5 text-center">
+                  <p className="font-medium text-gray-900 dark:text-white">当前没有待确认告警</p>
+                  <p className="text-sm text-gray-500 mt-1">副控心跳、证书、Xray、Snell、3x-ui、任务失败和流量异常会在这里汇总。</p>
+                </div>
+              )}
+              {recentAlerts.map(alert => (
+                <div key={alert.id} className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Chip size="sm" variant="flat" color={alertSeverityColor(alert.severity) as any}>{alert.severity}</Chip>
+                        <Chip size="sm" variant="flat">{alert.alertType}</Chip>
+                        <span className="text-xs text-gray-500">{alert.serverName || `#${alert.serverId}`} / {alert.source}</span>
+                      </div>
+                      <p className="mt-2 truncate font-semibold text-gray-900 dark:text-white">{alert.message}</p>
+                      <p className="text-xs text-gray-500">首次 {formatTime(alert.firstSeenAt)}，最近 {formatTime(alert.lastSeenAt)}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 lg:justify-end">
+                      {alert.detailJson && <Button size="sm" variant="flat" onPress={() => showThreeXuiResult("告警详情", alert.detailJson)}>详情</Button>}
+                      <Button size="sm" color="primary" variant="flat" onPress={() => acknowledgeAlert(alert)}>确认</Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {monitorAlerts.length > recentAlerts.length && (
+                <p className="text-xs text-gray-500">仅显示最近 {recentAlerts.length} 条，后端已保留 {monitorAlerts.length} 条待确认告警。</p>
+              )}
+            </CardBody>
+          </Card>
+        </section>
+
+        <section>
+          <Card radius="sm">
+            <CardHeader className="flex flex-col items-stretch gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">统一规则中心</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  当前显示 {filteredRuleRows.length} / {unifiedRuleRows.length} 条，健康 {ruleHealthCounts.healthy}，观察 {ruleHealthCounts.warning}，异常 {ruleHealthCounts.error}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>新增节点</Button>
+                <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal()}>新增转发</Button>
+                <Button size="sm" variant="light" onPress={loadData}>刷新</Button>
+              </div>
+            </CardHeader>
+            <CardBody className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                <Input aria-label="搜索规则" placeholder="搜索名称、服务器、端口、目标" value={ruleSearch} onChange={event => setRuleSearch(event.target.value)} variant="bordered" size="sm" />
+                <Select aria-label="规则类型" selectedKeys={[ruleKindFilter]} onSelectionChange={keys => setRuleKindFilter(Array.from(keys)[0] as RuleKindFilter)} variant="bordered" size="sm">
+                  <SelectItem key="all">全部类型</SelectItem>
+                  <SelectItem key="protocol">协议节点</SelectItem>
+                  <SelectItem key="forward">远端转发</SelectItem>
+                  <SelectItem key="xui">3x-ui 视图</SelectItem>
+                </Select>
+                <Select aria-label="规则服务器" selectedKeys={[ruleServerFilter]} onSelectionChange={keys => setRuleServerFilter(Array.from(keys)[0] as string)} variant="bordered" size="sm">
+                  {ruleServerOptions.map(option => <SelectItem key={option.id}>{option.name}</SelectItem>)}
+                </Select>
+                <Select aria-label="规则健康状态" selectedKeys={[ruleHealthFilter]} onSelectionChange={keys => setRuleHealthFilter(Array.from(keys)[0] as RuleHealthFilter)} variant="bordered" size="sm">
+                  <SelectItem key="all">全部状态</SelectItem>
+                  <SelectItem key="healthy">健康</SelectItem>
+                  <SelectItem key="warning">观察</SelectItem>
+                  <SelectItem key="error">异常</SelectItem>
+                </Select>
+              </div>
+
+              {unifiedRuleRows.length === 0 && (
+                <div className="rounded-small border border-dashed border-default-300 p-6 text-center">
+                  <p className="font-medium text-gray-900 dark:text-white">还没有规则</p>
+                  <p className="text-sm text-gray-500 mt-1">创建协议节点、添加远端转发或同步 3x-ui 流量后，这里会汇总展示。</p>
+                  <div className="mt-4 flex justify-center gap-2">
+                    <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>新增节点</Button>
+                    <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal()}>新增转发</Button>
+                  </div>
+                </div>
+              )}
+
+              {unifiedRuleRows.length > 0 && filteredRuleRows.length === 0 && (
+                <div className="rounded-small border border-dashed border-default-300 p-6 text-center">
+                  <p className="font-medium text-gray-900 dark:text-white">没有匹配的规则</p>
+                  <p className="text-sm text-gray-500 mt-1">清空搜索或放宽类型、服务器、状态筛选。</p>
+                  <Button size="sm" variant="flat" className="mt-4" onPress={() => {
+                    setRuleSearch("");
+                    setRuleKindFilter("all");
+                    setRuleServerFilter("all");
+                    setRuleHealthFilter("all");
+                  }}>
+                    重置筛选
+                  </Button>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {filteredRuleRows.map(row => (
+                  <div key={row.id} className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
+                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(220px,1.3fr)_minmax(180px,1fr)_minmax(220px,1.2fr)_minmax(160px,.8fr)_auto] xl:items-center">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Chip size="sm" variant="flat" color={row.kind === "protocol" ? "primary" : row.kind === "forward" ? "secondary" : "success"}>{row.kind === "protocol" ? "节点" : row.kind === "forward" ? "转发" : "3x-ui"}</Chip>
+                          <Chip size="sm" variant="flat" color={row.health === "healthy" ? "success" : row.health === "warning" ? "warning" : "danger"}>{row.status}</Chip>
+                        </div>
+                        <p className="mt-2 truncate font-semibold text-gray-900 dark:text-white">{row.title}</p>
+                        <p className="truncate text-xs text-gray-500">{row.serverName} / {row.detail}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div><p className="text-xs text-gray-500">协议</p><p className="truncate">{row.protocol || "-"}</p></div>
+                        <div><p className="text-xs text-gray-500">流量</p><p>{formatBytes(row.traffic)}</p></div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="min-w-0"><p className="text-xs text-gray-500">监听 / 入站</p><p className="truncate">{row.endpoint}</p></div>
+                        <div className="min-w-0"><p className="text-xs text-gray-500">目标 / 客户端</p><p className="truncate">{row.target}</p></div>
+                      </div>
+                      <div className="text-sm">
+                        <p className="text-xs text-gray-500">最近同步</p>
+                        <p>{formatTime(row.syncedAt)}</p>
+                        {row.error && <p className="mt-1 truncate text-xs text-danger">{row.error}</p>}
+                      </div>
+                      <div className="flex flex-wrap gap-2 xl:justify-end">
+                        <Button size="sm" variant="flat" onPress={() => copyRuleData(row)}>复制</Button>
+                        {row.node && (
+                          <>
+                            <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(undefined, row.node!)}>编辑</Button>
+                            <Button size="sm" variant="flat" onPress={() => restartNode(row.node!)}>重启</Button>
+                            <Button size="sm" variant="light" color="danger" onPress={() => removeProtocolNode(row.node!)}>删除</Button>
+                          </>
+                        )}
+                        {row.rule && (
+                          <>
+                            <Button size="sm" variant="flat" onPress={() => openServerForwardModal(undefined, row.rule!)}>编辑</Button>
+                            <Button size="sm" variant="flat" onPress={() => restartForwardRule(row.rule!)}>重启</Button>
+                            <Button size="sm" variant="light" color="danger" onPress={() => removeServerForwardRule(row.rule!)}>删除</Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardBody>
+          </Card>
+        </section>
 
         <section>
           <div className="flex items-center justify-between mb-3">

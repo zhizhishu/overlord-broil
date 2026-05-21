@@ -11,6 +11,13 @@ https://zhizhishu.github.io/flux-3xui-orchestrator/
 https://zhizhishu.github.io/
 ```
 
+Current release: `0.4.0` (pre-1.0 public productization batch).
+
+Release and operations docs:
+
+- [Release notes](docs/RELEASE_NOTES.md)
+- [Operations checklist](docs/OPERATIONS.md)
+
 ## Quick Start
 
 The repository is public, so the installer can be fetched directly from GitHub raw files.
@@ -115,12 +122,28 @@ The first iteration adds the foundation for:
   - remote traffic sync and local traffic snapshot viewer
   - one-click orchestration modal for 3x-ui, Reality, VMess WS, Trojan TLS, Shadowsocks and Snell
   - service/certificate/traffic status chips on server cards
+  - monitor alert center for agent offline, certificate expiry, service failures, task failures/timeouts and traffic anomalies
+  - unified rule center for protocol nodes, remote forwards and 3x-ui traffic snapshots with search and filters
   - script, token, inbound and config viewers
 - GitHub Actions:
   - CI builds backend Maven package and frontend production bundle
   - CI runs agent mock tests, compose validation and a disposable Docker compose smoke test built from the current checkout
   - Docker image workflow builds backend and frontend images
   - pushes images to GitHub Container Registry on `main`, tags and manual dispatch
+
+## Capability Matrix
+
+| Area | Current public repo capability |
+| --- | --- |
+| Master install | One-command GitHub raw installer, default install path `/opt/flux-3xui-orchestrator`. |
+| Master runtime | Docker Compose stack with MySQL, backend, frontend and optional phpMyAdmin. |
+| Images | GHCR backend/frontend images with local source-build fallback when package pulls are unavailable. |
+| Agent install | One-command systemd installer; config in `/etc/flux-agent.env`, runner at `/usr/local/bin/flux-agent.sh`. |
+| Agent tasks | Poll, execute, timeout, retry and report flow for Snell, 3x-ui orchestration and port-forward tasks. |
+| 3x-ui | Connection test, inbound/client operations, Xray config/outbound reads, traffic sync and Xray restart. |
+| Snell | Managed as a product-level protocol node through agent-generated systemd services. |
+| Port forwards | Controlled-host `socat` services created through auditable deployment tasks. |
+| Verification | Maven package, Vite build, agent mock test, compose config and disposable compose smoke test. |
 
 ## Repository Layout
 
@@ -207,6 +230,29 @@ CREATE TABLE `three_xui_traffic_snapshot` (
   KEY `server_id` (`server_id`),
   KEY `source_type` (`source_type`),
   KEY `synced_time` (`synced_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `monitor_alert` (
+  `id` int(10) NOT NULL AUTO_INCREMENT,
+  `server_id` int(10) NOT NULL,
+  `server_name` varchar(100) DEFAULT NULL,
+  `alert_type` varchar(50) NOT NULL,
+  `severity` varchar(30) NOT NULL DEFAULT 'warning',
+  `source` varchar(50) NOT NULL,
+  `message` varchar(255) NOT NULL,
+  `detail_json` longtext,
+  `first_seen_at` bigint(20) NOT NULL,
+  `last_seen_at` bigint(20) NOT NULL,
+  `acknowledged` int(1) NOT NULL DEFAULT '0',
+  `acknowledged_time` bigint(20) DEFAULT NULL,
+  `created_time` bigint(20) NOT NULL,
+  `updated_time` bigint(20) DEFAULT NULL,
+  `status` int(10) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `server_id` (`server_id`),
+  KEY `alert_type` (`alert_type`),
+  KEY `acknowledged` (`acknowledged`),
+  KEY `last_seen_at` (`last_seen_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE `protocol_node` (
@@ -428,7 +474,19 @@ Outbound saving intentionally edits the full Xray config rather than only patchi
 
 Traffic is also synced automatically every 5 minutes for active servers with `3x-ui 面板地址` and `3x-ui API Token` configured.
 
-### 11. API endpoints exposed by this project
+### 11. Monitor alerts
+
+Open `主控中心` and check `监控告警`.
+
+- Agent heartbeat stale for more than 5 minutes creates an `agent_offline` alert.
+- Heartbeats with unhealthy 3x-ui, Xray, Snell or certificate status create service/certificate alerts.
+- Certificates expiring within 30 days create warning alerts; expired certificates create critical alerts.
+- Deployment task `failed` and timeout results create task alerts.
+- Negative or unusually large traffic deltas create traffic anomaly alerts.
+
+Use `确认` only after the remote condition has been checked or fixed. Confirmed alerts stay out of the default open-alert view.
+
+### 12. API endpoints exposed by this project
 
 ```text
 POST /api/v1/control-server/create
@@ -446,6 +504,8 @@ POST /api/v1/deploy-task/state
 POST /api/v1/deploy-task/delete
 POST /api/v1/agent-task/claim
 POST /api/v1/agent-task/report
+POST /api/v1/monitor-alert/list
+POST /api/v1/monitor-alert/ack
 POST /api/v1/protocol-node/create
 POST /api/v1/protocol-node/update
 POST /api/v1/protocol-node/list
@@ -509,11 +569,12 @@ Reusable smoke checks:
 
 ```bash
 bash scripts/test-flux-agent-mock.sh
+bash scripts/test-three-xui-fixture.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
 bash scripts/test-compose-smoke.sh --build-local
 ```
 
-`scripts/test-compose-smoke.sh --build-local` builds backend/frontend images from the current checkout, starts disposable MySQL/backend/frontend services, checks `GET /flow/test` and the frontend `/`, then removes the smoke containers, volumes and network. It avoids depending on local GHCR pull permissions.
+`scripts/test-three-xui-fixture.sh` starts a local stateful 3x-ui API fixture and covers inbound CRUD, client operations, Xray config/outbound/traffic reads and restart routes. `scripts/test-compose-smoke.sh --build-local` builds backend/frontend images from the current checkout, starts disposable MySQL/backend/frontend services, checks `GET /flow/test` and the frontend `/`, then removes the smoke containers, volumes and network. It avoids depending on local GHCR pull permissions.
 
 ## GitHub Container Images
 
@@ -562,10 +623,10 @@ LOG_DIR
 
 ## Next Steps
 
-1. Add runtime smoke tests against disposable 3x-ui containers once stable fixtures are available.
-2. Add UI-side helpers for Reality public/private key display, Snell PSK generation and outbound tag selection.
-3. Add sensitive field encryption for stored 3x-ui credentials and API tokens.
-4. Add monitor alerts for agent offline, certificate expiry, Snell/Xray service failure and abnormal traffic.
+1. Add UI-side helpers for Reality public/private key display, Snell PSK generation and outbound tag selection.
+2. Add sensitive field encryption for stored 3x-ui credentials and API tokens.
+3. Add deeper runtime smoke tests against real disposable 3x-ui containers after a stable upstream container fixture is selected.
+4. Split legacy upstream wording/mojibake cleanup into a dedicated documentation pass.
 
 ## Upstream References
 
