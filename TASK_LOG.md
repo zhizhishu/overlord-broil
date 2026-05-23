@@ -224,3 +224,22 @@
 - GitHub Actions `pages-build-deployment` run `26253893769` 已通过；上一轮 `Docker Images` run `26253407666` 已通过，backend/frontend GHCR 镜像已构建并推送。
 - 本地复核通过：`bash -n scripts/*.sh`、`sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、带占位环境的 `scripts/flux-agent.sh --doctor`、`scripts/install-master.sh doctor`、`scripts/install-flux-agent.sh doctor`、v4/v6 compose config、`vite-frontend npm run build`、`git diff --check`。
 - 本机 Docker Desktop Linux engine 仍对 `docker version` 返回 500；本轮未关闭 Docker Desktop/WSL 后台服务，完整 Docker/Maven/compose/矩阵验证以 GitHub Actions 结果为准。
+
+## 2026-05-23 正式版展示与 future 分支计划
+
+### 本轮计划（创建于: 2026-05-23 10:14:47）
+
+1. 明确离正式版还差什么：把 0.6.0 已覆盖能力、仍缺的 1.0/商业级能力和下一步优先级写进 README。
+2. 补充 Flux UI 展示材料：生成可提交的主控工作台截图资产，放到项目内 `docs/assets/`，README 直接展示。
+3. 补 README 使用路径：保留一键安装、agent 安装、端口占用、主控/被控能力边界，并新增截图说明。
+4. 本地验证：检查 Markdown/资产引用、前端构建、脚本语法和 diff。
+5. 推送策略：不动上游，不开 PR；将本轮正式版展示材料推送到 `origin/future` 分支，供后续合并或发布使用。
+
+- [x] ~~**目标:** 补齐正式版差距说明、Flux UI 截图资产、README 截图展示，并推送到 `future` 分支~~ (创建于: 2026-05-23 10:14:47 | **完成于: 2026-05-23 10:34:52**)
+
+### 2026-05-23 10:34:52 进度记录
+
+- README 已新增 `UI Preview` 截图区、`Formal Release Gap` 正式版差距说明和 `future` 分支 P0-P3 路线。
+- 新增 `docs/assets/flux-orchestrator-screenshot.svg`，展示 Flux 风格主控工作台：服务器卡片、统一规则、3x-ui/Snell/Agent 操作和一键编排。
+- 本地验证：`git diff --check` 通过；`bash -n scripts/*.sh` 通过；`bash -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh` 通过；`npm run build` 通过；SVG XML 解析通过。
+- 环境限制：本机 Docker Desktop Linux engine 当前不可连接，本轮未跑 Docker compose/Maven 容器验证，后续以 GitHub Actions 或恢复 Docker 后再补完整 release gate。

@@ -18,6 +18,12 @@ Release and operations docs:
 - [Release notes](docs/RELEASE_NOTES.md)
 - [Operations checklist](docs/OPERATIONS.md)
 
+## UI Preview
+
+![Flux 3x-ui Orchestrator control plane](docs/assets/flux-orchestrator-screenshot.svg)
+
+The master panel keeps the Flux Panel direction: dense server cards, grouped operations, compact status chips and one unified rule view. The UI is meant for repeated operations rather than marketing pages: select one or many servers, generate agent tasks, manage 3x-ui inbound/outbound rules, run Snell as a managed protocol node, sync traffic and check certificate/service status from the same surface.
+
 ## Production Release Gate
 
 Before publishing a release tag or installing on a live host, run:
@@ -58,6 +64,27 @@ Linux support matrix:
 | Snell node tasks | systemd service | systemd service | OpenRC service |
 | Remote forwarding tasks | systemd + `socat` | systemd + `socat` | OpenRC + `socat` |
 | Full 3x-ui install/configure | Supported | Supported | Not supported in `0.6.0`; use a systemd host for this part |
+
+## Formal Release Gap
+
+Current status: `0.6.0` is a public-trial reliability release candidate. It is suitable for self-hosted testing and small authorized master/agent deployments, but it is intentionally not marketed as a broad `1.0` long-term compatibility release yet.
+
+The main gaps before a formal `1.0` are:
+
+1. Real VPS matrix verification: run fresh Debian, Ubuntu, Rocky Linux, Oracle Linux and Alpine hosts through master install, agent install, 3x-ui orchestration, Snell deployment, traffic sync, certificate handling, restart and uninstall.
+2. Real 3x-ui end-to-end smoke: the repository already has an API-level 3x-ui fixture; the next gate should add a real 3x-ui container or real VPS target for inbound/outbound/config/traffic/restart flows.
+3. Snell boundary clarity: Snell is unified in the product layer and deployed by the Flux agent as a managed runtime service. It is not a native Xray/3x-ui core protocol, so docs and UI must keep that distinction explicit.
+4. Certificate and firewall diagnostics: ACME HTTP mode depends on DNS, port `80`, local firewall and cloud security groups. Failure messages should be more specific before broad production use.
+5. Security governance: add RBAC, visible audit logs, agent token expiry/revocation, planned encryption-key rotation and second confirmation for destructive operations.
+6. UI finish: continue polishing the Flux-style operations console, especially mobile layout, empty/loading/error states, modal validation and human-readable task failures.
+7. Operations loop: add agent self-upgrade verification, one-click health repair, remote log pull retention, configurable retry policy and stronger service recovery checks.
+
+Planned `future` branch direction:
+
+- P0: real VPS matrix plus real 3x-ui E2E smoke.
+- P1: agent upgrade, repair and log-pull hardening.
+- P2: RBAC, audit log and token lifecycle management.
+- P3: UI/mobile polish, clearer errors and release screenshots.
 
 ## Quick Start
 
@@ -745,9 +772,9 @@ LOG_DIR
 
 ## Next Steps
 
-1. Add deeper runtime smoke tests against real disposable 3x-ui containers after a stable upstream container fixture is selected.
-2. Document a planned key-rotation migration for encrypted 3x-ui credentials and API tokens.
-3. Run a real VPS matrix for Debian, Ubuntu, Rocky Linux, Oracle Linux and Alpine from master install through node creation, certificate, restart and uninstall.
+1. Complete the `future` branch P0 gate: real VPS matrix and a real 3x-ui end-to-end smoke target.
+2. Harden day-2 operations: agent upgrade verification, health repair, remote log retention and configurable retries.
+3. Add governance features: RBAC, audit log views, agent token expiry/revocation and key-rotation migration.
 4. Split legacy upstream wording/mojibake cleanup into a dedicated documentation pass.
 
 ## References And Acknowledgements
