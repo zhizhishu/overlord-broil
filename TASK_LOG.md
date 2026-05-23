@@ -245,3 +245,4 @@
 - 环境限制：本机 Docker Desktop Linux engine 当前不可连接，本轮未跑 Docker compose/Maven 容器验证，后续以 GitHub Actions 或恢复 Docker 后再补完整 release gate。
 - 2026-05-23 10:37:30 追加：发现 GitHub Actions 只监听 `main`，已补 `future` 分支 CI 触发，并让 Docker Images workflow 支持 `future` 分支镜像构建。
 - 2026-05-23 10:46:47 追加：`future` 分支 Docker Images 前端镜像构建通过但 GHCR 推送 `frontend:future` 被拒绝；已调整为 `future` 只构建验证，只有 `main` 和 `v*` tag 推送 GHCR。
+- 2026-05-23 10:50:49 追加：`future` 分支 GitHub Actions 已通过，`CI` run `26330713783` 和 `Docker Images` run `26330713785` 均为 success。
