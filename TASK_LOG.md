@@ -243,3 +243,4 @@
 - 新增 `docs/assets/flux-orchestrator-screenshot.svg`，展示 Flux 风格主控工作台：服务器卡片、统一规则、3x-ui/Snell/Agent 操作和一键编排。
 - 本地验证：`git diff --check` 通过；`bash -n scripts/*.sh` 通过；`bash -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh` 通过；`npm run build` 通过；SVG XML 解析通过。
 - 环境限制：本机 Docker Desktop Linux engine 当前不可连接，本轮未跑 Docker compose/Maven 容器验证，后续以 GitHub Actions 或恢复 Docker 后再补完整 release gate。
+- 2026-05-23 10:37:30 追加：发现 GitHub Actions 只监听 `main`，已补 `future` 分支 CI 触发，并让 Docker Images workflow 支持 `future` 分支镜像构建。
