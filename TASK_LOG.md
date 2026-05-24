@@ -263,3 +263,16 @@
 - 新增 `README.zh-CN.md`，覆盖中文用户需要的项目定位、UI 默认中文、截图、安装、端口、主控/被控使用、Snell/3x-ui 边界、future/GHCR 策略和 1.0 差距。
 - 英文 `README.md` 已新增中文说明入口、Chinese-first UI 说明，以及 `future` 只构建验证不推 GHCR 的发布策略说明。
 - 本地验证：`git diff --check` 通过；中文 README 链接存在；`npm run build` 通过。
+- 2026-05-23 22:23:33 追加：推送 `future` 后 GitHub Actions `CI` run `26352795372` 已通过，覆盖 backend、frontend、scripts、compose smoke 和安装矩阵。
+
+## 2026-05-23 前端中英文切换实施计划
+
+### 本轮计划（创建于: 2026-05-23 22:19:57）
+
+1. 新增轻量 i18n 基础设施：语言类型、字典、Provider、hook、本地存储和 HTML `lang` 同步。
+2. 新增语言切换按钮：放到桌面布局、H5 简化布局和公共 Navbar，保持 Flux 运维控制台的紧凑风格。
+3. 优先覆盖核心运维界面：主控中心标题、统计卡片、规则中心、服务器卡片、主要操作按钮、关键弹窗标题和常用 toast。
+4. 同步 README 与中文 README：把“未提供切换”的旧口径改为“已提供核心界面中英文切换，历史页面分批覆盖”。
+5. 验证与发布：运行 `npm run build`、脚本语法和 `git diff --check`，提交并推送 `origin/future`，观察 GitHub Actions。
+
+- [ ] **目标:** 新增前端中英文切换基础设施，覆盖主控核心页面与文档口径，并推送到 `future` 分支 (创建于: 2026-05-23 22:19:57)
