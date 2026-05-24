@@ -350,3 +350,23 @@
 - 本地验证：`vite-frontend npm run build` 通过；`git diff --check` 通过；Git Bash 显式路径下 `bash -n scripts/*.sh` 通过；release bundle 实际生成 tar.gz 和 sha256，抽查包内有 `RELEASE_MANIFEST.txt`、`README.zh-CN.md`、`docs/OPERATIONS.md`、`scripts/install-master.sh`，`sha256sum -c` 返回 OK。
 - 环境限制：本机默认 `bash` 仍可能走 WSL 并返回 `E_ACCESSDENIED`，Git Bash 偶发 `couldn't create signal pipe, Win32 error 5`；本轮用提权 Git Bash 完成 release bundle 主路径验证，最终 Linux 侧仍以推送后的 GitHub Actions 为准。
 - 2026-05-24 11:50:46 追加：已推送 `origin/future` 提交 `f2b9c5f`；GitHub Actions `CI` run `26369723656` 已通过，覆盖 backend、frontend、shell scripts、agent mock、3x-ui fixture、compose config、dry-run/full compose smoke、Debian/Ubuntu/Alpine/Rocky Linux/Oracle Linux install matrix；`Docker Images` run `26369723666` 已通过。`Release` workflow 已加入仓库，但只在 `v*` tag 或手动触发时运行，本轮未擅自创建 tag/release。
+
+## 2026-05-24 节点表单与状态体验打磨计划
+
+### 本轮计划（创建于: 2026-05-24 11:55:15）
+
+1. 协议节点表单产品化：在新增/编辑协议节点弹窗中加入协议摘要、配置完整度、端口/凭据/Reality/Snell 检查提示，降低用户填错概率。
+2. 减少 JSON 压迫感：把协议节点 payload 从默认大段 JSON 预览改成可按需展开的高级预览，结构化表单作为默认主路径。
+3. 状态与空态统一：补齐协议节点列表空状态和表单内状态 chip，让用户知道下一步该做什么。
+4. 文档同步：README / 中文 README / Release Notes 说明本轮 UI 表单打磨范围。
+5. 验证与推送：运行前端构建、`git diff --check`，提交推送 `origin/future` 并观察 GitHub Actions。
+
+- [x] ~~**目标:** 打磨协议节点创建表单、减少 JSON 默认暴露、补齐节点空态和文档说明后推送 `future` 分支~~ (创建于: 2026-05-24 11:55:15 | **完成于: 2026-05-24 12:11:21**)
+
+### 2026-05-24 12:11:21 进度记录
+
+- 主控 `/orchestrator` 协议节点弹窗新增配置体检摘要，覆盖目标服务器、端口复用、UUID/密码、Reality SNI/Dest/Private Key/Short ID、Snell PSK/版本和 outbound tag。
+- 协议节点默认继续走结构化表单，`Inbound Payload` JSON 改为“高级 Payload 预览”按需展开，减少普通用户直接编辑 JSON 的压力。
+- 协议节点列表补齐空状态，空列表时直接给出“新增节点”和“一键编排”入口；新增文案已接入 `zh-CN/en-US` 字典。
+- README、中文 README 和 Release Notes 已同步说明结构化节点表单、配置体检和高级 JSON 预览范围。
+- 本地验证：`vite-frontend npm run build` 通过；`git diff --check` 通过。Vite 仍保留既有 `site.ts` 动静态混合导入 chunk 提示，不影响本轮构建。

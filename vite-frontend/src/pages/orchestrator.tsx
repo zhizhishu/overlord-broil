@@ -199,6 +199,7 @@ type RuleKindFilter = "all" | "protocol" | "forward" | "xui";
 type RuleHealthFilter = "all" | "healthy" | "warning" | "error";
 type RuleHealth = Exclude<RuleHealthFilter, "all">;
 type SetupStepState = "done" | "active" | "todo" | "warning";
+type FormCheckState = "ok" | "warning" | "missing";
 type AgentMaintenanceAction =
   | "doctor"
   | "logs"
@@ -240,6 +241,12 @@ interface SetupGuideStep {
   state: SetupStepState;
   actionLabel?: string;
   onAction?: () => void;
+}
+
+interface FormCheck {
+  label: string;
+  detail: string;
+  state: FormCheckState;
 }
 
 const blankServerForm: ServerForm = {
@@ -457,6 +464,11 @@ const collectOutboundTags = (value: any): string[] => {
 const withOutboundTag = (payload: any, outboundTag: string) => {
   const tag = outboundTag.trim();
   return tag ? { ...payload, outboundTag: tag } : payload;
+};
+
+const isPlaceholderValue = (value?: string) => {
+  const normalized = (value || "").trim().toLowerCase();
+  return !normalized || normalized.includes("replace-") || normalized === "password" || normalized === "psk";
 };
 
 const protocolNodePayloadPreview = (form: ProtocolNodeForm) => JSON.stringify(
@@ -727,6 +739,7 @@ export default function OrchestratorPage() {
   const [xraySettingText, setXraySettingText] = useState("");
   const [outboundTestUrl, setOutboundTestUrl] = useState("https://www.google.com/generate_204");
   const [outboundTagHints, setOutboundTagHints] = useState<string[]>(DEFAULT_OUTBOUND_TAGS);
+  const [protocolNodePreviewOpen, setProtocolNodePreviewOpen] = useState(false);
   const [serverForm, setServerForm] = useState<ServerForm>(blankServerForm);
   const [profileForm, setProfileForm] = useState<ProfileForm>(blankProfileForm);
   const [protocolNodeForm, setProtocolNodeForm] = useState<ProtocolNodeForm>(blankProtocolNodeForm);
@@ -790,6 +803,136 @@ export default function OrchestratorPage() {
   const selectedProtocolServer = useMemo(() => {
     return servers.find(server => server.id === protocolNodeForm.serverId);
   }, [protocolNodeForm.serverId, servers]);
+
+  const protocolNodeChecks = useMemo<FormCheck[]>(() => {
+    const checks: FormCheck[] = [];
+    const add = (state: FormCheckState, label: string, detail: string) => checks.push({ state, label, detail });
+    const portInUse = protocolNodes.find(node =>
+      node.serverId === protocolNodeForm.serverId &&
+      node.port === protocolNodeForm.port &&
+      node.id !== protocolNodeForm.id
+    );
+
+    if (!protocolNodeForm.serverId) {
+      add("missing", t("目标服务器"), t("请选择一台被控服务器。"));
+    } else if (!selectedProtocolServer) {
+      add("warning", t("目标服务器"), t("服务器列表还未同步，保存前请刷新确认。"));
+    } else if (selectedProtocolServer.role === "master") {
+      add("warning", t("目标服务器"), t("目标是主控服务器，保存前请确认不会影响控制面。"));
+    } else {
+      add("ok", t("目标服务器"), t("已选择 {name}", { name: selectedProtocolServer.name }));
+    }
+
+    if (!protocolNodeForm.port || protocolNodeForm.port < 1 || protocolNodeForm.port > 65535) {
+      add("missing", t("端口"), t("端口必须在 1-65535 之间。"));
+    } else if (portInUse) {
+      add("warning", t("端口"), t("同一服务器已有节点使用该端口：{name}", { name: portInUse.name }));
+    } else {
+      add("ok", t("端口"), t("端口可用于生成节点任务。"));
+    }
+
+    if (protocolNodeForm.protocol === "snell") {
+      add(
+        isPlaceholderValue(protocolNodeForm.snellPsk) ? "warning" : "ok",
+        "Snell PSK",
+        isPlaceholderValue(protocolNodeForm.snellPsk)
+          ? t("留空会由任务生成，正式环境建议先生成并确认保存。")
+          : t("PSK 已填写。")
+      );
+      add(
+        protocolNodeForm.snellVersion.trim() ? "ok" : "missing",
+        t("Snell 版本"),
+        protocolNodeForm.snellVersion.trim() ? t("已锁定 Snell 版本。") : t("请填写 Snell 版本。")
+      );
+      return checks;
+    }
+
+    if (protocolNodeForm.protocol === "vless" || protocolNodeForm.protocol === "vmess") {
+      add(
+        isPlaceholderValue(protocolNodeForm.clientId) ? "missing" : "ok",
+        t("客户端 UUID"),
+        isPlaceholderValue(protocolNodeForm.clientId) ? t("请生成或填写真实 UUID。") : t("UUID 已就绪。")
+      );
+    }
+
+    if (protocolNodeForm.protocol === "trojan" || protocolNodeForm.protocol === "shadowsocks") {
+      add(
+        isPlaceholderValue(protocolNodeForm.clientPassword) ? "missing" : "ok",
+        t("客户端密码 / PSK"),
+        isPlaceholderValue(protocolNodeForm.clientPassword) ? t("请生成或填写真实密码。") : t("凭据已就绪。")
+      );
+    }
+
+    if (protocolNodeForm.protocol === "vless" && protocolNodeForm.security === "reality") {
+      add(
+        protocolNodeForm.sni.trim() ? "ok" : "missing",
+        "Reality SNI",
+        protocolNodeForm.sni.trim() ? t("SNI 已填写。") : t("请填写 Reality SNI。")
+      );
+      add(
+        protocolNodeForm.realityDest.trim()
+          ? (protocolNodeForm.realityDest.includes(":") ? "ok" : "warning")
+          : "missing",
+        "Reality Dest",
+        protocolNodeForm.realityDest.trim()
+          ? (protocolNodeForm.realityDest.includes(":") ? t("目标地址包含端口。") : t("建议使用 host:port，例如 www.cloudflare.com:443。"))
+          : t("请填写 Reality 目标地址。")
+      );
+      add(
+        isPlaceholderValue(protocolNodeForm.realityPrivateKey) ? "missing" : "ok",
+        "Reality Private Key",
+        isPlaceholderValue(protocolNodeForm.realityPrivateKey) ? t("请生成 Reality 私钥。") : t("Reality 私钥已就绪。")
+      );
+      add(
+        protocolNodeForm.realityShortId.trim() ? "ok" : "warning",
+        "Reality Short ID",
+        protocolNodeForm.realityShortId.trim() ? t("Short ID 已填写。") : t("可以留空，但生产环境建议生成。")
+      );
+    } else if (protocolNodeForm.security === "tls") {
+      add(
+        protocolNodeForm.sni.trim() ? "ok" : "warning",
+        "TLS SNI",
+        protocolNodeForm.sni.trim() ? t("SNI 已填写。") : t("TLS 节点建议填写域名。")
+      );
+    }
+
+    if (protocolNodeForm.protocol === "vmess") {
+      add(
+        protocolNodeForm.wsPath.trim()
+          ? (protocolNodeForm.wsPath.trim().startsWith("/") ? "ok" : "warning")
+          : "missing",
+        "WebSocket Path",
+        protocolNodeForm.wsPath.trim()
+          ? (protocolNodeForm.wsPath.trim().startsWith("/") ? t("路径格式正确。") : t("路径建议以 / 开头。"))
+          : t("请填写 WebSocket 路径。")
+      );
+    }
+
+    const outboundTag = protocolNodeForm.outboundTag.trim();
+    add(
+      !outboundTag || outboundTagOptions.includes(outboundTag) ? "ok" : "warning",
+      "Outbound Tag",
+      !outboundTag
+        ? t("留空时使用 3x-ui 默认路由。")
+        : outboundTagOptions.includes(outboundTag)
+          ? t("已匹配已知出站 tag。")
+          : t("未在已知出站 tag 中，保存前请确认远端配置存在。")
+    );
+
+    return checks;
+  }, [outboundTagOptions, protocolNodeForm, protocolNodes, selectedProtocolServer, t]);
+
+  const protocolNodeCheckSummary = useMemo(() => {
+    const missing = protocolNodeChecks.filter(check => check.state === "missing").length;
+    const warnings = protocolNodeChecks.filter(check => check.state === "warning").length;
+    return {
+      ok: protocolNodeChecks.length - missing - warnings,
+      missing,
+      warnings,
+      total: protocolNodeChecks.length,
+      color: missing > 0 ? "danger" : warnings > 0 ? "warning" : "success"
+    };
+  }, [protocolNodeChecks]);
 
   const selectedOrchestrationServers = useMemo(() => {
     return servers.filter(server => orchestrationForm.serverIds.includes(server.id));
@@ -1001,6 +1144,7 @@ export default function OrchestratorPage() {
       security: (node?.security as ProtocolNodeForm["security"]) || (protocol === "snell" ? "psk" : protocol === "vless" ? "reality" : protocol === "trojan" ? "tls" : "none"),
       outboundTag: typeof savedConfig?.outboundTag === "string" ? savedConfig.outboundTag : ""
     });
+    setProtocolNodePreviewOpen(false);
     setProtocolNodeModalOpen(true);
   };
 
@@ -1736,6 +1880,12 @@ export default function OrchestratorPage() {
     return "danger";
   };
 
+  const formCheckColor = (state: FormCheckState) => {
+    if (state === "ok") return "success";
+    if (state === "warning") return "warning";
+    return "danger";
+  };
+
   const alertSeverityColor = (severity?: string) => {
     if (severity === "critical") return "danger";
     if (severity === "warning") return "warning";
@@ -2144,47 +2294,62 @@ export default function OrchestratorPage() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("协议节点")}</h2>
             <Button size="sm" variant="light" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {protocolNodes.map(node => (
-              <Card key={node.id} radius="sm">
-                <CardBody className="space-y-3">
-                  <div className="flex justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-gray-900 dark:text-white">{node.name}</p>
-                      <p className="text-xs text-gray-500">{node.serverName || node.serverId} / {node.direction || "inbound"}</p>
+          {protocolNodes.length === 0 ? (
+            <div className="rounded-small border border-dashed border-default-300 bg-white/60 px-4 py-6 dark:bg-default-50/5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{t("还没有协议节点")}</p>
+                  <p className="mt-1 max-w-2xl text-sm text-gray-500">{t("先新增一个结构化节点，或用一键编排批量创建 3x-ui/Xray/Snell 节点。")}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
+                  <Button size="sm" variant="flat" onPress={() => openOrchestrationModal()}>{t("一键编排")}</Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {protocolNodes.map(node => (
+                <Card key={node.id} radius="sm">
+                  <CardBody className="space-y-3">
+                    <div className="flex justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-white">{node.name}</p>
+                        <p className="text-xs text-gray-500">{node.serverName || node.serverId} / {node.direction || "inbound"}</p>
+                      </div>
+                      <Chip size="sm" variant="flat" color={serviceColor(node.state) as any}>{node.state || "-"}</Chip>
                     </div>
-                    <Chip size="sm" variant="flat" color={serviceColor(node.state) as any}>{node.state || "-"}</Chip>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <p className="text-gray-500">{t("引擎")}</p>
-                      <p>{node.engine}</p>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-gray-500">{t("引擎")}</p>
+                        <p>{node.engine}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">{t("协议")}</p>
+                        <p>{node.protocol}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">{t("端口")}</p>
+                        <p>{node.listen || "*"}:{node.port || "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">{t("流量")}</p>
+                        <p>{formatBytes(node.total || ((node.up || 0) + (node.down || 0)))}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-gray-500">{t("协议")}</p>
-                      <p>{node.protocol}</p>
+                    <p className="text-xs text-gray-500">{t("远端：{value}", { value: node.remoteId || node.serviceName || "-" })}</p>
+                    <p className="text-xs text-gray-500">{t("同步：{time}", { time: formatTime(node.lastSync) })}</p>
+                    {node.lastError && <p className="text-xs text-danger">{t("错误：{error}", { error: node.lastError })}</p>}
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(undefined, node)}>{t("编辑")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => restartNode(node)}>{t("重启")}</Button>
+                      <Button size="sm" variant="light" color="danger" onPress={() => removeProtocolNode(node)}>{t("删除")}</Button>
                     </div>
-                    <div>
-                      <p className="text-gray-500">{t("端口")}</p>
-                      <p>{node.listen || "*"}:{node.port || "-"}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">{t("流量")}</p>
-                      <p>{formatBytes(node.total || ((node.up || 0) + (node.down || 0)))}</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500">{t("远端：{value}", { value: node.remoteId || node.serviceName || "-" })}</p>
-                  <p className="text-xs text-gray-500">{t("同步：{time}", { time: formatTime(node.lastSync) })}</p>
-                  {node.lastError && <p className="text-xs text-danger">{t("错误：{error}", { error: node.lastError })}</p>}
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(undefined, node)}>{t("编辑")}</Button>
-                    <Button size="sm" variant="flat" onPress={() => restartNode(node)}>{t("重启")}</Button>
-                    <Button size="sm" variant="light" color="danger" onPress={() => removeProtocolNode(node)}>{t("删除")}</Button>
-                  </div>
-                </CardBody>
-              </Card>
-            ))}
-          </div>
+                  </CardBody>
+                </Card>
+              ))}
+            </div>
+          )}
         </section>
 
         <section>
@@ -2358,6 +2523,37 @@ export default function OrchestratorPage() {
           <ModalHeader>{protocolNodeForm.id ? t("编辑协议节点") : t("新增协议节点")}</ModalHeader>
           <ModalBody>
             <div className="space-y-4">
+              <div className="rounded-small border border-default-200 bg-default-50/60 p-3 dark:bg-default-50/5">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{t("配置体检")}</p>
+                    <p className="mt-1 text-xs text-gray-500">{t("保存前检查目标服务器、端口、凭据和协议关键参数。")}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Chip size="sm" variant="flat" color="primary">{protocolNodeForm.protocol.toUpperCase()}</Chip>
+                    <Chip size="sm" variant="flat">{protocolNodeForm.engine}</Chip>
+                    <Chip size="sm" variant="flat">{protocolNodeForm.security}</Chip>
+                    <Chip size="sm" variant="flat">{selectedProtocolServer?.name || t("未选择服务器")}</Chip>
+                    <Chip size="sm" variant="flat" color={protocolNodeCheckSummary.color as any}>
+                      {t("{ok}/{total} 通过", { ok: protocolNodeCheckSummary.ok, total: protocolNodeCheckSummary.total })}
+                    </Chip>
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                  {protocolNodeChecks.map((check, index) => (
+                    <div key={`${check.label}-${index}`} className="rounded-small border border-default-200 bg-white/70 px-3 py-2 dark:bg-default-50/5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">{check.label}</span>
+                        <Chip size="sm" variant="flat" color={formCheckColor(check.state) as any}>
+                          {check.state === "ok" ? t("通过") : check.state === "warning" ? t("需确认") : t("缺失")}
+                        </Chip>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">{check.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Select label={t("目标服务器")} selectedKeys={protocolNodeForm.serverId ? [protocolNodeForm.serverId.toString()] : []} onSelectionChange={keys => patchProtocolNodeForm({ serverId: Number(Array.from(keys)[0]) })} variant="bordered">
                   {renderServerOptions()}
@@ -2440,14 +2636,28 @@ export default function OrchestratorPage() {
                     <Input label="Outbound Tag" value={protocolNodeForm.outboundTag} onChange={e => patchProtocolNodeForm({ outboundTag: e.target.value })} variant="bordered" placeholder={t("留空使用默认路由")} />
                     {renderOutboundTagButtons(tag => patchProtocolNodeForm({ outboundTag: tag }))}
                   </div>
-                  <Textarea
-                    label={t("Inbound Payload 预览")}
-                    minRows={10}
-                    value={protocolNodePayloadPreview(protocolNodeForm)}
-                    readOnly
-                    variant="bordered"
-                    classNames={{ input: "font-mono text-xs" }}
-                  />
+                  <div className="rounded-small border border-default-200 bg-default-50/50 p-3 dark:bg-default-50/5">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{t("高级 Payload 预览")}</p>
+                        <p className="text-xs text-gray-500">{t("默认使用结构化表单；排查 3x-ui 入站字段时再展开 JSON。")}</p>
+                      </div>
+                      <Button size="sm" variant="flat" onPress={() => setProtocolNodePreviewOpen(open => !open)}>
+                        {protocolNodePreviewOpen ? t("收起") : t("展开")}
+                      </Button>
+                    </div>
+                    {protocolNodePreviewOpen && (
+                      <Textarea
+                        className="mt-3"
+                        label={t("Inbound Payload 预览")}
+                        minRows={10}
+                        value={protocolNodePayloadPreview(protocolNodeForm)}
+                        readOnly
+                        variant="bordered"
+                        classNames={{ input: "font-mono text-xs" }}
+                      />
+                    )}
+                  </div>
                 </div>
               )}
             </div>

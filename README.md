@@ -30,6 +30,8 @@ The current product UI is Chinese-first by default and now includes a `zh-CN` / 
 
 The master control center now includes a first-run setup guide. It walks a new operator through registering servers, installing the controlled agent, orchestrating 3x-ui/Snell, syncing rules and traffic, then running release and firewall checks before exposing the deployment.
 
+Protocol node creation now defaults to a structured form instead of a large JSON block. The modal shows a compact configuration check for target server, port reuse, credentials, Reality fields, Snell PSK/version and outbound tags; the generated inbound payload remains available as an advanced preview when troubleshooting 3x-ui fields.
+
 ## Production Release Gate
 
 Before publishing a release tag or installing on a live host, run:
@@ -104,7 +106,7 @@ The main gaps before a formal `1.0` are:
 3. Snell boundary clarity: Snell is unified in the product layer and deployed by the Flux agent as a managed runtime service. It is not a native Xray/3x-ui core protocol, so docs and UI must keep that distinction explicit.
 4. Certificate and firewall diagnostics: ACME HTTP mode depends on DNS, port `80`, local firewall and cloud security groups. Failure messages should be more specific before broad production use.
 5. Security governance: add RBAC, visible audit logs, agent token expiry/revocation, planned encryption-key rotation and second confirmation for destructive operations.
-6. UI finish: continue polishing the Flux-style operations console, especially mobile layout, empty/loading/error states, modal validation and human-readable task failures.
+6. UI finish: continue polishing the Flux-style operations console. The first-run guide and protocol-node form checks are in place; mobile layout, legacy forwarding-page i18n, loading/error states and human-readable task failures still need more passes.
 7. Operations loop: add agent self-upgrade verification, one-click health repair, remote log pull retention, configurable retry policy and stronger service recovery checks.
 
 Planned `future` branch direction:

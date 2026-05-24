@@ -18,6 +18,7 @@ This release moves the project from the first public production milestone into a
 - Future branch update: added `scripts/build-release-bundle.sh` and a `Release` workflow that validates `VERSION`, runs `scripts/release-check.sh --full`, builds a tarball plus sha256 checksum and uploads both to GitHub Releases for `v*` tags or manual runs.
 - Future branch update: added a first-run setup guide to the master control center, covering server registration, controlled-agent install, 3x-ui/Snell orchestration, rule/traffic sync and pre-release firewall checks.
 - Future branch update: documented the recommended public firewall baseline: `5166/tcp` for the frontend panel, `6365/tcp` for backend/agent callback, ACME `80/tcp` only when selected, and controlled-node protocol ports only when intentionally deployed.
+- Future branch update: refined protocol-node creation with structured form checks for target server, port reuse, credentials, Reality fields, Snell PSK/version and outbound tags; the generated inbound JSON is now an advanced preview instead of the default editing surface.
 
 ### 0.6.0 Capability Matrix
 
@@ -28,6 +29,7 @@ This release moves the project from the first public production milestone into a
 | Agent maintenance | Remote diagnostics, log collection, restart and upgrade tasks generated from the master panel. |
 | Release packaging | Future branch includes a clean-tree release bundle builder and GitHub Release workflow; release assets include the tarball and `.sha256`. |
 | First-run UI | Future branch includes a Flux-style setup guide in the master control center for the first operational path. |
+| Protocol-node UI | Future branch defaults to structured node forms with configuration checks and a collapsible advanced payload preview. |
 | Linux coverage | Docker/CI diagnostics cover Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux userspaces. |
 | 3x-ui | API fixture remains API-level; full 3x-ui install/configure still targets systemd hosts. |
 | Snell | Product-level protocol node with separate systemd/OpenRC runtime, not a native Xray/3x-ui core protocol. |
