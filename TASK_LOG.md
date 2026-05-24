@@ -370,3 +370,4 @@
 - 协议节点列表补齐空状态，空列表时直接给出“新增节点”和“一键编排”入口；新增文案已接入 `zh-CN/en-US` 字典。
 - README、中文 README 和 Release Notes 已同步说明结构化节点表单、配置体检和高级 JSON 预览范围。
 - 本地验证：`vite-frontend npm run build` 通过；`git diff --check` 通过。Vite 仍保留既有 `site.ts` 动静态混合导入 chunk 提示，不影响本轮构建。
+- 2026-05-24 12:16:30 追加：已推送 `origin/future` 提交 `554dc29`；GitHub Actions `CI` run `26370288360` 已通过，`Docker Images` run `26370288342` 已通过。
