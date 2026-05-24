@@ -182,6 +182,17 @@ Remote maintenance from the master panel:
 
 Failed or timed-out deployment tasks should be retried from the task card rather than edited in place. The retry endpoint creates a new `generated` task with the same script and stores `retryFromTaskId` in `request_json`, so the original stdout/stderr remains auditable.
 
+## First-Run Operator Path
+
+The master control center includes a first-run setup guide for new operators. Treat it as the shortest safe path from an empty panel to a usable multi-server control plane:
+
+1. Register the master and controlled servers in the asset list.
+2. Copy each server token and install the controlled agent.
+3. Wait for agent heartbeat before sending orchestration tasks.
+4. Run one-click orchestration for 3x-ui, Xray starter nodes, Snell and certificates.
+5. Sync 3x-ui inbounds/outbounds, Snell nodes, remote forwards and traffic snapshots into the unified rule center.
+6. Review critical alerts, run certificate/firewall diagnostics, back up `.env`, then expose only the intended public ports.
+
 ## Operational Checklist
 
 - Confirm `.env` has non-default `DB_PASSWORD`, `JWT_SECRET` and `SECRET_ENCRYPTION_KEY`.
@@ -208,6 +219,16 @@ Run the full release gate before publishing a Git tag, GitHub Release or live-ho
 ```bash
 bash scripts/release-check.sh --full
 ```
+
+Build a release bundle from the current commit:
+
+```bash
+bash scripts/build-release-bundle.sh --version "$(cat VERSION)"
+```
+
+The bundle lands in `dist/release/flux-3xui-orchestrator-<version>.tar.gz` with a `.sha256` checksum. It contains tracked installers, compose files, SQL, docs, workflows and `RELEASE_MANIFEST.txt`; it intentionally excludes `.git`, local build output, `node_modules`, backend `target` directories and `_references`.
+
+Publishing a `v*` tag or manually running the `Release` workflow validates `VERSION`, runs `scripts/release-check.sh --full`, builds the bundle with a clean-tree requirement and uploads the archive plus checksum to GitHub Releases. Versions below `1.x` are prereleases.
 
 Release readiness means:
 

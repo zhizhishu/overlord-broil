@@ -328,3 +328,24 @@
 - 本地验证通过：Docker Maven `mvn -B -DskipTests package` 成功生成后端 jar；`vite-frontend npm run build` 通过；`git diff --check` 通过。
 - 本轮环境限制：Windows Git Bash 当前无法创建 signal pipe / CreateFileMapping，WSL 返回 `E_ACCESSDENIED`，Docker API 后续检查返回 pipe permission denied；因此本轮收尾时无法重新跑 bash 脚本语法、agent mock 和 3x-ui fixture。该三项在本批改动过程中已跑通过一次，最终仍需推送后由 GitHub Actions 再确认。
 - 2026-05-24 10:22:12 追加：已推送 `origin/future` 提交 `c89fe3c`；GitHub Actions `CI` run `26367725355` 已通过，覆盖 frontend、backend、shell scripts、agent mock、3x-ui fixture、compose config、dry-run/full compose smoke、Debian/Ubuntu/Alpine/Rocky Linux/Oracle Linux install matrix；`Docker Images` run `26367725330` 也已通过。
+
+## 2026-05-24 Release 包与首次配置向导计划
+
+### 本轮计划（创建于: 2026-05-24 10:37:26）
+
+1. 发布包能力：新增 release bundle 脚本，打包安装脚本、compose、SQL、文档、版本信息和校验文件，供 GitHub Release 下载与离线审计。
+2. GitHub Release 自动生成：新增 `v*` tag / 手动触发 workflow，先跑 release gate，再上传 bundle 并生成 release notes。
+3. 主控 UI 首次配置向导：在 `/orchestrator` 增加 Flux 风格的上手路径，把主控端口、被控 agent、3x-ui、Snell、证书/防火墙和发布验证串起来。
+4. 文档同步：README、中文 README、Operations、Release Notes 写清 release 包、tag 发布、一键升级/回滚与推荐防火墙规则。
+5. 验证与推送：运行本地可用构建/脚本检查，推送 `origin/future` 并观察 GitHub Actions。
+
+- [x] ~~**目标:** 完成 Release 包/自动发布第一批和主控首次配置向导，补齐文档后推送 `future` 分支~~ (创建于: 2026-05-24 10:37:26 | **完成于: 2026-05-24 11:40:20**)
+
+### 2026-05-24 11:40:20 进度记录
+
+- 新增 `scripts/build-release-bundle.sh`，可从当前 Git commit 生成 `dist/release/flux-3xui-orchestrator-<version>.tar.gz` 和 `.sha256`，包内包含 `RELEASE_MANIFEST.txt`、安装脚本、compose、SQL、README、中文 README、Operations 和 Release Notes；`.git`、`node_modules`、`target`、`dist`、`_references` 等本地/构建产物不进入发布包。
+- 新增 `.github/workflows/release.yml`，支持 `v*` tag 和手动触发；workflow 会校验 `VERSION`，运行 `scripts/release-check.sh --full`，再用 clean-tree 要求构建 bundle 并上传到 GitHub Releases，`1.x` 之前自动标记 prerelease。
+- 主控 `/orchestrator` 新增 Flux 风格首次配置向导，覆盖登记服务器、安装被控 agent、编排 3x-ui/Snell、同步规则与流量、发布前检查；对应文案已接入 `zh-CN/en-US` i18n。
+- README、中文 README、Operations、Release Notes 和项目 docs 首页已同步 release 包、GitHub Release、首次向导和公网防火墙基线：主控前端 `5166/tcp`、后端/agent 回调 `6365/tcp`、ACME HTTP 仅按需开放 `80/tcp`，被控节点只开放实际编排端口。
+- 本地验证：`vite-frontend npm run build` 通过；`git diff --check` 通过；Git Bash 显式路径下 `bash -n scripts/*.sh` 通过；release bundle 实际生成 tar.gz 和 sha256，抽查包内有 `RELEASE_MANIFEST.txt`、`README.zh-CN.md`、`docs/OPERATIONS.md`、`scripts/install-master.sh`，`sha256sum -c` 返回 OK。
+- 环境限制：本机默认 `bash` 仍可能走 WSL 并返回 `E_ACCESSDENIED`，Git Bash 偶发 `couldn't create signal pipe, Win32 error 5`；本轮用提权 Git Bash 完成 release bundle 主路径验证，最终 Linux 侧仍以推送后的 GitHub Actions 为准。

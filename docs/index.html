@@ -44,7 +44,7 @@
       <section id="install" class="section">
         <div class="section-header">
           <h2>0.6.0 reliability gate，公开试用前先预检</h2>
-          <p>主控优先拉取 GitHub Actions 发布到 GHCR 的镜像；如果 GHCR 暂未公开，安装脚本会回退到下载公开源码并本地构建镜像。默认端口是前端 5166、后端/agent 回调 6365；phpMyAdmin 默认不暴露，只有显式设置端口时才发布。0.6.0 新增主控/被控 doctor 和 Docker/CI 多发行版安装矩阵。</p>
+          <p>主控优先拉取 GitHub Actions 发布到 GHCR 的镜像；如果 GHCR 暂未公开，安装脚本会回退到下载公开源码并本地构建镜像。默认端口是前端 5166、后端/agent 回调 6365；phpMyAdmin 默认不暴露，只有显式设置端口时才发布。0.6.0 新增主控/被控 doctor、Docker/CI 多发行版安装矩阵、Release 发布包和主控首次配置向导。</p>
         </div>
         <div class="grid two">
           <article class="card">
@@ -88,13 +88,17 @@ sudo -E /usr/local/bin/flux-agent.sh --doctor</code></pre>
             <span>发布门禁</span>
             <span class="tag green">release-check + install matrix</span>
           </div>
+          <div class="status-item">
+            <span>GitHub Release</span>
+            <span class="tag green">bundle + sha256</span>
+          </div>
         </div>
       </section>
 
       <section id="workspace" class="section">
         <div class="section-header">
           <h2>主控一键编排闭环已经打通</h2>
-          <p>当前版本能多选服务器生成编排任务，由副控 agent 自动领取执行；完成后把 3x-ui 连接信息、Xray inbound/outbound、Snell 节点、远端端口转发、证书、服务状态和流量快照回写到主控。服务器卡片现在也能生成 Agent 诊断、日志、重启和升级任务。完整 3x-ui 安装编排要求 systemd 主机；Alpine/OpenRC 用于 agent、Snell 和转发任务。</p>
+          <p>当前版本能多选服务器生成编排任务，由副控 agent 自动领取执行；完成后把 3x-ui 连接信息、Xray inbound/outbound、Snell 节点、远端端口转发、证书、服务状态和流量快照回写到主控。主控中心新增首次配置向导，把登记服务器、安装 agent、编排 3x-ui/Snell、同步规则和发布前防火墙检查串成一条路径。完整 3x-ui 安装编排要求 systemd 主机；Alpine/OpenRC 用于 agent、Snell 和转发任务。</p>
         </div>
         <div class="metric-row" aria-label="Current release metrics">
           <div class="metric">

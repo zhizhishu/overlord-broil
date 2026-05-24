@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without leading v. Defaults to VERSION file."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  packages: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.version || '' }}" ]; then
+            version="${{ inputs.version }}"
+          elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$(tr -d '[:space:]' < VERSION)"
+          fi
+          if [ -z "$version" ]; then
+            echo "version is empty" >&2
+            exit 2
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Validate release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          file_version="$(tr -d '[:space:]' < VERSION)"
+          if [ "$file_version" != "${{ steps.version.outputs.version }}" ]; then
+            echo "VERSION file ($file_version) does not match release version (${{ steps.version.outputs.version }})." >&2
+            exit 1
+          fi
+
+      - name: Run release gate
+        shell: bash
+        run: bash scripts/release-check.sh --full
+
+      - name: Build release bundle
+        shell: bash
+        run: bash scripts/build-release-bundle.sh --version "${{ steps.version.outputs.version }}" --require-clean
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Flux 3x-ui Orchestrator ${{ steps.version.outputs.version }}
+          body_path: docs/RELEASE_NOTES.md
+          prerelease: ${{ !startsWith(steps.version.outputs.version, '1.') }}
+          files: |
+            dist/release/flux-3xui-orchestrator-${{ steps.version.outputs.version }}.tar.gz
+            dist/release/flux-3xui-orchestrator-${{ steps.version.outputs.version }}.tar.gz.sha256

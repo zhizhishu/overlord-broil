@@ -15,6 +15,9 @@ This release moves the project from the first public production milestone into a
 - Added a server-card `Agent` action group in the orchestrator UI for diagnostics, logs, restart and upgrade.
 - Strengthened agent diagnostics so Python is treated as a blocking runtime dependency instead of a soft warning.
 - Future branch update: agent maintenance now also covers delayed uninstall, install diagnostics, ACME/certificate diagnostics, firewall diagnostics, one-click 3x-ui/Xray/Snell repair and failed-task retry from the task card.
+- Future branch update: added `scripts/build-release-bundle.sh` and a `Release` workflow that validates `VERSION`, runs `scripts/release-check.sh --full`, builds a tarball plus sha256 checksum and uploads both to GitHub Releases for `v*` tags or manual runs.
+- Future branch update: added a first-run setup guide to the master control center, covering server registration, controlled-agent install, 3x-ui/Snell orchestration, rule/traffic sync and pre-release firewall checks.
+- Future branch update: documented the recommended public firewall baseline: `5166/tcp` for the frontend panel, `6365/tcp` for backend/agent callback, ACME `80/tcp` only when selected, and controlled-node protocol ports only when intentionally deployed.
 
 ### 0.6.0 Capability Matrix
 
@@ -23,6 +26,8 @@ This release moves the project from the first public production milestone into a
 | Master install | Same one-command installer as 0.5.0, now with a pre-install doctor for ports, Docker/Compose and `.env` checks. |
 | Agent install | systemd/OpenRC installer plus preflight doctor and local runtime doctor. |
 | Agent maintenance | Remote diagnostics, log collection, restart and upgrade tasks generated from the master panel. |
+| Release packaging | Future branch includes a clean-tree release bundle builder and GitHub Release workflow; release assets include the tarball and `.sha256`. |
+| First-run UI | Future branch includes a Flux-style setup guide in the master control center for the first operational path. |
 | Linux coverage | Docker/CI diagnostics cover Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux userspaces. |
 | 3x-ui | API fixture remains API-level; full 3x-ui install/configure still targets systemd hosts. |
 | Snell | Product-level protocol node with separate systemd/OpenRC runtime, not a native Xray/3x-ui core protocol. |

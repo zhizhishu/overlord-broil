@@ -28,6 +28,8 @@ The master panel keeps the Flux Panel direction: dense server cards, grouped ope
 
 The current product UI is Chinese-first by default and now includes a `zh-CN` / `en-US` language switch in the main layouts. The switch persists in local storage, updates the document language, and currently covers the master control center, server cards, orchestration modal, 3x-ui operations, Snell nodes, remote forwarding rules, agent maintenance actions and the main navigation. Older Flux forwarding pages can continue to be translated in batches on top of the same dictionary.
 
+The master control center now includes a first-run setup guide. It walks a new operator through registering servers, installing the controlled agent, orchestrating 3x-ui/Snell, syncing rules and traffic, then running release and firewall checks before exposing the deployment.
+
 ## Production Release Gate
 
 Before publishing a release tag or installing on a live host, run:
@@ -37,6 +39,18 @@ bash scripts/release-check.sh --full
 ```
 
 The release gate validates shell scripts, agent task execution, tokenized 3x-ui fixture routes, compose v4/v6 config, frontend production build, Docker Maven backend build, multi-distribution installer diagnostics, a disposable compose smoke stack and `git diff --check`.
+
+To build a downloadable release bundle from the current Git commit:
+
+```bash
+bash scripts/build-release-bundle.sh --version "$(cat VERSION)"
+```
+
+The bundle is written to `dist/release/flux-3xui-orchestrator-<version>.tar.gz` with a `.sha256` checksum and a `RELEASE_MANIFEST.txt` inside the archive. It contains the tracked installers, compose files, SQL seed, docs and workflow definitions; local build outputs, `.git`, `node_modules`, backend `target` directories and `_references` are excluded.
+
+Publishing a `v*` tag runs the `Release` workflow. The workflow validates `VERSION`, runs `scripts/release-check.sh --full`, builds the release bundle and uploads the archive plus checksum to GitHub Releases. Versions below `1.x` are marked as prereleases.
+
+Manual `Release` workflow runs use the same path: pass a version that matches `VERSION`, keep the checkout clean, and download the generated archive plus checksum from the GitHub Release assets.
 
 Formal runtime assumptions for this release:
 
@@ -58,6 +72,16 @@ Default master ports:
 | `3306` | MySQL | Container-internal only; not published to the host. |
 
 Controlled-server ports are created by your orchestration choices: default 3x-ui panel port `5168`, Xray inbound ports, Snell listen ports, remote-forward listen ports and ACME HTTP `80` when that certificate mode is used.
+
+Recommended public firewall baseline:
+
+| Scope | Ports |
+| --- | --- |
+| Master panel users | `5166/tcp` |
+| Agents calling back to backend | `6365/tcp` |
+| ACME HTTP validation | `80/tcp` only on hosts/domains using `acme-http` |
+| Controlled nodes | Open only the selected 3x-ui panel, Xray inbound, Snell and remote-forward ports |
+| Internal only | MySQL `3306`, phpMyAdmin unless temporarily exposed |
 
 Linux support matrix:
 

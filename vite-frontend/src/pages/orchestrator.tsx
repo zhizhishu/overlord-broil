@@ -198,6 +198,7 @@ interface ServerForwardRuleForm {
 type RuleKindFilter = "all" | "protocol" | "forward" | "xui";
 type RuleHealthFilter = "all" | "healthy" | "warning" | "error";
 type RuleHealth = Exclude<RuleHealthFilter, "all">;
+type SetupStepState = "done" | "active" | "todo" | "warning";
 type AgentMaintenanceAction =
   | "doctor"
   | "logs"
@@ -231,6 +232,14 @@ interface UnifiedRuleRow {
   node?: ProtocolNode;
   rule?: ServerForwardRule;
   snapshot?: ThreeXuiTrafficSnapshot;
+}
+
+interface SetupGuideStep {
+  title: string;
+  detail: string;
+  state: SetupStepState;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 const blankServerForm: ServerForm = {
@@ -476,6 +485,64 @@ const ServerActionGroup = ({ title, children }: { title: string; children: React
         {children}
       </div>
     </div>
+  );
+};
+
+const SetupGuide = ({ steps }: { steps: SetupGuideStep[] }) => {
+  const { t } = useLanguage();
+  const completed = steps.filter(step => step.state === "done").length;
+  const current = steps.find(step => step.state === "active" || step.state === "warning") || steps.find(step => step.state === "todo");
+  const colorOf = (state: SetupStepState) => {
+    if (state === "done") return "success";
+    if (state === "warning") return "warning";
+    if (state === "active") return "primary";
+    return "default";
+  };
+  const labelOf = (state: SetupStepState) => {
+    if (state === "done") return t("已完成");
+    if (state === "warning") return t("需处理");
+    if (state === "active") return t("当前步骤");
+    return t("待开始");
+  };
+
+  return (
+    <Card radius="sm" className="border border-default-200 bg-white dark:bg-default-50/5">
+      <CardHeader className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("首次配置向导")}</h2>
+            <Chip size="sm" variant="flat" color={completed >= steps.length - 1 ? "success" : "primary"}>
+              {t("{done}/{total} 已就绪", { done: completed, total: steps.length })}
+            </Chip>
+          </div>
+          <p className="mt-1 text-xs text-gray-500">
+            {current ? t("下一步：{step}", { step: t(current.title) }) : t("主控已经具备基础运维闭环，发布前继续跑 release gate。")}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {current?.onAction && current.actionLabel && (
+            <Button size="sm" color="primary" onPress={current.onAction}>{t(current.actionLabel)}</Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardBody>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {steps.map((step, index) => (
+            <div key={step.title} className="rounded-small border border-default-200 bg-default-50/60 p-3 dark:bg-default-100/5">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold text-gray-500">{String(index + 1).padStart(2, "0")}</span>
+                <Chip size="sm" variant="flat" color={colorOf(step.state) as any}>{labelOf(step.state)}</Chip>
+              </div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">{t(step.title)}</p>
+              <p className="mt-1 min-h-10 text-xs leading-5 text-gray-500">{t(step.detail)}</p>
+              {step.onAction && step.actionLabel && (
+                <Button size="sm" variant="light" className="mt-2 px-0" onPress={step.onAction}>{t(step.actionLabel)}</Button>
+              )}
+            </div>
+          ))}
+        </div>
+      </CardBody>
+    </Card>
   );
 };
 
@@ -1681,6 +1748,62 @@ export default function OrchestratorPage() {
     return `${server.certificateStatus}${domain}`;
   };
 
+  const setupGuideSteps = useMemo<SetupGuideStep[]>(() => {
+    const hasServers = servers.length > 0;
+    const firstServer = servers[0];
+    const hasOnlineAgent = onlineServers > 0;
+    const hasXui = servers.some(server => Boolean(server.xuiEndpoint || server.xuiServiceStatus || server.xrayServiceStatus));
+    const hasRules = unifiedRuleRows.length > 0;
+    const hasBlockingAlerts = criticalAlerts > 0 || failedTasks > 0;
+
+    return [
+      {
+        title: "登记服务器",
+        detail: "先把主控和被控服务器加入资产列表，后续任务才有明确目标。",
+        state: hasServers ? "done" : "active",
+        actionLabel: "添加服务器",
+        onAction: () => openServerModal()
+      },
+      {
+        title: "安装被控 agent",
+        detail: "从服务器卡片复制 Token，在被控端安装 agent，等待心跳上线。",
+        state: !hasServers ? "todo" : hasOnlineAgent ? "done" : "active",
+        actionLabel: hasServers ? "查看 Token" : "添加服务器",
+        onAction: () => {
+          if (!firstServer) {
+            openServerModal();
+            return;
+          }
+          showServerToken(firstServer);
+        }
+      },
+      {
+        title: "编排 3x-ui / Snell",
+        detail: "选择一台或多台服务器，一次生成 3x-ui、Xray 节点、Snell 和证书任务。",
+        state: hasXui ? "done" : hasOnlineAgent ? "active" : "todo",
+        actionLabel: "一键编排",
+        onAction: () => openOrchestrationModal(firstServer)
+      },
+      {
+        title: "同步规则与流量",
+        detail: "把 3x-ui 入站、Snell 节点、远端转发和流量快照纳入统一规则中心。",
+        state: hasRules ? "done" : hasXui ? "active" : "todo",
+        actionLabel: "同步流量",
+        onAction: () => {
+          const server = servers.find(item => item.xuiEndpoint || item.xuiServiceStatus) || firstServer;
+          if (server) syncXuiTraffic(server);
+        }
+      },
+      {
+        title: "发布前检查",
+        detail: "确认无严重告警，运行 release gate，备份 .env，并只开放 5166/6365 与业务端口。",
+        state: hasBlockingAlerts ? "warning" : hasRules ? "done" : "todo",
+        actionLabel: hasBlockingAlerts ? "查看告警" : "刷新",
+        onAction: loadData
+      }
+    ];
+  }, [criticalAlerts, failedTasks, onlineServers, servers, unifiedRuleRows.length]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -1705,6 +1828,8 @@ export default function OrchestratorPage() {
             <Button variant="flat" onPress={() => openProfileModal()}>{t("添加模板")}</Button>
           </div>
         </div>
+
+        <SetupGuide steps={setupGuideSteps} />
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card radius="sm">

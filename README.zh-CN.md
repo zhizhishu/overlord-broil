@@ -27,6 +27,8 @@ https://zhizhishu.github.io/
 
 UI 方向继续贴近 Flux Panel：信息密度高、服务器卡片清晰、操作分组明确、状态 chip 紧凑、规则视图统一。它不是落地页，而是运维控制台：选择一台或多台服务器，然后生成 agent 任务、管理 3x-ui 出入站、部署 Snell、同步流量、查看证书和服务状态。
 
+主控中心已经加入首次配置向导，会按 `登记服务器 -> 安装被控 agent -> 编排 3x-ui / Snell -> 同步规则与流量 -> 发布前检查` 串起首次上手流程。向导按钮会直接打开添加服务器、查看 Token、一键编排、同步流量和刷新告警等操作。
+
 ## 已覆盖能力
 
 - 主控面板：
@@ -92,6 +94,16 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
 
 被控服务器还会根据你的编排选择产生额外端口：3x-ui 面板默认 `5168`、Xray 入站端口、Snell 监听端口、远端转发监听端口，以及 ACME HTTP 模式需要的 `80` 端口。
 
+推荐公网防火墙基线：
+
+| 范围 | 推荐放行 |
+| --- | --- |
+| 主控面板用户访问 | `5166/tcp` |
+| 被控 agent 回调主控后端 | `6365/tcp` |
+| ACME HTTP 验证 | 仅使用 `acme-http` 的域名/主机放行 `80/tcp` |
+| 被控节点业务端口 | 只放行你实际选择的 3x-ui 面板、Xray 入站、Snell、远端转发端口 |
+| 内部服务 | MySQL `3306`、phpMyAdmin 默认不暴露 |
+
 如果确实需要临时打开 phpMyAdmin：
 
 ```bash
@@ -143,6 +155,18 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
    - 执行 agent `诊断`、`日志`、`安装诊断`、`证书诊断`、`防火墙诊断`、`重启`、`升级`、`卸载 agent`。
    - 点 `一键修复` 修复 3x-ui / Xray / Snell；也可以单独点 `修复 3x-ui`、`修复 Xray`、`修复 Snell`。
    - 失败或超时的部署任务可以点 `重试`，主控会复制原脚本生成一个新任务，原失败日志保留。
+
+## 发布包与 GitHub Release
+
+本仓库提供可下载发布包脚本：
+
+```bash
+bash scripts/build-release-bundle.sh --version "$(cat VERSION)"
+```
+
+产物会写入 `dist/release/flux-3xui-orchestrator-<version>.tar.gz`，旁边生成 `.sha256` 校验文件。压缩包内带 `RELEASE_MANIFEST.txt`，包含版本号、Git commit、构建时间、主要入口脚本和默认端口说明。
+
+发布 `v*` tag 或手动触发 `Release` workflow 时，会先校验 `VERSION`，执行 `scripts/release-check.sh --full`，再构建发布包并上传到 GitHub Releases。`1.x` 之前的版本会自动标记为 prerelease。
 
 ## Snell 和 3x-ui 的关系
 
