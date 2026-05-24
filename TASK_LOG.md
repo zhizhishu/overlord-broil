@@ -284,3 +284,4 @@
 - 主控中心核心链路已接入中英文：导航、服务器卡片、统一规则、监控告警、一键编排、部署任务、3x-ui 入站/出站配置、Snell 节点、远端转发、agent 诊断/日志/重启/升级、常用 toast 和脚本弹窗。
 - README 与中文 README 已同步：说明当前默认中文、已提供核心界面 `zh-CN/en-US` 切换，旧 Flux 转发页面可继续按同一字典分批覆盖。
 - 本地验证：`npm run build` 通过；`git diff --check` 通过；`bash -n scripts/*.sh` 通过；临时 Vite dev server `127.0.0.1:5173` HTTP 200 检查通过并已关闭。当前 PowerShell PATH 无 `sh` 命令，因此 `sh -n` bootstrap 复核无法在本机执行。
+- 2026-05-23 23:29:50 追加：已推送 `origin/future` 提交 `c493d37`；GitHub Actions `CI` run `26353817391` 和 `Docker Images` run `26353817388` 均已通过。
