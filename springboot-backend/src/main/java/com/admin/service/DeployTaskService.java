@@ -21,6 +21,8 @@ public interface DeployTaskService extends IService<DeployTask> {
 
     R updateTaskState(DeployTaskStateDto dto);
 
+    R retryTask(Long id);
+
     R claimAgentTask(AgentTaskClaimDto dto, String token);
 
     R reportAgentTask(AgentTaskReportDto dto, String token);

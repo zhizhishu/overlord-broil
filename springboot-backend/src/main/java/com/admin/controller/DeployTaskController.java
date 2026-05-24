@@ -59,6 +59,14 @@ public class DeployTaskController {
 
     @LogAnnotation
     @RequireRole
+    @PostMapping("/retry")
+    public R retry(@RequestBody Map<String, Object> params) {
+        Long id = Long.valueOf(params.get("id").toString());
+        return deployTaskService.retryTask(id);
+    }
+
+    @LogAnnotation
+    @RequireRole
     @PostMapping("/delete")
     public R delete(@RequestBody Map<String, Object> params) {
         Long id = Long.valueOf(params.get("id").toString());

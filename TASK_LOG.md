@@ -307,3 +307,23 @@
 - 本地验证：`bash -n scripts/*.sh` 通过；`scripts/install-master.sh doctor` 显示 frontend=`5166`、backend=`6365`、phpmyadmin=`disabled`；v4/v6 compose config 通过；phpMyAdmin override config 可正确发布 `18066:80`；`npm run build` 通过；agent mock 与 3x-ui fixture 通过；`git diff --check` 通过。
 - 本机 Docker Desktop Linux engine 当前不可连接，无法跑 Docker Maven 后端容器构建；后端 Java 编译交由 GitHub Actions 验证。
 - 2026-05-24 04:54:56 追加：`origin/future` 最新提交 `18e8c6b` 的 GitHub Actions 已通过，`CI` run `26360283823` 与 `Docker Images` run `26360283821` 均为 success。
+
+## 2026-05-24 Agent 运维闭环与正式版产品化计划
+
+### 本轮长期计划（创建于: 2026-05-24 07:13:36）
+
+1. Agent 运维闭环：补齐自动升级、卸载、任务失败重试、远端日志拉取、一键修复 3x-ui / Snell / Xray、安装失败自动诊断。
+2. 证书和防火墙诊断：把 ACME、80 端口、DNS、云防火墙、端口占用、证书续期失败原因输出成用户能看懂的诊断项。
+3. Flux UI 打磨：补新手首次配置向导、精致节点创建表单、统一状态/空状态/失败态、移动端适配、旧转发页面 i18n、减少 JSON 编辑。
+4. 发布体验：固定版本号、changelog、一键升级脚本、回滚说明、推荐防火墙规则、GitHub Release 自动生成。
+5. 验证与推送：每个切片跑本地可用测试，推送 `origin/future` 并观察 GitHub Actions。
+
+- [x] ~~**目标:** 完成 Agent 运维闭环第一批：自动升级/卸载、任务失败重试、远端日志拉取、一键修复、安装/证书/防火墙诊断，并接入主控 UI 与文档~~ (创建于: 2026-05-24 07:13:36 | **完成于: 2026-05-24 10:12:47**)
+
+### 2026-05-24 10:12:47 进度记录
+
+- 后端新增失败/超时部署任务重试接口：`POST /api/v1/deploy-task/retry` 会复用原任务脚本、协议和动作创建新的 `generated` 任务，并在 `request_json` 记录原任务来源。
+- Agent 维护动作扩展为诊断、日志、重启、升级、卸载、安装诊断、证书诊断、防火墙诊断、一键修复和分项修复 3x-ui/Xray/Snell；维护脚本会输出结构化 `FLUX_AGENT_RESULT_JSON`，便于主控回写服务状态。
+- 主控 UI 已补 Agent 运维按钮、失败任务重试入口和中英文文案；README、中文 README、Operations、Release Notes 已同步说明重试语义、ACME/80/DNS/防火墙诊断和修复入口。
+- 本地验证通过：Docker Maven `mvn -B -DskipTests package` 成功生成后端 jar；`vite-frontend npm run build` 通过；`git diff --check` 通过。
+- 本轮环境限制：Windows Git Bash 当前无法创建 signal pipe / CreateFileMapping，WSL 返回 `E_ACCESSDENIED`，Docker API 后续检查返回 pipe permission denied；因此本轮收尾时无法重新跑 bash 脚本语法、agent mock 和 3x-ui fixture。该三项在本批改动过程中已跑通过一次，最终仍需推送后由 GitHub Actions 再确认。

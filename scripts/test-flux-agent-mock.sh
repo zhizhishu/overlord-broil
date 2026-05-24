@@ -23,6 +23,20 @@ detect_python() {
   exit 2
 }
 
+cleanup_tmp_dir() {
+  [ -n "${TMP_DIR:-}" ] || return 0
+  [ -d "$TMP_DIR" ] || return 0
+
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    rm -rf "$TMP_DIR" 2>/dev/null && return 0
+    sleep 0.2
+  done
+
+  echo "warning: could not remove temporary test directory ${TMP_DIR}; continuing" >&2
+  return 0
+}
+
 run_case() {
   local label="$1"
   local task_script="$2"
@@ -166,7 +180,7 @@ PY
 
 detect_python
 TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+trap cleanup_tmp_dir EXIT
 
 FLUX_PANEL_URL="http://127.0.0.1:1" \
 FLUX_SERVER_ID="1" \

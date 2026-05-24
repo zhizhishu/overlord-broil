@@ -512,8 +512,15 @@ The master can also generate agent maintenance tasks from each server card:
 
 - `诊断`: runs `/usr/local/bin/flux-agent.sh --doctor` remotely and reports structured status.
 - `日志`: collects recent systemd/OpenRC logs and recent `/var/lib/flux-agent/task-*.out|err` files.
+- `安装诊断`: checks the installed binary, env file, service manager, work directory, token presence and current agent service status.
+- `证书诊断`: checks ACME/DNS/port-80/certificate clues and reports user-readable causes such as `DNS 未解析` or `80 端口被占用`.
+- `防火墙诊断`: prints port-80 listeners plus ufw/firewalld/nftables/iptables summaries and reminds you to verify cloud security groups.
 - `重启`: schedules a delayed `flux-agent` service restart so the task can report before the daemon restarts.
 - `升级`: downloads the current `scripts/flux-agent.sh` from this repository, syntax-checks it, replaces the local runner and schedules a restart.
+- `一键修复`: restarts/repairs the detected 3x-ui, Xray and Snell services through systemd/OpenRC where available.
+- `卸载 agent`: schedules a delayed removal of the agent service, env file and runner after the current task report returns.
+
+Failed or timed-out deployment tasks can be retried from the task card. The retry creates a new `generated` task with the same script and a `retryFromTaskId` record, so the original failure log remains intact.
 
 Useful agent reliability knobs:
 
@@ -558,7 +565,7 @@ Click `生成一键任务`. The master creates one deployment task per selected 
 
 The one-click 3x-ui script validates duplicate ports before it is saved and requires a running systemd host because upstream 3x-ui ships systemd service units. Use Debian, Ubuntu, Rocky Linux or Oracle Linux for full 3x-ui installation/configuration. Alpine/OpenRC can still run the Flux agent, Snell node tasks and remote forwarding tasks, but the full 3x-ui install step is intentionally blocked with a clear preflight error.
 
-ACME HTTP mode requires the domain DNS to point at the target server and port `80` to be reachable. The current script uses standalone HTTP validation and expects the host firewall/cloud firewall to allow the challenge traffic.
+ACME HTTP mode requires the domain DNS to point at the target server and port `80` to be reachable. The current script uses standalone HTTP validation and expects the host firewall/cloud firewall to allow the challenge traffic. Use `Agent / 证书诊断` and `Agent / 防火墙诊断` before retrying failed ACME tasks; the report calls out DNS, port occupancy, local firewall and cloud-firewall boundaries explicitly.
 
 ### 6. Manage unified protocol nodes
 

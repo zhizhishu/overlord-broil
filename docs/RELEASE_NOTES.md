@@ -14,6 +14,7 @@ This release moves the project from the first public production milestone into a
 - Added agent maintenance deployment tasks for remote `doctor`, `logs`, `restart-agent` and `upgrade-agent` actions through the existing task claim/report channel.
 - Added a server-card `Agent` action group in the orchestrator UI for diagnostics, logs, restart and upgrade.
 - Strengthened agent diagnostics so Python is treated as a blocking runtime dependency instead of a soft warning.
+- Future branch update: agent maintenance now also covers delayed uninstall, install diagnostics, ACME/certificate diagnostics, firewall diagnostics, one-click 3x-ui/Xray/Snell repair and failed-task retry from the task card.
 
 ### 0.6.0 Capability Matrix
 

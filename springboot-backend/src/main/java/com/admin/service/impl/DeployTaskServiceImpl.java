@@ -217,7 +217,10 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             String action = dto.getAction() == null || dto.getAction().trim().isEmpty()
                     ? "doctor"
                     : dto.getAction().trim().toLowerCase();
-            Set<String> allowedActions = new HashSet<>(Arrays.asList("doctor", "status", "logs", "restart-agent", "upgrade-agent"));
+            Set<String> allowedActions = new HashSet<>(Arrays.asList(
+                    "doctor", "status", "logs", "restart-agent", "upgrade-agent", "uninstall-agent",
+                    "install-diagnose", "cert-diagnose", "firewall-diagnose",
+                    "repair-xui", "repair-xray", "repair-snell", "repair-all"));
             return allowedActions.contains(action) ? null : "unsupported agent maintenance action";
         }
         Integer listenPort = dto.getListenPort() != null ? dto.getListenPort() : profile == null ? null : profile.getListenPort();
@@ -304,6 +307,39 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     state, dto.getResultJson(), now);
         }
         return updated ? R.ok("deploy task state updated") : R.err("deploy task state update failed");
+    }
+
+    @Override
+    public R retryTask(Long id) {
+        DeployTask exists = this.getById(id);
+        if (exists == null) {
+            return R.err("deploy task not found");
+        }
+        String state = exists.getState() == null ? "" : exists.getState().trim().toLowerCase();
+        if (!STATE_FAILED.equals(state) && !STATE_TIMEOUT.equals(state)) {
+            return R.err("only failed or timeout deploy tasks can be retried");
+        }
+
+        long now = System.currentTimeMillis();
+        Map<String, Object> retryMeta = new LinkedHashMap<>();
+        retryMeta.put("retryFromTaskId", exists.getId());
+        retryMeta.put("retryFromState", exists.getState());
+        retryMeta.put("retryCreatedAt", now);
+        retryMeta.put("originalRequest", parseJsonOrRaw(exists.getRequestJson()));
+
+        DeployTask retry = new DeployTask();
+        retry.setServerId(exists.getServerId());
+        retry.setServerName(exists.getServerName());
+        retry.setProtocol(exists.getProtocol());
+        retry.setAction(exists.getAction());
+        retry.setState(STATE_GENERATED);
+        retry.setRequestJson(JSON.toJSONString(retryMeta));
+        retry.setScript(exists.getScript());
+        retry.setStatus(STATUS_ACTIVE);
+        retry.setCreatedTime(now);
+        retry.setUpdatedTime(now);
+
+        return this.save(retry) ? R.ok(retry) : R.err("deploy task retry failed");
     }
 
     @Override
@@ -501,6 +537,17 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         return value.substring(0, maxLength) + "\n[truncated]";
     }
 
+    private Object parseJsonOrRaw(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return JSON.parse(value);
+        } catch (Exception ignored) {
+            return value;
+        }
+    }
+
     private String buildXrayAgentPayload(DeployTaskDto dto, ProtocolProfile profile, ControlServer server) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("serverId", server.getId());
@@ -541,6 +588,10 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 + "REPO_RAW_URL='${FLUX_REPO_RAW_URL:-https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main}'\n"
                 + "SOURCE_URL='${FLUX_AGENT_SOURCE_URL:-${REPO_RAW_URL}/scripts/flux-agent.sh}'\n"
                 + "LOG_LINES='${FLUX_MAINTENANCE_LOG_LINES:-160}'\n\n"
+                + "SERVER_HOST='" + escapeShell(server.getHost()) + "'\n"
+                + "XUI_ENDPOINT='" + escapeShell(server.getXuiEndpoint()) + "'\n"
+                + "CERTIFICATE_DOMAIN='" + escapeShell(server.getCertificateDomain()) + "'\n"
+                + "CERTIFICATE_STATUS='" + escapeShell(server.getCertificateStatus()) + "'\n\n"
                 + agentMaintenanceBody();
     }
 
@@ -548,6 +599,68 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         return """
                 log() {
                   printf '[flux-maintenance] %s\\n' "$*"
+                }
+
+                section() {
+                  printf '\\n== %s ==\\n' "$*"
+                }
+
+                first_available_python() {
+                  if command -v python3 >/dev/null 2>&1; then
+                    command -v python3
+                    return
+                  fi
+                  if command -v python >/dev/null 2>&1; then
+                    command -v python
+                    return
+                  fi
+                  return 1
+                }
+
+                json_value() {
+                  local key="$1"
+                  local python_bin
+                  python_bin="$(first_available_python 2>/dev/null || true)"
+                  [ -n "$python_bin" ] || return 1
+                  REQUEST_JSON="$REQUEST_JSON" "$python_bin" - "$key" <<'PY'
+                import json
+                import os
+                import sys
+
+                key = sys.argv[1]
+                raw = os.environ.get("REQUEST_JSON") or "{}"
+
+                def parse(value):
+                    if not value:
+                        return {}
+                    try:
+                        return json.loads(value)
+                    except Exception:
+                        return {}
+
+                def pick(root, name):
+                    if not isinstance(root, dict):
+                        return None
+                    if name in root:
+                        return root.get(name)
+                    for part in ("request", "originalRequest"):
+                        child = root.get(part)
+                        if isinstance(child, dict) and name in child:
+                            return child.get(name)
+                    nested = root.get("requestJson")
+                    if isinstance(nested, str):
+                        return pick(parse(nested), name)
+                    return None
+
+                data = parse(raw)
+                value = pick(data, key)
+                if value is None or value == "":
+                    sys.exit(1)
+                if isinstance(value, (dict, list)):
+                    print(json.dumps(value, ensure_ascii=False))
+                else:
+                    print(value)
+                PY
                 }
 
                 detect_service_manager() {
@@ -562,6 +675,44 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   echo unknown
                 }
 
+                service_exists() {
+                  local manager="$1"
+                  local name="$2"
+                  case "$manager" in
+                    systemd)
+                      systemctl list-unit-files "${name}" --no-legend 2>/dev/null | grep -q . || systemctl status "${name}" >/dev/null 2>&1
+                      ;;
+                    openrc)
+                      [ -x "/etc/init.d/${name%.service}" ] || rc-service "${name%.service}" status >/dev/null 2>&1
+                      ;;
+                    *)
+                      return 1
+                      ;;
+                  esac
+                }
+
+                restart_service() {
+                  local manager="$1"
+                  local name="$2"
+                  case "$manager" in
+                    systemd)
+                      systemctl daemon-reload || true
+                      systemctl enable "$name" >/dev/null 2>&1 || true
+                      systemctl restart "$name"
+                      systemctl --no-pager --full status "$name" || true
+                      ;;
+                    openrc)
+                      rc-update add "${name%.service}" default >/dev/null 2>&1 || true
+                      rc-service "${name%.service}" restart
+                      rc-service "${name%.service}" status || true
+                      ;;
+                    *)
+                      echo "systemd or OpenRC is required to repair ${name}." >&2
+                      return 1
+                      ;;
+                  esac
+                }
+
                 run_agent_doctor() {
                   if [ -x "$AGENT_BIN" ]; then
                     "$AGENT_BIN" --doctor
@@ -571,7 +722,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   return 1
                 }
 
-                service_status() {
+                flux_agent_status() {
                   local manager
                   manager="$(detect_service_manager)"
                   case "$manager" in
@@ -580,6 +731,27 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                       ;;
                     openrc)
                       if rc-service flux-agent status >/dev/null 2>&1; then
+                        echo active
+                      else
+                        echo inactive
+                      fi
+                      ;;
+                    *)
+                      echo unknown
+                      ;;
+                  esac
+                }
+
+                service_status() {
+                  local name="$1"
+                  local manager
+                  manager="$(detect_service_manager)"
+                  case "$manager" in
+                    systemd)
+                      systemctl is-active "$name" 2>/dev/null || true
+                      ;;
+                    openrc)
+                      if rc-service "${name%.service}" status >/dev/null 2>&1; then
                         echo active
                       else
                         echo inactive
@@ -639,6 +811,31 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   echo "agent restart scheduled via ${manager}"
                 }
 
+                schedule_agent_uninstall() {
+                  local manager script
+                  manager="$(detect_service_manager)"
+                  script="/tmp/flux-agent-uninstall-$$.sh"
+                  cat > "$script" <<'UNINSTALL'
+                #!/usr/bin/env sh
+                sleep 5
+                if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+                  systemctl stop flux-agent.service 2>/dev/null || true
+                  systemctl disable flux-agent.service 2>/dev/null || true
+                  rm -f /etc/systemd/system/flux-agent.service
+                  systemctl daemon-reload 2>/dev/null || true
+                elif command -v rc-service >/dev/null 2>&1 && command -v rc-update >/dev/null 2>&1; then
+                  rc-service flux-agent stop 2>/dev/null || true
+                  rc-update del flux-agent default 2>/dev/null || true
+                  rm -f /etc/init.d/flux-agent /usr/local/bin/flux-agent-openrc-wrapper.sh
+                fi
+                rm -f /usr/local/bin/flux-agent.sh /etc/flux-agent.env
+                rm -f "$0"
+                UNINSTALL
+                  chmod 0700 "$script"
+                  nohup sh "$script" >/tmp/flux-agent-uninstall.log 2>&1 &
+                  echo "agent uninstall scheduled via ${manager}; current task can report before the service is removed"
+                }
+
                 upgrade_agent() {
                   local tmp
                   command -v curl >/dev/null 2>&1 || { echo 'curl is required for agent upgrade.' >&2; return 1; }
@@ -651,21 +848,220 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   schedule_agent_restart
                 }
 
+                repair_xui() {
+                  local manager
+                  manager="$(detect_service_manager)"
+                  section "3x-ui repair"
+                  if service_exists "$manager" "x-ui.service"; then
+                    restart_service "$manager" "x-ui.service"
+                  else
+                    echo "[fail] 3x-ui service not found. Run one-click orchestration or the 3x-ui installer first."
+                    return 1
+                  fi
+                  if [ -x /usr/local/x-ui/x-ui ]; then
+                    /usr/local/x-ui/x-ui setting -show 2>/dev/null || true
+                  fi
+                }
+
+                repair_xray() {
+                  local manager
+                  manager="$(detect_service_manager)"
+                  section "Xray repair"
+                  if [ -x /usr/local/x-ui/bin/xray ]; then
+                    /usr/local/x-ui/bin/xray version 2>/dev/null | head -n 1 || true
+                  fi
+                  if service_exists "$manager" "x-ui.service"; then
+                    echo "Restarting x-ui because it owns the embedded Xray runtime."
+                    restart_service "$manager" "x-ui.service"
+                  elif service_exists "$manager" "xray.service"; then
+                    restart_service "$manager" "xray.service"
+                  else
+                    echo "[fail] Xray service not found. If Xray is embedded in 3x-ui, repair 3x-ui first."
+                    return 1
+                  fi
+                }
+
+                repair_snell() {
+                  local manager units unit found
+                  manager="$(detect_service_manager)"
+                  found=0
+                  section "Snell repair"
+                  if [ "$manager" = "systemd" ]; then
+                    units="$(systemctl list-unit-files 'snell*.service' --no-legend 2>/dev/null | awk '{print $1}' || true)"
+                    for unit in $units; do
+                      found=1
+                      restart_service "$manager" "$unit"
+                    done
+                  elif [ "$manager" = "openrc" ]; then
+                    units="$(ls /etc/init.d/snell* 2>/dev/null | xargs -n1 basename 2>/dev/null || true)"
+                    for unit in $units; do
+                      found=1
+                      restart_service "$manager" "$unit"
+                    done
+                  fi
+                  if [ "$found" -eq 0 ]; then
+                    echo "[fail] Snell service not found. Create a Snell node from the master panel first."
+                    return 1
+                  fi
+                }
+
+                diagnose_install() {
+                  local manager
+                  manager="$(detect_service_manager)"
+                  section "Agent install diagnostics"
+                  echo "service manager: ${manager}"
+                  [ -x "$AGENT_BIN" ] && echo "[ok] agent binary: ${AGENT_BIN}" || echo "[fail] agent binary missing or not executable: ${AGENT_BIN}"
+                  [ -r "$AGENT_ENV" ] && echo "[ok] agent env: ${AGENT_ENV}" || echo "[fail] agent env missing: ${AGENT_ENV}"
+                  [ -d /var/lib/flux-agent ] && echo "[ok] work dir: /var/lib/flux-agent" || echo "[warn] work dir missing: /var/lib/flux-agent"
+                  if [ -r "$AGENT_ENV" ]; then
+                    grep -E '^(FLUX_PANEL_URL|FLUX_SERVER_ID|FLUX_POLL_INTERVAL)=' "$AGENT_ENV" || true
+                    grep -q '^FLUX_AGENT_TOKEN=' "$AGENT_ENV" && echo "[ok] agent token: configured" || echo "[fail] agent token missing"
+                  fi
+                  run_agent_doctor || true
+                  section "Agent service status"
+                  case "$manager" in
+                    systemd) systemctl --no-pager --full status flux-agent.service || true ;;
+                    openrc) rc-service flux-agent status || true ;;
+                    *) echo "[fail] no running systemd/OpenRC service manager detected" ;;
+                  esac
+                }
+
+                public_ip() {
+                  command -v curl >/dev/null 2>&1 || return 1
+                  curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || curl -fsS --max-time 5 https://ifconfig.me 2>/dev/null || true
+                }
+
+                resolve_domain() {
+                  local domain="$1"
+                  if command -v getent >/dev/null 2>&1; then
+                    getent ahosts "$domain" 2>/dev/null | awk '{print $1}' | sort -u
+                    return
+                  fi
+                  if command -v dig >/dev/null 2>&1; then
+                    dig +short A "$domain" 2>/dev/null
+                    dig +short AAAA "$domain" 2>/dev/null
+                    return
+                  fi
+                  if command -v nslookup >/dev/null 2>&1; then
+                    nslookup "$domain" 2>/dev/null | awk '/Address: / {print $2}'
+                  fi
+                }
+
+                certificate_domain() {
+                  if [ -n "$CERTIFICATE_DOMAIN" ]; then
+                    echo "$CERTIFICATE_DOMAIN"
+                    return
+                  fi
+                  json_value certificateDomain 2>/dev/null && return
+                  if printf '%s' "$SERVER_HOST" | grep -q '\\.'; then
+                    echo "$SERVER_HOST"
+                  fi
+                }
+
+                diagnose_dns() {
+                  local domain ips ip
+                  domain="$(certificate_domain || true)"
+                  section "DNS diagnostics"
+                  if [ -z "$domain" ]; then
+                    echo "[warn] DNS 未配置：没有证书域名，也无法从服务器主机名推断域名。"
+                    return 0
+                  fi
+                  ips="$(resolve_domain "$domain" | sort -u || true)"
+                  if [ -z "$ips" ]; then
+                    echo "[fail] DNS 未解析：${domain} 没有解析到 A/AAAA 记录。"
+                    return 1
+                  fi
+                  echo "[ok] DNS records for ${domain}:"
+                  printf '%s\\n' "$ips"
+                  ip="$(public_ip || true)"
+                  if [ -n "$ip" ]; then
+                    echo "detected public ip: ${ip}"
+                    printf '%s\\n' "$ips" | grep -qx "$ip" || echo "[warn] DNS 解析不指向本机公网 IP；如果使用云 NAT/负载均衡，请确认转发链路。"
+                  else
+                    echo "[warn] 无法探测本机公网 IP，跳过 DNS 与公网 IP 对比。"
+                  fi
+                }
+
+                check_port_usage() {
+                  local port="$1"
+                  section "Port ${port} diagnostics"
+                  if command -v ss >/dev/null 2>&1; then
+                    ss -ltnup 2>/dev/null | awk -v p=":${port}" '$0 ~ p {print}'
+                  elif command -v netstat >/dev/null 2>&1; then
+                    netstat -ltnup 2>/dev/null | awk -v p=":${port}" '$0 ~ p {print}'
+                  elif command -v lsof >/dev/null 2>&1; then
+                    lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null || true
+                  else
+                    echo "[warn] 缺少 ss/netstat/lsof，无法检查端口占用。"
+                    return 0
+                  fi
+                }
+
+                diagnose_firewall() {
+                  section "Firewall diagnostics"
+                  check_port_usage 80 || true
+                  echo "ACME HTTP 需要公网 TCP/80 能访问目标服务器；如果本机检查正常但外部仍失败，通常是云安全组/云防火墙未放行。"
+                  if command -v ufw >/dev/null 2>&1; then
+                    echo "-- ufw"
+                    ufw status verbose || true
+                  fi
+                  if command -v firewall-cmd >/dev/null 2>&1; then
+                    echo "-- firewalld"
+                    firewall-cmd --state 2>/dev/null || true
+                    firewall-cmd --list-all 2>/dev/null || true
+                  fi
+                  if command -v nft >/dev/null 2>&1; then
+                    echo "-- nftables summary"
+                    nft list ruleset 2>/dev/null | head -n 120 || true
+                  elif command -v iptables >/dev/null 2>&1; then
+                    echo "-- iptables summary"
+                    iptables -S 2>/dev/null | head -n 120 || true
+                  else
+                    echo "[warn] 未发现 ufw/firewalld/nft/iptables 命令，无法读取本机防火墙规则。"
+                  fi
+                }
+
+                diagnose_certificate() {
+                  local domain
+                  domain="$(certificate_domain || true)"
+                  section "Certificate / ACME diagnostics"
+                  echo "stored certificate status: ${CERTIFICATE_STATUS:-unknown}"
+                  if [ -z "$domain" ]; then
+                    echo "[warn] 证书域名缺失：ACME HTTP 模式必须填写域名。"
+                  else
+                    echo "certificate domain: ${domain}"
+                  fi
+                  if [ -n "$domain" ]; then
+                    for cert in "/root/.acme.sh/${domain}_ecc/fullchain.cer" "/root/.acme.sh/${domain}/fullchain.cer" "/etc/letsencrypt/live/${domain}/fullchain.pem"; do
+                      if [ -f "$cert" ]; then
+                        echo "[ok] certificate file: ${cert}"
+                        openssl x509 -in "$cert" -noout -subject -issuer -enddate 2>/dev/null || true
+                      fi
+                    done
+                  fi
+                  command -v acme.sh >/dev/null 2>&1 && acme.sh --list || true
+                  command -v certbot >/dev/null 2>&1 && certbot certificates || true
+                }
+
+                diagnose_acme() {
+                  diagnose_dns || true
+                  diagnose_firewall || true
+                  diagnose_certificate || true
+                  echo "结论提示：DNS 未解析、80 端口被占用、系统防火墙未放行、云安全组未放行，都会导致 ACME HTTP 申请或续期失败。"
+                }
+
                 emit_result() {
                   local action="$1"
                   local status="$2"
                   local manager
                   local python_bin
                   manager="$(detect_service_manager)"
-                  if command -v python3 >/dev/null 2>&1; then
-                    python_bin="$(command -v python3)"
-                  elif command -v python >/dev/null 2>&1; then
-                    python_bin="$(command -v python)"
-                  else
+                  python_bin="$(first_available_python 2>/dev/null || true)"
+                  if [ -z "$python_bin" ]; then
                     echo "python3 or python is unavailable; skipping structured maintenance metadata." >&2
                     return 0
                   fi
-                  "$python_bin" - "$action" "$status" "$manager" "$(service_status)" "$AGENT_BIN" <<'PY' || true
+                  "$python_bin" - "$action" "$status" "$manager" "$(flux_agent_status)" "$(service_status x-ui.service)" "$(service_status snell.service)" "$AGENT_BIN" <<'PY' || true
                 import json
                 import sys
                 import time
@@ -676,7 +1072,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                         "status": sys.argv[2],
                         "serviceManager": sys.argv[3],
                         "agentServiceStatus": sys.argv[4],
-                        "agentBinary": sys.argv[5],
+                        "xuiServiceStatus": sys.argv[5],
+                        "snellServiceStatus": sys.argv[6],
+                        "agentBinary": sys.argv[7],
                         "reportedAt": int(time.time() * 1000),
                     }
                 }, ensure_ascii=False))
@@ -700,6 +1098,40 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   upgrade-agent)
                     upgrade_agent
                     emit_result "$ACTION" "upgraded"
+                    ;;
+                  uninstall-agent)
+                    schedule_agent_uninstall
+                    emit_result "$ACTION" "scheduled"
+                    ;;
+                  install-diagnose)
+                    diagnose_install
+                    emit_result "$ACTION" "checked"
+                    ;;
+                  cert-diagnose)
+                    diagnose_acme
+                    emit_result "$ACTION" "checked"
+                    ;;
+                  firewall-diagnose)
+                    diagnose_firewall
+                    emit_result "$ACTION" "checked"
+                    ;;
+                  repair-xui)
+                    repair_xui
+                    emit_result "$ACTION" "repaired"
+                    ;;
+                  repair-xray)
+                    repair_xray
+                    emit_result "$ACTION" "repaired"
+                    ;;
+                  repair-snell)
+                    repair_snell
+                    emit_result "$ACTION" "repaired"
+                    ;;
+                  repair-all)
+                    repair_xui || true
+                    repair_xray || true
+                    repair_snell || true
+                    emit_result "$ACTION" "repaired"
                     ;;
                   *)
                     echo "unsupported agent maintenance action: ${ACTION}" >&2

@@ -45,6 +45,7 @@ import {
   restartProtocolNode,
   restartServerForwardRule,
   restartThreeXuiXray,
+  retryDeployTask,
   saveThreeXuiOutbounds,
   syncThreeXuiTraffic,
   syncProtocolNodes,
@@ -197,7 +198,19 @@ interface ServerForwardRuleForm {
 type RuleKindFilter = "all" | "protocol" | "forward" | "xui";
 type RuleHealthFilter = "all" | "healthy" | "warning" | "error";
 type RuleHealth = Exclude<RuleHealthFilter, "all">;
-type AgentMaintenanceAction = "doctor" | "logs" | "restart-agent" | "upgrade-agent";
+type AgentMaintenanceAction =
+  | "doctor"
+  | "logs"
+  | "restart-agent"
+  | "upgrade-agent"
+  | "uninstall-agent"
+  | "install-diagnose"
+  | "cert-diagnose"
+  | "firewall-diagnose"
+  | "repair-xui"
+  | "repair-xray"
+  | "repair-snell"
+  | "repair-all";
 
 interface UnifiedRuleRow {
   id: string;
@@ -1225,7 +1238,15 @@ export default function OrchestratorPage() {
       doctor: "诊断",
       logs: "日志",
       "restart-agent": "重启 agent",
-      "upgrade-agent": "升级 agent"
+      "upgrade-agent": "升级 agent",
+      "uninstall-agent": "卸载 agent",
+      "install-diagnose": "安装诊断",
+      "cert-diagnose": "证书诊断",
+      "firewall-diagnose": "防火墙诊断",
+      "repair-xui": "修复 3x-ui",
+      "repair-xray": "修复 Xray",
+      "repair-snell": "修复 Snell",
+      "repair-all": "一键修复"
     };
 
     setSubmitting(true);
@@ -1598,6 +1619,19 @@ export default function OrchestratorPage() {
     }
   };
 
+  const retryTask = async (task: DeployTask) => {
+    const res = await retryDeployTask(task.id);
+    if (res.code === 0) {
+      toast.success(t("重试任务已生成"));
+      setScriptTitle(t("任务 #{id} 脚本", { id: res.data.id }));
+      setScriptText(res.data.script || "");
+      setScriptModalOpen(true);
+      loadData();
+    } else {
+      toast.error(res.msg || t("重试任务失败"));
+    }
+  };
+
   const formatTime = (time?: number) => {
     if (!time) return "-";
     return new Date(time).toLocaleString();
@@ -1956,8 +1990,16 @@ export default function OrchestratorPage() {
                     <ServerActionGroup title="Agent">
                       <Button size="sm" variant="flat" onPress={() => createAgentMaintenance(server, "doctor")}>{t("诊断")}</Button>
                       <Button size="sm" variant="flat" onPress={() => createAgentMaintenance(server, "logs")}>{t("日志")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => createAgentMaintenance(server, "install-diagnose")}>{t("安装诊断")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => createAgentMaintenance(server, "cert-diagnose")}>{t("证书诊断")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => createAgentMaintenance(server, "firewall-diagnose")}>{t("防火墙诊断")}</Button>
+                      <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "repair-all")}>{t("一键修复")}</Button>
+                      <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "repair-xui")}>{t("修复 3x-ui")}</Button>
+                      <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "repair-xray")}>{t("修复 Xray")}</Button>
+                      <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "repair-snell")}>{t("修复 Snell")}</Button>
                       <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "restart-agent")}>{t("重启")}</Button>
                       <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "upgrade-agent")}>{t("升级")}</Button>
+                      <Button size="sm" variant="light" color="danger" onPress={() => createAgentMaintenance(server, "uninstall-agent")}>{t("卸载 agent")}</Button>
                     </ServerActionGroup>
                     <ServerActionGroup title="管理">
                       <Button size="sm" variant="flat" onPress={() => openServerModal(server)}>{t("编辑")}</Button>
@@ -2117,6 +2159,9 @@ export default function OrchestratorPage() {
                   <p className="text-xs text-gray-500">{t("创建：{time}", { time: formatTime(task.createdTime) })}</p>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="flat" onPress={() => showTaskScript(task)}>{t("脚本")}</Button>
+                    {["failed", "timeout"].includes(task.state) && (
+                      <Button size="sm" variant="flat" color="warning" onPress={() => retryTask(task)}>{t("重试")}</Button>
+                    )}
                     <Button size="sm" variant="light" color="danger" onPress={() => removeTask(task)}>{t("删除")}</Button>
                   </div>
                 </CardBody>

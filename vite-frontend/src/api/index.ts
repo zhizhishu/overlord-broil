@@ -71,6 +71,7 @@ export const createOrchestrationTask = (data: any) => Network.post("/deploy-task
 export const getDeployTaskList = () => Network.post("/deploy-task/list");
 export const getDeployTaskScript = (id: number) => Network.post("/deploy-task/script", { id });
 export const updateDeployTaskState = (data: any) => Network.post("/deploy-task/state", data);
+export const retryDeployTask = (id: number) => Network.post("/deploy-task/retry", { id });
 export const deleteDeployTask = (id: number) => Network.post("/deploy-task/delete", { id });
 
 // 主控监控告警

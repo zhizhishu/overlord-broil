@@ -172,8 +172,15 @@ Remote maintenance from the master panel:
 | --- | --- |
 | `Agent / 诊断` | Creates an `agent-maintenance` task that runs `/usr/local/bin/flux-agent.sh --doctor` on the controlled host. |
 | `Agent / 日志` | Collects recent systemd/OpenRC logs plus recent `/var/lib/flux-agent/task-*.out|err` task logs. |
+| `Agent / 安装诊断` | Checks the agent binary, env file, service manager, token configuration, work directory and current service status. |
+| `Agent / 证书诊断` | Checks ACME HTTP prerequisites: DNS records, local/public IP hint, port `80`, existing certificate files and acme.sh/certbot clues. |
+| `Agent / 防火墙诊断` | Prints port `80` listener information plus ufw/firewalld/nftables/iptables summaries; cloud security groups still need manual confirmation. |
 | `Agent / 重启` | Runs the doctor, then schedules a delayed `flux-agent` service restart so the report can return before restart. |
 | `Agent / 升级` | Downloads the latest `scripts/flux-agent.sh`, runs `bash -n`, installs it and schedules a service restart. |
+| `Agent / 一键修复` | Attempts to restart/repair 3x-ui, Xray and Snell services through systemd/OpenRC, without changing panel data. |
+| `Agent / 卸载 agent` | Schedules a delayed uninstall after the current task report returns; removes the service, env file and runner. |
+
+Failed or timed-out deployment tasks should be retried from the task card rather than edited in place. The retry endpoint creates a new `generated` task with the same script and stores `retryFromTaskId` in `request_json`, so the original stdout/stderr remains auditable.
 
 ## Operational Checklist
 
@@ -188,7 +195,7 @@ Remote maintenance from the master panel:
 - For each controlled server, rotate the agent token after handoff or suspected exposure.
 - Verify agent heartbeats before sending orchestration, Snell or forwarding tasks.
 - Send full 3x-ui install/configure orchestration only to normal systemd hosts. Alpine/OpenRC controlled hosts can run agent, Snell and forwarding tasks, but the upstream 3x-ui installation path is blocked by preflight.
-- For ACME HTTP certificate mode, verify DNS points at the target server and port `80` is reachable before task creation.
+- For ACME HTTP certificate mode, run `Agent / 证书诊断` and `Agent / 防火墙诊断` before retrying. The report should distinguish DNS not resolving, local port `80` occupancy, local firewall rules and cloud security-group exposure.
 - Verify duplicate protocol and forwarding ports before deploying to a shared host.
 - Review task stdout/stderr before retrying failed deployment tasks.
 - Review `监控告警` after every orchestration batch; acknowledge only after the remote service, certificate, task or traffic condition has been checked.
