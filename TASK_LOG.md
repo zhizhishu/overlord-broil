@@ -327,3 +327,4 @@
 - 主控 UI 已补 Agent 运维按钮、失败任务重试入口和中英文文案；README、中文 README、Operations、Release Notes 已同步说明重试语义、ACME/80/DNS/防火墙诊断和修复入口。
 - 本地验证通过：Docker Maven `mvn -B -DskipTests package` 成功生成后端 jar；`vite-frontend npm run build` 通过；`git diff --check` 通过。
 - 本轮环境限制：Windows Git Bash 当前无法创建 signal pipe / CreateFileMapping，WSL 返回 `E_ACCESSDENIED`，Docker API 后续检查返回 pipe permission denied；因此本轮收尾时无法重新跑 bash 脚本语法、agent mock 和 3x-ui fixture。该三项在本批改动过程中已跑通过一次，最终仍需推送后由 GitHub Actions 再确认。
+- 2026-05-24 10:22:12 追加：已推送 `origin/future` 提交 `c89fe3c`；GitHub Actions `CI` run `26367725355` 已通过，覆盖 frontend、backend、shell scripts、agent mock、3x-ui fixture、compose config、dry-run/full compose smoke、Debian/Ubuntu/Alpine/Rocky Linux/Oracle Linux install matrix；`Docker Images` run `26367725330` 也已通过。
