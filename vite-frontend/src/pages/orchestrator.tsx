@@ -10,6 +10,7 @@ import { Spinner } from "@heroui/spinner";
 import { Switch } from "@heroui/switch";
 import toast from "react-hot-toast";
 
+import { useLanguage } from "@/i18n";
 import {
   acknowledgeMonitorAlert,
   createControlServer,
@@ -442,20 +443,28 @@ const protocolNodePayloadPreview = (form: ProtocolNodeForm) => JSON.stringify(
   2
 );
 
-const MasterRiskNotice = ({ context }: { context: string }) => (
-  <div className="rounded-small border border-warning-300 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
-    <span className="font-semibold">主控高风险：</span>{context}会作用在控制面服务器上，建议确认 API、3x-ui、Xray 以及证书任务不会影响现有编排。
-  </div>
-);
+const MasterRiskNotice = ({ context }: { context: string }) => {
+  const { t } = useLanguage();
 
-const ServerActionGroup = ({ title, children }: { title: string; children: ReactNode }) => (
-  <div className="rounded-small border border-default-200 bg-white/60 p-2.5 dark:bg-default-50/5">
-    <p className="mb-2 text-[11px] font-semibold uppercase tracking-normal text-gray-500">{title}</p>
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3">
-      {children}
+  return (
+    <div className="rounded-small border border-warning-300 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
+      <span className="font-semibold">{t("主控高风险：")}</span>{t("{context}会作用在控制面服务器上，建议确认 API、3x-ui、Xray 以及证书任务不会影响现有编排。", { context: t(context) })}
     </div>
-  </div>
-);
+  );
+};
+
+const ServerActionGroup = ({ title, children }: { title: string; children: ReactNode }) => {
+  const { t } = useLanguage();
+
+  return (
+    <div className="rounded-small border border-default-200 bg-white/60 p-2.5 dark:bg-default-50/5">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-normal text-gray-500">{t(title)}</p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3">
+        {children}
+      </div>
+    </div>
+  );
+};
 
 const asExpiryTime = (days: number) => {
   if (!days || days <= 0) return 0;
@@ -613,6 +622,7 @@ const inboundFormFromNodeForm = (form: ProtocolNodeForm): ThreeXuiInboundForm =>
 });
 
 export default function OrchestratorPage() {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [servers, setServers] = useState<ControlServer[]>([]);
@@ -720,7 +730,7 @@ export default function OrchestratorPage() {
 
   const renderServerOptions = () => servers.map(server => (
     <SelectItem key={server.id.toString()} textValue={server.name}>
-      {server.role === "master" ? `${server.name} · 主控高风险` : server.name}
+      {server.role === "master" ? `${server.name} · ${t("主控高风险")}` : server.name}
     </SelectItem>
   ));
 
@@ -731,7 +741,7 @@ export default function OrchestratorPage() {
           {tag}
         </Button>
       ))}
-      <Button size="sm" variant="light" onPress={() => onSelect("")}>清空</Button>
+      <Button size="sm" variant="light" onPress={() => onSelect("")}>{t("清空")}</Button>
     </div>
   );
 
@@ -777,7 +787,7 @@ export default function OrchestratorPage() {
       port: rule.listenPort,
       traffic: (rule.up || 0) + (rule.down || 0),
       syncedAt: rule.lastSync,
-      detail: rule.serviceName || "远端转发",
+      detail: rule.serviceName || t("远端转发"),
       error: rule.lastError,
       rule
     }));
@@ -795,12 +805,12 @@ export default function OrchestratorPage() {
       health: snapshot.enable === 0 ? "error" as const : "healthy" as const,
       traffic: snapshot.total || ((snapshot.up || 0) + (snapshot.down || 0)),
       syncedAt: snapshot.syncedTime,
-      detail: snapshot.expiryTime ? `到期 ${new Date(snapshot.expiryTime).toLocaleString()}` : "3x-ui 流量快照",
+      detail: snapshot.expiryTime ? t("到期 {time}", { time: new Date(snapshot.expiryTime).toLocaleString() }) : t("3x-ui 流量快照"),
       snapshot
     }));
 
     return [...nodeRows, ...forwardRows, ...xuiRows];
-  }, [forwardRules, protocolNodes, servers, trafficSnapshots]);
+  }, [forwardRules, protocolNodes, servers, t, trafficSnapshots]);
 
   const filteredRuleRows = useMemo(() => {
     const query = ruleSearch.trim().toLowerCase();
@@ -822,8 +832,8 @@ export default function OrchestratorPage() {
   }, [unifiedRuleRows]);
 
   const ruleServerOptions = useMemo(() => {
-    return [{ id: "all", name: "全部服务器" }, ...servers.map(server => ({ id: server.id.toString(), name: server.name }))];
-  }, [servers]);
+    return [{ id: "all", name: t("全部服务器") }, ...servers.map(server => ({ id: server.id.toString(), name: server.name }))];
+  }, [servers, t]);
 
 
   useEffect(() => {
@@ -850,10 +860,10 @@ export default function OrchestratorPage() {
       if (forwardRes.code === 0) setForwardRules(forwardRes.data || []);
       if (alertRes.code === 0) setMonitorAlerts(alertRes.data || []);
       if (serverRes.code !== 0 || profileRes.code !== 0 || taskRes.code !== 0 || nodeRes.code !== 0 || forwardRes.code !== 0 || alertRes.code !== 0) {
-        toast.error("主控数据加载不完整");
+        toast.error(t("主控数据加载不完整"));
       }
     } catch (error) {
-      toast.error("主控中心加载失败");
+      toast.error(t("主控中心加载失败"));
     } finally {
       setLoading(false);
     }
@@ -990,7 +1000,7 @@ export default function OrchestratorPage() {
 
   const saveServer = async () => {
     if (!serverForm.name.trim() || !serverForm.host.trim()) {
-      toast.error("请填写服务器名称和主机地址");
+      toast.error(t("请填写服务器名称和主机地址"));
       return;
     }
 
@@ -1003,17 +1013,17 @@ export default function OrchestratorPage() {
     setSubmitting(false);
 
     if (res.code === 0) {
-      toast.success(serverForm.id ? "服务器已更新" : "服务器已添加");
+      toast.success(serverForm.id ? t("服务器已更新") : t("服务器已添加"));
       setServerModalOpen(false);
       loadData();
     } else {
-      toast.error(res.msg || "保存服务器失败");
+      toast.error(res.msg || t("保存服务器失败"));
     }
   };
 
   const saveProfile = async () => {
     if (!profileForm.name.trim() || !profileForm.protocol.trim()) {
-      toast.error("请填写协议模板名称和协议");
+      toast.error(t("请填写协议模板名称和协议"));
       return;
     }
 
@@ -1022,25 +1032,25 @@ export default function OrchestratorPage() {
     setSubmitting(false);
 
     if (res.code === 0) {
-      toast.success(profileForm.id ? "协议模板已更新" : "协议模板已添加");
+      toast.success(profileForm.id ? t("协议模板已更新") : t("协议模板已添加"));
       setProfileModalOpen(false);
       loadData();
     } else {
-      toast.error(res.msg || "保存协议模板失败");
+      toast.error(res.msg || t("保存协议模板失败"));
     }
   };
 
   const saveProtocolNode = async () => {
     if (!protocolNodeForm.serverId) {
-      toast.error("请选择目标服务器");
+      toast.error(t("请选择目标服务器"));
       return;
     }
     if (!protocolNodeForm.name.trim()) {
-      toast.error("请填写节点名称");
+      toast.error(t("请填写节点名称"));
       return;
     }
     if (!protocolNodeForm.port || protocolNodeForm.port < 1 || protocolNodeForm.port > 65535) {
-      toast.error("节点端口不合法");
+      toast.error(t("节点端口不合法"));
       return;
     }
 
@@ -1082,59 +1092,59 @@ export default function OrchestratorPage() {
     setSubmitting(false);
 
     if (res.code === 0) {
-      toast.success(isSnell ? "Snell 节点任务已生成" : "Xray 入站节点已创建");
+      toast.success(isSnell ? t("Snell 节点任务已生成") : t("Xray 入站节点已创建"));
       setProtocolNodeModalOpen(false);
       loadData();
     } else {
-      toast.error(res.msg || "保存协议节点失败");
+      toast.error(res.msg || t("保存协议节点失败"));
     }
   };
 
   const syncServerProtocolNodes = async (server: ControlServer) => {
     const res = await syncProtocolNodes(server.id);
     if (res.code === 0) {
-      toast.success("协议节点已同步");
+      toast.success(t("协议节点已同步"));
       loadData();
     } else {
-      toast.error(res.msg || "同步协议节点失败");
+      toast.error(res.msg || t("同步协议节点失败"));
     }
   };
 
   const removeProtocolNode = async (node: ProtocolNode) => {
     const res = await deleteProtocolNode(node.id);
     if (res.code === 0) {
-      toast.success(node.engine === "snell" ? "Snell 删除任务已生成" : "协议节点已删除");
+      toast.success(node.engine === "snell" ? t("Snell 删除任务已生成") : t("协议节点已删除"));
       loadData();
     } else {
-      toast.error(res.msg || "删除协议节点失败");
+      toast.error(res.msg || t("删除协议节点失败"));
     }
   };
 
   const restartNode = async (node: ProtocolNode) => {
     const res = await restartProtocolNode(node.id);
     if (res.code === 0) {
-      toast.success(node.engine === "snell" ? "Snell 重启任务已生成" : "已请求重启 Xray");
+      toast.success(node.engine === "snell" ? t("Snell 重启任务已生成") : t("已请求重启 Xray"));
       loadData();
     } else {
-      toast.error(res.msg || "重启协议节点失败");
+      toast.error(res.msg || t("重启协议节点失败"));
     }
   };
 
   const saveServerForwardRule = async () => {
     if (!serverForwardRuleForm.serverId) {
-      toast.error("请选择目标服务器");
+      toast.error(t("请选择目标服务器"));
       return;
     }
     if (!serverForwardRuleForm.name.trim() || !serverForwardRuleForm.targetHost.trim()) {
-      toast.error("请填写规则名称和目标地址");
+      toast.error(t("请填写规则名称和目标地址"));
       return;
     }
     if (!serverForwardRuleForm.listenPort || serverForwardRuleForm.listenPort < 1 || serverForwardRuleForm.listenPort > 65535) {
-      toast.error("监听端口不合法");
+      toast.error(t("监听端口不合法"));
       return;
     }
     if (!serverForwardRuleForm.targetPort || serverForwardRuleForm.targetPort < 1 || serverForwardRuleForm.targetPort > 65535) {
-      toast.error("目标端口不合法");
+      toast.error(t("目标端口不合法"));
       return;
     }
 
@@ -1147,50 +1157,50 @@ export default function OrchestratorPage() {
     setSubmitting(false);
 
     if (res.code === 0) {
-      toast.success("远端端口转发任务已生成");
+      toast.success(t("远端端口转发任务已生成"));
       setServerForwardModalOpen(false);
       loadData();
     } else {
-      toast.error(res.msg || "保存远端端口转发失败");
+      toast.error(res.msg || t("保存远端端口转发失败"));
     }
   };
 
   const removeServerForwardRule = async (rule: ServerForwardRule) => {
     const res = await deleteServerForwardRule(rule.id);
     if (res.code === 0) {
-      toast.success("远端转发删除任务已生成");
+      toast.success(t("远端转发删除任务已生成"));
       loadData();
     } else {
-      toast.error(res.msg || "删除远端转发失败");
+      toast.error(res.msg || t("删除远端转发失败"));
     }
   };
 
   const restartForwardRule = async (rule: ServerForwardRule) => {
     const res = await restartServerForwardRule(rule.id);
     if (res.code === 0) {
-      toast.success("远端转发重启任务已生成");
+      toast.success(t("远端转发重启任务已生成"));
       loadData();
     } else {
-      toast.error(res.msg || "重启远端转发失败");
+      toast.error(res.msg || t("重启远端转发失败"));
     }
   };
 
   const showServerRuleOverview = async (server: ControlServer) => {
     const res = await getServerRuleOverview(server.id);
     if (res.code === 0) {
-      showThreeXuiResult(`${server.name} 出入站与转发规则`, res.data);
+      showThreeXuiResult(t("{name} 出入站与转发规则", { name: server.name }), res.data);
     } else {
-      toast.error(res.msg || "读取服务器规则失败");
+      toast.error(res.msg || t("读取服务器规则失败"));
     }
   };
 
   const saveDeployTask = async () => {
     if (!deployForm.serverId) {
-      toast.error("请选择目标服务器");
+      toast.error(t("请选择目标服务器"));
       return;
     }
     if (!deployForm.protocol.trim()) {
-      toast.error("请选择协议");
+      toast.error(t("请选择协议"));
       return;
     }
 
@@ -1199,14 +1209,14 @@ export default function OrchestratorPage() {
     setSubmitting(false);
 
     if (res.code === 0) {
-      toast.success("部署任务已生成");
+      toast.success(t("部署任务已生成"));
       setDeployModalOpen(false);
-      setScriptTitle(`任务 #${res.data.id} 脚本`);
+      setScriptTitle(t("任务 #{id} 脚本", { id: res.data.id }));
       setScriptText(res.data.script || "");
       setScriptModalOpen(true);
       loadData();
     } else {
-      toast.error(res.msg || "生成部署任务失败");
+      toast.error(res.msg || t("生成部署任务失败"));
     }
   };
 
@@ -1233,13 +1243,13 @@ export default function OrchestratorPage() {
     setSubmitting(false);
 
     if (res.code === 0) {
-      toast.success(`${server.name} ${actionName[action]}任务已生成`);
-      setScriptTitle(`任务 #${res.data.id} / ${server.name} / ${actionName[action]}`);
+      toast.success(t("{name} {action}任务已生成", { name: server.name, action: t(actionName[action]) }));
+      setScriptTitle(t("任务 #{id} / {name} / {action}", { id: res.data.id, name: server.name, action: t(actionName[action]) }));
       setScriptText(res.data.script || "");
       setScriptModalOpen(true);
       loadData();
     } else {
-      toast.error(res.msg || `${actionName[action]}任务生成失败`);
+      toast.error(res.msg || t("{action}任务生成失败", { action: t(actionName[action]) }));
     }
   };
 
@@ -1248,11 +1258,11 @@ export default function OrchestratorPage() {
       ? orchestrationForm.serverIds
       : orchestrationForm.serverId ? [orchestrationForm.serverId] : [];
     if (targetServerIds.length === 0) {
-      toast.error("请选择目标服务器");
+      toast.error(t("请选择目标服务器"));
       return;
     }
     if (orchestrationForm.certificateMode === "acme-http" && !orchestrationForm.certificateDomain.trim()) {
-      toast.error("ACME 证书模式需要填写域名");
+      toast.error(t("ACME 证书模式需要填写域名"));
       return;
     }
     const ports = [
@@ -1267,11 +1277,11 @@ export default function OrchestratorPage() {
     for (const [name, port, enabled] of ports) {
       if (!enabled) continue;
       if (!port || port < 1 || port > 65535) {
-        toast.error(`${name} 端口不合法`);
+        toast.error(t("{name} 端口不合法", { name: t(name) }));
         return;
       }
       if (usedPorts.has(port)) {
-        toast.error(`${name} 端口与 ${usedPorts.get(port)} 重复`);
+        toast.error(t("{name} 端口与 {used} 重复", { name: t(name), used: t(usedPorts.get(port) || "") }));
         return;
       }
       usedPorts.set(port, name);
@@ -1294,14 +1304,14 @@ export default function OrchestratorPage() {
 
     const failed = results.find(res => res.code !== 0);
     if (!failed) {
-      toast.success(`已生成 ${results.length} 个一键编排任务，等待副控 agent 自动领取`);
+      toast.success(t("已生成 {count} 个一键编排任务，等待副控 agent 自动领取", { count: results.length }));
       setOrchestrationModalOpen(false);
-      setScriptTitle("一键编排任务");
+      setScriptTitle(t("一键编排任务"));
       setScriptText(results.map(res => `# Task ${res.data.id} / ${res.data.serverName || res.data.serverId}\n${res.data.script || ""}`).join("\n\n"));
       setScriptModalOpen(true);
       loadData();
     } else {
-      toast.error(failed.msg || "生成一键编排任务失败");
+      toast.error(failed.msg || t("生成一键编排任务失败"));
     }
   };
 
@@ -1313,18 +1323,18 @@ export default function OrchestratorPage() {
       setScriptModalOpen(true);
       if (rotate) loadData();
     } else {
-      toast.error(res.msg || "读取 token 失败");
+      toast.error(res.msg || t("读取 token 失败"));
     }
   };
 
   const showTaskScript = async (task: DeployTask) => {
     const res = await getDeployTaskScript(task.id);
     if (res.code === 0) {
-      setScriptTitle(`任务 #${task.id} ${task.protocol}`);
+      setScriptTitle(t("任务 #{id} {protocol}", { id: task.id, protocol: task.protocol }));
       setScriptText(res.data || "");
       setScriptModalOpen(true);
     } else {
-      toast.error(res.msg || "读取脚本失败");
+      toast.error(res.msg || t("读取脚本失败"));
     }
   };
 
@@ -1339,29 +1349,29 @@ export default function OrchestratorPage() {
   const testXui = async (server: ControlServer) => {
     const res = await testThreeXuiConnection(server.id);
     if (isThreeXuiSuccess(res)) {
-      toast.success("3x-ui 连接正常");
-      showThreeXuiResult(`${server.name} 3x-ui 状态`, res.data);
+      toast.success(t("3x-ui 连接正常"));
+      showThreeXuiResult(t("{name} 3x-ui 状态", { name: server.name }), res.data);
     } else {
-      toast.error(res.msg || res.data?.msg || "3x-ui 连接失败");
+      toast.error(res.msg || res.data?.msg || t("3x-ui 连接失败"));
     }
   };
 
   const showThreeXuiInbounds = async (server: ControlServer) => {
     const res = await listThreeXuiInbounds(server.id);
     if (isThreeXuiSuccess(res)) {
-      showThreeXuiResult(`${server.name} 入站列表`, res.data);
+      showThreeXuiResult(t("{name} 入站列表", { name: server.name }), res.data);
       loadData();
     } else {
-      toast.error(res.msg || res.data?.msg || "读取入站失败");
+      toast.error(res.msg || res.data?.msg || t("读取入站失败"));
     }
   };
 
   const showThreeXuiConfig = async (server: ControlServer) => {
     const res = await getThreeXuiConfig(server.id);
     if (isThreeXuiSuccess(res)) {
-      showThreeXuiResult(`${server.name} Xray 配置`, res.data);
+      showThreeXuiResult(t("{name} Xray 配置", { name: server.name }), res.data);
     } else {
-      toast.error(res.msg || res.data?.msg || "读取配置失败");
+      toast.error(res.msg || res.data?.msg || t("读取配置失败"));
     }
   };
 
@@ -1369,29 +1379,29 @@ export default function OrchestratorPage() {
     const res = await getThreeXuiOutbounds(server.id);
     if (isThreeXuiSuccess(res)) {
       rememberOutboundTags(res.data);
-      showThreeXuiResult(`${server.name} 出站配置`, res.data);
+      showThreeXuiResult(t("{name} 出站配置", { name: server.name }), res.data);
     } else {
-      toast.error(res.msg || res.data?.msg || "读取出站失败");
+      toast.error(res.msg || res.data?.msg || t("读取出站失败"));
     }
   };
 
   const showThreeXuiOutboundTraffic = async (server: ControlServer) => {
     const res = await getThreeXuiOutboundTraffic(server.id);
     if (isThreeXuiSuccess(res)) {
-      showThreeXuiResult(`${server.name} 出站流量`, res.data);
+      showThreeXuiResult(t("{name} 出站流量", { name: server.name }), res.data);
     } else {
-      toast.error(res.msg || res.data?.msg || "读取出站流量失败");
+      toast.error(res.msg || res.data?.msg || t("读取出站流量失败"));
     }
   };
 
   const syncXuiTraffic = async (server: ControlServer) => {
     const res = await syncThreeXuiTraffic(server.id);
     if (isThreeXuiSuccess(res)) {
-      toast.success("远端流量已同步入库");
-      showThreeXuiResult(`${server.name} 流量同步结果`, res.data);
+      toast.success(t("远端流量已同步入库"));
+      showThreeXuiResult(t("{name} 流量同步结果", { name: server.name }), res.data);
       loadData();
     } else {
-      toast.error(res.msg || res.data?.msg || "同步流量失败");
+      toast.error(res.msg || res.data?.msg || t("同步流量失败"));
     }
   };
 
@@ -1400,9 +1410,9 @@ export default function OrchestratorPage() {
     if (res.code === 0) {
       const snapshots = res.data || [];
       setTrafficSnapshots(snapshots);
-      showThreeXuiResult(`${server.name} 本地流量快照`, snapshots);
+      showThreeXuiResult(t("{name} 本地流量快照", { name: server.name }), snapshots);
     } else {
-      toast.error(res.msg || "读取本地流量快照失败");
+      toast.error(res.msg || t("读取本地流量快照失败"));
     }
   };
 
@@ -1437,11 +1447,11 @@ export default function OrchestratorPage() {
 
   const saveThreeXuiInbound = async () => {
     if (!threeXuiInboundForm.serverId) {
-      toast.error("请选择服务器");
+      toast.error(t("请选择服务器"));
       return;
     }
     if (threeXuiInboundForm.mode !== "add" && !threeXuiInboundForm.inboundId.trim()) {
-      toast.error("更新或删除入站时必须填写 inbound id");
+      toast.error(t("更新或删除入站时必须填写 inbound id"));
       return;
     }
 
@@ -1461,24 +1471,24 @@ export default function OrchestratorPage() {
       }
     } catch (error) {
       setSubmitting(false);
-      toast.error(threeXuiInboundForm.editMode === "json" ? "入站 JSON 格式不正确" : "入站表单内容不完整");
+      toast.error(threeXuiInboundForm.editMode === "json" ? t("入站 JSON 格式不正确") : t("入站表单内容不完整"));
       return;
     }
     setSubmitting(false);
 
     if (isThreeXuiSuccess(res)) {
-      toast.success("3x-ui 入站操作已提交");
+      toast.success(t("3x-ui 入站操作已提交"));
       setThreeXuiInboundModalOpen(false);
-      showThreeXuiResult("3x-ui 入站操作结果", res.data);
+      showThreeXuiResult(t("3x-ui 入站操作结果"), res.data);
     } else {
-      toast.error(res.msg || res.data?.msg || "3x-ui 入站操作失败");
+      toast.error(res.msg || res.data?.msg || t("3x-ui 入站操作失败"));
     }
   };
 
   const openXraySettingModal = async (server: ControlServer) => {
     const res = await getThreeXuiConfig(server.id);
     if (!isThreeXuiSuccess(res)) {
-      toast.error(res.msg || res.data?.msg || "读取 Xray 配置失败");
+      toast.error(res.msg || res.data?.msg || t("读取 Xray 配置失败"));
       return;
     }
 
@@ -1492,13 +1502,13 @@ export default function OrchestratorPage() {
 
   const saveXraySetting = async () => {
     if (!xraySettingServerId) {
-      toast.error("缺少服务器");
+      toast.error(t("缺少服务器"));
       return;
     }
     try {
       JSON.parse(xraySettingText);
     } catch (error) {
-      toast.error("Xray 配置 JSON 格式不正确");
+      toast.error(t("Xray 配置 JSON 格式不正确"));
       return;
     }
 
@@ -1511,80 +1521,80 @@ export default function OrchestratorPage() {
     setSubmitting(false);
 
     if (isThreeXuiSuccess(res)) {
-      toast.success("3x-ui 出站配置已保存");
+      toast.success(t("3x-ui 出站配置已保存"));
       setXraySettingModalOpen(false);
-      showThreeXuiResult("3x-ui 出站保存结果", res.data);
+      showThreeXuiResult(t("3x-ui 出站保存结果"), res.data);
     } else {
-      toast.error(res.msg || res.data?.msg || "保存出站配置失败");
+      toast.error(res.msg || res.data?.msg || t("保存出站配置失败"));
     }
   };
 
   const restartXray = async (server: ControlServer) => {
     const res = await restartThreeXuiXray(server.id);
     if (isThreeXuiSuccess(res)) {
-      toast.success("已请求重启 Xray");
-      showThreeXuiResult(`${server.name} Xray 重启结果`, res.data);
+      toast.success(t("已请求重启 Xray"));
+      showThreeXuiResult(t("{name} Xray 重启结果", { name: server.name }), res.data);
     } else {
-      toast.error(res.msg || res.data?.msg || "重启 Xray 失败");
+      toast.error(res.msg || res.data?.msg || t("重启 Xray 失败"));
     }
   };
 
   const copyScript = async () => {
     await navigator.clipboard.writeText(scriptText);
-    toast.success("已复制");
+    toast.success(t("已复制"));
   };
 
   const copyRuleData = async (row: UnifiedRuleRow) => {
     const payload = [
-      `名称=${row.title}`,
-      `类型=${row.kind}`,
-      `服务器=${row.serverName}`,
-      `协议=${row.protocol}`,
-      `入口=${row.endpoint}`,
-      `目标=${row.target}`,
-      `状态=${row.status}`
+      `${t("名称")}=${row.title}`,
+      `${t("类型")}=${row.kind}`,
+      `${t("服务器")}=${row.serverName}`,
+      `${t("协议")}=${row.protocol}`,
+      `${t("入口")}=${row.endpoint}`,
+      `${t("目标")}=${row.target}`,
+      `${t("状态")}=${row.status}`
     ].join("\n");
     await navigator.clipboard.writeText(payload);
-    toast.success("规则信息已复制");
+    toast.success(t("规则信息已复制"));
   };
 
   const acknowledgeAlert = async (alert: MonitorAlert) => {
     const res = await acknowledgeMonitorAlert(alert.id);
     if (res.code === 0) {
-      toast.success("告警已确认");
+      toast.success(t("告警已确认"));
       loadData();
     } else {
-      toast.error(res.msg || "确认告警失败");
+      toast.error(res.msg || t("确认告警失败"));
     }
   };
 
   const removeServer = async (server: ControlServer) => {
     const res = await deleteControlServer(server.id);
     if (res.code === 0) {
-      toast.success("服务器已删除");
+      toast.success(t("服务器已删除"));
       loadData();
     } else {
-      toast.error(res.msg || "删除失败");
+      toast.error(res.msg || t("删除失败"));
     }
   };
 
   const removeProfile = async (profile: ProtocolProfile) => {
     const res = await deleteProtocolProfile(profile.id);
     if (res.code === 0) {
-      toast.success("协议模板已删除");
+      toast.success(t("协议模板已删除"));
       loadData();
     } else {
-      toast.error(res.msg || "删除失败");
+      toast.error(res.msg || t("删除失败"));
     }
   };
 
   const removeTask = async (task: DeployTask) => {
     const res = await deleteDeployTask(task.id);
     if (res.code === 0) {
-      toast.success("部署任务已删除");
+      toast.success(t("部署任务已删除"));
       loadData();
     } else {
-      toast.error(res.msg || "删除失败");
+      toast.error(res.msg || t("删除失败"));
     }
   };
 
@@ -1612,9 +1622,9 @@ export default function OrchestratorPage() {
   };
 
   const heartbeatText = (server: ControlServer) => {
-    if (server.lastError) return "异常";
-    if (!server.lastHeartbeat) return "未连接";
-    return Date.now() - server.lastHeartbeat < 90000 ? "在线" : "离线";
+    if (server.lastError) return t("异常");
+    if (!server.lastHeartbeat) return t("未连接");
+    return Date.now() - server.lastHeartbeat < 90000 ? t("在线") : t("离线");
   };
 
   const serviceColor = (status?: string) => {
@@ -1632,7 +1642,7 @@ export default function OrchestratorPage() {
   };
 
   const certificateText = (server: ControlServer) => {
-    if (!server.certificateStatus) return "证书 -";
+    if (!server.certificateStatus) return t("证书 -");
     const domain = server.certificateDomain ? ` ${server.certificateDomain}` : "";
     return `${server.certificateStatus}${domain}`;
   };
@@ -1650,45 +1660,45 @@ export default function OrchestratorPage() {
       <div className="p-4 md:p-6 space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">主控中心</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">服务器编排、统一协议节点、Snell / Xray 运维</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("主控中心")}</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("服务器编排、统一协议节点、Snell / Xray 运维")}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button color="primary" onPress={() => openOrchestrationModal()}>一键编排</Button>
-            <Button color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>新增节点</Button>
-            <Button color="primary" onPress={() => openDeployModal()}>新建部署</Button>
-            <Button variant="flat" onPress={() => openServerModal()}>添加服务器</Button>
-            <Button variant="flat" onPress={() => openProfileModal()}>添加模板</Button>
+            <Button color="primary" onPress={() => openOrchestrationModal()}>{t("一键编排")}</Button>
+            <Button color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
+            <Button color="primary" onPress={() => openDeployModal()}>{t("新建部署")}</Button>
+            <Button variant="flat" onPress={() => openServerModal()}>{t("添加服务器")}</Button>
+            <Button variant="flat" onPress={() => openProfileModal()}>{t("添加模板")}</Button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card radius="sm">
             <CardBody>
-              <p className="text-sm text-gray-500">服务器</p>
+              <p className="text-sm text-gray-500">{t("服务器")}</p>
               <p className="text-3xl font-bold text-gray-900 dark:text-white">{servers.length}</p>
-              <p className="text-xs text-gray-500 mt-1">{onlineServers} 台在线</p>
+              <p className="text-xs text-gray-500 mt-1">{t("{count} 台在线", { count: onlineServers })}</p>
             </CardBody>
           </Card>
           <Card radius="sm">
             <CardBody>
-              <p className="text-sm text-gray-500">协议节点</p>
+              <p className="text-sm text-gray-500">{t("协议节点")}</p>
               <p className="text-3xl font-bold text-gray-900 dark:text-white">{protocolNodes.length}</p>
               <p className="text-xs text-gray-500 mt-1">Xray {xrayNodes} / Snell {snellNodes}</p>
             </CardBody>
           </Card>
           <Card radius="sm">
             <CardBody>
-              <p className="text-sm text-gray-500">部署任务</p>
+              <p className="text-sm text-gray-500">{t("部署任务")}</p>
               <p className="text-3xl font-bold text-gray-900 dark:text-white">{tasks.length}</p>
-              <p className="text-xs text-gray-500 mt-1">{runningTasks} 个等待/运行，{failedTasks} 个失败</p>
+              <p className="text-xs text-gray-500 mt-1">{t("{running} 个等待/运行，{failed} 个失败", { running: runningTasks, failed: failedTasks })}</p>
             </CardBody>
           </Card>
           <Card radius="sm">
             <CardBody>
-              <p className="text-sm text-gray-500">远端转发</p>
+              <p className="text-sm text-gray-500">{t("远端转发")}</p>
               <p className="text-3xl font-bold text-gray-900 dark:text-white">{forwardRules.length}</p>
-              <p className="text-xs text-gray-500 mt-1">{activeForwardRules} 条 active，{trafficSnapshots.length} 条快照，流量 {formatBytes(totalRemoteTraffic)}</p>
+              <p className="text-xs text-gray-500 mt-1">{t("{active} 条 active，{snapshots} 条快照，流量 {traffic}", { active: activeForwardRules, snapshots: trafficSnapshots.length, traffic: formatBytes(totalRemoteTraffic) })}</p>
             </CardBody>
           </Card>
         </div>
@@ -1697,18 +1707,18 @@ export default function OrchestratorPage() {
           <Card radius="sm">
             <CardHeader className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">监控告警</h2>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("监控告警")}</h2>
                 <p className="text-xs text-gray-500 mt-1">
-                  {activeAlerts} 条待确认，{criticalAlerts} 条严重，来自 agent 心跳、证书、服务状态、任务和流量异常
+                  {t("{active} 条待确认，{critical} 条严重，来自 agent 心跳、证书、服务状态、任务和流量异常", { active: activeAlerts, critical: criticalAlerts })}
                 </p>
               </div>
-              <Button size="sm" variant="light" onPress={loadData}>刷新</Button>
+              <Button size="sm" variant="light" onPress={loadData}>{t("刷新")}</Button>
             </CardHeader>
             <CardBody className="space-y-3">
               {monitorAlerts.length === 0 && (
                 <div className="rounded-small border border-dashed border-default-300 p-5 text-center">
-                  <p className="font-medium text-gray-900 dark:text-white">当前没有待确认告警</p>
-                  <p className="text-sm text-gray-500 mt-1">副控心跳、证书、Xray、Snell、3x-ui、任务失败和流量异常会在这里汇总。</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{t("当前没有待确认告警")}</p>
+                  <p className="text-sm text-gray-500 mt-1">{t("副控心跳、证书、Xray、Snell、3x-ui、任务失败和流量异常会在这里汇总。")}</p>
                 </div>
               )}
               {recentAlerts.map(alert => (
@@ -1721,17 +1731,17 @@ export default function OrchestratorPage() {
                         <span className="text-xs text-gray-500">{alert.serverName || `#${alert.serverId}`} / {alert.source}</span>
                       </div>
                       <p className="mt-2 truncate font-semibold text-gray-900 dark:text-white">{alert.message}</p>
-                      <p className="text-xs text-gray-500">首次 {formatTime(alert.firstSeenAt)}，最近 {formatTime(alert.lastSeenAt)}</p>
+                      <p className="text-xs text-gray-500">{t("首次 {first}，最近 {last}", { first: formatTime(alert.firstSeenAt), last: formatTime(alert.lastSeenAt) })}</p>
                     </div>
                     <div className="flex flex-wrap gap-2 lg:justify-end">
-                      {alert.detailJson && <Button size="sm" variant="flat" onPress={() => showThreeXuiResult("告警详情", alert.detailJson)}>详情</Button>}
-                      <Button size="sm" color="primary" variant="flat" onPress={() => acknowledgeAlert(alert)}>确认</Button>
+                      {alert.detailJson && <Button size="sm" variant="flat" onPress={() => showThreeXuiResult(t("告警详情"), alert.detailJson)}>{t("详情")}</Button>}
+                      <Button size="sm" color="primary" variant="flat" onPress={() => acknowledgeAlert(alert)}>{t("确认")}</Button>
                     </div>
                   </div>
                 </div>
               ))}
               {monitorAlerts.length > recentAlerts.length && (
-                <p className="text-xs text-gray-500">仅显示最近 {recentAlerts.length} 条，后端已保留 {monitorAlerts.length} 条待确认告警。</p>
+                <p className="text-xs text-gray-500">{t("仅显示最近 {shown} 条，后端已保留 {total} 条待确认告警。", { shown: recentAlerts.length, total: monitorAlerts.length })}</p>
               )}
             </CardBody>
           </Card>
@@ -1741,59 +1751,59 @@ export default function OrchestratorPage() {
           <Card radius="sm">
             <CardHeader className="flex flex-col items-stretch gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">统一规则中心</h2>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("统一规则中心")}</h2>
                 <p className="text-xs text-gray-500 mt-1">
-                  当前显示 {filteredRuleRows.length} / {unifiedRuleRows.length} 条，健康 {ruleHealthCounts.healthy}，观察 {ruleHealthCounts.warning}，异常 {ruleHealthCounts.error}
+                  {t("当前显示 {filtered} / {total} 条，健康 {healthy}，观察 {warning}，异常 {error}", { filtered: filteredRuleRows.length, total: unifiedRuleRows.length, healthy: ruleHealthCounts.healthy, warning: ruleHealthCounts.warning, error: ruleHealthCounts.error })}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>新增节点</Button>
-                <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal()}>新增转发</Button>
-                <Button size="sm" variant="light" onPress={loadData}>刷新</Button>
+                <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
+                <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal()}>{t("新增转发")}</Button>
+                <Button size="sm" variant="light" onPress={loadData}>{t("刷新")}</Button>
               </div>
             </CardHeader>
             <CardBody className="space-y-4">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                <Input aria-label="搜索规则" placeholder="搜索名称、服务器、端口、目标" value={ruleSearch} onChange={event => setRuleSearch(event.target.value)} variant="bordered" size="sm" />
-                <Select aria-label="规则类型" selectedKeys={[ruleKindFilter]} onSelectionChange={keys => setRuleKindFilter(Array.from(keys)[0] as RuleKindFilter)} variant="bordered" size="sm">
-                  <SelectItem key="all">全部类型</SelectItem>
-                  <SelectItem key="protocol">协议节点</SelectItem>
-                  <SelectItem key="forward">远端转发</SelectItem>
-                  <SelectItem key="xui">3x-ui 视图</SelectItem>
+                <Input aria-label={t("搜索规则")} placeholder={t("搜索名称、服务器、端口、目标")} value={ruleSearch} onChange={event => setRuleSearch(event.target.value)} variant="bordered" size="sm" />
+                <Select aria-label={t("规则类型")} selectedKeys={[ruleKindFilter]} onSelectionChange={keys => setRuleKindFilter(Array.from(keys)[0] as RuleKindFilter)} variant="bordered" size="sm">
+                  <SelectItem key="all">{t("全部类型")}</SelectItem>
+                  <SelectItem key="protocol">{t("协议节点")}</SelectItem>
+                  <SelectItem key="forward">{t("远端转发")}</SelectItem>
+                  <SelectItem key="xui">{t("3x-ui 视图")}</SelectItem>
                 </Select>
-                <Select aria-label="规则服务器" selectedKeys={[ruleServerFilter]} onSelectionChange={keys => setRuleServerFilter(Array.from(keys)[0] as string)} variant="bordered" size="sm">
+                <Select aria-label={t("规则服务器")} selectedKeys={[ruleServerFilter]} onSelectionChange={keys => setRuleServerFilter(Array.from(keys)[0] as string)} variant="bordered" size="sm">
                   {ruleServerOptions.map(option => <SelectItem key={option.id}>{option.name}</SelectItem>)}
                 </Select>
-                <Select aria-label="规则健康状态" selectedKeys={[ruleHealthFilter]} onSelectionChange={keys => setRuleHealthFilter(Array.from(keys)[0] as RuleHealthFilter)} variant="bordered" size="sm">
-                  <SelectItem key="all">全部状态</SelectItem>
-                  <SelectItem key="healthy">健康</SelectItem>
-                  <SelectItem key="warning">观察</SelectItem>
-                  <SelectItem key="error">异常</SelectItem>
+                <Select aria-label={t("规则健康状态")} selectedKeys={[ruleHealthFilter]} onSelectionChange={keys => setRuleHealthFilter(Array.from(keys)[0] as RuleHealthFilter)} variant="bordered" size="sm">
+                  <SelectItem key="all">{t("全部状态")}</SelectItem>
+                  <SelectItem key="healthy">{t("健康")}</SelectItem>
+                  <SelectItem key="warning">{t("观察")}</SelectItem>
+                  <SelectItem key="error">{t("异常")}</SelectItem>
                 </Select>
               </div>
 
               {unifiedRuleRows.length === 0 && (
                 <div className="rounded-small border border-dashed border-default-300 p-6 text-center">
-                  <p className="font-medium text-gray-900 dark:text-white">还没有规则</p>
-                  <p className="text-sm text-gray-500 mt-1">创建协议节点、添加远端转发或同步 3x-ui 流量后，这里会汇总展示。</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{t("还没有规则")}</p>
+                  <p className="text-sm text-gray-500 mt-1">{t("创建协议节点、添加远端转发或同步 3x-ui 流量后，这里会汇总展示。")}</p>
                   <div className="mt-4 flex justify-center gap-2">
-                    <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>新增节点</Button>
-                    <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal()}>新增转发</Button>
+                    <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
+                    <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal()}>{t("新增转发")}</Button>
                   </div>
                 </div>
               )}
 
               {unifiedRuleRows.length > 0 && filteredRuleRows.length === 0 && (
                 <div className="rounded-small border border-dashed border-default-300 p-6 text-center">
-                  <p className="font-medium text-gray-900 dark:text-white">没有匹配的规则</p>
-                  <p className="text-sm text-gray-500 mt-1">清空搜索或放宽类型、服务器、状态筛选。</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{t("没有匹配的规则")}</p>
+                  <p className="text-sm text-gray-500 mt-1">{t("清空搜索或放宽类型、服务器、状态筛选。")}</p>
                   <Button size="sm" variant="flat" className="mt-4" onPress={() => {
                     setRuleSearch("");
                     setRuleKindFilter("all");
                     setRuleServerFilter("all");
                     setRuleHealthFilter("all");
                   }}>
-                    重置筛选
+                    {t("重置筛选")}
                   </Button>
                 </div>
               )}
@@ -1804,39 +1814,39 @@ export default function OrchestratorPage() {
                     <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(220px,1.3fr)_minmax(180px,1fr)_minmax(220px,1.2fr)_minmax(160px,.8fr)_auto] xl:items-center">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <Chip size="sm" variant="flat" color={row.kind === "protocol" ? "primary" : row.kind === "forward" ? "secondary" : "success"}>{row.kind === "protocol" ? "节点" : row.kind === "forward" ? "转发" : "3x-ui"}</Chip>
+                          <Chip size="sm" variant="flat" color={row.kind === "protocol" ? "primary" : row.kind === "forward" ? "secondary" : "success"}>{row.kind === "protocol" ? t("节点") : row.kind === "forward" ? t("转发") : "3x-ui"}</Chip>
                           <Chip size="sm" variant="flat" color={row.health === "healthy" ? "success" : row.health === "warning" ? "warning" : "danger"}>{row.status}</Chip>
                         </div>
                         <p className="mt-2 truncate font-semibold text-gray-900 dark:text-white">{row.title}</p>
                         <p className="truncate text-xs text-gray-500">{row.serverName} / {row.detail}</p>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div><p className="text-xs text-gray-500">协议</p><p className="truncate">{row.protocol || "-"}</p></div>
-                        <div><p className="text-xs text-gray-500">流量</p><p>{formatBytes(row.traffic)}</p></div>
+                        <div><p className="text-xs text-gray-500">{t("协议")}</p><p className="truncate">{row.protocol || "-"}</p></div>
+                        <div><p className="text-xs text-gray-500">{t("流量")}</p><p>{formatBytes(row.traffic)}</p></div>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="min-w-0"><p className="text-xs text-gray-500">监听 / 入站</p><p className="truncate">{row.endpoint}</p></div>
-                        <div className="min-w-0"><p className="text-xs text-gray-500">目标 / 客户端</p><p className="truncate">{row.target}</p></div>
+                        <div className="min-w-0"><p className="text-xs text-gray-500">{t("监听 / 入站")}</p><p className="truncate">{row.endpoint}</p></div>
+                        <div className="min-w-0"><p className="text-xs text-gray-500">{t("目标 / 客户端")}</p><p className="truncate">{row.target}</p></div>
                       </div>
                       <div className="text-sm">
-                        <p className="text-xs text-gray-500">最近同步</p>
+                        <p className="text-xs text-gray-500">{t("最近同步")}</p>
                         <p>{formatTime(row.syncedAt)}</p>
                         {row.error && <p className="mt-1 truncate text-xs text-danger">{row.error}</p>}
                       </div>
                       <div className="flex flex-wrap gap-2 xl:justify-end">
-                        <Button size="sm" variant="flat" onPress={() => copyRuleData(row)}>复制</Button>
+                        <Button size="sm" variant="flat" onPress={() => copyRuleData(row)}>{t("复制")}</Button>
                         {row.node && (
                           <>
-                            <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(undefined, row.node!)}>编辑</Button>
-                            <Button size="sm" variant="flat" onPress={() => restartNode(row.node!)}>重启</Button>
-                            <Button size="sm" variant="light" color="danger" onPress={() => removeProtocolNode(row.node!)}>删除</Button>
+                            <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(undefined, row.node!)}>{t("编辑")}</Button>
+                            <Button size="sm" variant="flat" onPress={() => restartNode(row.node!)}>{t("重启")}</Button>
+                            <Button size="sm" variant="light" color="danger" onPress={() => removeProtocolNode(row.node!)}>{t("删除")}</Button>
                           </>
                         )}
                         {row.rule && (
                           <>
-                            <Button size="sm" variant="flat" onPress={() => openServerForwardModal(undefined, row.rule!)}>编辑</Button>
-                            <Button size="sm" variant="flat" onPress={() => restartForwardRule(row.rule!)}>重启</Button>
-                            <Button size="sm" variant="light" color="danger" onPress={() => removeServerForwardRule(row.rule!)}>删除</Button>
+                            <Button size="sm" variant="flat" onPress={() => openServerForwardModal(undefined, row.rule!)}>{t("编辑")}</Button>
+                            <Button size="sm" variant="flat" onPress={() => restartForwardRule(row.rule!)}>{t("重启")}</Button>
+                            <Button size="sm" variant="light" color="danger" onPress={() => removeServerForwardRule(row.rule!)}>{t("删除")}</Button>
                           </>
                         )}
                       </div>
@@ -1850,8 +1860,8 @@ export default function OrchestratorPage() {
 
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">服务器</h2>
-            <Button size="sm" variant="light" onPress={loadData}>刷新</Button>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("服务器")}</h2>
+            <Button size="sm" variant="light" onPress={loadData}>{t("刷新")}</Button>
           </div>
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             {servers.map(server => (
@@ -1863,7 +1873,7 @@ export default function OrchestratorPage() {
                   </div>
                   <div className="flex flex-wrap justify-end gap-2">
                     <Chip color={server.role === "master" ? "warning" : "default"} variant="flat" size="sm">
-                      {server.role === "master" ? "主控" : "副控"}
+                      {server.role === "master" ? t("主控") : t("副控")}
                     </Chip>
                     <Chip color={heartbeatColor(server) as any} variant="flat" size="sm">{heartbeatText(server)}</Chip>
                   </div>
@@ -1874,7 +1884,7 @@ export default function OrchestratorPage() {
                   )}
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <p className="text-gray-500">入口</p>
+                      <p className="text-gray-500">{t("入口")}</p>
                       <p className="truncate">{server.endpoint || "-"}</p>
                     </div>
                     <div>
@@ -1898,15 +1908,15 @@ export default function OrchestratorPage() {
                       <p>{server.cpuUsage == null ? "-" : `${server.cpuUsage.toFixed(1)}%`}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">内存</p>
+                      <p className="text-gray-500">{t("内存")}</p>
                       <p>{server.memoryUsage == null ? "-" : `${server.memoryUsage.toFixed(1)}%`}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">上传</p>
+                      <p className="text-gray-500">{t("上传")}</p>
                       <p>{formatBytes(server.uploadTraffic)}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">下载</p>
+                      <p className="text-gray-500">{t("下载")}</p>
                       <p>{formatBytes(server.downloadTraffic)}</p>
                     </div>
                   </div>
@@ -1916,44 +1926,44 @@ export default function OrchestratorPage() {
                     <Chip size="sm" variant="flat" color={serviceColor(server.snellServiceStatus) as any}>Snell {server.snellServiceStatus || "-"}</Chip>
                     <Chip size="sm" variant="flat" color={serviceColor(server.certificateStatus) as any}>{certificateText(server)}</Chip>
                   </div>
-                  <p className="text-xs text-gray-500">心跳：{formatTime(server.lastHeartbeat)}</p>
-                  <p className="text-xs text-gray-500">3x-ui 同步：{formatTime(server.xuiLastSync)}</p>
-                  {server.certificateExpireAt && <p className="text-xs text-gray-500">证书到期：{formatTime(server.certificateExpireAt)}</p>}
-                  {server.lastError && <p className="text-xs text-danger">最近错误：{server.lastError}</p>}
+                  <p className="text-xs text-gray-500">{t("心跳：{time}", { time: formatTime(server.lastHeartbeat) })}</p>
+                  <p className="text-xs text-gray-500">{t("3x-ui 同步：{time}", { time: formatTime(server.xuiLastSync) })}</p>
+                  {server.certificateExpireAt && <p className="text-xs text-gray-500">{t("证书到期：{time}", { time: formatTime(server.certificateExpireAt) })}</p>}
+                  {server.lastError && <p className="text-xs text-danger">{t("最近错误：{error}", { error: server.lastError })}</p>}
                   <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                     <ServerActionGroup title="编排">
-                      <Button size="sm" color="primary" variant="flat" onPress={() => openOrchestrationModal(server)}>一键编排</Button>
-                      <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal(server)}>新增节点</Button>
-                      <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal(server)}>新增转发</Button>
-                      <Button size="sm" variant="flat" onPress={() => openDeployModal(server)}>部署</Button>
+                      <Button size="sm" color="primary" variant="flat" onPress={() => openOrchestrationModal(server)}>{t("一键编排")}</Button>
+                      <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal(server)}>{t("新增节点")}</Button>
+                      <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal(server)}>{t("新增转发")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => openDeployModal(server)}>{t("部署")}</Button>
                     </ServerActionGroup>
                     <ServerActionGroup title="规则流量">
-                      <Button size="sm" variant="flat" onPress={() => showServerRuleOverview(server)}>规则总览</Button>
-                      <Button size="sm" variant="flat" onPress={() => syncServerProtocolNodes(server)}>同步节点</Button>
-                      <Button size="sm" variant="flat" onPress={() => syncXuiTraffic(server)}>同步流量</Button>
-                      <Button size="sm" variant="flat" onPress={() => showTrafficSnapshots(server)}>流量快照</Button>
+                      <Button size="sm" variant="flat" onPress={() => showServerRuleOverview(server)}>{t("规则总览")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => syncServerProtocolNodes(server)}>{t("同步节点")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => syncXuiTraffic(server)}>{t("同步流量")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => showTrafficSnapshots(server)}>{t("流量快照")}</Button>
                     </ServerActionGroup>
                     <ServerActionGroup title="3x-ui">
-                      <Button size="sm" variant="flat" onPress={() => testXui(server)}>测 3x-ui</Button>
-                      <Button size="sm" variant="flat" onPress={() => showThreeXuiInbounds(server)}>入站</Button>
-                      <Button size="sm" variant="flat" onPress={() => openThreeXuiInboundModal(server)}>入站操作</Button>
-                      <Button size="sm" variant="flat" onPress={() => showThreeXuiConfig(server)}>配置</Button>
-                      <Button size="sm" variant="flat" onPress={() => showThreeXuiOutbounds(server)}>出站</Button>
-                      <Button size="sm" variant="flat" onPress={() => showThreeXuiOutboundTraffic(server)}>出站流量</Button>
-                      <Button size="sm" variant="flat" onPress={() => openXraySettingModal(server)}>保存出站</Button>
-                      <Button size="sm" variant="flat" onPress={() => restartXray(server)}>重启 Xray</Button>
+                      <Button size="sm" variant="flat" onPress={() => testXui(server)}>{t("测 3x-ui")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => showThreeXuiInbounds(server)}>{t("入站")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => openThreeXuiInboundModal(server)}>{t("入站操作")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => showThreeXuiConfig(server)}>{t("配置")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => showThreeXuiOutbounds(server)}>{t("出站")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => showThreeXuiOutboundTraffic(server)}>{t("出站流量")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => openXraySettingModal(server)}>{t("保存出站")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => restartXray(server)}>{t("重启 Xray")}</Button>
                     </ServerActionGroup>
                     <ServerActionGroup title="Agent">
-                      <Button size="sm" variant="flat" onPress={() => createAgentMaintenance(server, "doctor")}>诊断</Button>
-                      <Button size="sm" variant="flat" onPress={() => createAgentMaintenance(server, "logs")}>日志</Button>
-                      <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "restart-agent")}>重启</Button>
-                      <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "upgrade-agent")}>升级</Button>
+                      <Button size="sm" variant="flat" onPress={() => createAgentMaintenance(server, "doctor")}>{t("诊断")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => createAgentMaintenance(server, "logs")}>{t("日志")}</Button>
+                      <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "restart-agent")}>{t("重启")}</Button>
+                      <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "upgrade-agent")}>{t("升级")}</Button>
                     </ServerActionGroup>
                     <ServerActionGroup title="管理">
-                      <Button size="sm" variant="flat" onPress={() => openServerModal(server)}>编辑</Button>
+                      <Button size="sm" variant="flat" onPress={() => openServerModal(server)}>{t("编辑")}</Button>
                       <Button size="sm" variant="flat" onPress={() => showServerToken(server)}>Token</Button>
-                      <Button size="sm" variant="flat" color="warning" onPress={() => showServerToken(server, true)}>轮换</Button>
-                      <Button size="sm" variant="light" color="danger" onPress={() => removeServer(server)}>删除</Button>
+                      <Button size="sm" variant="flat" color="warning" onPress={() => showServerToken(server, true)}>{t("轮换")}</Button>
+                      <Button size="sm" variant="light" color="danger" onPress={() => removeServer(server)}>{t("删除")}</Button>
                     </ServerActionGroup>
                   </div>
                 </CardBody>
@@ -1964,8 +1974,8 @@ export default function OrchestratorPage() {
 
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">协议节点</h2>
-            <Button size="sm" variant="light" onPress={() => openProtocolNodeModal()}>新增</Button>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("协议节点")}</h2>
+            <Button size="sm" variant="light" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {protocolNodes.map(node => (
@@ -1980,29 +1990,29 @@ export default function OrchestratorPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <p className="text-gray-500">引擎</p>
+                      <p className="text-gray-500">{t("引擎")}</p>
                       <p>{node.engine}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">协议</p>
+                      <p className="text-gray-500">{t("协议")}</p>
                       <p>{node.protocol}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">端口</p>
+                      <p className="text-gray-500">{t("端口")}</p>
                       <p>{node.listen || "*"}:{node.port || "-"}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">流量</p>
+                      <p className="text-gray-500">{t("流量")}</p>
                       <p>{formatBytes(node.total || ((node.up || 0) + (node.down || 0)))}</p>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500">远端：{node.remoteId || node.serviceName || "-"}</p>
-                  <p className="text-xs text-gray-500">同步：{formatTime(node.lastSync)}</p>
-                  {node.lastError && <p className="text-xs text-danger">错误：{node.lastError}</p>}
+                  <p className="text-xs text-gray-500">{t("远端：{value}", { value: node.remoteId || node.serviceName || "-" })}</p>
+                  <p className="text-xs text-gray-500">{t("同步：{time}", { time: formatTime(node.lastSync) })}</p>
+                  {node.lastError && <p className="text-xs text-danger">{t("错误：{error}", { error: node.lastError })}</p>}
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(undefined, node)}>编辑</Button>
-                    <Button size="sm" variant="flat" onPress={() => restartNode(node)}>重启</Button>
-                    <Button size="sm" variant="light" color="danger" onPress={() => removeProtocolNode(node)}>删除</Button>
+                    <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(undefined, node)}>{t("编辑")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => restartNode(node)}>{t("重启")}</Button>
+                    <Button size="sm" variant="light" color="danger" onPress={() => removeProtocolNode(node)}>{t("删除")}</Button>
                   </div>
                 </CardBody>
               </Card>
@@ -2012,8 +2022,8 @@ export default function OrchestratorPage() {
 
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">远端端口转发</h2>
-            <Button size="sm" variant="light" onPress={() => openServerForwardModal()}>新增</Button>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("远端端口转发")}</h2>
+            <Button size="sm" variant="light" onPress={() => openServerForwardModal()}>{t("新增转发")}</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {forwardRules.map(rule => (
@@ -2028,29 +2038,29 @@ export default function OrchestratorPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <p className="text-gray-500">监听</p>
+                      <p className="text-gray-500">{t("监听")}</p>
                       <p>{rule.listenHost || "0.0.0.0"}:{rule.listenPort}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">目标</p>
+                      <p className="text-gray-500">{t("目标")}</p>
                       <p className="truncate">{rule.targetHost}:{rule.targetPort}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">引擎</p>
+                      <p className="text-gray-500">{t("引擎")}</p>
                       <p>{rule.engine || "socat"}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">流量</p>
+                      <p className="text-gray-500">{t("流量")}</p>
                       <p>{formatBytes((rule.up || 0) + (rule.down || 0))}</p>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500">服务：{rule.serviceName || "-"}</p>
-                  <p className="text-xs text-gray-500">同步：{formatTime(rule.lastSync)}</p>
-                  {rule.lastError && <p className="text-xs text-danger">错误：{rule.lastError}</p>}
+                  <p className="text-xs text-gray-500">{t("服务：{value}", { value: rule.serviceName || "-" })}</p>
+                  <p className="text-xs text-gray-500">{t("同步：{time}", { time: formatTime(rule.lastSync) })}</p>
+                  {rule.lastError && <p className="text-xs text-danger">{t("错误：{error}", { error: rule.lastError })}</p>}
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="flat" onPress={() => openServerForwardModal(undefined, rule)}>编辑</Button>
-                    <Button size="sm" variant="flat" onPress={() => restartForwardRule(rule)}>重启</Button>
-                    <Button size="sm" variant="light" color="danger" onPress={() => removeServerForwardRule(rule)}>删除</Button>
+                    <Button size="sm" variant="flat" onPress={() => openServerForwardModal(undefined, rule)}>{t("编辑")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => restartForwardRule(rule)}>{t("重启")}</Button>
+                    <Button size="sm" variant="light" color="danger" onPress={() => removeServerForwardRule(rule)}>{t("删除")}</Button>
                   </div>
                 </CardBody>
               </Card>
@@ -2060,8 +2070,8 @@ export default function OrchestratorPage() {
 
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">协议模板</h2>
-            <Button size="sm" variant="light" onPress={() => openProfileModal()}>新增</Button>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("协议模板")}</h2>
+            <Button size="sm" variant="light" onPress={() => openProfileModal()}>{t("新增节点")}</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {profiles.map(profile => (
@@ -2075,10 +2085,10 @@ export default function OrchestratorPage() {
                     <Chip size="sm" variant="flat">{profile.versionFamily || "xray"}</Chip>
                   </div>
                   <p className="text-sm text-gray-500 min-h-10">{profile.remark || "-"}</p>
-                  <p className="text-sm">端口：{profile.listenPort || "-"}</p>
+                  <p className="text-sm">{t("端口")}：{profile.listenPort || "-"}</p>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="flat" onPress={() => openProfileModal(profile)}>编辑</Button>
-                    <Button size="sm" variant="light" color="danger" onPress={() => removeProfile(profile)}>删除</Button>
+                    <Button size="sm" variant="flat" onPress={() => openProfileModal(profile)}>{t("编辑")}</Button>
+                    <Button size="sm" variant="light" color="danger" onPress={() => removeProfile(profile)}>{t("删除")}</Button>
                   </div>
                 </CardBody>
               </Card>
@@ -2088,8 +2098,8 @@ export default function OrchestratorPage() {
 
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">部署任务</h2>
-            <Button size="sm" variant="light" onPress={() => openDeployModal()}>生成</Button>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("部署任务")}</h2>
+            <Button size="sm" variant="light" onPress={() => openDeployModal()}>{t("生成")}</Button>
           </div>
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             {tasks.map(task => (
@@ -2104,10 +2114,10 @@ export default function OrchestratorPage() {
                       {task.state}
                     </Chip>
                   </div>
-                  <p className="text-xs text-gray-500">创建：{formatTime(task.createdTime)}</p>
+                  <p className="text-xs text-gray-500">{t("创建：{time}", { time: formatTime(task.createdTime) })}</p>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="flat" onPress={() => showTaskScript(task)}>脚本</Button>
-                    <Button size="sm" variant="light" color="danger" onPress={() => removeTask(task)}>删除</Button>
+                    <Button size="sm" variant="flat" onPress={() => showTaskScript(task)}>{t("脚本")}</Button>
+                    <Button size="sm" variant="light" color="danger" onPress={() => removeTask(task)}>{t("删除")}</Button>
                   </div>
                 </CardBody>
               </Card>
@@ -2118,27 +2128,27 @@ export default function OrchestratorPage() {
 
       <Modal isOpen={serverModalOpen} onOpenChange={setServerModalOpen} size="4xl">
         <ModalContent>
-          <ModalHeader>{serverForm.id ? "编辑服务器" : "添加服务器"}</ModalHeader>
+          <ModalHeader>{serverForm.id ? t("编辑服务器") : t("添加服务器")}</ModalHeader>
           <ModalBody>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input label="名称" value={serverForm.name} onChange={e => setServerForm(prev => ({ ...prev, name: e.target.value }))} variant="bordered" />
-              <Select label="角色" selectedKeys={[serverForm.role]} onSelectionChange={keys => setServerForm(prev => ({ ...prev, role: Array.from(keys)[0] as string }))} variant="bordered">
-                <SelectItem key="master">主控</SelectItem>
-                <SelectItem key="agent">副控</SelectItem>
+              <Input label={t("名称")} value={serverForm.name} onChange={e => setServerForm(prev => ({ ...prev, name: e.target.value }))} variant="bordered" />
+              <Select label={t("角色")} selectedKeys={[serverForm.role]} onSelectionChange={keys => setServerForm(prev => ({ ...prev, role: Array.from(keys)[0] as string }))} variant="bordered">
+                <SelectItem key="master">{t("主控")}</SelectItem>
+                <SelectItem key="agent">{t("副控")}</SelectItem>
               </Select>
-              <Input label="主机" value={serverForm.host} onChange={e => setServerForm(prev => ({ ...prev, host: e.target.value }))} variant="bordered" />
+              <Input label={t("主机")} value={serverForm.host} onChange={e => setServerForm(prev => ({ ...prev, host: e.target.value }))} variant="bordered" />
               <Input label="SSH 端口" type="number" value={serverForm.sshPort.toString()} onChange={e => setServerForm(prev => ({ ...prev, sshPort: Number(e.target.value) || 22 }))} variant="bordered" />
               <Input label="SSH 用户" value={serverForm.sshUser} onChange={e => setServerForm(prev => ({ ...prev, sshUser: e.target.value }))} variant="bordered" />
-              <Input label="副控 API" value={serverForm.endpoint} onChange={e => setServerForm(prev => ({ ...prev, endpoint: e.target.value }))} variant="bordered" />
-              <Input label="3x-ui 面板地址" value={serverForm.xuiEndpoint} onChange={e => setServerForm(prev => ({ ...prev, xuiEndpoint: e.target.value }))} variant="bordered" placeholder="https://1.2.3.4:54321" />
+              <Input label={t("副控 API")} value={serverForm.endpoint} onChange={e => setServerForm(prev => ({ ...prev, endpoint: e.target.value }))} variant="bordered" />
+              <Input label={t("3x-ui 面板地址")} value={serverForm.xuiEndpoint} onChange={e => setServerForm(prev => ({ ...prev, xuiEndpoint: e.target.value }))} variant="bordered" placeholder="https://1.2.3.4:54321" />
               <Input label="3x-ui Base Path" value={serverForm.xuiBasePath} onChange={e => setServerForm(prev => ({ ...prev, xuiBasePath: e.target.value }))} variant="bordered" placeholder="/secret-path" />
               <Input label="3x-ui API Token" value={serverForm.xuiApiToken} onChange={e => setServerForm(prev => ({ ...prev, xuiApiToken: e.target.value }))} variant="bordered" />
-              <Input label="3x-ui 用户名" value={serverForm.xuiUsername} onChange={e => setServerForm(prev => ({ ...prev, xuiUsername: e.target.value }))} variant="bordered" />
-              <Input label="3x-ui 密码" type="password" value={serverForm.xuiPassword} onChange={e => setServerForm(prev => ({ ...prev, xuiPassword: e.target.value }))} variant="bordered" />
+              <Input label={t("3x-ui 用户名")} value={serverForm.xuiUsername} onChange={e => setServerForm(prev => ({ ...prev, xuiUsername: e.target.value }))} variant="bordered" />
+              <Input label={t("3x-ui 密码")} type="password" value={serverForm.xuiPassword} onChange={e => setServerForm(prev => ({ ...prev, xuiPassword: e.target.value }))} variant="bordered" />
               <Input label="3x-ui 2FA" value={serverForm.xuiTwoFactorCode} onChange={e => setServerForm(prev => ({ ...prev, xuiTwoFactorCode: e.target.value }))} variant="bordered" />
-              <Select label="3x-ui TLS 校验" selectedKeys={[serverForm.xuiAllowInsecure.toString()]} onSelectionChange={keys => setServerForm(prev => ({ ...prev, xuiAllowInsecure: Number(Array.from(keys)[0]) }))} variant="bordered">
-                <SelectItem key="0">校验证书</SelectItem>
-                <SelectItem key="1">允许自签名</SelectItem>
+              <Select label={t("3x-ui TLS 校验")} selectedKeys={[serverForm.xuiAllowInsecure.toString()]} onSelectionChange={keys => setServerForm(prev => ({ ...prev, xuiAllowInsecure: Number(Array.from(keys)[0]) }))} variant="bordered">
+                <SelectItem key="0">{t("校验证书")}</SelectItem>
+                <SelectItem key="1">{t("允许自签名")}</SelectItem>
               </Select>
             </div>
             {serverForm.role === "master" && (
@@ -2146,57 +2156,57 @@ export default function OrchestratorPage() {
             )}
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setServerModalOpen(false)}>取消</Button>
-            <Button color="primary" isLoading={submitting} onPress={saveServer}>保存</Button>
+            <Button variant="light" onPress={() => setServerModalOpen(false)}>{t("取消")}</Button>
+            <Button color="primary" isLoading={submitting} onPress={saveServer}>{t("保存")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
       <Modal isOpen={profileModalOpen} onOpenChange={setProfileModalOpen} size="3xl">
         <ModalContent>
-          <ModalHeader>{profileForm.id ? "编辑协议模板" : "添加协议模板"}</ModalHeader>
+          <ModalHeader>{profileForm.id ? t("编辑协议模板") : t("添加协议模板")}</ModalHeader>
           <ModalBody>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input label="名称" value={profileForm.name} onChange={e => setProfileForm(prev => ({ ...prev, name: e.target.value }))} variant="bordered" />
-              <Input label="协议" value={profileForm.protocol} onChange={e => setProfileForm(prev => ({ ...prev, protocol: e.target.value }))} variant="bordered" />
-              <Input label="版本族" value={profileForm.versionFamily} onChange={e => setProfileForm(prev => ({ ...prev, versionFamily: e.target.value }))} variant="bordered" />
-              <Input label="端口" type="number" value={profileForm.listenPort.toString()} onChange={e => setProfileForm(prev => ({ ...prev, listenPort: Number(e.target.value) || 0 }))} variant="bordered" />
-              <Input label="传输" value={profileForm.transport} onChange={e => setProfileForm(prev => ({ ...prev, transport: e.target.value }))} variant="bordered" />
-              <Input label="备注" value={profileForm.remark} onChange={e => setProfileForm(prev => ({ ...prev, remark: e.target.value }))} variant="bordered" />
+              <Input label={t("名称")} value={profileForm.name} onChange={e => setProfileForm(prev => ({ ...prev, name: e.target.value }))} variant="bordered" />
+              <Input label={t("协议")} value={profileForm.protocol} onChange={e => setProfileForm(prev => ({ ...prev, protocol: e.target.value }))} variant="bordered" />
+              <Input label={t("版本族")} value={profileForm.versionFamily} onChange={e => setProfileForm(prev => ({ ...prev, versionFamily: e.target.value }))} variant="bordered" />
+              <Input label={t("端口")} type="number" value={profileForm.listenPort.toString()} onChange={e => setProfileForm(prev => ({ ...prev, listenPort: Number(e.target.value) || 0 }))} variant="bordered" />
+              <Input label={t("传输")} value={profileForm.transport} onChange={e => setProfileForm(prev => ({ ...prev, transport: e.target.value }))} variant="bordered" />
+              <Input label={t("备注")} value={profileForm.remark} onChange={e => setProfileForm(prev => ({ ...prev, remark: e.target.value }))} variant="bordered" />
             </div>
-            <Textarea label="配置 JSON" minRows={5} value={profileForm.configJson} onChange={e => setProfileForm(prev => ({ ...prev, configJson: e.target.value }))} variant="bordered" />
+            <Textarea label={t("配置 JSON")} minRows={5} value={profileForm.configJson} onChange={e => setProfileForm(prev => ({ ...prev, configJson: e.target.value }))} variant="bordered" />
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setProfileModalOpen(false)}>取消</Button>
-            <Button color="primary" isLoading={submitting} onPress={saveProfile}>保存</Button>
+            <Button variant="light" onPress={() => setProfileModalOpen(false)}>{t("取消")}</Button>
+            <Button color="primary" isLoading={submitting} onPress={saveProfile}>{t("保存")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
       <Modal isOpen={protocolNodeModalOpen} onOpenChange={setProtocolNodeModalOpen} size="5xl" scrollBehavior="inside">
         <ModalContent>
-          <ModalHeader>{protocolNodeForm.id ? "编辑协议节点" : "新增协议节点"}</ModalHeader>
+          <ModalHeader>{protocolNodeForm.id ? t("编辑协议节点") : t("新增协议节点")}</ModalHeader>
           <ModalBody>
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Select label="目标服务器" selectedKeys={protocolNodeForm.serverId ? [protocolNodeForm.serverId.toString()] : []} onSelectionChange={keys => patchProtocolNodeForm({ serverId: Number(Array.from(keys)[0]) })} variant="bordered">
+                <Select label={t("目标服务器")} selectedKeys={protocolNodeForm.serverId ? [protocolNodeForm.serverId.toString()] : []} onSelectionChange={keys => patchProtocolNodeForm({ serverId: Number(Array.from(keys)[0]) })} variant="bordered">
                   {renderServerOptions()}
                 </Select>
-                <Input label="节点名称" value={protocolNodeForm.name} onChange={e => patchProtocolNodeForm({ name: e.target.value })} variant="bordered" />
-                <Select label="协议" selectedKeys={[protocolNodeForm.protocol]} onSelectionChange={keys => updateProtocolNodeProtocol(Array.from(keys)[0] as ProtocolNodeForm["protocol"])} variant="bordered">
+                <Input label={t("节点名称")} value={protocolNodeForm.name} onChange={e => patchProtocolNodeForm({ name: e.target.value })} variant="bordered" />
+                <Select label={t("协议")} selectedKeys={[protocolNodeForm.protocol]} onSelectionChange={keys => updateProtocolNodeProtocol(Array.from(keys)[0] as ProtocolNodeForm["protocol"])} variant="bordered">
                   <SelectItem key="vless">VLESS Reality</SelectItem>
                   <SelectItem key="vmess">VMess WS</SelectItem>
                   <SelectItem key="trojan">Trojan TLS</SelectItem>
                   <SelectItem key="shadowsocks">Shadowsocks</SelectItem>
                   <SelectItem key="snell">Snell</SelectItem>
                 </Select>
-                <Input label="监听地址" value={protocolNodeForm.listen} onChange={e => patchProtocolNodeForm({ listen: e.target.value })} variant="bordered" placeholder={protocolNodeForm.protocol === "snell" ? "::0" : "留空监听全部"} />
-                <Input label="端口" type="number" value={protocolNodeForm.port.toString()} onChange={e => patchProtocolNodeForm({ port: Number(e.target.value) || 0 })} variant="bordered" />
-                <Select label="传输" selectedKeys={[protocolNodeForm.transport]} onSelectionChange={keys => patchProtocolNodeForm({ transport: Array.from(keys)[0] as ProtocolNodeForm["transport"] })} variant="bordered" isDisabled={protocolNodeForm.protocol === "snell"}>
+                <Input label={t("监听地址")} value={protocolNodeForm.listen} onChange={e => patchProtocolNodeForm({ listen: e.target.value })} variant="bordered" placeholder={protocolNodeForm.protocol === "snell" ? "::0" : t("留空监听全部")} />
+                <Input label={t("端口")} type="number" value={protocolNodeForm.port.toString()} onChange={e => patchProtocolNodeForm({ port: Number(e.target.value) || 0 })} variant="bordered" />
+                <Select label={t("传输")} selectedKeys={[protocolNodeForm.transport]} onSelectionChange={keys => patchProtocolNodeForm({ transport: Array.from(keys)[0] as ProtocolNodeForm["transport"] })} variant="bordered" isDisabled={protocolNodeForm.protocol === "snell"}>
                   <SelectItem key="tcp">TCP</SelectItem>
                   <SelectItem key="ws">WebSocket</SelectItem>
                 </Select>
-                <Select label="安全" selectedKeys={[protocolNodeForm.security]} onSelectionChange={keys => patchProtocolNodeForm({ security: Array.from(keys)[0] as ProtocolNodeForm["security"] })} variant="bordered" isDisabled={protocolNodeForm.protocol === "snell"}>
+                <Select label={t("安全")} selectedKeys={[protocolNodeForm.security]} onSelectionChange={keys => patchProtocolNodeForm({ security: Array.from(keys)[0] as ProtocolNodeForm["security"] })} variant="bordered" isDisabled={protocolNodeForm.protocol === "snell"}>
                   <SelectItem key="none">None</SelectItem>
                   <SelectItem key="tls">TLS</SelectItem>
                   <SelectItem key="reality">Reality</SelectItem>
@@ -2210,29 +2220,29 @@ export default function OrchestratorPage() {
               {protocolNodeForm.protocol === "snell" ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Input label="Snell PSK" value={protocolNodeForm.snellPsk} onChange={e => patchProtocolNodeForm({ snellPsk: e.target.value })} variant="bordered" placeholder="留空自动生成" />
-                    <Button size="sm" variant="flat" onPress={() => patchProtocolNodeForm({ snellPsk: randomToken(32) })}>生成 PSK</Button>
+                    <Input label="Snell PSK" value={protocolNodeForm.snellPsk} onChange={e => patchProtocolNodeForm({ snellPsk: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
+                    <Button size="sm" variant="flat" onPress={() => patchProtocolNodeForm({ snellPsk: randomToken(32) })}>{t("生成 PSK")}</Button>
                   </div>
-                  <Input label="Snell 版本" value={protocolNodeForm.snellVersion} onChange={e => patchProtocolNodeForm({ snellVersion: e.target.value })} variant="bordered" />
+                  <Input label={t("Snell 版本")} value={protocolNodeForm.snellVersion} onChange={e => patchProtocolNodeForm({ snellVersion: e.target.value })} variant="bordered" />
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Input label="客户端 Email" value={protocolNodeForm.clientEmail} onChange={e => patchProtocolNodeForm({ clientEmail: e.target.value })} variant="bordered" />
+                    <Input label={t("客户端 Email")} value={protocolNodeForm.clientEmail} onChange={e => patchProtocolNodeForm({ clientEmail: e.target.value })} variant="bordered" />
                     {protocolNodeForm.protocol !== "trojan" && protocolNodeForm.protocol !== "shadowsocks" && (
                       <div className="space-y-2">
-                        <Input label="客户端 UUID" value={protocolNodeForm.clientId} onChange={e => patchProtocolNodeForm({ clientId: e.target.value })} variant="bordered" />
-                        <Button size="sm" variant="flat" onPress={() => patchProtocolNodeForm({ clientId: randomUuid() })}>生成 UUID</Button>
+                        <Input label={t("客户端 UUID")} value={protocolNodeForm.clientId} onChange={e => patchProtocolNodeForm({ clientId: e.target.value })} variant="bordered" />
+                        <Button size="sm" variant="flat" onPress={() => patchProtocolNodeForm({ clientId: randomUuid() })}>{t("生成 UUID")}</Button>
                       </div>
                     )}
                     {(protocolNodeForm.protocol === "trojan" || protocolNodeForm.protocol === "shadowsocks") && (
-                      <Input label="客户端密码 / PSK" value={protocolNodeForm.clientPassword} onChange={e => patchProtocolNodeForm({ clientPassword: e.target.value })} variant="bordered" />
+                      <Input label={t("客户端密码 / PSK")} value={protocolNodeForm.clientPassword} onChange={e => patchProtocolNodeForm({ clientPassword: e.target.value })} variant="bordered" />
                     )}
                     {protocolNodeForm.protocol === "vless" && (
                       <Input label="Flow" value={protocolNodeForm.flow} onChange={e => patchProtocolNodeForm({ flow: e.target.value })} variant="bordered" />
                     )}
-                    <Input label="流量限制 GB" type="number" value={protocolNodeForm.totalGb.toString()} onChange={e => patchProtocolNodeForm({ totalGb: Number(e.target.value) || 0 })} variant="bordered" />
-                    <Input label="有效期天数" type="number" value={protocolNodeForm.expiryDays.toString()} onChange={e => patchProtocolNodeForm({ expiryDays: Number(e.target.value) || 0 })} variant="bordered" />
+                    <Input label={t("流量限制 GB")} type="number" value={protocolNodeForm.totalGb.toString()} onChange={e => patchProtocolNodeForm({ totalGb: Number(e.target.value) || 0 })} variant="bordered" />
+                    <Input label={t("有效期天数")} type="number" value={protocolNodeForm.expiryDays.toString()} onChange={e => patchProtocolNodeForm({ expiryDays: Number(e.target.value) || 0 })} variant="bordered" />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Input label="SNI / Host" value={protocolNodeForm.sni} onChange={e => patchProtocolNodeForm({ sni: e.target.value })} variant="bordered" />
@@ -2241,11 +2251,11 @@ export default function OrchestratorPage() {
                         <Input label="Reality Dest" value={protocolNodeForm.realityDest} onChange={e => patchProtocolNodeForm({ realityDest: e.target.value })} variant="bordered" />
                         <div className="space-y-2">
                           <Input label="Reality Private Key" value={protocolNodeForm.realityPrivateKey} onChange={e => patchProtocolNodeForm({ realityPrivateKey: e.target.value })} variant="bordered" />
-                          <Button size="sm" variant="flat" onPress={() => patchProtocolNodeForm({ realityPrivateKey: randomRealityPrivateKey() })}>生成私钥</Button>
+                          <Button size="sm" variant="flat" onPress={() => patchProtocolNodeForm({ realityPrivateKey: randomRealityPrivateKey() })}>{t("生成私钥")}</Button>
                         </div>
                         <div className="space-y-2">
                           <Input label="Reality Short ID" value={protocolNodeForm.realityShortId} onChange={e => patchProtocolNodeForm({ realityShortId: e.target.value })} variant="bordered" />
-                          <Button size="sm" variant="flat" onPress={() => patchProtocolNodeForm({ realityShortId: randomHex(8) })}>生成 Short ID</Button>
+                          <Button size="sm" variant="flat" onPress={() => patchProtocolNodeForm({ realityShortId: randomHex(8) })}>{t("生成 Short ID")}</Button>
                         </div>
                       </>
                     )}
@@ -2253,15 +2263,15 @@ export default function OrchestratorPage() {
                       <Input label="WebSocket Path" value={protocolNodeForm.wsPath} onChange={e => patchProtocolNodeForm({ wsPath: e.target.value })} variant="bordered" />
                     )}
                     {protocolNodeForm.protocol === "shadowsocks" && (
-                      <Input label="加密方法" value={protocolNodeForm.ssMethod} onChange={e => patchProtocolNodeForm({ ssMethod: e.target.value })} variant="bordered" />
+                      <Input label={t("加密方法")} value={protocolNodeForm.ssMethod} onChange={e => patchProtocolNodeForm({ ssMethod: e.target.value })} variant="bordered" />
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Input label="Outbound Tag" value={protocolNodeForm.outboundTag} onChange={e => patchProtocolNodeForm({ outboundTag: e.target.value })} variant="bordered" placeholder="留空使用默认路由" />
+                    <Input label="Outbound Tag" value={protocolNodeForm.outboundTag} onChange={e => patchProtocolNodeForm({ outboundTag: e.target.value })} variant="bordered" placeholder={t("留空使用默认路由")} />
                     {renderOutboundTagButtons(tag => patchProtocolNodeForm({ outboundTag: tag }))}
                   </div>
                   <Textarea
-                    label="Inbound Payload 预览"
+                    label={t("Inbound Payload 预览")}
                     minRows={10}
                     value={protocolNodePayloadPreview(protocolNodeForm)}
                     readOnly
@@ -2273,80 +2283,80 @@ export default function OrchestratorPage() {
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setProtocolNodeModalOpen(false)}>取消</Button>
-            <Button color="primary" isLoading={submitting} onPress={saveProtocolNode}>保存</Button>
+            <Button variant="light" onPress={() => setProtocolNodeModalOpen(false)}>{t("取消")}</Button>
+            <Button color="primary" isLoading={submitting} onPress={saveProtocolNode}>{t("保存")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
       <Modal isOpen={serverForwardModalOpen} onOpenChange={setServerForwardModalOpen} size="3xl">
         <ModalContent>
-          <ModalHeader>{serverForwardRuleForm.id ? "编辑远端端口转发" : "新增远端端口转发"}</ModalHeader>
+          <ModalHeader>{serverForwardRuleForm.id ? t("编辑远端端口转发") : t("新增远端端口转发")}</ModalHeader>
           <ModalBody>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Select label="目标服务器" selectedKeys={serverForwardRuleForm.serverId ? [serverForwardRuleForm.serverId.toString()] : []} onSelectionChange={keys => patchServerForwardRuleForm({ serverId: Number(Array.from(keys)[0]) })} variant="bordered">
+              <Select label={t("目标服务器")} selectedKeys={serverForwardRuleForm.serverId ? [serverForwardRuleForm.serverId.toString()] : []} onSelectionChange={keys => patchServerForwardRuleForm({ serverId: Number(Array.from(keys)[0]) })} variant="bordered">
                 {renderServerOptions()}
               </Select>
-              <Input label="规则名称" value={serverForwardRuleForm.name} onChange={e => patchServerForwardRuleForm({ name: e.target.value })} variant="bordered" />
-              <Select label="协议" selectedKeys={[serverForwardRuleForm.protocol]} onSelectionChange={keys => patchServerForwardRuleForm({ protocol: Array.from(keys)[0] as ServerForwardRuleForm["protocol"] })} variant="bordered">
+              <Input label={t("规则名称")} value={serverForwardRuleForm.name} onChange={e => patchServerForwardRuleForm({ name: e.target.value })} variant="bordered" />
+              <Select label={t("协议")} selectedKeys={[serverForwardRuleForm.protocol]} onSelectionChange={keys => patchServerForwardRuleForm({ protocol: Array.from(keys)[0] as ServerForwardRuleForm["protocol"] })} variant="bordered">
                 <SelectItem key="tcp">TCP</SelectItem>
                 <SelectItem key="udp">UDP</SelectItem>
               </Select>
-              <Input label="监听地址" value={serverForwardRuleForm.listenHost} onChange={e => patchServerForwardRuleForm({ listenHost: e.target.value })} variant="bordered" />
-              <Input label="监听端口" type="number" value={serverForwardRuleForm.listenPort.toString()} onChange={e => patchServerForwardRuleForm({ listenPort: Number(e.target.value) || 0 })} variant="bordered" />
-              <Input label="目标地址" value={serverForwardRuleForm.targetHost} onChange={e => patchServerForwardRuleForm({ targetHost: e.target.value })} variant="bordered" />
-              <Input label="目标端口" type="number" value={serverForwardRuleForm.targetPort.toString()} onChange={e => patchServerForwardRuleForm({ targetPort: Number(e.target.value) || 0 })} variant="bordered" />
+              <Input label={t("监听地址")} value={serverForwardRuleForm.listenHost} onChange={e => patchServerForwardRuleForm({ listenHost: e.target.value })} variant="bordered" />
+              <Input label={t("监听端口")} type="number" value={serverForwardRuleForm.listenPort.toString()} onChange={e => patchServerForwardRuleForm({ listenPort: Number(e.target.value) || 0 })} variant="bordered" />
+              <Input label={t("目标地址")} value={serverForwardRuleForm.targetHost} onChange={e => patchServerForwardRuleForm({ targetHost: e.target.value })} variant="bordered" />
+              <Input label={t("目标端口")} type="number" value={serverForwardRuleForm.targetPort.toString()} onChange={e => patchServerForwardRuleForm({ targetPort: Number(e.target.value) || 0 })} variant="bordered" />
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setServerForwardModalOpen(false)}>取消</Button>
-            <Button color="primary" isLoading={submitting} onPress={saveServerForwardRule}>保存</Button>
+            <Button variant="light" onPress={() => setServerForwardModalOpen(false)}>{t("取消")}</Button>
+            <Button color="primary" isLoading={submitting} onPress={saveServerForwardRule}>{t("保存")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
       <Modal isOpen={deployModalOpen} onOpenChange={setDeployModalOpen} size="2xl">
         <ModalContent>
-          <ModalHeader>生成部署任务</ModalHeader>
+          <ModalHeader>{t("生成部署任务")}</ModalHeader>
           <ModalBody>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Select label="目标服务器" selectedKeys={deployForm.serverId ? [deployForm.serverId.toString()] : []} onSelectionChange={keys => setDeployForm(prev => ({ ...prev, serverId: Number(Array.from(keys)[0]) }))} variant="bordered">
+              <Select label={t("目标服务器")} selectedKeys={deployForm.serverId ? [deployForm.serverId.toString()] : []} onSelectionChange={keys => setDeployForm(prev => ({ ...prev, serverId: Number(Array.from(keys)[0]) }))} variant="bordered">
                 {renderServerOptions()}
               </Select>
-              <Select label="协议模板" selectedKeys={deployForm.profileId ? [deployForm.profileId.toString()] : []} onSelectionChange={keys => selectProfileForDeploy(Number(Array.from(keys)[0]))} variant="bordered">
+              <Select label={t("协议模板")} selectedKeys={deployForm.profileId ? [deployForm.profileId.toString()] : []} onSelectionChange={keys => selectProfileForDeploy(Number(Array.from(keys)[0]))} variant="bordered">
                 {profiles.map(profile => <SelectItem key={profile.id.toString()}>{profile.name}</SelectItem>)}
               </Select>
-              <Select label="动作" selectedKeys={[deployForm.action]} onSelectionChange={keys => setDeployForm(prev => ({ ...prev, action: Array.from(keys)[0] as string }))} variant="bordered">
-                <SelectItem key="present">安装/更新</SelectItem>
-                <SelectItem key="restarted">重启</SelectItem>
-                <SelectItem key="status">状态</SelectItem>
-                <SelectItem key="absent">卸载</SelectItem>
+              <Select label={t("动作")} selectedKeys={[deployForm.action]} onSelectionChange={keys => setDeployForm(prev => ({ ...prev, action: Array.from(keys)[0] as string }))} variant="bordered">
+                <SelectItem key="present">{t("安装/更新")}</SelectItem>
+                <SelectItem key="restarted">{t("重启")}</SelectItem>
+                <SelectItem key="status">{t("状态")}</SelectItem>
+                <SelectItem key="absent">{t("卸载")}</SelectItem>
               </Select>
-              <Input label="协议" value={deployForm.protocol} onChange={e => setDeployForm(prev => ({ ...prev, protocol: e.target.value }))} variant="bordered" />
-              <Input label="版本族" value={deployForm.versionFamily} onChange={e => setDeployForm(prev => ({ ...prev, versionFamily: e.target.value }))} variant="bordered" />
-              <Input label="固定版本" value={deployForm.exactVersion} onChange={e => setDeployForm(prev => ({ ...prev, exactVersion: e.target.value }))} variant="bordered" />
-              <Input label="监听端口" type="number" value={deployForm.listenPort.toString()} onChange={e => setDeployForm(prev => ({ ...prev, listenPort: Number(e.target.value) || 0 }))} variant="bordered" />
+              <Input label={t("协议")} value={deployForm.protocol} onChange={e => setDeployForm(prev => ({ ...prev, protocol: e.target.value }))} variant="bordered" />
+              <Input label={t("版本族")} value={deployForm.versionFamily} onChange={e => setDeployForm(prev => ({ ...prev, versionFamily: e.target.value }))} variant="bordered" />
+              <Input label={t("固定版本")} value={deployForm.exactVersion} onChange={e => setDeployForm(prev => ({ ...prev, exactVersion: e.target.value }))} variant="bordered" />
+              <Input label={t("监听端口")} type="number" value={deployForm.listenPort.toString()} onChange={e => setDeployForm(prev => ({ ...prev, listenPort: Number(e.target.value) || 0 }))} variant="bordered" />
               <div className="space-y-2">
                 <Input label="Snell PSK" value={deployForm.psk} onChange={e => setDeployForm(prev => ({ ...prev, psk: e.target.value }))} variant="bordered" />
-                <Button size="sm" variant="flat" onPress={() => setDeployForm(prev => ({ ...prev, psk: randomToken(32) }))}>生成 PSK</Button>
+                <Button size="sm" variant="flat" onPress={() => setDeployForm(prev => ({ ...prev, psk: randomToken(32) }))}>{t("生成 PSK")}</Button>
               </div>
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setDeployModalOpen(false)}>取消</Button>
-            <Button color="primary" isLoading={submitting} onPress={saveDeployTask}>生成</Button>
+            <Button variant="light" onPress={() => setDeployModalOpen(false)}>{t("取消")}</Button>
+            <Button color="primary" isLoading={submitting} onPress={saveDeployTask}>{t("生成")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
       <Modal isOpen={orchestrationModalOpen} onOpenChange={setOrchestrationModalOpen} size="5xl" scrollBehavior="inside">
         <ModalContent>
-          <ModalHeader>一键编排 3x-ui / Xray / Snell</ModalHeader>
+          <ModalHeader>{t("一键编排 3x-ui / Xray / Snell")}</ModalHeader>
           <ModalBody>
             <div className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Select
-                  label="目标服务器"
+                  label={t("目标服务器")}
                   selectionMode="multiple"
                   selectedKeys={orchestrationForm.serverIds.map(id => id.toString())}
                   onSelectionChange={keys => {
@@ -2365,108 +2375,108 @@ export default function OrchestratorPage() {
                 >
                   {renderServerOptions()}
                 </Select>
-                <Input label="公网主机" value={orchestrationForm.publicHost} onChange={e => patchOrchestrationForm({ publicHost: e.target.value })} variant="bordered" />
-                <Input label="3x-ui 版本" value={orchestrationForm.xuiVersion} onChange={e => patchOrchestrationForm({ xuiVersion: e.target.value })} variant="bordered" placeholder="留空使用最新版" />
+                <Input label={t("公网主机")} value={orchestrationForm.publicHost} onChange={e => patchOrchestrationForm({ publicHost: e.target.value })} variant="bordered" />
+                <Input label={t("3x-ui 版本")} value={orchestrationForm.xuiVersion} onChange={e => patchOrchestrationForm({ xuiVersion: e.target.value })} variant="bordered" placeholder={t("留空使用最新版")} />
               </div>
               {selectedOrchestrationHasMaster && (
                 <MasterRiskNotice context="生成一键编排任务" />
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-small border border-default-200 p-4">
-                <Switch isSelected={orchestrationForm.installXui} onValueChange={value => patchOrchestrationForm({ installXui: value })}>安装 3x-ui</Switch>
-                <Switch isSelected={orchestrationForm.configurePanel} onValueChange={value => patchOrchestrationForm({ configurePanel: value })}>配置面板</Switch>
-                <Switch isSelected={orchestrationForm.installSnell} onValueChange={value => patchOrchestrationForm({ installSnell: value })}>安装 Snell</Switch>
-                <Switch isSelected={orchestrationForm.createVlessReality || orchestrationForm.createVmessWs || orchestrationForm.createTrojanTls || orchestrationForm.createShadowsocks} isReadOnly>创建节点</Switch>
+                <Switch isSelected={orchestrationForm.installXui} onValueChange={value => patchOrchestrationForm({ installXui: value })}>{t("安装 3x-ui")}</Switch>
+                <Switch isSelected={orchestrationForm.configurePanel} onValueChange={value => patchOrchestrationForm({ configurePanel: value })}>{t("配置面板")}</Switch>
+                <Switch isSelected={orchestrationForm.installSnell} onValueChange={value => patchOrchestrationForm({ installSnell: value })}>{t("安装 Snell")}</Switch>
+                <Switch isSelected={orchestrationForm.createVlessReality || orchestrationForm.createVmessWs || orchestrationForm.createTrojanTls || orchestrationForm.createShadowsocks} isReadOnly>{t("创建节点")}</Switch>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input label="面板端口" type="number" value={orchestrationForm.panelPort.toString()} onChange={e => patchOrchestrationForm({ panelPort: Number(e.target.value) || 54321 })} variant="bordered" />
-                <Input label="面板用户名" value={orchestrationForm.panelUsername} onChange={e => patchOrchestrationForm({ panelUsername: e.target.value })} variant="bordered" placeholder="留空自动生成" />
-                <Input label="面板密码" type="password" value={orchestrationForm.panelPassword} onChange={e => patchOrchestrationForm({ panelPassword: e.target.value })} variant="bordered" placeholder="留空自动生成" />
+                <Input label={t("面板端口")} type="number" value={orchestrationForm.panelPort.toString()} onChange={e => patchOrchestrationForm({ panelPort: Number(e.target.value) || 54321 })} variant="bordered" />
+                <Input label={t("面板用户名")} value={orchestrationForm.panelUsername} onChange={e => patchOrchestrationForm({ panelUsername: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
+                <Input label={t("面板密码")} type="password" value={orchestrationForm.panelPassword} onChange={e => patchOrchestrationForm({ panelPassword: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
                 <Input label="Web Base Path" value={orchestrationForm.webBasePath} onChange={e => patchOrchestrationForm({ webBasePath: e.target.value })} variant="bordered" />
-                <Input label="监听 IP" value={orchestrationForm.listenIp} onChange={e => patchOrchestrationForm({ listenIp: e.target.value })} variant="bordered" />
-                <Select label="证书模式" selectedKeys={[orchestrationForm.certificateMode]} onSelectionChange={keys => patchOrchestrationForm({ certificateMode: Array.from(keys)[0] as OrchestrationForm["certificateMode"] })} variant="bordered">
-                  <SelectItem key="self-signed">自签名</SelectItem>
+                <Input label={t("监听 IP")} value={orchestrationForm.listenIp} onChange={e => patchOrchestrationForm({ listenIp: e.target.value })} variant="bordered" />
+                <Select label={t("证书模式")} selectedKeys={[orchestrationForm.certificateMode]} onSelectionChange={keys => patchOrchestrationForm({ certificateMode: Array.from(keys)[0] as OrchestrationForm["certificateMode"] })} variant="bordered">
+                  <SelectItem key="self-signed">{t("自签名")}</SelectItem>
                   <SelectItem key="acme-http">ACME HTTP</SelectItem>
-                  <SelectItem key="none">不配置</SelectItem>
+                  <SelectItem key="none">{t("不配置")}</SelectItem>
                 </Select>
-                <Input label="证书域名" value={orchestrationForm.certificateDomain} onChange={e => patchOrchestrationForm({ certificateDomain: e.target.value })} variant="bordered" />
-                <Input label="ACME 邮箱" value={orchestrationForm.acmeEmail} onChange={e => patchOrchestrationForm({ acmeEmail: e.target.value })} variant="bordered" />
+                <Input label={t("证书域名")} value={orchestrationForm.certificateDomain} onChange={e => patchOrchestrationForm({ certificateDomain: e.target.value })} variant="bordered" />
+                <Input label={t("ACME 邮箱")} value={orchestrationForm.acmeEmail} onChange={e => patchOrchestrationForm({ acmeEmail: e.target.value })} variant="bordered" />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 rounded-small border border-default-200 p-4">
                 <div className="space-y-3">
                   <Switch isSelected={orchestrationForm.createVlessReality} onValueChange={value => patchOrchestrationForm({ createVlessReality: value })}>VLESS Reality</Switch>
-                  <Input label="VLESS 端口" type="number" value={orchestrationForm.vlessPort.toString()} onChange={e => patchOrchestrationForm({ vlessPort: Number(e.target.value) || 443 })} variant="bordered" />
+                  <Input label={t("VLESS 端口")} type="number" value={orchestrationForm.vlessPort.toString()} onChange={e => patchOrchestrationForm({ vlessPort: Number(e.target.value) || 443 })} variant="bordered" />
                   <Input label="Reality SNI" value={orchestrationForm.realitySni} onChange={e => patchOrchestrationForm({ realitySni: e.target.value })} variant="bordered" />
                   <Input label="Reality Dest" value={orchestrationForm.realityDest} onChange={e => patchOrchestrationForm({ realityDest: e.target.value })} variant="bordered" />
                 </div>
                 <div className="space-y-3">
                   <Switch isSelected={orchestrationForm.createVmessWs} onValueChange={value => patchOrchestrationForm({ createVmessWs: value })}>VMess WS</Switch>
-                  <Input label="VMess 端口" type="number" value={orchestrationForm.vmessPort.toString()} onChange={e => patchOrchestrationForm({ vmessPort: Number(e.target.value) || 2086 })} variant="bordered" />
+                  <Input label={t("VMess 端口")} type="number" value={orchestrationForm.vmessPort.toString()} onChange={e => patchOrchestrationForm({ vmessPort: Number(e.target.value) || 2086 })} variant="bordered" />
                   <Input label="WS Path" value={orchestrationForm.wsPath} onChange={e => patchOrchestrationForm({ wsPath: e.target.value })} variant="bordered" />
                 </div>
                 <div className="space-y-3">
                   <Switch isSelected={orchestrationForm.createTrojanTls} onValueChange={value => patchOrchestrationForm({ createTrojanTls: value })}>Trojan TLS</Switch>
-                  <Input label="Trojan 端口" type="number" value={orchestrationForm.trojanPort.toString()} onChange={e => patchOrchestrationForm({ trojanPort: Number(e.target.value) || 8443 })} variant="bordered" />
+                  <Input label={t("Trojan 端口")} type="number" value={orchestrationForm.trojanPort.toString()} onChange={e => patchOrchestrationForm({ trojanPort: Number(e.target.value) || 8443 })} variant="bordered" />
                 </div>
                 <div className="space-y-3">
                   <Switch isSelected={orchestrationForm.createShadowsocks} onValueChange={value => patchOrchestrationForm({ createShadowsocks: value })}>Shadowsocks</Switch>
-                  <Input label="SS 端口" type="number" value={orchestrationForm.shadowsocksPort.toString()} onChange={e => patchOrchestrationForm({ shadowsocksPort: Number(e.target.value) || 8388 })} variant="bordered" />
-                  <Input label="SS 加密" value={orchestrationForm.ssMethod} onChange={e => patchOrchestrationForm({ ssMethod: e.target.value })} variant="bordered" />
+                  <Input label={t("SS 端口")} type="number" value={orchestrationForm.shadowsocksPort.toString()} onChange={e => patchOrchestrationForm({ shadowsocksPort: Number(e.target.value) || 8388 })} variant="bordered" />
+                  <Input label={t("SS 加密")} value={orchestrationForm.ssMethod} onChange={e => patchOrchestrationForm({ ssMethod: e.target.value })} variant="bordered" />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input label="Snell 端口" type="number" value={orchestrationForm.snellPort.toString()} onChange={e => patchOrchestrationForm({ snellPort: Number(e.target.value) || 8390 })} variant="bordered" />
+                <Input label={t("Snell 端口")} type="number" value={orchestrationForm.snellPort.toString()} onChange={e => patchOrchestrationForm({ snellPort: Number(e.target.value) || 8390 })} variant="bordered" />
                 <div className="space-y-2">
-                  <Input label="Snell PSK" value={orchestrationForm.snellPsk} onChange={e => patchOrchestrationForm({ snellPsk: e.target.value })} variant="bordered" placeholder="留空自动生成" />
-                  <Button size="sm" variant="flat" onPress={() => patchOrchestrationForm({ snellPsk: randomToken(32) })}>生成 PSK</Button>
+                  <Input label="Snell PSK" value={orchestrationForm.snellPsk} onChange={e => patchOrchestrationForm({ snellPsk: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
+                  <Button size="sm" variant="flat" onPress={() => patchOrchestrationForm({ snellPsk: randomToken(32) })}>{t("生成 PSK")}</Button>
                 </div>
               </div>
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setOrchestrationModalOpen(false)}>取消</Button>
-            <Button color="primary" isLoading={submitting} onPress={saveOrchestrationTask}>生成一键任务</Button>
+            <Button variant="light" onPress={() => setOrchestrationModalOpen(false)}>{t("取消")}</Button>
+            <Button color="primary" isLoading={submitting} onPress={saveOrchestrationTask}>{t("生成一键任务")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
       <Modal isOpen={threeXuiInboundModalOpen} onOpenChange={setThreeXuiInboundModalOpen} size="5xl" scrollBehavior="inside">
         <ModalContent>
-          <ModalHeader>3x-ui 入站操作</ModalHeader>
+          <ModalHeader>{t("3x-ui 入站操作")}</ModalHeader>
           <ModalBody>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Select label="动作" selectedKeys={[threeXuiInboundForm.mode]} onSelectionChange={keys => patchThreeXuiInboundForm({ mode: Array.from(keys)[0] as ThreeXuiInboundForm["mode"] })} variant="bordered">
-                <SelectItem key="add">新增 inbound</SelectItem>
-                <SelectItem key="update">更新 inbound</SelectItem>
-                <SelectItem key="delete">删除 inbound</SelectItem>
+              <Select label={t("动作")} selectedKeys={[threeXuiInboundForm.mode]} onSelectionChange={keys => patchThreeXuiInboundForm({ mode: Array.from(keys)[0] as ThreeXuiInboundForm["mode"] })} variant="bordered">
+                <SelectItem key="add">{t("新增 inbound")}</SelectItem>
+                <SelectItem key="update">{t("更新 inbound")}</SelectItem>
+                <SelectItem key="delete">{t("删除 inbound")}</SelectItem>
               </Select>
-              <Select label="编辑方式" selectedKeys={[threeXuiInboundForm.editMode]} onSelectionChange={keys => patchThreeXuiInboundForm({ editMode: Array.from(keys)[0] as ThreeXuiInboundForm["editMode"] })} variant="bordered">
-                <SelectItem key="form">结构化表单</SelectItem>
-                <SelectItem key="json">高级 JSON</SelectItem>
+              <Select label={t("编辑方式")} selectedKeys={[threeXuiInboundForm.editMode]} onSelectionChange={keys => patchThreeXuiInboundForm({ editMode: Array.from(keys)[0] as ThreeXuiInboundForm["editMode"] })} variant="bordered">
+                <SelectItem key="form">{t("结构化表单")}</SelectItem>
+                <SelectItem key="json">{t("高级 JSON")}</SelectItem>
               </Select>
-              <Input label="服务器 ID" value={threeXuiInboundForm.serverId?.toString() || ""} isReadOnly variant="bordered" />
+              <Input label={t("服务器 ID")} value={threeXuiInboundForm.serverId?.toString() || ""} isReadOnly variant="bordered" />
               <Input label="Inbound ID" value={threeXuiInboundForm.inboundId} onChange={e => patchThreeXuiInboundForm({ inboundId: e.target.value })} variant="bordered" />
-              <Input label="备注" value={threeXuiInboundForm.remark} onChange={e => patchThreeXuiInboundForm({ remark: e.target.value })} variant="bordered" />
-              <Select label="启用" selectedKeys={[threeXuiInboundForm.enable.toString()]} onSelectionChange={keys => patchThreeXuiInboundForm({ enable: Number(Array.from(keys)[0]) })} variant="bordered">
-                <SelectItem key="1">启用</SelectItem>
-                <SelectItem key="0">停用</SelectItem>
+              <Input label={t("备注")} value={threeXuiInboundForm.remark} onChange={e => patchThreeXuiInboundForm({ remark: e.target.value })} variant="bordered" />
+              <Select label={t("启用")} selectedKeys={[threeXuiInboundForm.enable.toString()]} onSelectionChange={keys => patchThreeXuiInboundForm({ enable: Number(Array.from(keys)[0]) })} variant="bordered">
+                <SelectItem key="1">{t("启用")}</SelectItem>
+                <SelectItem key="0">{t("停用")}</SelectItem>
               </Select>
-              <Input label="监听地址" value={threeXuiInboundForm.listen} onChange={e => patchThreeXuiInboundForm({ listen: e.target.value })} variant="bordered" placeholder="留空监听所有地址" />
-              <Input label="端口" type="number" value={threeXuiInboundForm.port.toString()} onChange={e => patchThreeXuiInboundForm({ port: Number(e.target.value) || 0 })} variant="bordered" />
-              <Select label="协议" selectedKeys={[threeXuiInboundForm.protocol]} onSelectionChange={keys => updateInboundProtocol(Array.from(keys)[0] as ThreeXuiInboundForm["protocol"])} variant="bordered">
+              <Input label={t("监听地址")} value={threeXuiInboundForm.listen} onChange={e => patchThreeXuiInboundForm({ listen: e.target.value })} variant="bordered" placeholder={t("留空监听所有地址")} />
+              <Input label={t("端口")} type="number" value={threeXuiInboundForm.port.toString()} onChange={e => patchThreeXuiInboundForm({ port: Number(e.target.value) || 0 })} variant="bordered" />
+              <Select label={t("协议")} selectedKeys={[threeXuiInboundForm.protocol]} onSelectionChange={keys => updateInboundProtocol(Array.from(keys)[0] as ThreeXuiInboundForm["protocol"])} variant="bordered">
                 <SelectItem key="vless">VLESS</SelectItem>
                 <SelectItem key="vmess">VMess</SelectItem>
                 <SelectItem key="trojan">Trojan</SelectItem>
                 <SelectItem key="shadowsocks">Shadowsocks</SelectItem>
               </Select>
-              <Select label="传输" selectedKeys={[threeXuiInboundForm.network]} onSelectionChange={keys => patchThreeXuiInboundForm({ network: Array.from(keys)[0] as ThreeXuiInboundForm["network"] })} variant="bordered">
+              <Select label={t("传输")} selectedKeys={[threeXuiInboundForm.network]} onSelectionChange={keys => patchThreeXuiInboundForm({ network: Array.from(keys)[0] as ThreeXuiInboundForm["network"] })} variant="bordered">
                 <SelectItem key="tcp">TCP</SelectItem>
                 <SelectItem key="ws">WebSocket</SelectItem>
               </Select>
-              <Select label="安全" selectedKeys={[threeXuiInboundForm.security]} onSelectionChange={keys => patchThreeXuiInboundForm({ security: Array.from(keys)[0] as ThreeXuiInboundForm["security"] })} variant="bordered">
+              <Select label={t("安全")} selectedKeys={[threeXuiInboundForm.security]} onSelectionChange={keys => patchThreeXuiInboundForm({ security: Array.from(keys)[0] as ThreeXuiInboundForm["security"] })} variant="bordered">
                 <SelectItem key="none">None</SelectItem>
                 <SelectItem key="tls">TLS</SelectItem>
                 <SelectItem key="reality">Reality</SelectItem>
@@ -2479,35 +2489,35 @@ export default function OrchestratorPage() {
             {threeXuiInboundForm.mode !== "delete" && threeXuiInboundForm.editMode === "form" && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Input label="客户端 Email" value={threeXuiInboundForm.clientEmail} onChange={e => patchThreeXuiInboundForm({ clientEmail: e.target.value })} variant="bordered" />
+                  <Input label={t("客户端 Email")} value={threeXuiInboundForm.clientEmail} onChange={e => patchThreeXuiInboundForm({ clientEmail: e.target.value })} variant="bordered" />
                   {threeXuiInboundForm.protocol !== "trojan" && threeXuiInboundForm.protocol !== "shadowsocks" && (
                     <div className="space-y-2">
-                      <Input label="客户端 UUID" value={threeXuiInboundForm.clientId} onChange={e => patchThreeXuiInboundForm({ clientId: e.target.value })} variant="bordered" />
-                      <Button size="sm" variant="flat" onPress={() => patchThreeXuiInboundForm({ clientId: randomUuid() })}>生成 UUID</Button>
+                      <Input label={t("客户端 UUID")} value={threeXuiInboundForm.clientId} onChange={e => patchThreeXuiInboundForm({ clientId: e.target.value })} variant="bordered" />
+                      <Button size="sm" variant="flat" onPress={() => patchThreeXuiInboundForm({ clientId: randomUuid() })}>{t("生成 UUID")}</Button>
                     </div>
                   )}
                   {(threeXuiInboundForm.protocol === "trojan" || threeXuiInboundForm.protocol === "shadowsocks") && (
-                    <Input label="客户端密码 / PSK" value={threeXuiInboundForm.clientPassword} onChange={e => patchThreeXuiInboundForm({ clientPassword: e.target.value })} variant="bordered" />
+                    <Input label={t("客户端密码 / PSK")} value={threeXuiInboundForm.clientPassword} onChange={e => patchThreeXuiInboundForm({ clientPassword: e.target.value })} variant="bordered" />
                   )}
                   {threeXuiInboundForm.protocol === "vless" && (
                     <Input label="Flow" value={threeXuiInboundForm.flow} onChange={e => patchThreeXuiInboundForm({ flow: e.target.value })} variant="bordered" />
                   )}
-                  <Input label="流量限制 GB" type="number" value={threeXuiInboundForm.totalGb.toString()} onChange={e => patchThreeXuiInboundForm({ totalGb: Number(e.target.value) || 0 })} variant="bordered" />
-                  <Input label="有效期天数" type="number" value={threeXuiInboundForm.expiryDays.toString()} onChange={e => patchThreeXuiInboundForm({ expiryDays: Number(e.target.value) || 0 })} variant="bordered" />
+                  <Input label={t("流量限制 GB")} type="number" value={threeXuiInboundForm.totalGb.toString()} onChange={e => patchThreeXuiInboundForm({ totalGb: Number(e.target.value) || 0 })} variant="bordered" />
+                  <Input label={t("有效期天数")} type="number" value={threeXuiInboundForm.expiryDays.toString()} onChange={e => patchThreeXuiInboundForm({ expiryDays: Number(e.target.value) || 0 })} variant="bordered" />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Input label="SNI / Host" value={threeXuiInboundForm.sni} onChange={e => patchThreeXuiInboundForm({ sni: e.target.value })} variant="bordered" />
                   {threeXuiInboundForm.protocol === "vless" && threeXuiInboundForm.security === "reality" && (
                     <>
-                      <Input label="Reality Dest" value={threeXuiInboundForm.realityDest} onChange={e => patchThreeXuiInboundForm({ realityDest: e.target.value })} variant="bordered" />
-                      <div className="space-y-2">
-                        <Input label="Reality Private Key" value={threeXuiInboundForm.realityPrivateKey} onChange={e => patchThreeXuiInboundForm({ realityPrivateKey: e.target.value })} variant="bordered" />
-                        <Button size="sm" variant="flat" onPress={() => patchThreeXuiInboundForm({ realityPrivateKey: randomRealityPrivateKey() })}>生成私钥</Button>
+                        <Input label="Reality Dest" value={threeXuiInboundForm.realityDest} onChange={e => patchThreeXuiInboundForm({ realityDest: e.target.value })} variant="bordered" />
+                        <div className="space-y-2">
+                          <Input label="Reality Private Key" value={threeXuiInboundForm.realityPrivateKey} onChange={e => patchThreeXuiInboundForm({ realityPrivateKey: e.target.value })} variant="bordered" />
+                        <Button size="sm" variant="flat" onPress={() => patchThreeXuiInboundForm({ realityPrivateKey: randomRealityPrivateKey() })}>{t("生成私钥")}</Button>
                       </div>
                       <div className="space-y-2">
                         <Input label="Reality Short ID" value={threeXuiInboundForm.realityShortId} onChange={e => patchThreeXuiInboundForm({ realityShortId: e.target.value })} variant="bordered" />
-                        <Button size="sm" variant="flat" onPress={() => patchThreeXuiInboundForm({ realityShortId: randomHex(8) })}>生成 Short ID</Button>
+                        <Button size="sm" variant="flat" onPress={() => patchThreeXuiInboundForm({ realityShortId: randomHex(8) })}>{t("生成 Short ID")}</Button>
                       </div>
                     </>
                   )}
@@ -2515,7 +2525,7 @@ export default function OrchestratorPage() {
                     <Input label="WebSocket Path" value={threeXuiInboundForm.wsPath} onChange={e => patchThreeXuiInboundForm({ wsPath: e.target.value })} variant="bordered" />
                   )}
                   {threeXuiInboundForm.protocol === "shadowsocks" && (
-                    <Input label="加密方法" value={threeXuiInboundForm.ssMethod} onChange={e => patchThreeXuiInboundForm({ ssMethod: e.target.value })} variant="bordered" />
+                    <Input label={t("加密方法")} value={threeXuiInboundForm.ssMethod} onChange={e => patchThreeXuiInboundForm({ ssMethod: e.target.value })} variant="bordered" />
                   )}
                 </div>
               </div>
@@ -2523,7 +2533,7 @@ export default function OrchestratorPage() {
 
             {threeXuiInboundForm.mode !== "delete" && (
               <Textarea
-                label={threeXuiInboundForm.editMode === "json" ? "Inbound Payload JSON" : "生成的 Payload 预览"}
+                label={threeXuiInboundForm.editMode === "json" ? "Inbound Payload JSON" : t("生成的 Payload 预览")}
                 minRows={14}
                 value={threeXuiInboundForm.editMode === "json" ? threeXuiInboundForm.payloadJson : inboundPayloadPreview(threeXuiInboundForm)}
                 onChange={e => patchThreeXuiInboundForm({ payloadJson: e.target.value })}
@@ -2534,19 +2544,19 @@ export default function OrchestratorPage() {
             )}
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setThreeXuiInboundModalOpen(false)}>取消</Button>
-            <Button color={threeXuiInboundForm.mode === "delete" ? "danger" : "primary"} isLoading={submitting} onPress={saveThreeXuiInbound}>提交</Button>
+            <Button variant="light" onPress={() => setThreeXuiInboundModalOpen(false)}>{t("取消")}</Button>
+            <Button color={threeXuiInboundForm.mode === "delete" ? "danger" : "primary"} isLoading={submitting} onPress={saveThreeXuiInbound}>{t("提交")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
       <Modal isOpen={xraySettingModalOpen} onOpenChange={setXraySettingModalOpen} size="5xl" scrollBehavior="inside">
         <ModalContent>
-          <ModalHeader>保存 3x-ui Xray / Outbound 配置</ModalHeader>
+          <ModalHeader>{t("保存 3x-ui Xray / Outbound 配置")}</ModalHeader>
           <ModalBody>
-            <Input label="Outbound 测试地址" value={outboundTestUrl} onChange={e => setOutboundTestUrl(e.target.value)} variant="bordered" />
+            <Input label={t("Outbound 测试地址")} value={outboundTestUrl} onChange={e => setOutboundTestUrl(e.target.value)} variant="bordered" />
             <Textarea
-              label="完整 Xray 配置 JSON"
+              label={t("完整 Xray 配置 JSON")}
               minRows={22}
               value={xraySettingText}
               onChange={e => setXraySettingText(e.target.value)}
@@ -2555,8 +2565,8 @@ export default function OrchestratorPage() {
             />
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setXraySettingModalOpen(false)}>取消</Button>
-            <Button color="primary" isLoading={submitting} onPress={saveXraySetting}>保存到 3x-ui</Button>
+            <Button variant="light" onPress={() => setXraySettingModalOpen(false)}>{t("取消")}</Button>
+            <Button color="primary" isLoading={submitting} onPress={saveXraySetting}>{t("保存到 3x-ui")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
@@ -2568,8 +2578,8 @@ export default function OrchestratorPage() {
             <Textarea value={scriptText} minRows={18} readOnly variant="bordered" classNames={{ input: "font-mono text-xs" }} />
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setScriptModalOpen(false)}>关闭</Button>
-            <Button color="primary" onPress={copyScript}>复制</Button>
+            <Button variant="light" onPress={() => setScriptModalOpen(false)}>{t("关闭")}</Button>
+            <Button color="primary" onPress={copyScript}>{t("复制")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

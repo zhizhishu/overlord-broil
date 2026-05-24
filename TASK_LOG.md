@@ -275,4 +275,12 @@
 4. 同步 README 与中文 README：把“未提供切换”的旧口径改为“已提供核心界面中英文切换，历史页面分批覆盖”。
 5. 验证与发布：运行 `npm run build`、脚本语法和 `git diff --check`，提交并推送 `origin/future`，观察 GitHub Actions。
 
-- [ ] **目标:** 新增前端中英文切换基础设施，覆盖主控核心页面与文档口径，并推送到 `future` 分支 (创建于: 2026-05-23 22:19:57)
+- [x] ~~**目标:** 新增前端中英文切换基础设施，覆盖主控核心页面与文档口径，并推送到 `future` 分支~~ (创建于: 2026-05-23 22:19:57 | **完成于: 2026-05-23 23:16:21**)
+
+### 2026-05-23 23:16:21 进度记录
+
+- 新增前端轻量 i18n 基础设施：`LanguageProvider`、`useLanguage`、`zh-CN/en-US` 类型、localStorage 语言持久化、HTML `lang` 同步和参数插值。
+- 新增 `LanguageSwitch`，接入桌面主布局、H5 布局、H5 简化布局和公共 Navbar；HeroUI `I18nProvider` 已随当前语言切换。
+- 主控中心核心链路已接入中英文：导航、服务器卡片、统一规则、监控告警、一键编排、部署任务、3x-ui 入站/出站配置、Snell 节点、远端转发、agent 诊断/日志/重启/升级、常用 toast 和脚本弹窗。
+- README 与中文 README 已同步：说明当前默认中文、已提供核心界面 `zh-CN/en-US` 切换，旧 Flux 转发页面可继续按同一字典分批覆盖。
+- 本地验证：`npm run build` 通过；`git diff --check` 通过；`bash -n scripts/*.sh` 通过；临时 Vite dev server `127.0.0.1:5173` HTTP 200 检查通过并已关闭。当前 PowerShell PATH 无 `sh` 命令，因此 `sh -n` bootstrap 复核无法在本机执行。

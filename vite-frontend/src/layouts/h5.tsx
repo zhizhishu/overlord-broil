@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { Logo } from '@/components/icons';
+import { LanguageSwitch } from '@/components/language-switch';
 import { siteConfig } from '@/config/site';
+import { useLanguage } from '@/i18n';
 
 interface TabItem {
   path: string;
@@ -20,13 +22,14 @@ export default function H5Layout({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useLanguage();
   const [isAdmin, setIsAdmin] = useState(false);
 
   // Tabbar配置
   const tabItems: TabItem[] = [
     {
       path: '/dashboard',
-      label: '首页',
+      label: t('仪表板'),
       icon: (
         <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
           <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
@@ -35,7 +38,7 @@ export default function H5Layout({
     },
     {
       path: '/forward',
-      label: '转发',
+      label: t('转发管理'),
       icon: (
         <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -44,7 +47,7 @@ export default function H5Layout({
     },
     {
       path: '/tunnel',
-      label: '隧道',
+      label: t('隧道管理'),
       icon: (
         <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
@@ -54,7 +57,7 @@ export default function H5Layout({
     },
     {
       path: '/node',
-      label: '节点',
+      label: t('节点监控'),
       icon: (
         <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -64,7 +67,7 @@ export default function H5Layout({
     },
     {
       path: '/profile',
-      label: '我的',
+      label: t('用户管理'),
       icon: (
         <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
           <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
@@ -119,6 +122,7 @@ export default function H5Layout({
         </div>
 
         <div className="flex items-center gap-2">
+          <LanguageSwitch />
         </div>
       </header>
 

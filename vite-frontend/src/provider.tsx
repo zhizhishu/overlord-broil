@@ -6,6 +6,7 @@ import { useHref, useNavigate } from "react-router-dom";
 import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from '@/components/theme-provider';
 import { I18nProvider } from "@react-aria/i18n";
+import { LanguageProvider, useLanguage } from "@/i18n";
 
 declare module "@react-types/shared" {
   interface RouterConfig {
@@ -17,11 +18,12 @@ export interface ProvidersProps {
   children: React.ReactNode;
 }
 
-export function Provider({ children }: ProvidersProps) {
+function LocaleProviders({ children }: ProvidersProps) {
   const navigate = useNavigate();
+  const { locale } = useLanguage();
 
   return (
-    <I18nProvider locale="zh-CN">
+    <I18nProvider locale={locale}>
       <HeroUIProvider navigate={navigate} useHref={useHref}>
         <ThemeProvider>
           {children}
@@ -54,5 +56,13 @@ export function Provider({ children }: ProvidersProps) {
         </ThemeProvider>
       </HeroUIProvider>
     </I18nProvider>
+  );
+}
+
+export function Provider({ children }: ProvidersProps) {
+  return (
+    <LanguageProvider>
+      <LocaleProviders>{children}</LocaleProviders>
+    </LanguageProvider>
   );
 }

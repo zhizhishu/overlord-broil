@@ -26,7 +26,7 @@ Release and operations docs:
 
 The master panel keeps the Flux Panel direction: dense server cards, grouped operations, compact status chips and one unified rule view. The UI is meant for repeated operations rather than marketing pages: select one or many servers, generate agent tasks, manage 3x-ui inbound/outbound rules, run Snell as a managed protocol node, sync traffic and check certificate/service status from the same surface.
 
-The current product UI is Chinese-first. The master control center, server cards, orchestration modal, 3x-ui operations, Snell nodes, remote forwarding rules and agent maintenance actions are presented in Chinese by default. A full bilingual i18n switch is intentionally not shipped yet; if English UI support is added later, it should be implemented through a real translation dictionary rather than a partial toggle.
+The current product UI is Chinese-first by default and now includes a `zh-CN` / `en-US` language switch in the main layouts. The switch persists in local storage, updates the document language, and currently covers the master control center, server cards, orchestration modal, 3x-ui operations, Snell nodes, remote forwarding rules, agent maintenance actions and the main navigation. Older Flux forwarding pages can continue to be translated in batches on top of the same dictionary.
 
 ## Production Release Gate
 
