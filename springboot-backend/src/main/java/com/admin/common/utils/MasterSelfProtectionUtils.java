@@ -62,7 +62,8 @@ public final class MasterSelfProtectionUtils {
 
     private static Map<Integer, String> protectedListenPorts() {
         Map<Integer, String> ports = new LinkedHashMap<>();
-        ports.put(80, "HTTP/ACME/前端入口端口");
+        ports.put(80, "HTTP/ACME 证书验证端口");
+        ports.put(5166, "默认前端入口端口");
         ports.put(6365, "后端 API 端口");
         ports.put(3306, "MySQL 数据库端口");
         ports.put(8081, "前端端口");

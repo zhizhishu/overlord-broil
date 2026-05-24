@@ -264,7 +264,7 @@ const blankOrchestrationForm: OrchestrationForm = {
   installXui: true,
   configurePanel: true,
   xuiVersion: "",
-  panelPort: 54321,
+  panelPort: 5168,
   panelUsername: "",
   panelPassword: "",
   webBasePath: "flux-control",
@@ -2140,7 +2140,7 @@ export default function OrchestratorPage() {
               <Input label="SSH 端口" type="number" value={serverForm.sshPort.toString()} onChange={e => setServerForm(prev => ({ ...prev, sshPort: Number(e.target.value) || 22 }))} variant="bordered" />
               <Input label="SSH 用户" value={serverForm.sshUser} onChange={e => setServerForm(prev => ({ ...prev, sshUser: e.target.value }))} variant="bordered" />
               <Input label={t("副控 API")} value={serverForm.endpoint} onChange={e => setServerForm(prev => ({ ...prev, endpoint: e.target.value }))} variant="bordered" />
-              <Input label={t("3x-ui 面板地址")} value={serverForm.xuiEndpoint} onChange={e => setServerForm(prev => ({ ...prev, xuiEndpoint: e.target.value }))} variant="bordered" placeholder="https://1.2.3.4:54321" />
+              <Input label={t("3x-ui 面板地址")} value={serverForm.xuiEndpoint} onChange={e => setServerForm(prev => ({ ...prev, xuiEndpoint: e.target.value }))} variant="bordered" placeholder="https://1.2.3.4:5168" />
               <Input label="3x-ui Base Path" value={serverForm.xuiBasePath} onChange={e => setServerForm(prev => ({ ...prev, xuiBasePath: e.target.value }))} variant="bordered" placeholder="/secret-path" />
               <Input label="3x-ui API Token" value={serverForm.xuiApiToken} onChange={e => setServerForm(prev => ({ ...prev, xuiApiToken: e.target.value }))} variant="bordered" />
               <Input label={t("3x-ui 用户名")} value={serverForm.xuiUsername} onChange={e => setServerForm(prev => ({ ...prev, xuiUsername: e.target.value }))} variant="bordered" />
@@ -2390,7 +2390,7 @@ export default function OrchestratorPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input label={t("面板端口")} type="number" value={orchestrationForm.panelPort.toString()} onChange={e => patchOrchestrationForm({ panelPort: Number(e.target.value) || 54321 })} variant="bordered" />
+                <Input label={t("面板端口")} type="number" value={orchestrationForm.panelPort.toString()} onChange={e => patchOrchestrationForm({ panelPort: Number(e.target.value) || 5168 })} variant="bordered" />
                 <Input label={t("面板用户名")} value={orchestrationForm.panelUsername} onChange={e => patchOrchestrationForm({ panelUsername: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
                 <Input label={t("面板密码")} type="password" value={orchestrationForm.panelPassword} onChange={e => patchOrchestrationForm({ panelPassword: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
                 <Input label="Web Base Path" value={orchestrationForm.webBasePath} onChange={e => patchOrchestrationForm({ webBasePath: e.target.value })} variant="bordered" />

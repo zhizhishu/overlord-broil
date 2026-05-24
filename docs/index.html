@@ -44,7 +44,7 @@
       <section id="install" class="section">
         <div class="section-header">
           <h2>0.6.0 reliability gate，公开试用前先预检</h2>
-          <p>主控优先拉取 GitHub Actions 发布到 GHCR 的镜像；如果 GHCR 暂未公开，安装脚本会回退到下载公开源码并本地构建镜像。默认端口是前端 80、后端/agent 回调 6365、phpMyAdmin 8066，均可在安装时改写。0.6.0 新增主控/被控 doctor 和 Docker/CI 多发行版安装矩阵。</p>
+          <p>主控优先拉取 GitHub Actions 发布到 GHCR 的镜像；如果 GHCR 暂未公开，安装脚本会回退到下载公开源码并本地构建镜像。默认端口是前端 5166、后端/agent 回调 6365；phpMyAdmin 默认不暴露，只有显式设置端口时才发布。0.6.0 新增主控/被控 doctor 和 Docker/CI 多发行版安装矩阵。</p>
         </div>
         <div class="grid two">
           <article class="card">
@@ -64,14 +64,14 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
           <article class="card">
             <h3>被控服务器 Agent</h3>
             <pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
-  | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash</code></pre>
+  | sudo env FLUX_PANEL_URL="http://your-master-panel:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash</code></pre>
             <p>agent 会注册为 systemd 或 OpenRC 服务，自动领取 Snell、3x-ui、Xray 和远端端口转发任务；内置单机任务锁、HTTP 重试退避和任务超时上报。</p>
             <pre class="runbook"><code># Alpine / 极简系统没有 bash 时
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent-bootstrap.sh \
-  | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" sh</code></pre>
+  | sudo env FLUX_PANEL_URL="http://your-master-panel:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" sh</code></pre>
             <pre class="runbook"><code># 被控端预检 / 已安装 agent 自检
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
-  | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
+  | sudo env FLUX_PANEL_URL="http://your-master-panel:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
 sudo -E /usr/local/bin/flux-agent.sh --doctor</code></pre>
           </article>
         </div>

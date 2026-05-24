@@ -285,3 +285,24 @@
 - README 与中文 README 已同步：说明当前默认中文、已提供核心界面 `zh-CN/en-US` 切换，旧 Flux 转发页面可继续按同一字典分批覆盖。
 - 本地验证：`npm run build` 通过；`git diff --check` 通过；`bash -n scripts/*.sh` 通过；临时 Vite dev server `127.0.0.1:5173` HTTP 200 检查通过并已关闭。当前 PowerShell PATH 无 `sh` 命令，因此 `sh -n` bootstrap 复核无法在本机执行。
 - 2026-05-23 23:29:50 追加：已推送 `origin/future` 提交 `c493d37`；GitHub Actions `CI` run `26353817391` 和 `Docker Images` run `26353817388` 均已通过。
+
+## 2026-05-24 默认端口迁移计划
+
+### 本轮计划（创建于: 2026-05-24 03:52:53）
+
+1. 主控默认端口迁移：将前端公开端口从 `80` 改为 `5166`，后端 API / agent 回调继续保留 `6365`，避免破坏既有 agent 通信链路。
+2. 被控 3x-ui 默认端口迁移：将一键编排里的 3x-ui 面板默认端口从 `54321` 改为 `5168`，同步前端表单、后端 DTO 和脚本兜底默认值。
+3. phpMyAdmin 暴露策略收口：默认不暴露 phpMyAdmin 宿主机端口，只有显式设置 `FLUX_PHPMYADMIN_PORT` 或 `--phpmyadmin-port` 时才发布；安装输出和 doctor 需要明确显示状态。
+4. 文档端口说明：README / 中文 README 清楚列出主控默认暴露端口、默认不暴露端口、被控按编排暴露端口和 ACME `80` 的边界。
+5. 验证与推送：运行脚本语法、compose config、前端构建、`git diff --check`，提交并推送 `origin/future`，观察 GitHub Actions。
+
+- [x] ~~**目标:** 完成主控 `5166`、被控 3x-ui `5168` 默认端口迁移，收口 phpMyAdmin 默认不暴露，并更新 README 后推送 `future` 分支~~ (创建于: 2026-05-24 03:52:53 | **完成于: 2026-05-24 04:41:22**)
+
+### 2026-05-24 04:41:22 进度记录
+
+- 主控前端默认公开端口已从 `80` 改为 `5166`；后端 API / agent 回调继续保留 `6365`。
+- 一键编排里的被控 3x-ui 面板默认端口已从 `54321` 改为 `5168`，覆盖前端表单、后端 DTO 和脚本生成兜底值。
+- phpMyAdmin 已改为默认不暴露宿主机端口；基础 compose 保留内部服务，安装脚本仅在 `PHPMYADMIN_PORT` 非空时生成 `docker-compose-phpmyadmin.yml` override 暴露端口。
+- README、中文 README、Operations 和项目 docs 站点已同步说明默认暴露端口、默认不暴露端口、被控端口和 ACME HTTP `80` 的边界。
+- 本地验证：`bash -n scripts/*.sh` 通过；`scripts/install-master.sh doctor` 显示 frontend=`5166`、backend=`6365`、phpmyadmin=`disabled`；v4/v6 compose config 通过；phpMyAdmin override config 可正确发布 `18066:80`；`npm run build` 通过；agent mock 与 3x-ui fixture 通过；`git diff --check` 通过。
+- 本机 Docker Desktop Linux engine 当前不可连接，无法跑 Docker Maven 后端容器构建；后端 Java 编译交由 GitHub Actions 验证。

@@ -7,9 +7,9 @@ RAW_BASE="${FLUX_RAW_BASE:-https://raw.githubusercontent.com/${REPO}/${REF}}"
 INSTALL_DIR="${FLUX_INSTALL_DIR:-/opt/flux-3xui-orchestrator}"
 SOURCE_DIR="${FLUX_SOURCE_DIR:-${INSTALL_DIR}/source}"
 NETWORK_STACK="${FLUX_NETWORK_STACK:-v4}"
-FRONTEND_PORT="${FLUX_FRONTEND_PORT:-80}"
+FRONTEND_PORT="${FLUX_FRONTEND_PORT:-5166}"
 BACKEND_PORT="${FLUX_BACKEND_PORT:-6365}"
-PHPMYADMIN_PORT="${FLUX_PHPMYADMIN_PORT:-8066}"
+PHPMYADMIN_PORT="${FLUX_PHPMYADMIN_PORT:-}"
 DB_NAME="${FLUX_DB_NAME:-gost}"
 DB_USER="${FLUX_DB_USER:-gost}"
 DB_PASSWORD="${FLUX_DB_PASSWORD:-}"
@@ -43,9 +43,9 @@ Actions:
 Options:
   --dir PATH              Install directory, default /opt/flux-3xui-orchestrator
   --stack v4|v6           Compose network stack, default v4
-  --frontend-port PORT    Public frontend port, default 80
+  --frontend-port PORT    Public frontend port, default 5166
   --backend-port PORT     Public backend API port, default 6365
-  --phpmyadmin-port PORT  Public phpMyAdmin port, default 8066
+  --phpmyadmin-port PORT  Expose phpMyAdmin on this host port; disabled by default
   --backup-dir PATH       Backup output directory, default /opt/flux-3xui-orchestrator/backups
   --backup-file PATH      Backup archive used by restore
   --repo OWNER/REPO       GitHub repo, default zhizhishu/flux-3xui-orchestrator
@@ -61,7 +61,7 @@ Environment:
   FLUX_DB_PASSWORD          Optional database password; generated when empty
   FLUX_JWT_SECRET           Optional JWT secret; generated when empty
   FLUX_SECRET_ENCRYPTION_KEY Optional credential encryption key; generated when empty
-  FLUX_PHPMYADMIN_PORT       Optional phpMyAdmin public port, default 8066
+  FLUX_PHPMYADMIN_PORT       Optional phpMyAdmin public port; unset disables public exposure
   FLUX_BACKUP_DIR           Optional backup output directory
   FLUX_BACKUP_FILE          Optional restore archive path
   FLUX_BUILD_ON_PULL_FAILURE Build local images after GHCR pull failure, default 1
@@ -158,6 +158,7 @@ fi
 BACKUP_DIR="${BACKUP_DIR:-${INSTALL_DIR}/backups}"
 COMPOSE_FILE="docker-compose-${NETWORK_STACK}.yml"
 ENV_FILE=".env"
+PHPMYADMIN_OVERRIDE_FILE="docker-compose-phpmyadmin.yml"
 
 detect_os_name() {
   if [ -r /etc/os-release ]; then
@@ -278,6 +279,12 @@ read_env_value() {
   grep -E "^${key}=" "$file" | tail -n 1 | cut -d= -f2- || true
 }
 
+env_key_exists() {
+  local key="$1"
+  local file="$2"
+  grep -qE "^${key}=" "$file"
+}
+
 require_env_values() {
   local file="$1"
   local missing=""
@@ -288,7 +295,7 @@ require_env_values() {
     exit 2
   fi
 
-  for key in DB_NAME DB_USER DB_PASSWORD JWT_SECRET SECRET_ENCRYPTION_KEY FRONTEND_PORT BACKEND_PORT PHPMYADMIN_PORT; do
+  for key in DB_NAME DB_USER DB_PASSWORD JWT_SECRET SECRET_ENCRYPTION_KEY FRONTEND_PORT BACKEND_PORT; do
     value="$(read_env_value "$key" "$file")"
     if [ -z "$value" ]; then
       missing="${missing} ${key}"
@@ -350,12 +357,31 @@ load_existing_env() {
     DB_NAME="${DB_NAME:-gost}"
     DB_USER="${DB_USER:-gost}"
     DB_PASSWORD="${DB_PASSWORD:-}"
-    PHPMYADMIN_PORT="${PHPMYADMIN_PORT:-8066}"
+    PHPMYADMIN_PORT="${PHPMYADMIN_PORT:-}"
   fi
 }
 
 compose_cmd() {
-  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
+  if [ -f "$PHPMYADMIN_OVERRIDE_FILE" ]; then
+    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -f "$PHPMYADMIN_OVERRIDE_FILE" "$@"
+  else
+    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
+  fi
+}
+
+ensure_phpmyadmin_override() {
+  local configured_port
+  configured_port="$(read_env_value PHPMYADMIN_PORT "$ENV_FILE")"
+  if [ -n "$configured_port" ]; then
+    cat > "$PHPMYADMIN_OVERRIDE_FILE" <<'YAML'
+services:
+  phpmyadmin:
+    ports:
+      - "${PHPMYADMIN_PORT}:80"
+YAML
+  else
+    rm -f "$PHPMYADMIN_OVERRIDE_FILE"
+  fi
 }
 
 wait_for_mysql() {
@@ -404,7 +430,7 @@ ENV
       chmod 600 "$ENV_FILE"
       echo "Added SECRET_ENCRYPTION_KEY to existing ${INSTALL_DIR}/${ENV_FILE}"
     fi
-    if [ -z "$(read_env_value PHPMYADMIN_PORT "$ENV_FILE")" ]; then
+    if ! env_key_exists PHPMYADMIN_PORT "$ENV_FILE"; then
       printf '\nPHPMYADMIN_PORT=%s\n' "$PHPMYADMIN_PORT" >> "$ENV_FILE"
       chmod 600 "$ENV_FILE"
       echo "Added PHPMYADMIN_PORT to existing ${INSTALL_DIR}/${ENV_FILE}"
@@ -458,29 +484,33 @@ preflight_ports() {
   final_frontend="$(read_env_value FRONTEND_PORT "$ENV_FILE")"
   final_backend="$(read_env_value BACKEND_PORT "$ENV_FILE")"
   final_phpmyadmin="$(read_env_value PHPMYADMIN_PORT "$ENV_FILE")"
-  final_phpmyadmin="${final_phpmyadmin:-8066}"
 
   validate_port_number FRONTEND_PORT "$final_frontend"
   validate_port_number BACKEND_PORT "$final_backend"
-  validate_port_number PHPMYADMIN_PORT "$final_phpmyadmin"
+  if [ -n "$final_phpmyadmin" ]; then
+    validate_port_number PHPMYADMIN_PORT "$final_phpmyadmin"
+  fi
 
-  if [ "$final_frontend" = "$final_backend" ] || [ "$final_frontend" = "$final_phpmyadmin" ] || [ "$final_backend" = "$final_phpmyadmin" ]; then
+  if [ "$final_frontend" = "$final_backend" ] || { [ -n "$final_phpmyadmin" ] && { [ "$final_frontend" = "$final_phpmyadmin" ] || [ "$final_backend" = "$final_phpmyadmin" ]; }; }; then
     echo "FRONTEND_PORT, BACKEND_PORT and PHPMYADMIN_PORT must be different." >&2
     exit 2
   fi
 
   local label port
-  for label in FRONTEND_PORT BACKEND_PORT PHPMYADMIN_PORT; do
+  for label in FRONTEND_PORT BACKEND_PORT; do
     case "$label" in
       FRONTEND_PORT) port="$final_frontend" ;;
       BACKEND_PORT) port="$final_backend" ;;
-      PHPMYADMIN_PORT) port="$final_phpmyadmin" ;;
     esac
     if port_is_listening "$port" && ! port_owned_by_flux_container "$port"; then
       echo "${label}=${port} is already listening on this host. Set a different FLUX_${label} or stop the conflicting service." >&2
       exit 2
     fi
   done
+  if [ -n "$final_phpmyadmin" ] && port_is_listening "$final_phpmyadmin" && ! port_owned_by_flux_container "$final_phpmyadmin"; then
+    echo "PHPMYADMIN_PORT=${final_phpmyadmin} is already listening on this host. Set a different FLUX_PHPMYADMIN_PORT or stop the conflicting service." >&2
+    exit 2
+  fi
 }
 
 docker_login_if_configured() {
@@ -508,7 +538,6 @@ print_success() {
   FINAL_FRONTEND_PORT="$(read_env_value FRONTEND_PORT "$ENV_FILE")"
   FINAL_BACKEND_PORT="$(read_env_value BACKEND_PORT "$ENV_FILE")"
   FINAL_PHPMYADMIN_PORT="$(read_env_value PHPMYADMIN_PORT "$ENV_FILE")"
-  FINAL_PHPMYADMIN_PORT="${FINAL_PHPMYADMIN_PORT:-8066}"
   PANEL_HOST="$(detect_host)"
 
   cat <<EOF
@@ -518,7 +547,7 @@ Flux 3x-ui Orchestrator is running.
 Install dir: ${INSTALL_DIR}
 Frontend:    http://${PANEL_HOST}:${FINAL_FRONTEND_PORT}
 Backend API: http://${PANEL_HOST}:${FINAL_BACKEND_PORT}
-phpMyAdmin:  http://${PANEL_HOST}:${FINAL_PHPMYADMIN_PORT}  (restrict by firewall in production)
+phpMyAdmin:  $(if [ -n "$FINAL_PHPMYADMIN_PORT" ]; then printf 'http://%s:%s  (restrict by firewall in production)' "$PANEL_HOST" "$FINAL_PHPMYADMIN_PORT"; else printf 'not publicly exposed; set FLUX_PHPMYADMIN_PORT or --phpmyadmin-port to expose temporarily'; fi)
 
 Default login from gost.sql:
   username: admin_user
@@ -653,7 +682,6 @@ run_master_doctor() {
     frontend_port="$(read_env_value FRONTEND_PORT "${INSTALL_DIR}/${ENV_FILE}")"
     backend_port="$(read_env_value BACKEND_PORT "${INSTALL_DIR}/${ENV_FILE}")"
     phpmyadmin_port="$(read_env_value PHPMYADMIN_PORT "${INSTALL_DIR}/${ENV_FILE}")"
-    phpmyadmin_port="${phpmyadmin_port:-8066}"
     doctor_item ok "env-file" "found ${INSTALL_DIR}/${ENV_FILE}"
   else
     doctor_item warn "env-file" "not found yet; using requested/default ports"
@@ -661,12 +689,16 @@ run_master_doctor() {
 
   doctor_port FRONTEND_PORT "$frontend_port"
   doctor_port BACKEND_PORT "$backend_port"
-  doctor_port PHPMYADMIN_PORT "$phpmyadmin_port"
+  if [ -n "$phpmyadmin_port" ]; then
+    doctor_port PHPMYADMIN_PORT "$phpmyadmin_port"
+  else
+    doctor_item ok "PHPMYADMIN_PORT" "not publicly exposed"
+  fi
 
-  if [ "$frontend_port" = "$backend_port" ] || [ "$frontend_port" = "$phpmyadmin_port" ] || [ "$backend_port" = "$phpmyadmin_port" ]; then
+  if [ "$frontend_port" = "$backend_port" ] || { [ -n "$phpmyadmin_port" ] && { [ "$frontend_port" = "$phpmyadmin_port" ] || [ "$backend_port" = "$phpmyadmin_port" ]; }; }; then
     doctor_item fail "port-matrix" "FRONTEND_PORT, BACKEND_PORT and PHPMYADMIN_PORT must be different"
   else
-    doctor_item ok "port-matrix" "frontend=${frontend_port}, backend=${backend_port}, phpmyadmin=${phpmyadmin_port}"
+    doctor_item ok "port-matrix" "frontend=${frontend_port}, backend=${backend_port}, phpmyadmin=${phpmyadmin_port:-disabled}"
   fi
 
   if [ "$doctor_failed" -eq 0 ]; then
@@ -688,7 +720,7 @@ create_backup() {
   archive="${BACKUP_DIR}/flux-master-backup-${stamp}.tar.gz"
 
   mkdir -p "${workdir}/files"
-  for file in "$ENV_FILE" "docker-compose-v4.yml" "docker-compose-v6.yml" "gost.sql"; do
+  for file in "$ENV_FILE" "docker-compose-v4.yml" "docker-compose-v6.yml" "$PHPMYADMIN_OVERRIDE_FILE" "gost.sql"; do
     if [ -f "$file" ]; then
       cp -p "$file" "${workdir}/files/${file}"
       file_count=$((file_count + 1))
@@ -741,6 +773,7 @@ restore_backup() {
 
   require_env_values "$ENV_FILE"
   resolve_restore_compose_file
+  ensure_phpmyadmin_override
 
   docker_login_if_configured
   pull_or_build_images
@@ -761,6 +794,7 @@ install_or_upgrade() {
   download_runtime_files
   ensure_env_file
   require_env_values "$ENV_FILE"
+  ensure_phpmyadmin_override
   preflight_ports
   docker_login_if_configured
   pull_or_build_images

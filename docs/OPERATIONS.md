@@ -75,7 +75,7 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
   | sudo bash -s -- doctor
 ```
 
-It checks OS/package-manager detection, root status, Docker/Compose, Docker daemon reachability, existing `.env` values and whether frontend/backend/phpMyAdmin ports are already occupied. For CI/container checks where Docker is intentionally unavailable:
+It checks OS/package-manager detection, root status, Docker/Compose, Docker daemon reachability, existing `.env` values and whether frontend/backend ports, plus phpMyAdmin when explicitly exposed, are already occupied. For CI/container checks where Docker is intentionally unavailable:
 
 ```bash
 FLUX_DOCTOR_REQUIRE_DOCKER=0 \
@@ -218,12 +218,12 @@ Default master ports:
 
 | Port | Component | Production note |
 | --- | --- | --- |
-| `80` | Frontend panel | Change with `FLUX_FRONTEND_PORT` when another web server already owns port 80. |
+| `5166` | Frontend panel | Change with `FLUX_FRONTEND_PORT`; default avoids occupying port `80`. |
 | `6365` | Backend API and agent callback | Change with `FLUX_BACKEND_PORT`; agents must use the same URL. |
-| `8066` | phpMyAdmin | Change with `FLUX_PHPMYADMIN_PORT`; restrict by firewall, remove the published port, or use only during maintenance. |
+| disabled | phpMyAdmin | Internal only by default; set `FLUX_PHPMYADMIN_PORT` or `--phpmyadmin-port` only during maintenance. |
 | `3306` | MySQL | Container-internal in the shipped compose files. |
 
-Controlled hosts do not need an inbound agent port. They only expose the 3x-ui panel port, Xray/Snell node ports, remote-forward listen ports, and ACME HTTP `80` when selected by your orchestration plan.
+Controlled hosts do not need an inbound agent port. They only expose the default 3x-ui panel port `5168`, Xray/Snell node ports, remote-forward listen ports, and ACME HTTP `80` when selected by your orchestration plan.
 
 ## Local And CI Verification
 

@@ -40,24 +40,24 @@ The release gate validates shell scripts, agent task execution, tokenized 3x-ui 
 
 Formal runtime assumptions for this release:
 
-- Use a fresh Linux host or a host where ports `80`, `6365` and `8066` are either free or intentionally remapped.
+- Use a fresh Linux host or a host where ports `5166` and `6365` are either free or intentionally remapped.
 - Supported master hosts are Docker-capable Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux. Minimal hosts without `bash` can use the bootstrap commands below.
 - Full 3x-ui install/configure orchestration requires a normal systemd host, such as Debian, Ubuntu, Rocky Linux or Oracle Linux. Alpine/OpenRC is supported for the Flux agent, Snell tasks and remote port-forward tasks, but not for upstream 3x-ui service installation.
 - Keep `/opt/flux-3xui-orchestrator/.env` and backups private; it contains `DB_PASSWORD`, `JWT_SECRET` and `SECRET_ENCRYPTION_KEY`.
 - Keep `SECRET_ENCRYPTION_KEY` stable. It encrypts stored agent tokens and 3x-ui API/password/2FA fields.
-- Restrict `8066` phpMyAdmin with a firewall or remove the published port in production.
+- phpMyAdmin is not exposed by default. Only expose it temporarily with `FLUX_PHPMYADMIN_PORT` or `--phpmyadmin-port`, and restrict it with a firewall.
 - Register controlled servers only when you own or are authorized to administer them.
 
 Default master ports:
 
 | Port | Component | Notes |
 | --- | --- | --- |
-| `80` | Frontend panel | Change with `FLUX_FRONTEND_PORT`. |
+| `5166` | Frontend panel | Change with `FLUX_FRONTEND_PORT`; this intentionally avoids occupying `80`. |
 | `6365` | Backend API / agent callback | Change with `FLUX_BACKEND_PORT`. |
-| `8066` | phpMyAdmin | Change with `FLUX_PHPMYADMIN_PORT` or `--phpmyadmin-port`; restrict before production exposure. |
+| disabled | phpMyAdmin | Internal container service only by default; set `FLUX_PHPMYADMIN_PORT` or `--phpmyadmin-port` to expose it temporarily. |
 | `3306` | MySQL | Container-internal only; not published to the host. |
 
-Controlled-server ports are created by your orchestration choices: 3x-ui panel port, Xray inbound ports, Snell listen ports, remote-forward listen ports and ACME HTTP `80` when that certificate mode is used.
+Controlled-server ports are created by your orchestration choices: default 3x-ui panel port `5168`, Xray inbound ports, Snell listen ports, remote-forward listen ports and ACME HTTP `80` when that certificate mode is used.
 
 Linux support matrix:
 
@@ -129,7 +129,14 @@ Common options:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo env FLUX_FRONTEND_PORT="8080" FLUX_BACKEND_PORT="6365" FLUX_PHPMYADMIN_PORT="18066" FLUX_NETWORK_STACK="v4" bash
+  | sudo env FLUX_FRONTEND_PORT="5166" FLUX_BACKEND_PORT="6365" FLUX_NETWORK_STACK="v4" bash
+```
+
+phpMyAdmin is not publicly exposed by default. Expose it only for maintenance:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+  | sudo env FLUX_PHPMYADMIN_PORT="18066" bash
 ```
 
 The installer downloads `docker-compose-v4.yml` or `docker-compose-v6.yml`, downloads `gost.sql`, creates `/opt/flux-3xui-orchestrator/.env`, pulls the backend/frontend images and starts the stack. If GHCR is not public yet or pull fails, it falls back to downloading the public GitHub source archive and building both images locally.
@@ -151,14 +158,14 @@ Controlled server agent one-command install:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
-  | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash
+  | sudo env FLUX_PANEL_URL="http://your-master-panel:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash
 ```
 
 Alpine or minimal controlled hosts can use the agent bootstrap:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent-bootstrap.sh \
-  | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" sh
+  | sudo env FLUX_PANEL_URL="http://your-master-panel:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" sh
 ```
 
 `FLUX_SERVER_ID` and `FLUX_AGENT_TOKEN` come from `主控中心`: create or open the server card, then click `Token`.
@@ -167,13 +174,13 @@ Before installing a controlled host, run the agent preflight:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
-  | sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
+  | sudo env FLUX_PANEL_URL="http://your-master-panel:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
 ```
 
 After install, the local agent can diagnose itself:
 
 ```bash
-sudo env FLUX_PANEL_URL="http://your-master-panel:80" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" \
+sudo env FLUX_PANEL_URL="http://your-master-panel:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" \
   /usr/local/bin/flux-agent.sh --doctor
 ```
 
@@ -456,7 +463,7 @@ Open `主控中心` and click `添加服务器`.
 Fill:
 
 - `主机`: the server host or IP for your own reference.
-- `3x-ui 面板地址`: for example `https://1.2.3.4:54321`.
+- `3x-ui 面板地址`: for example `https://1.2.3.4:5168`.
 - `3x-ui Base Path`: only fill this when the remote 3x-ui panel uses a custom web base path, for example `/secret-path`.
 - `3x-ui API Token`: required for inbound list/add/update/delete, client operations, Xray config read and Xray restart.
 - `3x-ui 用户名` and `3x-ui 密码`: optional, but required when saving full Xray/outbound settings and reading outbound traffic because 3x-ui keeps `/panel/xray/*` behind login session + CSRF.

@@ -27,7 +27,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
         appendVar(script, "INSTALL_XUI", enabled(dto.getInstallXui()) ? "1" : "0");
         appendVar(script, "CONFIGURE_PANEL", enabled(dto.getConfigurePanel()) ? "1" : "0");
         appendVar(script, "XUI_VERSION", firstNotBlank(dto.getXuiVersion(), ""));
-        appendVar(script, "PANEL_PORT", String.valueOf(firstNotNull(dto.getPanelPort(), 54321)));
+        appendVar(script, "PANEL_PORT", String.valueOf(firstNotNull(dto.getPanelPort(), 5168)));
         appendVar(script, "PANEL_USERNAME", username);
         appendVar(script, "PANEL_PASSWORD", password);
         appendVar(script, "WEB_BASE_PATH", webBasePath);

@@ -20,7 +20,7 @@ public class OrchestrationPlanDto {
 
     @Min(value = 1, message = "panel port must be greater than 0")
     @Max(value = 65535, message = "panel port must be less than 65536")
-    private Integer panelPort = 54321;
+    private Integer panelPort = 5168;
 
     private String panelUsername;
 

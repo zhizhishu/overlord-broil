@@ -35,8 +35,8 @@ services:
       PMA_ARBITRARY: 1          # 允许手动输入服务器
       # PMA_ABSOLUTE_URI: https://example.cc/pma/
       # 如果使用Nginx反代域名访问，请取消上一行的注释，并设置对应的域名及路径
-    ports:
-      - "${PHPMYADMIN_PORT:-8066}:80"  # phpMyAdmin 对外暴露，生产建议用防火墙限制
+    # phpMyAdmin stays internal by default.
+    # install-master.sh creates docker-compose-phpmyadmin.yml only when PHPMYADMIN_PORT is set.
     networks:
       - gost-network
 
@@ -53,7 +53,7 @@ services:
       SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
       FRONTEND_PORT: ${FRONTEND_PORT}
       BACKEND_PORT: ${BACKEND_PORT}
-      PHPMYADMIN_PORT: ${PHPMYADMIN_PORT:-8066}
+      PHPMYADMIN_PORT: ${PHPMYADMIN_PORT:-}
       LOG_DIR: /app/logs
       JAVA_OPTS: "-Xms256m -Xmx512m -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
     ports:
