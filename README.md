@@ -1,5 +1,7 @@
 # Flux 3x-ui Orchestrator
 
+[中文说明](README.zh-CN.md)
+
 Flux 3x-ui Orchestrator is a control-panel project based on the Flux Panel UI and forwarding-panel foundation. It provides a master/agent orchestration panel for managing multiple servers, deploying 3x-ui compatible protocol nodes, and operating Snell alongside Xray-based nodes.
 
 This repository is an independent project. It uses upstream projects as references and foundations, but future development should happen here.
@@ -23,6 +25,8 @@ Release and operations docs:
 ![Flux 3x-ui Orchestrator control plane](docs/assets/flux-orchestrator-screenshot.svg)
 
 The master panel keeps the Flux Panel direction: dense server cards, grouped operations, compact status chips and one unified rule view. The UI is meant for repeated operations rather than marketing pages: select one or many servers, generate agent tasks, manage 3x-ui inbound/outbound rules, run Snell as a managed protocol node, sync traffic and check certificate/service status from the same surface.
+
+The current product UI is Chinese-first. The master control center, server cards, orchestration modal, 3x-ui operations, Snell nodes, remote forwarding rules and agent maintenance actions are presented in Chinese by default. A full bilingual i18n switch is intentionally not shipped yet; if English UI support is added later, it should be implemented through a real translation dictionary rather than a partial toggle.
 
 ## Production Release Gate
 
@@ -731,7 +735,7 @@ ghcr.io/zhizhishu/flux-3xui-orchestrator-backend:latest
 ghcr.io/zhizhishu/flux-3xui-orchestrator-frontend:latest
 ```
 
-Tags are published on `main`, Git tags and manual `workflow_dispatch`. Pull requests build the images without pushing them.
+Tags are published on `main`, Git tags and manual `workflow_dispatch`. Pull requests build the images without pushing them. The `future` branch also builds backend/frontend images for validation, but it does not push to GHCR; only `main` and `v*` tags publish pullable images. This keeps experimental validation branches from overwriting or polluting release images.
 
 The compose files now point at these GHCR images:
 

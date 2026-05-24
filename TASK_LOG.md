@@ -246,3 +246,20 @@
 - 2026-05-23 10:37:30 追加：发现 GitHub Actions 只监听 `main`，已补 `future` 分支 CI 触发，并让 Docker Images workflow 支持 `future` 分支镜像构建。
 - 2026-05-23 10:46:47 追加：`future` 分支 Docker Images 前端镜像构建通过但 GHCR 推送 `frontend:future` 被拒绝；已调整为 `future` 只构建验证，只有 `main` 和 `v*` tag 推送 GHCR。
 - 2026-05-23 10:50:49 追加：`future` 分支 GitHub Actions 已通过，`CI` run `26330713783` 和 `Docker Images` run `26330713785` 均为 success。
+
+## 2026-05-23 中文文档与语言口径计划
+
+### 本轮计划（创建于: 2026-05-23 22:16:14）
+
+1. 复核 UI 语言现状：确认主控核心页面、导航和常用操作是否以中文为主。
+2. 补中文 README：新增 `README.zh-CN.md`，覆盖项目定位、UI 截图、安装、端口、主控/被控使用、正式版差距、future 分支和镜像策略。
+3. 补英文 README 入口：添加中文 README 链接和 UI 默认中文说明。
+4. 验证与推送：运行 Markdown/链接/diff/前端构建检查，提交并推送 `origin/future`。
+
+- [x] ~~**目标:** 补齐中文 README、UI 语言说明和 future/GHCR 策略解释，并推送到 `future` 分支~~ (创建于: 2026-05-23 22:16:14 | **完成于: 2026-05-23 22:19:38**)
+
+### 2026-05-23 22:19:38 进度记录
+
+- 新增 `README.zh-CN.md`，覆盖中文用户需要的项目定位、UI 默认中文、截图、安装、端口、主控/被控使用、Snell/3x-ui 边界、future/GHCR 策略和 1.0 差距。
+- 英文 `README.md` 已新增中文说明入口、Chinese-first UI 说明，以及 `future` 只构建验证不推 GHCR 的发布策略说明。
+- 本地验证：`git diff --check` 通过；中文 README 链接存在；`npm run build` 通过。
