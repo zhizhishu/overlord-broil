@@ -306,3 +306,4 @@
 - README、中文 README、Operations 和项目 docs 站点已同步说明默认暴露端口、默认不暴露端口、被控端口和 ACME HTTP `80` 的边界。
 - 本地验证：`bash -n scripts/*.sh` 通过；`scripts/install-master.sh doctor` 显示 frontend=`5166`、backend=`6365`、phpmyadmin=`disabled`；v4/v6 compose config 通过；phpMyAdmin override config 可正确发布 `18066:80`；`npm run build` 通过；agent mock 与 3x-ui fixture 通过；`git diff --check` 通过。
 - 本机 Docker Desktop Linux engine 当前不可连接，无法跑 Docker Maven 后端容器构建；后端 Java 编译交由 GitHub Actions 验证。
+- 2026-05-24 04:54:56 追加：`origin/future` 最新提交 `18e8c6b` 的 GitHub Actions 已通过，`CI` run `26360283823` 与 `Docker Images` run `26360283821` 均为 success。
