@@ -390,3 +390,4 @@
 - README、中文 README、Operations 和 Release Notes 已同步说明：安装/证书/防火墙诊断会先给结构化摘要，再保留原始日志。
 - 本地验证：`vite-frontend npm run build` 通过；Docker Maven JDK21 `mvn -B -DskipTests package` 通过；提权 Git Bash 路径下 `bash -n scripts/*.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh` 通过；`git diff --check` 通过。Vite 仍保留既有 `site.ts` 动静态混合导入 chunk 提示，不影响构建。
 - 环境限制：普通 Git Bash 在当前 Windows 会话中仍会偶发 `couldn't create signal pipe, Win32 error 5`；本轮改用已批准的提权 Git Bash 路径完成脚本验证。
+- 2026-05-24 17:11:17 追加：已推送 `origin/future` 提交 `09fe949`；GitHub Actions `CI` run `26376592654` 已通过，覆盖 frontend、backend、shell scripts、agent mock、3x-ui fixture、compose config、dry-run/full compose smoke、Debian/Ubuntu/Alpine/Rocky Linux/Oracle Linux install matrix；`Docker Images` run `26376592682` 已通过。
