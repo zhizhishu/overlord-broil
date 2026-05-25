@@ -147,6 +147,8 @@ Agent reports store a normalized `resultJson.runtimeState` block beside `resultJ
 
 The State Sync overview endpoint, `/api/v1/deploy-task/runtime-state/overview`, aggregates the latest `runtimeState` task result per server/provider and fills gaps from `control_server` heartbeat fields. The master UI shows that data as a compact State Sync panel so operators can compare XUI/Xray, Snell and certificate health across all registered servers without opening each task card.
 
+State Sync row actions reuse the existing `agent-maintenance` task path instead of introducing a second executor. The runtime doctor button maps the provider to the most relevant diagnostic action (`install-diagnose`, `cert-diagnose`, `firewall-diagnose` or `doctor`), while XUI/Snell repair buttons generate `repair-xui`, `repair-xray` or `repair-snell` tasks with the source runtime metadata preserved in `request_json`.
+
 Install, certificate and firewall diagnostics write structured `diagnostics.items` into the task result. The master task card summarizes high-risk findings first: unresolved DNS, local port `80` occupancy, missing certificate files, missing ACME tooling, local firewall command availability and the cloud-security-group boundary.
 
 ## First-Run Operator Path

@@ -50,6 +50,8 @@ Task results also include a normalized `resultJson.runtimeState` block. It recor
 
 State Sync now lifts those task-level runtime states into a server-by-provider overview. The master exposes `/api/v1/deploy-task/runtime-state/overview`, aggregating latest task results with server heartbeat fields for XUI/Xray, Snell and certificates, and the control center renders the same view as a Flux-style operations panel.
 
+The same State Sync rows can also start Runtime Provider maintenance tasks. Operators can launch provider-aware diagnostics from the overview, and XUI/Snell rows expose repair actions that create normal `agent-maintenance` deployment tasks for the controlled agent to claim, execute and report.
+
 ## UI Preview
 
 ![Flux 3x-ui Orchestrator control plane](docs/assets/flux-orchestrator-screenshot.svg)
@@ -64,6 +66,7 @@ Current UI coverage includes:
 - remote TCP/UDP forward rules
 - Runtime Provider visibility
 - State Sync runtime overview by server and provider
+- State Sync runtime diagnostics and repair task shortcuts
 - agent diagnostics, logs, restart, upgrade, uninstall and repair tasks
 - monitor alerts and a unified rule center
 - `zh-CN` / `en-US` language switching

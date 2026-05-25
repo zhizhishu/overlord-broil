@@ -96,6 +96,8 @@ const en: Record<string, string> = {
   "{count} 个节点": "{count} nodes",
   "{count} 条转发": "{count} forwards",
   "等待 Agent 回报": "Waiting for agent report",
+  "运行时诊断": "Runtime doctor",
+  "运行时修复": "Runtime repair",
   "任务 #{id}": "Task #{id}",
   "仅显示最近 {shown} 条，后端已聚合 {total} 条运行时状态。": "Showing the latest {shown}; backend aggregated {total} runtime states.",
   "Runtime Provider 层": "Runtime Provider Layer",

@@ -89,4 +89,21 @@
   - Docker Maven `mvn -B -DskipTests package` 通过。
   - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
 - 清理：Docker Maven 测试容器 `flux-state-sync-test`、package 容器 `flux-state-sync-package` 均使用 `--rm`，无残留；agent mock 临时服务随脚本结束；本阶段未启动长期 dev server。
-- 后续：提交推送 `origin/main` / `origin/future`，再等待 GitHub Actions / GHCR 镜像结果。
+- 推送：已推送 `f8adf8c Add runtime state sync overview` 到 `origin/main` 和 `origin/future`。
+- 远端验证：`f8adf8c` 的 main CI、main Docker Images、main Pages、future CI、future Docker Images 均成功；GHCR `flux-3xui-orchestrator-master:latest` 更新到 index digest `sha256:82f5aa31d51b964fd45d1b5644303d6bebf3653600d16163bbd71222a62e5a42`，linux/amd64 digest `sha256:92e79daad1da2f1eab1c8131fadab4690c7803fbaf82952c9072a75757cb7261`。
+- 后续：让 State Sync 面板可直接发起 Runtime Provider 诊断/修复任务，继续打通 `State -> Task -> Agent -> Report` 运维闭环。
+
+### State Sync Runtime Actions
+
+- 完成：State Sync 行现在可以直接创建 Runtime Provider 诊断任务；XUI/Snell 行也可以创建对应修复任务。
+- 修改：
+  - `vite-frontend/src/pages/orchestrator.tsx` 增加 provider 到诊断/修复 action 的映射。
+  - `createAgentMaintenance` 支持附加 State Sync 触发元数据，并保留 `source: orchestrator-ui`。
+  - State Sync 行增加 `运行时诊断` 和 `运行时修复` 按钮，继续复用普通 `agent-maintenance` 部署任务链路。
+  - README、中文 README、Operations、Release Notes 和 PROJECT_CONTEXT 补充 State Sync 行动作说明。
+- 验证：
+  - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
+  - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
+  - 临时 Vite preview `http://127.0.0.1:4173/` 返回 HTTP 200，生产包中已确认包含 `运行时诊断`、`运行时修复` 和 `trigger: "state-sync"`。
+- 清理：临时 preview 进程 PID `11232` 已停止，复查 `4173` 无监听输出；内置浏览器验证时 `node_repl` 返回 `Transport closed`，已降级为 HTTP 和生产包检查，未保留可见浏览器页签。
+- 后续：提交并推送 `origin/main` 和 `origin/future`，等待 GitHub Actions / GHCR 镜像结果。

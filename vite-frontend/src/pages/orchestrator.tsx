@@ -218,6 +218,26 @@ type AgentMaintenanceAction =
   | "repair-snell"
   | "repair-all";
 
+const runtimeProviderDiagnosticAction = (providerKey?: string): AgentMaintenanceAction => {
+  if (providerKey === "certificate") return "cert-diagnose";
+  if (providerKey === "firewall" || providerKey === "forward") return "firewall-diagnose";
+  if (providerKey === "xui") return "install-diagnose";
+  return "doctor";
+};
+
+const runtimeProviderStatusNeedsRepair = (status?: string) => {
+  if (!status) return false;
+  return ["failed", "fail", "error", "danger", "missing", "timeout", "inactive", "expired", "unreadable", "offline"].includes(status.toLowerCase());
+};
+
+const runtimeProviderRepairAction = (item?: RuntimeStateOverviewItem): AgentMaintenanceAction | null => {
+  if (item?.providerKey === "xui") {
+    return runtimeProviderStatusNeedsRepair(item.serviceStatuses?.xray) ? "repair-xray" : "repair-xui";
+  }
+  if (item?.providerKey === "snell") return "repair-snell";
+  return null;
+};
+
 interface UnifiedRuleRow {
   id: string;
   kind: Exclude<RuleKindFilter, "all">;
@@ -1754,7 +1774,7 @@ export default function OrchestratorPage() {
     }
   };
 
-  const createAgentMaintenance = async (server: ControlServer, action: AgentMaintenanceAction) => {
+  const createAgentMaintenance = async (server: ControlServer, action: AgentMaintenanceAction, meta: Record<string, unknown> = {}) => {
     const actionName: Record<AgentMaintenanceAction, string> = {
       doctor: "诊断",
       logs: "日志",
@@ -1777,6 +1797,7 @@ export default function OrchestratorPage() {
       action,
       requestJson: JSON.stringify({
         source: "orchestrator-ui",
+        ...meta,
         serverId: server.id,
         serverName: server.name,
         action
@@ -2388,9 +2409,21 @@ export default function OrchestratorPage() {
 
                   <div className="space-y-2">
                     {recentRuntimeStateItems.map(item => {
+                      const targetServer = servers.find(server => server.id === item.serverId);
                       const serviceEntries = Object.entries(item.serviceStatuses || {}).filter(([, value]) => value);
                       const diagnostic = item.diagnosticSummary;
                       const sourceLabel = item.source === "task" ? t("任务结果") : t("服务器心跳");
+                      const diagnosticAction = runtimeProviderDiagnosticAction(item.providerKey);
+                      const repairAction = runtimeProviderRepairAction(item);
+                      const stateSyncMeta = {
+                        trigger: "state-sync",
+                        runtimeProvider: item.providerKey,
+                        providerName: item.providerName,
+                        runtimeStatus: item.status,
+                        statusSource: item.statusSource,
+                        sourceTaskId: item.taskId,
+                        taskState: item.taskState
+                      };
                       const detailParts = [
                         item.protocol && item.action ? `${item.protocol} / ${item.action}` : null,
                         item.nodeCount !== undefined ? t("{count} 个节点", { count: item.nodeCount }) : null,
@@ -2434,8 +2467,27 @@ export default function OrchestratorPage() {
                               </div>
                               {item.lastError && <p className="mt-1 truncate text-xs text-danger">{item.lastError}</p>}
                             </div>
-                            <div className="flex justify-start lg:justify-end">
+                            <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
                               <Chip size="sm" variant="flat">{item.taskState || item.source || "-"}</Chip>
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                isDisabled={!targetServer || submitting}
+                                onPress={() => targetServer ? createAgentMaintenance(targetServer, diagnosticAction, stateSyncMeta) : toast.error(t("缺少服务器"))}
+                              >
+                                {t("运行时诊断")}
+                              </Button>
+                              {repairAction && (
+                                <Button
+                                  size="sm"
+                                  color="warning"
+                                  variant="flat"
+                                  isDisabled={!targetServer || submitting}
+                                  onPress={() => targetServer ? createAgentMaintenance(targetServer, repairAction, stateSyncMeta) : toast.error(t("缺少服务器"))}
+                                >
+                                  {t("运行时修复")}
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </div>
