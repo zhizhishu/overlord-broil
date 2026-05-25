@@ -69,6 +69,7 @@ export const getServerRuleOverview = (serverId: number) => Network.post("/server
 export const createDeployTask = (data: any) => Network.post("/deploy-task/create", data);
 export const createOrchestrationTask = (data: any) => Network.post("/deploy-task/orchestrate", data);
 export const getDeployTaskList = () => Network.post("/deploy-task/list");
+export const getRuntimeStateOverview = () => Network.post("/deploy-task/runtime-state/overview");
 export const getDeployTaskScript = (id: number) => Network.post("/deploy-task/script", { id });
 export const updateDeployTaskState = (data: any) => Network.post("/deploy-task/state", data);
 export const retryDeployTask = (id: number) => Network.post("/deploy-task/retry", { id });

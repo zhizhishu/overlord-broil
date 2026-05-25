@@ -31,6 +31,7 @@ import {
   getControlServerToken,
   getDeployTaskList,
   getDeployTaskScript,
+  getRuntimeStateOverview,
   getRuntimeProviderList,
   listMonitorAlerts,
   getProtocolNodeList,
@@ -57,7 +58,7 @@ import {
   updateProtocolProfile,
   updateServerForwardRule
 } from "@/api";
-import type { ControlServer, DeployTask, MonitorAlert, ProtocolNode, ProtocolProfile, RuntimeProviderDescriptor, RuntimeState, ServerForwardRule, ThreeXuiTrafficSnapshot } from "@/types";
+import type { ControlServer, DeployTask, MonitorAlert, ProtocolNode, ProtocolProfile, RuntimeProviderDescriptor, RuntimeState, RuntimeStateOverview, RuntimeStateOverviewItem, ServerForwardRule, ThreeXuiTrafficSnapshot } from "@/types";
 
 interface ServerForm {
   id?: number;
@@ -984,6 +985,7 @@ export default function OrchestratorPage() {
   const [profiles, setProfiles] = useState<ProtocolProfile[]>([]);
   const [tasks, setTasks] = useState<DeployTask[]>([]);
   const [runtimeProviders, setRuntimeProviders] = useState<RuntimeProviderDescriptor[]>([]);
+  const [runtimeStateOverview, setRuntimeStateOverview] = useState<RuntimeStateOverview | null>(null);
   const [trafficSnapshots, setTrafficSnapshots] = useState<ThreeXuiTrafficSnapshot[]>([]);
   const [monitorAlerts, setMonitorAlerts] = useState<MonitorAlert[]>([]);
   const [serverModalOpen, setServerModalOpen] = useState(false);
@@ -1071,6 +1073,14 @@ export default function OrchestratorPage() {
       return counts;
     }, {});
   }, [tasks]);
+
+  const runtimeStateItems = useMemo<RuntimeStateOverviewItem[]>(() => {
+    return runtimeStateOverview?.items || [];
+  }, [runtimeStateOverview]);
+
+  const recentRuntimeStateItems = useMemo(() => {
+    return runtimeStateItems.slice(0, 12);
+  }, [runtimeStateItems]);
 
   const outboundTagOptions = useMemo(() => uniqueStrings([
     ...DEFAULT_OUTBOUND_TAGS,
@@ -1359,14 +1369,15 @@ export default function OrchestratorPage() {
     setLoading(true);
     try {
       await ensureDefaultProtocolProfiles();
-      const [serverRes, profileRes, taskRes, nodeRes, forwardRes, alertRes, providerRes] = await Promise.all([
+      const [serverRes, profileRes, taskRes, nodeRes, forwardRes, alertRes, providerRes, runtimeStateRes] = await Promise.all([
         getControlServerList(),
         getProtocolProfileList(),
         getDeployTaskList(),
         getProtocolNodeList({ limit: 300 }),
         getServerForwardRuleList({ limit: 300 }),
         listMonitorAlerts({ acknowledged: 0, limit: 100 }),
-        getRuntimeProviderList()
+        getRuntimeProviderList(),
+        getRuntimeStateOverview()
       ]);
 
       if (serverRes.code === 0) setServers(serverRes.data || []);
@@ -1376,7 +1387,8 @@ export default function OrchestratorPage() {
       if (forwardRes.code === 0) setForwardRules(forwardRes.data || []);
       if (alertRes.code === 0) setMonitorAlerts(alertRes.data || []);
       if (providerRes.code === 0) setRuntimeProviders(providerRes.data || []);
-      if (serverRes.code !== 0 || profileRes.code !== 0 || taskRes.code !== 0 || nodeRes.code !== 0 || forwardRes.code !== 0 || alertRes.code !== 0 || providerRes.code !== 0) {
+      if (runtimeStateRes.code === 0) setRuntimeStateOverview(runtimeStateRes.data || null);
+      if (serverRes.code !== 0 || profileRes.code !== 0 || taskRes.code !== 0 || nodeRes.code !== 0 || forwardRes.code !== 0 || alertRes.code !== 0 || providerRes.code !== 0 || runtimeStateRes.code !== 0) {
         toast.error(t("主控数据加载不完整"));
       }
     } catch (error) {
@@ -2329,6 +2341,118 @@ export default function OrchestratorPage() {
             </CardBody>
           </Card>
         </div>
+
+        <section>
+          <Card radius="sm">
+            <CardHeader className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("State Sync 状态同步")}</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  {t("按服务器和 Runtime Provider 聚合 agent 心跳、任务结果、服务、节点、证书和诊断状态。")}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Chip size="sm" variant="flat" color="success">{t("{count} 健康", { count: runtimeStateOverview?.healthy || 0 })}</Chip>
+                <Chip size="sm" variant="flat" color="warning">{t("{count} 观察", { count: runtimeStateOverview?.warning || 0 })}</Chip>
+                <Chip size="sm" variant="flat" color="danger">{t("{count} 异常", { count: runtimeStateOverview?.failed || 0 })}</Chip>
+                <Chip size="sm" variant="flat">{t("{count} 未知", { count: runtimeStateOverview?.unknown || 0 })}</Chip>
+                <Button size="sm" variant="light" onPress={loadData}>{t("刷新")}</Button>
+              </div>
+            </CardHeader>
+            <CardBody className="space-y-3">
+              {!runtimeStateOverview || runtimeStateItems.length === 0 ? (
+                <div className="rounded-small border border-dashed border-default-300 p-5 text-center">
+                  <p className="font-medium text-gray-900 dark:text-white">{t("暂无运行时状态")}</p>
+                  <p className="text-sm text-gray-500 mt-1">{t("Agent 回报和服务器心跳会在这里聚合。")}</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    <div className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
+                      <p className="text-xs text-gray-500">{t("服务器")}</p>
+                      <p className="text-xl font-semibold text-gray-900 dark:text-white">{runtimeStateOverview.servers}</p>
+                    </div>
+                    <div className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
+                      <p className="text-xs text-gray-500">{t("运行时")}</p>
+                      <p className="text-xl font-semibold text-gray-900 dark:text-white">{runtimeStateOverview.providers}</p>
+                    </div>
+                    <div className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
+                      <p className="text-xs text-gray-500">{t("聚合项")}</p>
+                      <p className="text-xl font-semibold text-gray-900 dark:text-white">{runtimeStateItems.length}</p>
+                    </div>
+                    <div className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
+                      <p className="text-xs text-gray-500">{t("生成时间")}</p>
+                      <p className="truncate text-sm font-medium text-gray-900 dark:text-white">{formatTime(runtimeStateOverview.generatedAt)}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {recentRuntimeStateItems.map(item => {
+                      const serviceEntries = Object.entries(item.serviceStatuses || {}).filter(([, value]) => value);
+                      const diagnostic = item.diagnosticSummary;
+                      const sourceLabel = item.source === "task" ? t("任务结果") : t("服务器心跳");
+                      const detailParts = [
+                        item.protocol && item.action ? `${item.protocol} / ${item.action}` : null,
+                        item.nodeCount !== undefined ? t("{count} 个节点", { count: item.nodeCount }) : null,
+                        item.forwardRuleCount !== undefined ? t("{count} 条转发", { count: item.forwardRuleCount }) : null,
+                        item.certificateStatus ? [item.certificateStatus, item.certificateDomain].filter(Boolean).join(" ") : null
+                      ].filter(Boolean);
+
+                      return (
+                        <div key={`${item.serverId}-${item.providerKey}-${item.taskId || item.source || "state"}`} className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
+                          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1.2fr)_minmax(180px,.8fr)_minmax(260px,1.3fr)_auto] lg:items-center">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Chip size="sm" variant="flat" color={runtimeProviderColor(item.providerKey) as any}>{item.providerKey}</Chip>
+                                <Chip size="sm" variant="flat" color={runtimeStateColor(item.status) as any}>{item.status || "-"}</Chip>
+                                <Chip size="sm" variant="flat">{sourceLabel}</Chip>
+                              </div>
+                              <p className="mt-2 truncate font-semibold text-gray-900 dark:text-white">{item.serverName || `#${item.serverId}`}</p>
+                              <p className="truncate text-xs text-gray-500">{item.providerName || item.providerKey}</p>
+                            </div>
+                            <div className="text-sm">
+                              <p className="text-xs text-gray-500">{t("来源")}</p>
+                              <p className="truncate text-gray-900 dark:text-white">{item.statusSource || "-"}</p>
+                              <p className="text-xs text-gray-500">{formatTime(item.stateUpdatedAt || item.taskUpdatedAt || item.lastHeartbeat)}</p>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm text-gray-900 dark:text-white">{detailParts.length > 0 ? detailParts.join(" · ") : t("等待 Agent 回报")}</p>
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {item.taskId && <Chip size="sm" variant="flat">{t("任务 #{id}", { id: item.taskId })}</Chip>}
+                                {serviceEntries.map(([name, status]) => (
+                                  <Chip key={name} size="sm" variant="flat" color={runtimeStateColor(status) as any}>{name} {status}</Chip>
+                                ))}
+                                {diagnostic && (
+                                  <Chip size="sm" variant="flat" color={(diagnostic.fail || 0) > 0 ? "danger" : (diagnostic.warning || 0) > 0 ? "warning" : "success"}>
+                                    {t("诊断 {fail}/{warning}/{ok}", {
+                                      fail: diagnostic.fail || 0,
+                                      warning: diagnostic.warning || 0,
+                                      ok: diagnostic.ok || 0
+                                    })}
+                                  </Chip>
+                                )}
+                              </div>
+                              {item.lastError && <p className="mt-1 truncate text-xs text-danger">{item.lastError}</p>}
+                            </div>
+                            <div className="flex justify-start lg:justify-end">
+                              <Chip size="sm" variant="flat">{item.taskState || item.source || "-"}</Chip>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {runtimeStateItems.length > recentRuntimeStateItems.length && (
+                    <p className="text-xs text-gray-500">
+                      {t("仅显示最近 {shown} 条，后端已聚合 {total} 条运行时状态。", { shown: recentRuntimeStateItems.length, total: runtimeStateItems.length })}
+                    </p>
+                  )}
+                </>
+              )}
+            </CardBody>
+          </Card>
+        </section>
 
         <section>
           <Card radius="sm">

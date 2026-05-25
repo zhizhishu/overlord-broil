@@ -44,6 +44,13 @@ public class DeployTaskController {
 
     @LogAnnotation
     @RequireRole
+    @PostMapping("/runtime-state/overview")
+    public R runtimeStateOverview() {
+        return deployTaskService.getRuntimeStateOverview();
+    }
+
+    @LogAnnotation
+    @RequireRole
     @PostMapping("/script")
     public R script(@RequestBody Map<String, Object> params) {
         Long id = Long.valueOf(params.get("id").toString());

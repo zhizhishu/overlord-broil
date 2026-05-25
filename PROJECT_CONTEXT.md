@@ -65,6 +65,7 @@ Controlled hosts may expose business ports depending on orchestration choices:
 - Runtime Provider registry and API for `xui`, `snell`, `forward`, `certificate`, and `firewall` task assignment.
 - Runtime Provider metadata travels through task claim/report and is stored in task result JSON for audit.
 - Runtime State is stored in `resultJson.runtimeState` and rendered on task cards, normalizing provider, protocol/action, task state, resolved status/source, services, nodes, forwarding, certificates and diagnostics.
+- State Sync overview aggregates latest `runtimeState` task results with server heartbeat service/certificate fields through `/api/v1/deploy-task/runtime-state/overview` and renders a server-by-provider panel in the master control center.
 - One-click orchestration tasks for 3x-ui/Xray and Snell.
 - 3x-ui API integration for inbound/outbound/config/traffic/restart operations.
 - Protocol-node form flow with validation and advanced payload preview.

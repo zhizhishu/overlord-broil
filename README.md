@@ -48,6 +48,8 @@ Runtime Provider metadata now follows the task from master claim to agent report
 
 Task results also include a normalized `resultJson.runtimeState` block. It records `providerKey`, `providerName`, `protocol`, `action`, `taskState`, resolved `status`, `statusSource`, `updatedAt`, and optional summaries for service states, protocol nodes, forwarding rules, certificates and diagnostics. The control-center task card renders this block so XUI, Snell, forwarding, certificate and firewall tasks share one status model.
 
+State Sync now lifts those task-level runtime states into a server-by-provider overview. The master exposes `/api/v1/deploy-task/runtime-state/overview`, aggregating latest task results with server heartbeat fields for XUI/Xray, Snell and certificates, and the control center renders the same view as a Flux-style operations panel.
+
 ## UI Preview
 
 ![Flux 3x-ui Orchestrator control plane](docs/assets/flux-orchestrator-screenshot.svg)
@@ -61,6 +63,7 @@ Current UI coverage includes:
 - Snell node create/restart/remove flows
 - remote TCP/UDP forward rules
 - Runtime Provider visibility
+- State Sync runtime overview by server and provider
 - agent diagnostics, logs, restart, upgrade, uninstall and repair tasks
 - monitor alerts and a unified rule center
 - `zh-CN` / `en-US` language switching

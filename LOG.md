@@ -71,3 +71,22 @@
   - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
 - 清理：Docker 验证容器 `flux-runtime-state-verify`、`flux-runtime-state-package` 使用 `--rm`，无残留；agent mock 临时服务已结束。
 - 后续：提交并推送 `origin/main` 和 `origin/future`，等待 GitHub Actions / GHCR 镜像结果。
+
+### State Sync Runtime Overview
+
+- 完成：新增 State Sync 运行时聚合视图，把单个任务的 `resultJson.runtimeState` 提升为“服务器 × Runtime Provider”的主控状态面板。
+- 修改：
+  - `DeployTaskController` / `DeployTaskService` 新增 `/api/v1/deploy-task/runtime-state/overview`。
+  - `DeployTaskServiceImpl` 聚合最新任务运行时状态，并用 `control_server` 心跳里的 XUI/Xray、Snell、证书字段补齐基础状态。
+  - `DeployTaskServiceImplTest` 新增 runtimeState 提取、任务聚合项、心跳种子状态和健康计数覆盖。
+  - 前端新增 API/type，主控中心增加 State Sync 面板，展示健康/观察/异常/未知统计、来源、服务 chip、任务编号、节点/转发/证书和诊断摘要。
+  - README、中文 README、Operations、Release Notes 和 PROJECT_CONTEXT 补充 State Sync 聚合接口和 UI 说明。
+- 验证：
+  - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
+  - Docker Maven `RuntimeProviderServiceTest,DeployTaskServiceImplTest` 通过，11 个测试全部成功。
+  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
+  - `bash scripts/test-flux-agent-mock.sh` 通过。
+  - Docker Maven `mvn -B -DskipTests package` 通过。
+  - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
+- 清理：Docker Maven 测试容器 `flux-state-sync-test`、package 容器 `flux-state-sync-package` 均使用 `--rm`，无残留；agent mock 临时服务随脚本结束；本阶段未启动长期 dev server。
+- 后续：提交推送 `origin/main` / `origin/future`，再等待 GitHub Actions / GHCR 镜像结果。

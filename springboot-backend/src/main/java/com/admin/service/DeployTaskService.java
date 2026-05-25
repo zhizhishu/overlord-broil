@@ -17,6 +17,8 @@ public interface DeployTaskService extends IService<DeployTask> {
 
     R getAllTasks();
 
+    R getRuntimeStateOverview();
+
     R getTaskScript(Long id);
 
     R updateTaskState(DeployTaskStateDto dto);

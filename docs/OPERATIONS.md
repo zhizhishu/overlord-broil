@@ -145,6 +145,8 @@ Failed or timed-out deployment tasks should be retried from the task card rather
 
 Agent reports store a normalized `resultJson.runtimeState` block beside `resultJson.runtimeProvider`. Operators should read `runtimeState.status` with `runtimeState.statusSource`: failed or timed-out task states win first, then provider service state, protocol-node state, forwarding-rule state, certificate state, diagnostic summary and finally the task state fallback. This keeps XUI, Snell, forwarding, certificate and firewall tasks comparable in the master task card.
 
+The State Sync overview endpoint, `/api/v1/deploy-task/runtime-state/overview`, aggregates the latest `runtimeState` task result per server/provider and fills gaps from `control_server` heartbeat fields. The master UI shows that data as a compact State Sync panel so operators can compare XUI/Xray, Snell and certificate health across all registered servers without opening each task card.
+
 Install, certificate and firewall diagnostics write structured `diagnostics.items` into the task result. The master task card summarizes high-risk findings first: unresolved DNS, local port `80` occupancy, missing certificate files, missing ACME tooling, local firewall command availability and the cloud-security-group boundary.
 
 ## First-Run Operator Path

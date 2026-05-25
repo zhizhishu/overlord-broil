@@ -26,12 +26,14 @@ import com.admin.service.ServerForwardRuleService;
 import com.admin.service.SnellTemplateService;
 import com.admin.service.XuiOrchestrationScriptService;
 import com.admin.runtime.RuntimeProviderAssignment;
+import com.admin.runtime.RuntimeProviderDescriptor;
 import com.admin.runtime.RuntimeProviderService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -309,6 +311,222 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         List<DeployTask> tasks = this.list();
         tasks.forEach(runtimeProviderService::applyToTask);
         return R.ok(tasks);
+    }
+
+    @Override
+    public R getRuntimeStateOverview() {
+        long now = System.currentTimeMillis();
+        List<ControlServer> servers = controlServerService.list();
+        Map<Long, ControlServer> serverMap = new LinkedHashMap<>();
+        Map<String, Map<String, Object>> latestByServerProvider = new LinkedHashMap<>();
+
+        for (ControlServer server : servers) {
+            if (server == null || server.getId() == null) {
+                continue;
+            }
+            serverMap.put(server.getId(), server);
+            seedServerProviderRuntimeStates(latestByServerProvider, server, now);
+        }
+
+        QueryWrapper<DeployTask> query = new QueryWrapper<>();
+        query.eq("status", STATUS_ACTIVE)
+                .isNotNull("result_json")
+                .orderByDesc("updated_time")
+                .orderByDesc("id");
+        List<DeployTask> tasks = this.list(query);
+        for (DeployTask task : tasks) {
+            JSONObject runtimeState = extractRuntimeState(task);
+            if (runtimeState == null || runtimeState.isEmpty()) {
+                continue;
+            }
+            String providerKey = runtimeState.getString("providerKey");
+            if (!notBlank(providerKey)) {
+                RuntimeProviderAssignment assignment = runtimeProviderService.assign(task.getProtocol(), task.getAction());
+                providerKey = assignment == null ? "unknown" : assignment.getKey();
+            }
+            String key = seedKey(task.getServerId(), providerKey);
+            Map<String, Object> current = latestByServerProvider.get(key);
+            if (current != null && "task".equals(current.get("source"))) {
+                continue;
+            }
+            latestByServerProvider.put(key, runtimeOverviewItem(task, runtimeState, providerKey, serverMap.get(task.getServerId())));
+        }
+
+        List<Map<String, Object>> items = new ArrayList<>(latestByServerProvider.values());
+        Map<String, Integer> counts = countRuntimeOverview(items);
+        Map<String, Object> overview = new LinkedHashMap<>();
+        overview.put("generatedAt", now);
+        overview.put("servers", serverMap.size());
+        overview.put("providers", runtimeProviderService.listProviders().size());
+        overview.putAll(counts);
+        overview.put("items", items);
+        return R.ok(overview);
+    }
+
+    private void seedServerProviderRuntimeStates(Map<String, Map<String, Object>> items,
+                                                 ControlServer server,
+                                                 long now) {
+        JSONObject xuiServices = new JSONObject();
+        if (notBlank(server.getXuiServiceStatus())) {
+            xuiServices.put("xui", server.getXuiServiceStatus());
+        }
+        if (notBlank(server.getXrayServiceStatus())) {
+            xuiServices.put("xray", server.getXrayServiceStatus());
+        }
+        String xuiStatus = providerServiceStatus("xui", xuiServices);
+        putSeedRuntimeState(items, server, "xui", xuiStatus, "control_server.services", xuiServices, null, null, now);
+
+        JSONObject snellServices = new JSONObject();
+        if (notBlank(server.getSnellServiceStatus())) {
+            snellServices.put("snell", server.getSnellServiceStatus());
+        }
+        putSeedRuntimeState(items, server, "snell", server.getSnellServiceStatus(), "control_server.services",
+                snellServices, null, null, now);
+
+        String certificateStatus = notBlank(server.getCertificateStatus()) ? server.getCertificateStatus() : null;
+        putSeedRuntimeState(items, server, "certificate", certificateStatus, "control_server.certificate",
+                null, certificateStatus, server.getCertificateDomain(), now);
+    }
+
+    private void putSeedRuntimeState(Map<String, Map<String, Object>> items,
+                                     ControlServer server,
+                                     String providerKey,
+                                     String status,
+                                     String statusSource,
+                                     JSONObject serviceStatuses,
+                                     String certificateStatus,
+                                     String certificateDomain,
+                                     long now) {
+        RuntimeProviderDescriptor provider = runtimeProviderService.getProvider(providerKey);
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("serverId", server.getId());
+        item.put("serverName", server.getName());
+        item.put("providerKey", providerKey);
+        item.put("providerName", provider == null ? providerKey : provider.getName());
+        item.put("status", notBlank(status) ? status : heartbeatStatus(server, now));
+        item.put("statusSource", notBlank(status) ? statusSource : "control_server.heartbeat");
+        item.put("stateUpdatedAt", server.getLastHeartbeat() == null ? server.getUpdatedTime() : server.getLastHeartbeat());
+        item.put("lastHeartbeat", server.getLastHeartbeat());
+        item.put("lastError", server.getLastError());
+        item.put("source", "heartbeat");
+        if (serviceStatuses != null && !serviceStatuses.isEmpty()) {
+            item.put("serviceStatuses", serviceStatuses);
+        }
+        if (notBlank(certificateStatus)) {
+            item.put("certificateStatus", certificateStatus);
+        }
+        if (notBlank(certificateDomain)) {
+            item.put("certificateDomain", certificateDomain);
+        }
+        if (server.getCertificateExpireAt() != null) {
+            item.put("certificateExpireAt", server.getCertificateExpireAt());
+        }
+        items.put(seedKey(server.getId(), providerKey), item);
+    }
+
+    private Map<String, Object> runtimeOverviewItem(DeployTask task,
+                                                    JSONObject runtimeState,
+                                                    String providerKey,
+                                                    ControlServer server) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("serverId", task.getServerId());
+        item.put("serverName", notBlank(task.getServerName()) ? task.getServerName() : server == null ? null : server.getName());
+        item.put("providerKey", providerKey);
+        item.put("providerName", runtimeState.getString("providerName"));
+        item.put("status", runtimeState.getString("status"));
+        item.put("statusSource", runtimeState.getString("statusSource"));
+        item.put("protocol", runtimeState.getString("protocol"));
+        item.put("action", runtimeState.getString("action"));
+        item.put("taskState", runtimeState.getString("taskState"));
+        item.put("taskId", task.getId());
+        item.put("taskUpdatedAt", task.getUpdatedTime());
+        item.put("stateUpdatedAt", runtimeState.getLong("updatedAt"));
+        item.put("source", "task");
+
+        JSONObject serviceStatuses = runtimeState.getJSONObject("serviceStatuses");
+        if (serviceStatuses != null && !serviceStatuses.isEmpty()) {
+            item.put("serviceStatuses", serviceStatuses);
+        }
+        putIfPresent(item, "nodeCount", runtimeState.getInteger("nodeCount"));
+        putIfPresent(item, "forwardRuleCount", runtimeState.getInteger("forwardRuleCount"));
+        putIfPresent(item, "certificateStatus", runtimeState.getString("certificateStatus"));
+        putIfPresent(item, "certificateDomain", runtimeState.getString("certificateDomain"));
+        JSONObject diagnosticSummary = runtimeState.getJSONObject("diagnosticSummary");
+        if (diagnosticSummary != null && !diagnosticSummary.isEmpty()) {
+            item.put("diagnosticSummary", diagnosticSummary);
+        }
+        return item;
+    }
+
+    private JSONObject extractRuntimeState(DeployTask task) {
+        if (task == null || task.getResultJson() == null || task.getResultJson().trim().isEmpty()) {
+            return null;
+        }
+        try {
+            JSONObject root = JSON.parseObject(task.getResultJson());
+            JSONObject runtimeState = root.getJSONObject("runtimeState");
+            if (runtimeState != null) {
+                return runtimeState;
+            }
+            String nestedResult = root.getString("resultJson");
+            if (notBlank(nestedResult)) {
+                JSONObject nested = JSON.parseObject(nestedResult);
+                return nested.getJSONObject("runtimeState");
+            }
+        } catch (Exception ignored) {
+            return null;
+        }
+        return null;
+    }
+
+    private Map<String, Integer> countRuntimeOverview(List<Map<String, Object>> items) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        counts.put("healthy", 0);
+        counts.put("warning", 0);
+        counts.put("failed", 0);
+        counts.put("unknown", 0);
+        for (Map<String, Object> item : items) {
+            String bucket = runtimeHealth(item == null ? null : String.valueOf(item.get("status")));
+            counts.put(bucket, counts.get(bucket) + 1);
+        }
+        return counts;
+    }
+
+    private String runtimeHealth(String status) {
+        if (!notBlank(status)) {
+            return "unknown";
+        }
+        String normalized = status.trim().toLowerCase();
+        if (Arrays.asList("active", "valid", "running", "healthy", "ok", "success", "succeeded", "synced").contains(normalized)) {
+            return "healthy";
+        }
+        if (Arrays.asList("mixed", "warning", "expiring", "unknown", "not-installed", "pending", "generated", "claimed", "stale").contains(normalized)) {
+            return "warning";
+        }
+        if (Arrays.asList("failed", "fail", "error", "danger", "missing", "timeout", "inactive", "expired", "unreadable", "offline").contains(normalized)) {
+            return "failed";
+        }
+        return "unknown";
+    }
+
+    private String heartbeatStatus(ControlServer server, long now) {
+        if (server == null || server.getLastHeartbeat() == null) {
+            return "unknown";
+        }
+        if (now - server.getLastHeartbeat() > 90000) {
+            return "stale";
+        }
+        return notBlank(server.getLastError()) ? "warning" : "healthy";
+    }
+
+    private String seedKey(Object serverId, String providerKey) {
+        return String.valueOf(serverId) + ":" + (providerKey == null ? "unknown" : providerKey);
+    }
+
+    private void putIfPresent(Map<String, Object> item, String key, Object value) {
+        if (value != null) {
+            item.put(key, value);
+        }
     }
 
     @Override

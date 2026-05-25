@@ -239,6 +239,42 @@ export interface RuntimeState {
   updatedAt?: number;
 }
 
+export interface RuntimeStateOverviewItem {
+  serverId: number;
+  serverName?: string;
+  providerKey: string;
+  providerName?: string;
+  status?: string;
+  statusSource?: string;
+  protocol?: string;
+  action?: string;
+  taskState?: string;
+  taskId?: number;
+  taskUpdatedAt?: number;
+  stateUpdatedAt?: number;
+  lastHeartbeat?: number;
+  lastError?: string;
+  serviceStatuses?: Record<string, string>;
+  nodeCount?: number;
+  forwardRuleCount?: number;
+  certificateStatus?: string;
+  certificateDomain?: string;
+  certificateExpireAt?: number;
+  diagnosticSummary?: RuntimeState["diagnosticSummary"];
+  source?: "task" | "heartbeat" | string;
+}
+
+export interface RuntimeStateOverview {
+  generatedAt: number;
+  servers: number;
+  providers: number;
+  healthy: number;
+  warning: number;
+  failed: number;
+  unknown: number;
+  items: RuntimeStateOverviewItem[];
+}
+
 export interface DeployTask {
   id: number;
   serverId: number;

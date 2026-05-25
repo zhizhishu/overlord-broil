@@ -26,6 +26,7 @@ This release moves the project from the first public production milestone into a
 - Future branch update: added the Runtime Provider registry for `xui`, `snell`, `forward`, `certificate` and `firewall`; deployment tasks now expose provider metadata to the master UI and controlled-agent claim payloads.
 - Future branch update: connected Runtime Provider metadata through the controlled-agent execution report path. Agents log and report the claimed provider, while the master attaches provider audit metadata to stored task results when older agents omit it.
 - Future branch update: added normalized `resultJson.runtimeState` to task results and the master task card. Runtime status now records provider, protocol/action, task state, resolved status/source, service states, node/forward counts, certificate state and diagnostic summaries in one model.
+- Future branch update: added the State Sync runtime overview API and control-center panel. The master aggregates latest task runtime states with server heartbeat service/certificate fields, producing a server-by-provider view for XUI/Xray, Snell and certificate health.
 
 ### 0.6.0 Capability Matrix
 
@@ -42,6 +43,7 @@ This release moves the project from the first public production milestone into a
 | Legacy forwarding UI | Future branch translates the main forwarding workflows through the shared `zh-CN` / `en-US` dictionary and unifies empty/failure/status wording. |
 | Nano controlled hosts | Agent heartbeat reports total memory; the master badges low-memory servers and keeps sub-200 MB hosts on Snell or remote-forwarding paths. |
 | Runtime Provider / Runtime State audit | Task claim/report results carry provider metadata and normalized runtime state for `xui`, `snell`, `forward`, `certificate` and `firewall`, giving the master a stable audit trail across agent versions. |
+| State Sync overview | `/api/v1/deploy-task/runtime-state/overview` aggregates latest runtime states plus heartbeat fields into a server-by-provider operations panel. |
 | Linux coverage | Docker/CI diagnostics cover Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux userspaces. |
 | 3x-ui | API fixture remains API-level; full 3x-ui install/configure still targets systemd hosts. |
 | Snell | Product-level protocol node with separate systemd/OpenRC runtime, not a native Xray/3x-ui core protocol. |

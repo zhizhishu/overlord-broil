@@ -2,7 +2,7 @@
 
 ## Handoff Summary
 
-当前目标：继续朝用户给出的 `flux-master` 单体主控架构推进，把 `Task -> Agent -> Execute -> Report -> Master` 链路做实；本轮已把 Runtime Provider 执行报告升级为统一 `runtimeState` 状态模型，下一步提交推送并确认 GitHub Actions / GHCR 镜像成果。
+当前目标：继续朝用户给出的 `flux-master` 单体主控架构推进，把 `Task -> Agent -> Execute -> Report -> Master` 链路做实；本轮已完成 `State Sync`，把 `runtimeState` 从单个任务卡提升为按服务器和 Runtime Provider 聚合的状态同步 API 与主控状态面板。
 
 已完成：
 - 已确认父级 `C:\Users\echo\Downloads\claude` 只是存放根目录，不在父级写日志或计划。
@@ -14,18 +14,22 @@
 - 本轮已新增 `resultJson.runtimeState`：后端从服务、协议节点、转发规则、证书、诊断和任务状态统一解析 `status/statusSource`。
 - 本轮已在主控任务卡展示运行时状态，覆盖 XUI、Snell、转发、证书、防火墙任务的统一状态模型。
 - 本轮已同步 README、中文 README、Operations 和 Release Notes，说明 `runtimeState`、任务历史和 GHCR 可见性检查。
+- 本轮已新增 State Sync 聚合接口 `/api/v1/deploy-task/runtime-state/overview`，按服务器和 Runtime Provider 汇总最新任务运行时状态，并用服务器心跳里的 XUI/Xray、Snell、证书状态补齐。
+- 本轮已在主控 UI 增加 State Sync 面板，展示健康/观察/异常/未知统计、状态来源、服务 chip、任务编号、节点/转发/证书和诊断摘要。
 
 下一步：
-- 提交本轮改动。
-- 推送到 `origin/main` 和 `origin/future`。
+- 提交推送 `origin/main` 和 `origin/future`。
 - 检查 GitHub Actions / GHCR 镜像成果。
 
 关键文件：
 - `scripts/flux-agent.sh`
 - `scripts/test-flux-agent-mock.sh`
 - `springboot-backend/src/main/java/com/admin/service/impl/DeployTaskServiceImpl.java`
+- `springboot-backend/src/main/java/com/admin/controller/DeployTaskController.java`
+- `springboot-backend/src/main/java/com/admin/service/DeployTaskService.java`
 - `springboot-backend/src/test/java/com/admin/service/impl/DeployTaskServiceImplTest.java`
 - `springboot-backend/src/main/java/com/admin/runtime/*`
+- `vite-frontend/src/api/index.ts`
 - `vite-frontend/src/types/index.ts`
 - `vite-frontend/src/pages/orchestrator.tsx`
 - `vite-frontend/src/i18n/index.tsx`
@@ -36,12 +40,12 @@
 - `PROJECT_CONTEXT.md`
 
 验证状态：
-- 本轮已通过 `npm run build`。
-- 本轮已通过 Docker Maven：`RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 8 个测试成功。
-- 本轮已通过 `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'`。
-- 本轮已通过 `bash scripts/test-flux-agent-mock.sh`，mock 中 running/final report 均断言带 `runtimeProvider.key=snell`。
-- 本轮已通过 Docker Maven：`mvn -B -DskipTests package`。
-- 本轮已通过 `git diff --check`，仅有 Windows LF/CRLF 提示。
+- 本轮 State Sync 已通过 `npm run build`。
+- 本轮 State Sync 已通过 Docker Maven：`RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 11 个测试成功。
+- 本轮 State Sync 已通过 `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'`。
+- 本轮 State Sync 已通过 `bash scripts/test-flux-agent-mock.sh`。
+- 本轮 State Sync 已通过 Docker Maven：`mvn -B -DskipTests package`。
+- 本轮 State Sync 已通过 `git diff --check`，仅有 Windows LF/CRLF 提示。
 
 风险/待确认：
 - Runtime Provider 已是融合架构关键层，但真实 VPS 矩阵和真实 3x-ui E2E 仍是正式 1.0 前最大缺口。
@@ -49,11 +53,12 @@
 - `future` 分支用于持续验证；正式 GHCR 镜像以 `main` 和 `v*` tag 为准。
 
 资源清理：
-- 本轮 Docker Maven 验证容器 `flux-runtime-state-verify`、`flux-runtime-state-package` 使用 `--rm`，已结束且无残留。
+- 本轮 Docker Maven 测试容器 `flux-state-sync-test` 使用 `--rm`，已结束且无残留。
+- 本轮 Docker Maven package 容器 `flux-state-sync-package` 使用 `--rm`，已结束且无残留。
 - 本轮 agent mock server 随脚本结束并清理临时目录。
-- 已复查 `5166`、`5168`、`6365`、`8066`，未发现本轮遗留监听。
+- 本轮未启动长期 dev server。
 
-最后更新：2026-05-25 14:02:49 -07:00
+最后更新：2026-05-25 14:54:38 -07:00
 
 ## Active Tasks
 
@@ -64,7 +69,9 @@
 - [x] **Goal:** Runtime Provider 层、任务元数据和主控可视入口落地。
 - [x] **Goal:** 打通 Runtime Provider 到 Agent 执行报告的审计闭环。
 - [x] **Goal:** Runtime State 统一任务结果模型和主控任务卡展示落地。
-- [ ] **Goal:** 提交推送并确认 GitHub Actions / GHCR 成果。
+- [x] **Goal:** 提交推送并确认 GitHub Actions / GHCR 成果。
+- [x] **Goal:** State Sync 聚合 API 和主控状态面板落地。
+- [ ] **Goal:** 提交推送并确认 State Sync 的 GitHub Actions / GHCR 成果。
 
 ## Notes For Next Agent
 
