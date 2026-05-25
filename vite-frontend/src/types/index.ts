@@ -108,6 +108,10 @@ export interface ControlServer {
   lastHeartbeat?: number;
   cpuUsage?: number;
   memoryUsage?: number;
+  memoryTotalMb?: number;
+  lowMemoryMode?: number;
+  lowMemoryProfile?: string;
+  lowMemoryAdvice?: string;
   uploadTraffic?: number;
   downloadTraffic?: number;
   lastError?: string;

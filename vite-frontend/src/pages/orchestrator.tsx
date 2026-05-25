@@ -265,6 +265,9 @@ interface DiagnosticSummary {
   total: number;
 }
 
+const NANO_MEMORY_MB = 256;
+const NANO_CRITICAL_MEMORY_MB = 200;
+
 const blankServerForm: ServerForm = {
   name: "",
   role: "agent",
@@ -567,6 +570,25 @@ const protocolNodePayloadPreview = (form: ProtocolNodeForm) => JSON.stringify(
   null,
   2
 );
+
+const isLowMemoryServer = (server?: ControlServer) => {
+  if (!server) return false;
+  if (server.lowMemoryMode === 1) return true;
+  return typeof server.memoryTotalMb === "number" && server.memoryTotalMb > 0 && server.memoryTotalMb < NANO_MEMORY_MB;
+};
+
+const isNanoCriticalServer = (server?: ControlServer) => {
+  return Boolean(server?.memoryTotalMb && server.memoryTotalMb > 0 && server.memoryTotalMb < NANO_CRITICAL_MEMORY_MB);
+};
+
+const orchestrationUsesFullXuiStack = (form: OrchestrationForm) => {
+  return form.installXui
+    || form.configurePanel
+    || form.createVlessReality
+    || form.createVmessWs
+    || form.createTrojanTls
+    || form.createShadowsocks;
+};
 
 const MasterRiskNotice = ({ context }: { context: string }) => {
   const { t } = useLanguage();
@@ -974,6 +996,10 @@ export default function OrchestratorPage() {
       add("ok", t("目标服务器"), t("已选择 {name}", { name: selectedProtocolServer.name }));
     }
 
+    if (selectedProtocolServer && isNanoCriticalServer(selectedProtocolServer) && protocolNodeForm.protocol !== "snell") {
+      add("missing", t("Nano 被控"), t("低于 200MB 的 Nano 被控不支持创建 Xray 入站节点，请改用 Snell 或远端端口转发。"));
+    }
+
     if (!protocolNodeForm.port || protocolNodeForm.port < 1 || protocolNodeForm.port > 65535) {
       add("missing", t("端口"), t("端口必须在 1-65535 之间。"));
     } else if (portInUse) {
@@ -1090,6 +1116,9 @@ export default function OrchestratorPage() {
   }, [orchestrationForm.serverIds, servers]);
 
   const selectedOrchestrationHasMaster = selectedOrchestrationServers.some(server => server.role === "master");
+  const selectedOrchestrationLowMemoryServers = selectedOrchestrationServers.filter(isLowMemoryServer);
+  const selectedOrchestrationCriticalNanoServers = selectedOrchestrationServers.filter(isNanoCriticalServer);
+  const selectedOrchestrationUsesFullXuiStack = orchestrationUsesFullXuiStack(orchestrationForm);
 
   const selectedInboundServer = useMemo(() => {
     return servers.find(server => server.id === threeXuiInboundForm.serverId);
@@ -1104,7 +1133,11 @@ export default function OrchestratorPage() {
 
   const renderServerOptions = () => servers.map(server => (
     <SelectItem key={server.id.toString()} textValue={server.name}>
-      {server.role === "master" ? `${server.name} · ${t("主控高风险")}` : server.name}
+      {[
+        server.name,
+        server.role === "master" ? t("主控高风险") : null,
+        isLowMemoryServer(server) ? t("Nano 被控") : null
+      ].filter(Boolean).join(" · ")}
     </SelectItem>
   ));
 
@@ -1428,6 +1461,10 @@ export default function OrchestratorPage() {
       toast.error(t("节点端口不合法"));
       return;
     }
+    if (protocolNodeForm.protocol !== "snell" && isNanoCriticalServer(selectedProtocolServer)) {
+      toast.error(t("Nano 被控低于 200MB，不支持创建 Xray 入站节点；请改用 Snell 或远端端口转发。"));
+      return;
+    }
 
     const isSnell = protocolNodeForm.protocol === "snell";
     const payload = isSnell ? undefined : withOutboundTag(
@@ -1646,6 +1683,10 @@ export default function OrchestratorPage() {
     }
     if (orchestrationForm.certificateMode === "acme-http" && !orchestrationForm.certificateDomain.trim()) {
       toast.error(t("ACME 证书模式需要填写域名"));
+      return;
+    }
+    if (selectedOrchestrationCriticalNanoServers.length > 0 && selectedOrchestrationUsesFullXuiStack) {
+      toast.error(t("Nano 被控内存低于 200MB，不支持完整 3x-ui/Xray 编排；请关闭 3x-ui/Xray 相关选项，仅保留 Snell 或端口转发。"));
       return;
     }
     const ports = [
@@ -2342,12 +2383,25 @@ export default function OrchestratorPage() {
                     <Chip color={server.role === "master" ? "warning" : "default"} variant="flat" size="sm">
                       {server.role === "master" ? t("主控") : t("副控")}
                     </Chip>
+                    {isLowMemoryServer(server) && (
+                      <Chip color={isNanoCriticalServer(server) ? "danger" : "warning"} variant="flat" size="sm">
+                        {t("Nano 被控")}
+                      </Chip>
+                    )}
                     <Chip color={heartbeatColor(server) as any} variant="flat" size="sm">{heartbeatText(server)}</Chip>
                   </div>
                 </CardHeader>
                 <CardBody className="space-y-4">
                   {server.role === "master" && (
                     <MasterRiskNotice context="在该卡片执行一键编排、入站/出站保存或重启" />
+                  )}
+                  {isLowMemoryServer(server) && (
+                    <div className="rounded-small border border-warning-300 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
+                      <span className="font-semibold">{t("超小内存提示：")}</span>
+                      {t("该被控总内存约 {memory} MB，完整 3x-ui/Xray 编排可能 OOM；优先使用 Snell、远端端口转发或先开启 swap。", {
+                        memory: server.memoryTotalMb || "-"
+                      })}
+                    </div>
                   )}
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
@@ -2376,7 +2430,10 @@ export default function OrchestratorPage() {
                     </div>
                     <div>
                       <p className="text-gray-500">{t("内存")}</p>
-                      <p>{server.memoryUsage == null ? "-" : `${server.memoryUsage.toFixed(1)}%`}</p>
+                      <p>
+                        {server.memoryUsage == null ? "-" : `${server.memoryUsage.toFixed(1)}%`}
+                        {server.memoryTotalMb ? ` / ${server.memoryTotalMb} MB` : ""}
+                      </p>
                     </div>
                     <div>
                       <p className="text-gray-500">{t("上传")}</p>
@@ -2922,6 +2979,18 @@ export default function OrchestratorPage() {
               </div>
               {selectedOrchestrationHasMaster && (
                 <MasterRiskNotice context="生成一键编排任务" />
+              )}
+              {selectedOrchestrationLowMemoryServers.length > 0 && (
+                <div className={`rounded-small border px-3 py-2 text-xs leading-5 ${
+                  selectedOrchestrationCriticalNanoServers.length > 0
+                    ? "border-danger-300 bg-danger-50 text-danger-700 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-300"
+                    : "border-warning-300 bg-warning-50 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300"
+                }`}>
+                  <span className="font-semibold">{t("Nano 被控风险：")}</span>
+                  {t("已选择 {count} 台低内存服务器。低于 200MB 时主控会阻止完整 3x-ui/Xray 编排；建议只保留 Snell 或端口转发，并先开启 swap。", {
+                    count: selectedOrchestrationLowMemoryServers.length
+                  })}
+                </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-small border border-default-200 p-4">

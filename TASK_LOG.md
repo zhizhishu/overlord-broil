@@ -409,3 +409,24 @@
 - `vite-frontend/src/i18n/index.tsx` 已补齐旧转发页英文词典；脚本复核 `forward.tsx` 内 139 个中文 `t(...)` key 缺失数为 0，并额外覆盖 `内容`、`地址`、`所有地址`、`转发数据` 等动态标签。
 - README、中文 README 和 Release Notes 已同步说明旧 Flux 转发页主流程已接入 `zh-CN/en-US`，同时保留移动端、加载态、失败态和任务详情继续打磨的 1.0 前差距。
 - 本地验证：`vite-frontend npm run build` 通过；`git diff --check` 通过。Vite 仍保留既有 `site.ts` 动静态混合导入 chunk 提示，不影响构建。
+
+## 2026-05-24 Nano 被控服务器识别计划
+
+### 本轮计划（创建于: 2026-05-24 22:13:35）
+
+1. agent 识别：在心跳里上报总内存 MB、是否低内存、低内存档位和建议，默认把低于 256MB 识别为 Nano，被控低于 200MB 时给更明确的 3x-ui/Xray 完整栈风险提示。
+2. 后端入库：扩展服务器心跳字段和数据库结构，保存 `memory_total_mb`、`low_memory_profile`、`low_memory_mode`、`low_memory_advice`，让主控能持久展示。
+3. 前端展示：服务器卡片显示 Nano/低内存标签，在一键编排选择低内存服务器时提示不建议完整 3x-ui/Xray 编排，可优先 Snell/端口转发。
+4. 文档同步：README / 中文 README / Release Notes 写清低于 200MB 的支持边界：agent 可轻量运行，完整 3x-ui/Xray 不承诺稳定。
+5. 验证与推送：运行脚本语法、agent mock、前端 build、后端构建或可用替代检查、`git diff --check`，提交推送 `origin/future` 并观察 GitHub Actions。
+
+- [x] ~~**目标:** 完成超小内存被控服务器 Nano 识别、主控展示和编排风险提示，并推送 `future` 分支~~ (创建于: 2026-05-24 22:13:35 | **完成于: 2026-05-24 23:27:36**)
+
+### 2026-05-24 23:27:36 进度记录
+
+- agent 心跳已新增总内存 MB、`lowMemoryMode`、`lowMemoryProfile` 和 `lowMemoryAdvice` 上报；`nano-critical` 低于 `200 MB`，`nano` 低于 `256 MB`，`small` 低于 `512 MB`，其余为 `standard`。
+- 后端已扩展 `control_server` 实体/心跳 DTO/SQL 字段，并把低内存判断抽到 `LowMemoryPolicyUtils`；心跳会持久化档位，监控会生成 `low_memory_server` 告警。
+- 编排安全已收口：低于 `200 MB` 的 Nano 被控会拒绝完整 3x-ui/Xray 一键编排、普通 Xray/3x-ui 部署任务和 Xray 协议节点创建/更新；Snell 与远端端口转发仍作为推荐轻量路径保留。
+- 主控 UI 已在服务器卡片、服务器选择项、一键编排弹窗和协议节点表单展示 Nano 风险；中英文词典已补齐新增文案。
+- README、中文 README、Operations 和 Release Notes 已写清 Nano 边界、数据库升级字段和端口/协议建议。
+- 本地验证通过：`bash -n scripts/*.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、`vite-frontend npm run build`、Docker Maven `mvn -B -DskipTests package`、浏览器 dev server 烟测、`git diff --check`。浏览器烟测后已关闭 5173 端口；Docker Maven 容器已自动清理。

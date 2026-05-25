@@ -207,6 +207,7 @@ The master control center includes a first-run setup guide for new operators. Tr
 - Store 3x-ui API tokens only in the panel fields intended for that purpose; do not paste tokens into issue reports or logs.
 - For each controlled server, rotate the agent token after handoff or suspected exposure.
 - Verify agent heartbeats before sending orchestration, Snell or forwarding tasks.
+- Treat hosts below `256 MB` as Nano nodes. Hosts below `200 MB` should only receive Snell or remote-forwarding tasks until swap and real-host testing prove they can survive 3x-ui/Xray.
 - Send full 3x-ui install/configure orchestration only to normal systemd hosts. Alpine/OpenRC controlled hosts can run agent, Snell and forwarding tasks, but the upstream 3x-ui installation path is blocked by preflight.
 - For ACME HTTP certificate mode, run `Agent / 证书诊断` and `Agent / 防火墙诊断` before retrying. The task card should distinguish DNS not resolving, local port `80` occupancy, certificate-file state, local firewall rules and cloud security-group exposure.
 - Verify duplicate protocol and forwarding ports before deploying to a shared host.
@@ -253,7 +254,7 @@ Default master ports:
 | disabled | phpMyAdmin | Internal only by default; set `FLUX_PHPMYADMIN_PORT` or `--phpmyadmin-port` only during maintenance. |
 | `3306` | MySQL | Container-internal in the shipped compose files. |
 
-Controlled hosts do not need an inbound agent port. They only expose the default 3x-ui panel port `5168`, Xray/Snell node ports, remote-forward listen ports, and ACME HTTP `80` when selected by your orchestration plan.
+Controlled hosts do not need an inbound agent port. They only expose the default 3x-ui panel port `5168`, Xray/Snell node ports, remote-forward listen ports, and ACME HTTP `80` when selected by your orchestration plan. Nano hosts below `200 MB` should not expose new Xray/3x-ui ports through the master; keep them on Snell or forwarding unless you deliberately override outside the supported path.
 
 ## Local And CI Verification
 

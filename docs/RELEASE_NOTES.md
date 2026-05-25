@@ -21,6 +21,7 @@ This release moves the project from the first public production milestone into a
 - Future branch update: refined protocol-node creation with structured form checks for target server, port reuse, credentials, Reality fields, Snell PSK/version and outbound tags; the generated inbound JSON is now an advanced preview instead of the default editing surface.
 - Future branch update: install, certificate and firewall diagnostics now emit structured `diagnostics.items`; the master task card summarizes DNS, port `80`, certificate-file, ACME-tooling, local-firewall and cloud-firewall findings before users open raw logs.
 - Future branch update: connected the legacy Flux forwarding page to the shared `zh-CN` / `en-US` dictionary for its main flows, including toasts, form validation, empty states, import/export, delete confirmation, address copy and diagnostics modals.
+- Future branch update: added Nano controlled-server detection from agent heartbeat memory totals. The master stores `nano-critical` below `200 MB`, `nano` below `256 MB`, `small` below `512 MB`, raises low-memory alerts and blocks full 3x-ui/Xray orchestration plus Xray protocol-node creation on `nano-critical` hosts.
 
 ### 0.6.0 Capability Matrix
 
@@ -34,6 +35,7 @@ This release moves the project from the first public production milestone into a
 | Protocol-node UI | Future branch defaults to structured node forms with configuration checks and a collapsible advanced payload preview. |
 | Diagnostic UI | Future branch shows structured task-card diagnostics for install, ACME/certificate and firewall checks, with raw result access retained. |
 | Legacy forwarding UI | Future branch translates the main forwarding workflows through the shared `zh-CN` / `en-US` dictionary and unifies empty/failure/status wording. |
+| Nano controlled hosts | Agent heartbeat reports total memory; the master badges low-memory servers and keeps sub-200 MB hosts on Snell or remote-forwarding paths. |
 | Linux coverage | Docker/CI diagnostics cover Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux userspaces. |
 | 3x-ui | API fixture remains API-level; full 3x-ui install/configure still targets systemd hosts. |
 | Snell | Product-level protocol node with separate systemd/OpenRC runtime, not a native Xray/3x-ui core protocol. |
@@ -44,6 +46,7 @@ This release moves the project from the first public production milestone into a
 - The Linux matrix in this release is Docker/CI preflight coverage. It is not yet the full real-VPS matrix with public DNS, cloud firewall, ACME HTTP validation and real service managers.
 - The included 3x-ui fixture is API-level. A real 3x-ui container or VPS end-to-end smoke test is still the next reliability milestone.
 - Snell is unified at the product/control-plane layer. It remains a separate runtime service managed by the Flux agent rather than a native Xray protocol inside 3x-ui.
+- Nano detection is a protection layer, not a promise that 3x-ui/Xray will run well on tiny hardware. Sub-200 MB hosts should be treated as Snell or forwarding nodes unless swap and real-host testing prove otherwise.
 - Enterprise-grade governance is still future work: RBAC, full audit log views, key-rotation migration, agent token expiry/revocation and dangerous-operation confirmation.
 
 ## 0.5.0 - production-ready public milestone

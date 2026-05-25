@@ -8,6 +8,7 @@ import com.admin.common.dto.ProtocolNodeQueryDto;
 import com.admin.common.dto.ThreeXuiInboundDto;
 import com.admin.common.dto.ThreeXuiServerDto;
 import com.admin.common.lang.R;
+import com.admin.common.utils.LowMemoryPolicyUtils;
 import com.admin.common.utils.MasterSelfProtectionUtils;
 import com.admin.common.utils.ProtocolValidationUtils;
 import com.admin.entity.ControlServer;
@@ -91,6 +92,11 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
             return R.ok(result(node, task));
         }
 
+        String nanoError = validateNanoXrayNode(server);
+        if (nanoError != null) {
+            return R.err(nanoError);
+        }
+
         Map<String, Object> payload = payloadFrom(dto);
         if (payload == null || payload.isEmpty()) {
             return R.err("xray node payload is required");
@@ -156,6 +162,11 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
             this.updateById(exists);
             DeployTask task = createSnellTask(server, exists, action);
             return R.ok(result(exists, task));
+        }
+
+        String nanoError = validateNanoXrayNode(server);
+        if (nanoError != null) {
+            return R.err(nanoError);
         }
 
         String localValidation = validateXrayNodeFields(exists);
@@ -643,6 +654,13 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
 
     private ControlServer resolveServer(Long serverId) {
         return serverId == null ? null : controlServerService.getById(serverId);
+    }
+
+    private String validateNanoXrayNode(ControlServer server) {
+        if (!LowMemoryPolicyUtils.isNanoCritical(server == null ? null : server.getMemoryTotalMb())) {
+            return null;
+        }
+        return "server memory is below 200 MB; Nano nodes should use Snell or remote port forwarding instead of Xray inbound nodes";
     }
 
     private String inferEngine(String protocol) {

@@ -49,6 +49,7 @@ run_case() {
   local server_script="${case_dir}/mock_server.py"
   local ready_file="${case_dir}/ready.txt"
   local reports_file="${case_dir}/reports.jsonl"
+  local heartbeats_file="${case_dir}/heartbeats.jsonl"
   local server_pid=""
 
   mkdir -p "$case_dir"
@@ -59,6 +60,7 @@ import pathlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 reports_path = pathlib.Path(os.environ["REPORTS_FILE"])
+heartbeats_path = pathlib.Path(os.environ["HEARTBEATS_FILE"])
 ready_path = pathlib.Path(os.environ["READY_FILE"])
 task_script = os.environ["TASK_SCRIPT"]
 claimed = False
@@ -73,6 +75,8 @@ class Handler(BaseHTTPRequestHandler):
         body = self.rfile.read(length).decode("utf-8") if length else ""
 
         if self.path == "/api/v1/control-server/heartbeat":
+            with heartbeats_path.open("a", encoding="utf-8") as fh:
+                fh.write(body + "\n")
             self._send({"success": True, "data": None})
             return
 
@@ -106,7 +110,7 @@ ready_path.write_text(str(server.server_address[1]), encoding="utf-8")
 server.serve_forever()
 PY
 
-  REPORTS_FILE="$reports_file" READY_FILE="$ready_file" TASK_SCRIPT="$task_script" "$PYTHON_BIN" "$server_script" &
+  REPORTS_FILE="$reports_file" HEARTBEATS_FILE="$heartbeats_file" READY_FILE="$ready_file" TASK_SCRIPT="$task_script" "$PYTHON_BIN" "$server_script" &
   server_pid="$!"
   trap 'if [ -n "${server_pid:-}" ]; then kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true; fi' RETURN
 
@@ -169,6 +173,38 @@ print(json.dumps({
     "exitCode": final.get("exitCode"),
     "timedOut": result.get("timedOut"),
     "reports": len(reports),
+}, ensure_ascii=False))
+PY
+
+  "$PYTHON_BIN" - "$heartbeats_file" <<'PY'
+import json
+import pathlib
+import sys
+
+heartbeats_path = pathlib.Path(sys.argv[1])
+heartbeats = [
+    json.loads(line)
+    for line in heartbeats_path.read_text(encoding="utf-8").splitlines()
+    if line.strip()
+]
+if not heartbeats:
+    raise SystemExit("no heartbeat captured")
+
+heartbeat = heartbeats[-1]
+if "memoryTotalMb" not in heartbeat:
+    raise SystemExit(f"heartbeat missing memoryTotalMb: {heartbeat}")
+if "lowMemoryMode" not in heartbeat:
+    raise SystemExit(f"heartbeat missing lowMemoryMode: {heartbeat}")
+if "lowMemoryProfile" not in heartbeat:
+    raise SystemExit(f"heartbeat missing lowMemoryProfile: {heartbeat}")
+if heartbeat["memoryTotalMb"] is not None and heartbeat["memoryTotalMb"] < 256:
+    if not heartbeat.get("lowMemoryAdvice"):
+        raise SystemExit(f"low-memory heartbeat missing advice: {heartbeat}")
+
+print(json.dumps({
+    "memoryTotalMb": heartbeat.get("memoryTotalMb"),
+    "lowMemoryMode": heartbeat.get("lowMemoryMode"),
+    "lowMemoryProfile": heartbeat.get("lowMemoryProfile"),
 }, ensure_ascii=False))
 PY
 

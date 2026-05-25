@@ -67,6 +67,14 @@ public class ControlServer extends BaseEntity {
 
     private Double memoryUsage;
 
+    private Long memoryTotalMb;
+
+    private Integer lowMemoryMode;
+
+    private String lowMemoryProfile;
+
+    private String lowMemoryAdvice;
+
     private Long uploadTraffic;
 
     private Long downloadTraffic;

@@ -97,6 +97,8 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
 
 被控服务器还会根据你的编排选择产生额外端口：3x-ui 面板默认 `5168`、Xray 入站端口、Snell 监听端口、远端转发监听端口，以及 ACME HTTP 模式需要的 `80` 端口。
 
+超小内存被控会由 agent 心跳自动识别：低于 `256 MB` 会在主控显示 `Nano 被控`，低于 `200 MB` 会阻止完整 3x-ui/Xray 一键编排和 Xray 入站节点创建。这个档位仍建议跑轻量 agent、Snell 或远端端口转发；如果确实要跑 3x-ui/Xray，请先开启 swap 并换到更大的机器。
+
 推荐公网防火墙基线：
 
 | 范围 | 推荐放行 |
@@ -139,6 +141,20 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
   | sudo env FLUX_PANEL_URL="http://your-master-panel:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
 ```
 
+agent 心跳会上报 CPU、内存使用率、总内存 MB、3x-ui/Xray/Snell 服务状态、证书状态和最近错误。主控会把总内存分成 `nano-critical`（低于 `200 MB`）、`nano`（低于 `256 MB`）、`small`（低于 `512 MB`）和 `standard`，并在低内存服务器卡片、一键编排弹窗和告警里提示风险。
+
+## 数据库升级
+
+全新安装直接导入 `gost.sql` 即可。已经跑过旧版 3x-ui 主控的数据库，如果还没有 Nano 字段，执行：
+
+```sql
+ALTER TABLE `control_server`
+  ADD COLUMN `memory_total_mb` bigint(20) DEFAULT NULL AFTER `memory_usage`,
+  ADD COLUMN `low_memory_mode` int(1) NOT NULL DEFAULT '0' AFTER `memory_total_mb`,
+  ADD COLUMN `low_memory_profile` varchar(30) DEFAULT NULL AFTER `low_memory_mode`,
+  ADD COLUMN `low_memory_advice` varchar(512) DEFAULT NULL AFTER `low_memory_profile`;
+```
+
 ## 主控怎么用
 
 1. 打开主控面板，登录后台。
@@ -158,6 +174,8 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
    - 执行 agent `诊断`、`日志`、`安装诊断`、`证书诊断`、`防火墙诊断`、`重启`、`升级`、`卸载 agent`。
    - 点 `一键修复` 修复 3x-ui / Xray / Snell；也可以单独点 `修复 3x-ui`、`修复 Xray`、`修复 Snell`。
    - 失败或超时的部署任务可以点 `重试`，主控会复制原脚本生成一个新任务，原失败日志保留。
+
+如果服务器卡片出现 `Nano 被控`，优先选择 Snell 或远端端口转发。低于 `200 MB` 时，主控会直接阻止 3x-ui/Xray 全栈编排和 Xray 入站节点创建，避免被控机器 OOM 后失联。
 
 安装诊断、证书诊断和防火墙诊断会把结构化 `diagnostics.items` 写入任务结果。主控部署任务卡会优先展示异常和提醒，例如 `DNS 未解析`、`80 端口被占用`、证书文件缺失、ACME 工具缺失、云防火墙需确认等；需要深挖时仍可点 `原始结果` 查看完整 stdout/stderr。
 

@@ -59,6 +59,7 @@ Formal runtime assumptions for this release:
 - Use a fresh Linux host or a host where ports `5166` and `6365` are either free or intentionally remapped.
 - Supported master hosts are Docker-capable Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux. Minimal hosts without `bash` can use the bootstrap commands below.
 - Full 3x-ui install/configure orchestration requires a normal systemd host, such as Debian, Ubuntu, Rocky Linux or Oracle Linux. Alpine/OpenRC is supported for the Flux agent, Snell tasks and remote port-forward tasks, but not for upstream 3x-ui service installation.
+- Nano controlled servers are detected from agent heartbeat memory totals. Below `256 MB` the UI marks the host as `Nano`; below `200 MB` the master blocks full 3x-ui/Xray orchestration and recommends Snell, remote port forwarding or enabling swap first.
 - Keep `/opt/flux-3xui-orchestrator/.env` and backups private; it contains `DB_PASSWORD`, `JWT_SECRET` and `SECRET_ENCRYPTION_KEY`.
 - Keep `SECRET_ENCRYPTION_KEY` stable. It encrypts stored agent tokens and 3x-ui API/password/2FA fields.
 - phpMyAdmin is not exposed by default. Only expose it temporarily with `FLUX_PHPMYADMIN_PORT` or `--phpmyadmin-port`, and restrict it with a firewall.
@@ -352,7 +353,11 @@ ALTER TABLE `control_server`
   ADD COLUMN `certificate_mode` varchar(30) DEFAULT NULL AFTER `snell_service_status`,
   ADD COLUMN `certificate_domain` varchar(255) DEFAULT NULL AFTER `certificate_mode`,
   ADD COLUMN `certificate_status` varchar(30) DEFAULT NULL AFTER `certificate_domain`,
-  ADD COLUMN `certificate_expire_at` bigint(20) DEFAULT NULL AFTER `certificate_status`;
+  ADD COLUMN `certificate_expire_at` bigint(20) DEFAULT NULL AFTER `certificate_status`,
+  ADD COLUMN `memory_total_mb` bigint(20) DEFAULT NULL AFTER `memory_usage`,
+  ADD COLUMN `low_memory_mode` int(1) NOT NULL DEFAULT '0' AFTER `memory_total_mb`,
+  ADD COLUMN `low_memory_profile` varchar(30) DEFAULT NULL AFTER `low_memory_mode`,
+  ADD COLUMN `low_memory_advice` varchar(512) DEFAULT NULL AFTER `low_memory_profile`;
 
 CREATE TABLE `three_xui_traffic_snapshot` (
   `id` int(10) NOT NULL AUTO_INCREMENT,
@@ -463,6 +468,16 @@ CREATE TABLE `server_forward_rule` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
+If your database already has the 3x-ui connector tables but was created before Nano detection, add only the low-memory columns:
+
+```sql
+ALTER TABLE `control_server`
+  ADD COLUMN `memory_total_mb` bigint(20) DEFAULT NULL AFTER `memory_usage`,
+  ADD COLUMN `low_memory_mode` int(1) NOT NULL DEFAULT '0' AFTER `memory_total_mb`,
+  ADD COLUMN `low_memory_profile` varchar(30) DEFAULT NULL AFTER `low_memory_mode`,
+  ADD COLUMN `low_memory_advice` varchar(512) DEFAULT NULL AFTER `low_memory_profile`;
+```
+
 If those 3x-ui columns already exist from an older checkout, widen the encrypted fields before saving new credentials:
 
 ```sql
@@ -533,6 +548,8 @@ sudo -E bash ./flux-agent.sh --once
 ```
 
 The agent polls `POST /api/v1/agent-task/claim`, writes the claimed Snell/Xray script to `/var/lib/flux-agent`, executes it locally, and reports `running/succeeded/failed` plus stdout/stderr through `POST /api/v1/agent-task/report`.
+
+The agent heartbeat reports memory usage and total memory in MB. The backend stores a low-memory profile: `nano-critical` below `200 MB`, `nano` below `256 MB`, `small` below `512 MB`, otherwise `standard`. The server card shows the `Nano` badge and warning text for low-memory hosts; one-click orchestration and Xray protocol-node creation refuse full 3x-ui/Xray plans on `nano-critical` hosts because they are more likely to OOM. Snell and remote port-forward tasks remain the recommended path for tiny nodes.
 
 The master can also generate agent maintenance tasks from each server card:
 

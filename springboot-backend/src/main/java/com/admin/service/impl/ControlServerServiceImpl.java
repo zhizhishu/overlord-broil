@@ -5,6 +5,7 @@ import com.admin.common.dto.ControlServerDto;
 import com.admin.common.dto.ControlServerHeartbeatDto;
 import com.admin.common.dto.ControlServerUpdateDto;
 import com.admin.common.lang.R;
+import com.admin.common.utils.LowMemoryPolicyUtils;
 import com.admin.common.utils.SecretCryptoUtils;
 import com.admin.entity.ControlServer;
 import com.admin.mapper.ControlServerMapper;
@@ -132,6 +133,8 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         update.setCertificateExpireAt(dto.getCertificateExpireAt());
         update.setCpuUsage(dto.getCpuUsage());
         update.setMemoryUsage(dto.getMemoryUsage());
+        update.setMemoryTotalMb(dto.getMemoryTotalMb());
+        applyLowMemoryState(update, dto);
         update.setUploadTraffic(dto.getUploadTraffic());
         update.setDownloadTraffic(dto.getDownloadTraffic());
         update.setLastHeartbeat(now);
@@ -144,6 +147,28 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
             monitorAlertService.handleHeartbeat(server, dto, now);
         }
         return updated ? R.ok("heartbeat accepted") : R.err("heartbeat update failed");
+    }
+
+    private void applyLowMemoryState(ControlServer update, ControlServerHeartbeatDto dto) {
+        Long memoryTotalMb = dto.getMemoryTotalMb();
+        if (memoryTotalMb == null || memoryTotalMb <= 0) {
+            update.setLowMemoryMode(dto.getLowMemoryMode());
+            update.setLowMemoryProfile(blankToNull(dto.getLowMemoryProfile()));
+            update.setLowMemoryAdvice(blankToNull(dto.getLowMemoryAdvice()));
+            return;
+        }
+
+        String profile = LowMemoryPolicyUtils.profile(memoryTotalMb);
+        String advice = LowMemoryPolicyUtils.advice(memoryTotalMb);
+
+        update.setLowMemoryMode(LowMemoryPolicyUtils.isLowMemory(memoryTotalMb) ? 1 : 0);
+        update.setLowMemoryProfile(profile);
+        String agentAdvice = blankToNull(dto.getLowMemoryAdvice());
+        update.setLowMemoryAdvice(agentAdvice == null ? (advice == null ? "" : advice) : agentAdvice);
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.trim().isEmpty() ? null : value.trim();
     }
 
     private ControlServer maskToken(ControlServer server) {

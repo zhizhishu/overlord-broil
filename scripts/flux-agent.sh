@@ -501,6 +501,14 @@ memory_usage() {
   ' /proc/meminfo 2>/dev/null || true
 }
 
+memory_total_mb() {
+  awk '
+    /^MemTotal:/ {
+      printf "%d", int(($2 + 1023) / 1024)
+    }
+  ' /proc/meminfo 2>/dev/null || true
+}
+
 cpu_usage() {
   awk '
     /^cpu / {
@@ -617,11 +625,12 @@ PY
 
 heartbeat_payload() {
   local last_error="$1"
-  local xray_version snell_version cpu mem_usage net rx tx xui_service xray_service snell_service cert_json
+  local xray_version snell_version cpu mem_usage mem_total net rx tx xui_service xray_service snell_service cert_json
   xray_version="$(command_output 'for f in /usr/local/x-ui/bin/xray-linux-* /usr/local/x-ui/bin/xray $(command -v xray 2>/dev/null); do [ -x "$f" ] && "$f" version && exit 0; done')"
   snell_version="$(command_output 'command -v snell-server >/dev/null 2>&1 && snell-server -v')"
   cpu="$(cpu_usage)"
   mem_usage="$(memory_usage)"
+  mem_total="$(memory_total_mb)"
   net="$(net_bytes)"
   rx="${net%% *}"
   tx="${net##* }"
@@ -629,7 +638,7 @@ heartbeat_payload() {
   xray_service="$(xray_status)"
   snell_service="$(service_status snell)"
   cert_json="$(certificate_json)"
-  "$PYTHON_BIN" - "$SERVER_ID" "$AGENT_VERSION" "$xray_version" "$snell_version" "$cpu" "$mem_usage" "$rx" "$tx" "$xui_service" "$xray_service" "$snell_service" "$last_error" "$cert_json" <<'PY'
+  "$PYTHON_BIN" - "$SERVER_ID" "$AGENT_VERSION" "$xray_version" "$snell_version" "$cpu" "$mem_usage" "$mem_total" "$rx" "$tx" "$xui_service" "$xray_service" "$snell_service" "$last_error" "$cert_json" <<'PY'
 import json
 import sys
 
@@ -645,6 +654,38 @@ def as_int(value):
     except (TypeError, ValueError):
         return 0
 
+def as_optional_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+def low_memory_state(total_mb):
+    if total_mb is None or total_mb <= 0:
+        return False, "unknown", None
+    if total_mb < 200:
+        return (
+            True,
+            "nano-critical",
+            "Memory is below 200 MB. Avoid full 3x-ui/Xray orchestration; prefer Snell or port forwarding and enable swap.",
+        )
+    if total_mb < 256:
+        return (
+            True,
+            "nano",
+            "Memory is below 256 MB. Treat this as a Nano node; avoid full 3x-ui/Xray unless swap is available.",
+        )
+    if total_mb < 512:
+        return (
+            False,
+            "small",
+            "Memory is below 512 MB. Full 3x-ui/Xray may work only with careful swap and low concurrency.",
+        )
+    return False, "standard", None
+
+memory_total_mb = as_optional_int(sys.argv[7])
+low_memory_mode, low_memory_profile, low_memory_advice = low_memory_state(memory_total_mb)
+
 payload = {
     "serverId": int(sys.argv[1]),
     "agentVersion": sys.argv[2],
@@ -652,15 +693,22 @@ payload = {
     "snellVersion": sys.argv[4] or None,
     "cpuUsage": as_float(sys.argv[5]),
     "memoryUsage": as_float(sys.argv[6]),
-    "downloadTraffic": as_int(sys.argv[7]),
-    "uploadTraffic": as_int(sys.argv[8]),
-    "xuiServiceStatus": sys.argv[9] or None,
-    "xrayServiceStatus": sys.argv[10] or None,
-    "snellServiceStatus": sys.argv[11] or None,
-    "lastError": sys.argv[12] or None,
+    "memoryTotalMb": memory_total_mb,
+    "downloadTraffic": as_int(sys.argv[8]),
+    "uploadTraffic": as_int(sys.argv[9]),
+    "xuiServiceStatus": sys.argv[10] or None,
+    "xrayServiceStatus": sys.argv[11] or None,
+    "snellServiceStatus": sys.argv[12] or None,
+    "lastError": sys.argv[13] or None,
 }
+if low_memory_mode is not None:
+    payload["lowMemoryMode"] = 1 if low_memory_mode else 0
+if low_memory_profile:
+    payload["lowMemoryProfile"] = low_memory_profile
+if low_memory_advice:
+    payload["lowMemoryAdvice"] = low_memory_advice
 try:
-    cert = json.loads(sys.argv[13] or "{}")
+    cert = json.loads(sys.argv[14] or "{}")
 except json.JSONDecodeError:
     cert = {}
 for key in ("certificateDomain", "certificateStatus", "certificateExpireAt"):

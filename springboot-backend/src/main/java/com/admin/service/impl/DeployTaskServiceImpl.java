@@ -7,6 +7,7 @@ import com.admin.common.dto.DeployTaskDto;
 import com.admin.common.dto.DeployTaskStateDto;
 import com.admin.common.dto.OrchestrationPlanDto;
 import com.admin.common.lang.R;
+import com.admin.common.utils.LowMemoryPolicyUtils;
 import com.admin.common.utils.MasterSelfProtectionUtils;
 import com.admin.common.utils.ProtocolValidationUtils;
 import com.admin.common.utils.SecretCryptoUtils;
@@ -89,6 +90,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         if (validationError != null) {
             return R.err(validationError);
         }
+        if (isNanoCritical(server) && requiresXrayTask(protocol)) {
+            return R.err("server memory is below 200 MB; Nano nodes should use Snell or remote port forwarding instead of Xray/3x-ui deployment tasks");
+        }
         Integer listenPort = dto.getListenPort() != null ? dto.getListenPort() : profile == null ? null : profile.getListenPort();
         String masterGuardError = MasterSelfProtectionUtils.validateListenPortAndAction(
                 server, listenPort, dto.getAction(), "部署任务", "协议监听端口");
@@ -156,6 +160,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 && (dto.getCertificateDomain() == null || dto.getCertificateDomain().trim().isEmpty())) {
             return "certificate domain is required for acme-http mode";
         }
+        if (isNanoCritical(server) && requiresFullXuiStack(dto)) {
+            return "server memory is below 200 MB; Nano nodes should use Snell or remote port forwarding instead of full 3x-ui/Xray orchestration";
+        }
         if (enabled(dto.getCreateVlessReality())) {
             String realityError = ProtocolValidationUtils.validateReality(dto.getRealitySni(), dto.getRealityDest(), null);
             if (realityError != null) {
@@ -210,6 +217,24 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             return "at least one orchestration action is required";
         }
         return null;
+    }
+
+    private boolean isNanoCritical(ControlServer server) {
+        return server != null
+                && LowMemoryPolicyUtils.isNanoCritical(server.getMemoryTotalMb());
+    }
+
+    private boolean requiresFullXuiStack(OrchestrationPlanDto dto) {
+        return enabled(dto.getInstallXui())
+                || enabled(dto.getConfigurePanel())
+                || enabled(dto.getCreateVlessReality())
+                || enabled(dto.getCreateVmessWs())
+                || enabled(dto.getCreateTrojanTls())
+                || enabled(dto.getCreateShadowsocks());
+    }
+
+    private boolean requiresXrayTask(String protocol) {
+        return !"snell".equals(protocol) && !"agent-maintenance".equals(protocol);
     }
 
     private String validateDeployTask(DeployTaskDto dto, ProtocolProfile profile, String protocol) {

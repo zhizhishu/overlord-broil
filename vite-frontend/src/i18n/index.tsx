@@ -581,7 +581,15 @@ const en: Record<string, string> = {
   "成功": "Success",
   "失败": "Failed",
   "连接成功": "Connected",
-  "连接失败": "Connection failed"
+  "连接失败": "Connection failed",
+  "Nano 被控": "Nano Agent",
+  "超小内存提示：": "Tiny-memory warning: ",
+  "该被控总内存约 {memory} MB，完整 3x-ui/Xray 编排可能 OOM；优先使用 Snell、远端端口转发或先开启 swap。": "This agent has about {memory} MB RAM. Full 3x-ui/Xray orchestration may run out of memory; prefer Snell, remote port forwarding, or enable swap first.",
+  "Nano 被控风险：": "Nano agent risk: ",
+  "已选择 {count} 台低内存服务器。低于 200MB 时主控会阻止完整 3x-ui/Xray 编排；建议只保留 Snell 或端口转发，并先开启 swap。": "{count} low-memory server(s) selected. Below 200 MB, the control plane blocks full 3x-ui/Xray orchestration; keep only Snell or port forwarding and enable swap first.",
+  "Nano 被控内存低于 200MB，不支持完整 3x-ui/Xray 编排；请关闭 3x-ui/Xray 相关选项，仅保留 Snell 或端口转发。": "Nano agent memory is below 200 MB, so full 3x-ui/Xray orchestration is not supported. Disable 3x-ui/Xray options and keep only Snell or port forwarding.",
+  "低于 200MB 的 Nano 被控不支持创建 Xray 入站节点，请改用 Snell 或远端端口转发。": "Nano agents below 200 MB cannot create Xray inbound nodes. Use Snell or remote port forwarding instead.",
+  "Nano 被控低于 200MB，不支持创建 Xray 入站节点；请改用 Snell 或远端端口转发。": "This Nano agent is below 200 MB, so Xray inbound creation is not supported. Use Snell or remote port forwarding instead."
 };
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);

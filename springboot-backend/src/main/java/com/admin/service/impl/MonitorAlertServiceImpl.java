@@ -5,6 +5,7 @@ import com.alibaba.fastjson2.JSONObject;
 import com.admin.common.dto.ControlServerHeartbeatDto;
 import com.admin.common.dto.MonitorAlertQueryDto;
 import com.admin.common.lang.R;
+import com.admin.common.utils.LowMemoryPolicyUtils;
 import com.admin.entity.ControlServer;
 import com.admin.entity.MonitorAlert;
 import com.admin.mapper.ControlServerMapper;
@@ -84,6 +85,7 @@ public class MonitorAlertServiceImpl extends ServiceImpl<MonitorAlertMapper, Mon
         checkService(previous, "snell_service_failure", "snell", dto.getSnellServiceStatus(), now);
         checkCertificate(previous, dto, now);
         checkTraffic(previous, dto, now);
+        checkLowMemory(previous, dto, now);
     }
 
     @Override
@@ -187,6 +189,32 @@ public class MonitorAlertServiceImpl extends ServiceImpl<MonitorAlertMapper, Mon
         detail.put("uploadTraffic", upload);
         detail.put("downloadTraffic", download);
         return detail;
+    }
+
+    private void checkLowMemory(ControlServer server, ControlServerHeartbeatDto dto, long now) {
+        Long memoryTotalMb = dto.getMemoryTotalMb();
+        boolean lowMemoryMode = Integer.valueOf(1).equals(dto.getLowMemoryMode())
+                || LowMemoryPolicyUtils.isLowMemory(memoryTotalMb);
+        if (!lowMemoryMode) {
+            return;
+        }
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("memoryTotalMb", memoryTotalMb);
+        detail.put("memoryUsage", dto.getMemoryUsage());
+        detail.put("profile", notBlank(dto.getLowMemoryProfile())
+                ? dto.getLowMemoryProfile()
+                : LowMemoryPolicyUtils.profile(memoryTotalMb));
+        detail.put("advice", notBlank(dto.getLowMemoryAdvice())
+                ? dto.getLowMemoryAdvice()
+                : LowMemoryPolicyUtils.advice(memoryTotalMb));
+        String severity = LowMemoryPolicyUtils.isNanoCritical(memoryTotalMb)
+                ? "critical"
+                : "warning";
+        String message = memoryTotalMb == null || memoryTotalMb <= 0
+                ? "Server is marked as low-memory Nano mode"
+                : "Server memory is " + memoryTotalMb + " MB; avoid full 3x-ui/Xray orchestration";
+        raise(server.getId(), server.getName(), "low_memory_server", severity, "heartbeat", message, detail, now);
     }
 
     private void raise(Long serverId, String serverName, String alertType, String severity, String source,
