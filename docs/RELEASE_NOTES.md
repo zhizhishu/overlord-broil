@@ -20,6 +20,7 @@ This release moves the project from the first public production milestone into a
 - Future branch update: documented the recommended public firewall baseline: `5166/tcp` for the frontend panel, `6365/tcp` for backend/agent callback, ACME `80/tcp` only when selected, and controlled-node protocol ports only when intentionally deployed.
 - Future branch update: refined protocol-node creation with structured form checks for target server, port reuse, credentials, Reality fields, Snell PSK/version and outbound tags; the generated inbound JSON is now an advanced preview instead of the default editing surface.
 - Future branch update: install, certificate and firewall diagnostics now emit structured `diagnostics.items`; the master task card summarizes DNS, port `80`, certificate-file, ACME-tooling, local-firewall and cloud-firewall findings before users open raw logs.
+- Future branch update: connected the legacy Flux forwarding page to the shared `zh-CN` / `en-US` dictionary for its main flows, including toasts, form validation, empty states, import/export, delete confirmation, address copy and diagnostics modals.
 
 ### 0.6.0 Capability Matrix
 
@@ -32,6 +33,7 @@ This release moves the project from the first public production milestone into a
 | First-run UI | Future branch includes a Flux-style setup guide in the master control center for the first operational path. |
 | Protocol-node UI | Future branch defaults to structured node forms with configuration checks and a collapsible advanced payload preview. |
 | Diagnostic UI | Future branch shows structured task-card diagnostics for install, ACME/certificate and firewall checks, with raw result access retained. |
+| Legacy forwarding UI | Future branch translates the main forwarding workflows through the shared `zh-CN` / `en-US` dictionary and unifies empty/failure/status wording. |
 | Linux coverage | Docker/CI diagnostics cover Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux userspaces. |
 | 3x-ui | API fixture remains API-level; full 3x-ui install/configure still targets systemd hosts. |
 | Snell | Product-level protocol node with separate systemd/OpenRC runtime, not a native Xray/3x-ui core protocol. |

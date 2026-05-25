@@ -31,6 +31,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+import { useLanguage } from "@/i18n";
 
 import { 
   createForward, 
@@ -120,6 +121,7 @@ interface TunnelGroup {
 }
 
 export default function ForwardPage() {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [forwards, setForwards] = useState<Forward[]>([]);
   const [tunnels, setTunnels] = useState<Tunnel[]>([]);
@@ -329,7 +331,7 @@ export default function ForwardPage() {
           }
         }
       } else {
-        toast.error(forwardsRes.msg || '获取转发列表失败');
+        toast.error(forwardsRes.msg || t('获取转发列表失败'));
       }
       
       if (tunnelsRes.code === 0) {
@@ -339,7 +341,7 @@ export default function ForwardPage() {
       }
     } catch (error) {
       console.error('加载数据失败:', error);
-      toast.error('加载数据失败');
+      toast.error(t('加载数据失败'));
     } finally {
       setLoading(false);
     }
@@ -354,7 +356,7 @@ export default function ForwardPage() {
     
     sortedForwards.forEach(forward => {
       const userKey = forward.userId ? forward.userId.toString() : 'unknown';
-      const userName = forward.userName || '未知用户';
+      const userName = forward.userName || t('未知用户');
       
       if (!userMap.has(userKey)) {
         userMap.set(userKey, {
@@ -394,17 +396,17 @@ export default function ForwardPage() {
     const newErrors: {[key: string]: string} = {};
     
     if (!form.name.trim()) {
-      newErrors.name = '请输入转发名称';
+      newErrors.name = t('请输入转发名称');
     } else if (form.name.length < 2 || form.name.length > 50) {
-      newErrors.name = '转发名称长度应在2-50个字符之间';
+      newErrors.name = t('转发名称长度应在2-50个字符之间');
     }
     
     if (!form.tunnelId) {
-      newErrors.tunnelId = '请选择关联隧道';
+      newErrors.tunnelId = t('请选择关联隧道');
     }
     
     if (!form.remoteAddr.trim()) {
-      newErrors.remoteAddr = '请输入远程地址';
+      newErrors.remoteAddr = t('请输入远程地址');
     } else {
       // 验证地址格式
       const addresses = form.remoteAddr.split('\n').map(addr => addr.trim()).filter(addr => addr);
@@ -415,19 +417,22 @@ export default function ForwardPage() {
       for (let i = 0; i < addresses.length; i++) {
         const addr = addresses[i];
         if (!ipv4Pattern.test(addr) && !ipv6FullPattern.test(addr) && !domainPattern.test(addr)) {
-          newErrors.remoteAddr = `第${i + 1}行地址格式错误`;
+          newErrors.remoteAddr = t('第 {line} 行地址格式错误', { line: i + 1 });
           break;
         }
       }
     }
     
     if (form.inPort !== null && (form.inPort < 1 || form.inPort > 65535)) {
-      newErrors.inPort = '端口号必须在1-65535之间';
+      newErrors.inPort = t('端口号必须在1-65535之间');
     }
     
     if (selectedTunnel && selectedTunnel.inNodePortSta && selectedTunnel.inNodePortEnd && form.inPort) {
       if (form.inPort < selectedTunnel.inNodePortSta || form.inPort > selectedTunnel.inNodePortEnd) {
-        newErrors.inPort = `端口号必须在${selectedTunnel.inNodePortSta}-${selectedTunnel.inNodePortEnd}范围内`;
+        newErrors.inPort = t('端口号必须在 {start}-{end} 范围内', {
+          start: selectedTunnel.inNodePortSta,
+          end: selectedTunnel.inNodePortEnd
+        });
       }
     }
     
@@ -484,26 +489,26 @@ export default function ForwardPage() {
     try {
       const res = await deleteForward(forwardToDelete.id);
       if (res.code === 0) {
-        toast.success('删除成功');
+        toast.success(t('删除成功'));
         setDeleteModalOpen(false);
         loadData();
       } else {
         // 删除失败，询问是否强制删除
-        const confirmed = window.confirm(`常规删除失败：${res.msg || '删除失败'}\n\n是否需要强制删除？\n\n⚠️ 注意：强制删除不会去验证节点端是否已经删除对应的转发服务。`);
+        const confirmed = window.confirm(t('常规删除失败：{message}\n\n是否需要强制删除？\n\n注意：强制删除不会验证节点端是否已经删除对应的转发服务。', { message: res.msg || t('删除失败') }));
         if (confirmed) {
           const forceRes = await forceDeleteForward(forwardToDelete.id);
           if (forceRes.code === 0) {
-            toast.success('强制删除成功');
+            toast.success(t('强制删除成功'));
             setDeleteModalOpen(false);
             loadData();
           } else {
-            toast.error(forceRes.msg || '强制删除失败');
+            toast.error(forceRes.msg || t('强制删除失败'));
           }
         }
       }
     } catch (error) {
       console.error('删除失败:', error);
-      toast.error('删除失败');
+      toast.error(t('删除失败'));
     } finally {
       setDeleteLoading(false);
     }
@@ -558,15 +563,15 @@ export default function ForwardPage() {
       }
       
       if (res.code === 0) {
-        toast.success(isEdit ? '修改成功' : '创建成功');
+        toast.success(isEdit ? t('修改成功') : t('创建成功'));
         setModalOpen(false);
         loadData();
       } else {
-        toast.error(res.msg || '操作失败');
+        toast.error(res.msg || t('操作失败'));
       }
     } catch (error) {
       console.error('提交失败:', error);
-      toast.error('操作失败');
+      toast.error(t('操作失败'));
     } finally {
       setSubmitLoading(false);
     }
@@ -575,7 +580,7 @@ export default function ForwardPage() {
   // 处理服务开关
   const handleServiceToggle = async (forward: Forward) => {
     if (forward.status !== 1 && forward.status !== 0) {
-      toast.error('转发状态异常，无法操作');
+      toast.error(t('转发状态异常，无法操作'));
       return;
     }
 
@@ -597,7 +602,7 @@ export default function ForwardPage() {
       }
       
       if (res.code === 0) {
-        toast.success(targetState ? '服务已启动' : '服务已暂停');
+        toast.success(targetState ? t('服务已启动') : t('服务已暂停'));
         // 更新转发状态
         setForwards(prev => prev.map(f => 
           f.id === forward.id 
@@ -611,7 +616,7 @@ export default function ForwardPage() {
             ? { ...f, serviceRunning: !targetState }
             : f
         ));
-        toast.error(res.msg || '操作失败');
+        toast.error(res.msg || t('操作失败'));
       }
     } catch (error) {
       // 操作失败，恢复UI状态
@@ -621,7 +626,7 @@ export default function ForwardPage() {
           : f
       ));
       console.error('服务开关操作失败:', error);
-      toast.error('网络错误，操作失败');
+      toast.error(t('网络错误，操作失败'));
     }
   };
 
@@ -637,33 +642,33 @@ export default function ForwardPage() {
       if (response.code === 0) {
         setDiagnosisResult(response.data);
       } else {
-        toast.error(response.msg || '诊断失败');
+        toast.error(response.msg || t('诊断失败'));
         setDiagnosisResult({
           forwardName: forward.name,
           timestamp: Date.now(),
           results: [{
             success: false,
-            description: '诊断失败',
+            description: t('诊断失败'),
             nodeName: '-',
             nodeId: '-',
             targetIp: forward.remoteAddr.split(',')[0] || '-',
-            message: response.msg || '诊断过程中发生错误'
+            message: response.msg || t('诊断过程中发生错误')
           }]
         });
       }
     } catch (error) {
       console.error('诊断失败:', error);
-      toast.error('网络错误，请重试');
+      toast.error(t('网络错误，请重试'));
       setDiagnosisResult({
         forwardName: forward.name,
         timestamp: Date.now(),
         results: [{
           success: false,
-          description: '网络错误',
+          description: t('网络错误'),
           nodeName: '-',
           nodeId: '-',
           targetIp: forward.remoteAddr.split(',')[0] || '-',
-          message: '无法连接到服务器'
+          message: t('无法连接到服务器')
         }]
       });
     } finally {
@@ -675,12 +680,12 @@ export default function ForwardPage() {
   const getQualityDisplay = (averageTime?: number, packetLoss?: number) => {
     if (averageTime === undefined || packetLoss === undefined) return null;
     
-    if (averageTime < 30 && packetLoss === 0) return { text: '🚀 优秀', color: 'success' };
-    if (averageTime < 50 && packetLoss === 0) return { text: '✨ 很好', color: 'success' };
-    if (averageTime < 100 && packetLoss < 1) return { text: '👍 良好', color: 'primary' };
-    if (averageTime < 150 && packetLoss < 2) return { text: '😐 一般', color: 'warning' };
-    if (averageTime < 200 && packetLoss < 5) return { text: '😟 较差', color: 'warning' };
-    return { text: '😵 很差', color: 'danger' };
+    if (averageTime < 30 && packetLoss === 0) return { text: t('优秀'), color: 'success' };
+    if (averageTime < 50 && packetLoss === 0) return { text: t('很好'), color: 'success' };
+    if (averageTime < 100 && packetLoss < 1) return { text: t('良好'), color: 'primary' };
+    if (averageTime < 150 && packetLoss < 2) return { text: t('一般'), color: 'warning' };
+    if (averageTime < 200 && packetLoss < 5) return { text: t('较差'), color: 'warning' };
+    return { text: t('很差'), color: 'danger' };
   };
 
   // 格式化流量
@@ -770,7 +775,7 @@ export default function ForwardPage() {
       address,
       copying: false
     })));
-    setAddressModalTitle(`${title} (${addresses.length}个)`);
+    setAddressModalTitle(t('{title} ({count} 个)', { title: t(title), count: addresses.length }));
     setAddressModalOpen(true);
   };
 
@@ -778,9 +783,9 @@ export default function ForwardPage() {
   const copyToClipboard = async (text: string, label: string = '内容') => {
     try {
       await navigator.clipboard.writeText(text);
-      toast.success(`已复制${label}`);
+      toast.success(t('已复制{label}', { label: t(label) }));
     } catch (error) {
-      toast.error('复制失败：请使用https访问面板（例如nginx反代），http无法复制。');
+      toast.error(t('复制失败：请使用 HTTPS 访问面板，HTTP 无法复制。'));
     }
   };
 
@@ -792,7 +797,7 @@ export default function ForwardPage() {
       ));
       await copyToClipboard(addressItem.address, '地址');
     } catch (error) {
-      toast.error('复制失败：请使用https访问面板（例如nginx反代），http无法复制。');
+      toast.error(t('复制失败：请使用 HTTPS 访问面板，HTTP 无法复制。'));
     } finally {
       setAddressList(prev => prev.map(item => 
         item.id === addressItem.id ? { ...item, copying: false } : item
@@ -817,7 +822,7 @@ export default function ForwardPage() {
   // 执行导出
   const executeExport = () => {
     if (!selectedTunnelForExport) {
-      toast.error('请选择要导出的隧道');
+      toast.error(t('请选择要导出的隧道'));
       return;
     }
 
@@ -841,7 +846,7 @@ export default function ForwardPage() {
       }
       
       if (forwardsToExport.length === 0) {
-        toast.error('所选隧道没有转发数据');
+        toast.error(t('所选隧道没有转发数据'));
         setExportLoading(false);
         return;
       }
@@ -855,7 +860,7 @@ export default function ForwardPage() {
       setExportData(exportText);
     } catch (error) {
       console.error('导出失败:', error);
-      toast.error('导出失败');
+      toast.error(t('导出失败'));
     } finally {
       setExportLoading(false);
     }
@@ -877,12 +882,12 @@ export default function ForwardPage() {
   // 执行导入
   const executeImport = async () => {
     if (!importData.trim()) {
-      toast.error('请输入要导入的数据');
+      toast.error(t('请输入要导入的数据'));
       return;
     }
 
     if (!selectedTunnelForImport) {
-      toast.error('请选择要导入的隧道');
+      toast.error(t('请选择要导入的隧道'));
       return;
     }
 
@@ -900,7 +905,7 @@ export default function ForwardPage() {
           setImportResults(prev => [{
             line,
             success: false,
-            message: '格式错误：需要至少包含目标地址和转发名称'
+            message: t('格式错误：需要至少包含目标地址和转发名称')
           }, ...prev]);
           continue;
         }
@@ -911,7 +916,7 @@ export default function ForwardPage() {
           setImportResults(prev => [{
             line,
             success: false,
-            message: '目标地址和转发名称不能为空'
+            message: t('目标地址和转发名称不能为空')
           }, ...prev]);
           continue;
         }
@@ -925,7 +930,7 @@ export default function ForwardPage() {
           setImportResults(prev => [{
             line,
             success: false,
-            message: '目标地址格式错误，应为 地址:端口 格式，多个地址用逗号分隔'
+            message: t('目标地址格式错误，应为 地址:端口 格式，多个地址用逗号分隔')
           }, ...prev]);
           continue;
         }
@@ -939,7 +944,7 @@ export default function ForwardPage() {
               setImportResults(prev => [{
                 line,
                 success: false,
-                message: '入口端口格式错误，应为1-65535之间的数字'
+                message: t('入口端口格式错误，应为 1-65535 之间的数字')
               }, ...prev]);
               continue;
             }
@@ -959,33 +964,33 @@ export default function ForwardPage() {
             setImportResults(prev => [{
               line,
               success: true,
-              message: '创建成功',
+              message: t('创建成功'),
               forwardName: name.trim()
             }, ...prev]);
           } else {
             setImportResults(prev => [{
               line,
               success: false,
-              message: response.msg || '创建失败'
+              message: response.msg || t('创建失败')
             }, ...prev]);
           }
         } catch (error) {
           setImportResults(prev => [{
             line,
             success: false,
-            message: '网络错误，创建失败'
+            message: t('网络错误，创建失败')
           }, ...prev]);
         }
       }
       
       
-      toast.success(`导入执行完成`);
+      toast.success(t('导入执行完成'));
       
       // 导入完成后刷新转发列表
       await loadData(false);
     } catch (error) {
       console.error('导入失败:', error);
-      toast.error('导入过程中发生错误');
+      toast.error(t('导入过程中发生错误'));
     } finally {
       setImportLoading(false);
     }
@@ -995,13 +1000,13 @@ export default function ForwardPage() {
   const getStatusDisplay = (status: number) => {
     switch (status) {
       case 1:
-        return { color: 'success', text: '正常' };
+        return { color: 'success', text: t('正常') };
       case 0:
-        return { color: 'warning', text: '暂停' };
+        return { color: 'warning', text: t('暂停') };
       case -1:
-        return { color: 'danger', text: '异常' };
+        return { color: 'danger', text: t('异常') };
       default:
-        return { color: 'default', text: '未知' };
+        return { color: 'default', text: t('未知') };
     }
   };
 
@@ -1009,13 +1014,13 @@ export default function ForwardPage() {
   const getStrategyDisplay = (strategy: string) => {
     switch (strategy) {
       case 'fifo':
-        return { color: 'primary', text: '主备' };
+        return { color: 'primary', text: t('主备') };
       case 'round':
-        return { color: 'success', text: '轮询' };
+        return { color: 'success', text: t('轮询') };
       case 'rand':
-        return { color: 'warning', text: '随机' };
+        return { color: 'warning', text: t('随机') };
       default:
-        return { color: 'default', text: '未知' };
+        return { color: 'default', text: t('未知') };
     }
   };
 
@@ -1073,11 +1078,11 @@ export default function ForwardPage() {
             return forward;
           }));
         } else {
-          toast.error('保存排序失败：' + (response.msg || '未知错误'));
+          toast.error(t('保存排序失败：{message}', { message: response.msg || t('未知错误') }));
         }
       } catch (error) {
         console.error('保存排序到数据库失败:', error);
-        toast.error('保存排序失败，请重试');
+        toast.error(t('保存排序失败，请重试'));
       }
     }
   };
@@ -1194,7 +1199,7 @@ export default function ForwardPage() {
                       : 'opacity-0 group-hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100'
                   }`}
                   {...listeners}
-                  title={isMobile ? "长按拖拽排序" : "拖拽排序"}
+                  title={isMobile ? t("长按拖拽排序") : t("拖拽排序")}
                   style={{ touchAction: 'none' }}
                 >
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -1233,7 +1238,7 @@ export default function ForwardPage() {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    <span className="text-xs font-medium text-default-600 flex-shrink-0">入口:</span>
+                    <span className="text-xs font-medium text-default-600 flex-shrink-0">{t("入口")}:</span>
                     <code className="text-xs font-mono text-foreground truncate min-w-0">
                       {formatInAddress(forward.inIp, forward.inPort)}
                     </code>
@@ -1255,7 +1260,7 @@ export default function ForwardPage() {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    <span className="text-xs font-medium text-default-600 flex-shrink-0">目标:</span>
+                    <span className="text-xs font-medium text-default-600 flex-shrink-0">{t("目标")}:</span>
                     <code className="text-xs font-mono text-foreground truncate min-w-0">
                       {formatRemoteAddress(forward.remoteAddr)}
                     </code>
@@ -1299,7 +1304,7 @@ export default function ForwardPage() {
                 </svg>
               }
             >
-              编辑
+              {t("编辑")}
             </Button>
             <Button
               size="sm"
@@ -1313,7 +1318,7 @@ export default function ForwardPage() {
                 </svg>
               }
             >
-              诊断
+              {t("诊断")}
             </Button>
             <Button
               size="sm"
@@ -1328,7 +1333,7 @@ export default function ForwardPage() {
                 </svg>
               }
             >
-              删除
+              {t("删除")}
             </Button>
           </div>
         </CardBody>
@@ -1342,7 +1347,7 @@ export default function ForwardPage() {
         <div className="flex items-center justify-center h-64">
           <div className="flex items-center gap-3">
             <Spinner size="sm" />
-            <span className="text-default-600">正在加载...</span>
+            <span className="text-default-600">{t("正在加载...")}</span>
           </div>
         </div>
       
@@ -1367,7 +1372,7 @@ export default function ForwardPage() {
               onPress={handleViewModeChange}
               isIconOnly
               className="text-sm"
-              title={viewMode === 'grouped' ? '切换到直接显示' : '切换到分类显示'}
+              title={viewMode === 'grouped' ? t('切换到直接显示') : t('切换到分类显示')}
             >
               {viewMode === 'grouped' ? (
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -1387,7 +1392,7 @@ export default function ForwardPage() {
               color="warning"
               onPress={handleImport}
             >
-              导入
+              {t("导入")}
             </Button>
             
             {/* 导出按钮 */}
@@ -1399,7 +1404,7 @@ export default function ForwardPage() {
               isLoading={exportLoading}
           
             >
-              导出
+              {t("导出")}
             </Button>
 
             <Button
@@ -1409,7 +1414,7 @@ export default function ForwardPage() {
               onPress={handleAdd}
              
             >
-              新增
+              {t("新增")}
             </Button>
             
         
@@ -1435,13 +1440,15 @@ export default function ForwardPage() {
                         <div className="min-w-0 flex-1">
                           <h2 className="text-base font-medium text-foreground truncate max-w-[150px] sm:max-w-[250px] md:max-w-[350px] lg:max-w-[450px]">{userGroup.userName}</h2>
                           <p className="text-xs text-default-500 truncate max-w-[150px] sm:max-w-[250px] md:max-w-[350px] lg:max-w-[450px]">
-                            {userGroup.tunnelGroups.length} 个隧道，
-                            {userGroup.tunnelGroups.reduce((total, tg) => total + tg.forwards.length, 0)} 个转发
+                            {t("{tunnels} 个隧道，{forwards} 个转发", {
+                              tunnels: userGroup.tunnelGroups.length,
+                              forwards: userGroup.tunnelGroups.reduce((total, tg) => total + tg.forwards.length, 0)
+                            })}
                           </p>
                         </div>
                       </div>
                       <Chip color="primary" variant="flat" size="sm" className="text-xs flex-shrink-0 ml-2">
-                        用户
+                        {t("用户")}
                       </Chip>
                     </div>
                   </CardHeader>
@@ -1494,8 +1501,9 @@ export default function ForwardPage() {
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-foreground">暂无转发配置</h3>
-                    <p className="text-default-500 text-sm mt-1">还没有创建任何转发配置，点击上方按钮开始创建</p>
+                    <h3 className="text-lg font-semibold text-foreground">{t("暂无转发配置")}</h3>
+                    <p className="text-default-500 text-sm mt-1">{t("还没有创建任何转发配置，点击新增开始创建。")}</p>
+                    <Button color="primary" size="sm" className="mt-4" onPress={handleAdd}>{t("新增转发")}</Button>
                   </div>
                 </div>
               </CardBody>
@@ -1534,8 +1542,9 @@ export default function ForwardPage() {
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-foreground">暂无转发配置</h3>
-                    <p className="text-default-500 text-sm mt-1">还没有创建任何转发配置，点击上方按钮开始创建</p>
+                    <h3 className="text-lg font-semibold text-foreground">{t("暂无转发配置")}</h3>
+                    <p className="text-default-500 text-sm mt-1">{t("还没有创建任何转发配置，点击新增开始创建。")}</p>
+                    <Button color="primary" size="sm" className="mt-4" onPress={handleAdd}>{t("新增转发")}</Button>
                   </div>
                 </div>
               </CardBody>
@@ -1557,17 +1566,17 @@ export default function ForwardPage() {
               <>
                 <ModalHeader className="flex flex-col gap-1">
                   <h2 className="text-xl font-bold">
-                    {isEdit ? '编辑转发' : '新增转发'}
+                    {isEdit ? t('编辑转发') : t('新增转发')}
                   </h2>
                   <p className="text-small text-default-500">
-                    {isEdit ? '修改现有转发配置的信息' : '创建新的转发配置'}
+                    {isEdit ? t('修改现有转发配置的信息') : t('创建新的转发配置')}
                   </p>
                 </ModalHeader>
                 <ModalBody>
                   <div className="space-y-4 pb-4">
                     <Input
-                      label="转发名称"
-                      placeholder="请输入转发名称"
+                      label={t("转发名称")}
+                      placeholder={t("请输入转发名称")}
                       value={form.name}
                       onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
                       isInvalid={!!errors.name}
@@ -1576,8 +1585,8 @@ export default function ForwardPage() {
                     />
                     
                     <Select
-                      label="选择隧道"
-                      placeholder="请选择关联的隧道"
+                      label={t("选择隧道")}
+                      placeholder={t("请选择关联的隧道")}
                       selectedKeys={form.tunnelId ? [form.tunnelId.toString()] : []}
                       onSelectionChange={(keys) => {
                         const selectedKey = Array.from(keys)[0] as string;
@@ -1597,8 +1606,8 @@ export default function ForwardPage() {
                     </Select>
                     
                     <Input
-                      label="入口端口"
-                      placeholder="留空自动分配"
+                      label={t("入口端口")}
+                      placeholder={t("留空自动分配")}
                       type="number"
                       value={form.inPort?.toString() || ''}
                       onChange={(e) => setForm(prev => ({ 
@@ -1610,65 +1619,65 @@ export default function ForwardPage() {
                       variant="bordered"
                       description={
                         selectedTunnel && selectedTunnel.inNodePortSta && selectedTunnel.inNodePortEnd
-                          ? `允许范围: ${selectedTunnel.inNodePortSta}-${selectedTunnel.inNodePortEnd}`
-                          : '留空将自动分配可用端口'
+                          ? t("允许范围: {start}-{end}", { start: selectedTunnel.inNodePortSta, end: selectedTunnel.inNodePortEnd })
+                          : t('留空将自动分配可用端口')
                       }
                     />
                     
                     <Textarea
-                      label="远程地址"
-                      placeholder="请输入远程地址，多个地址用换行分隔&#10;例如:&#10;192.168.1.100:8080&#10;example.com:3000"
+                      label={t("远程地址")}
+                      placeholder={t("请输入远程地址，多个地址用换行分隔\n例如:\n192.168.1.100:8080\nexample.com:3000")}
                       value={form.remoteAddr}
                       onChange={(e) => setForm(prev => ({ ...prev, remoteAddr: e.target.value }))}
                       isInvalid={!!errors.remoteAddr}
                       errorMessage={errors.remoteAddr}
                       variant="bordered"
-                      description="格式: IP:端口 或 域名:端口，支持多个地址（每行一个）"
+                      description={t("格式: IP:端口 或 域名:端口，支持多个地址（每行一个）")}
                       minRows={3}
                       maxRows={6}
                     />
                     
                     <Input
-                      label="出口网卡名或IP"
-                      placeholder="请输入出口网卡名或IP"
+                      label={t("出口网卡名或IP")}
+                      placeholder={t("请输入出口网卡名或IP")}
                       value={form.interfaceName}
                       onChange={(e) => setForm(prev => ({ ...prev, interfaceName: e.target.value }))}
                       isInvalid={!!errors.interfaceName}
                       errorMessage={errors.interfaceName}
                       variant="bordered"
-                      description="用于多IP服务器指定使用那个IP请求远程地址，不懂的默认为空就行"
+                      description={t("用于多 IP 服务器指定出口地址；不需要时留空。")}
                     />
                     
                     {getAddressCount(form.remoteAddr) > 1 && (
                       <Select
-                        label="负载策略"
-                        placeholder="请选择负载均衡策略"
+                        label={t("负载策略")}
+                        placeholder={t("请选择负载均衡策略")}
                         selectedKeys={[form.strategy]}
                         onSelectionChange={(keys) => {
                           const selectedKey = Array.from(keys)[0] as string;
                           setForm(prev => ({ ...prev, strategy: selectedKey }));
                         }}
                         variant="bordered"
-                        description="多个目标地址的负载均衡策略"
+                        description={t("多个目标地址的负载均衡策略")}
                       >
-                        <SelectItem key="fifo" >主备模式 - 自上而下</SelectItem>
-                        <SelectItem key="round" >轮询模式 - 依次轮换</SelectItem>
-                        <SelectItem key="rand" >随机模式 - 随机选择</SelectItem>
-                        <SelectItem key="hash" >哈希模式 - IP哈希</SelectItem>
+                        <SelectItem key="fifo" >{t("主备模式 - 自上而下")}</SelectItem>
+                        <SelectItem key="round" >{t("轮询模式 - 依次轮换")}</SelectItem>
+                        <SelectItem key="rand" >{t("随机模式 - 随机选择")}</SelectItem>
+                        <SelectItem key="hash" >{t("哈希模式 - IP 哈希")}</SelectItem>
                       </Select>
                     )}
                   </div>
                 </ModalBody>
                 <ModalFooter>
                   <Button variant="light" onPress={onClose}>
-                    取消
+                    {t("取消")}
                   </Button>
                   <Button 
                     color="primary" 
                     onPress={handleSubmit}
                     isLoading={submitLoading}
                   >
-                    {isEdit ? '保存修改' : '创建转发'}
+                    {isEdit ? t('保存修改') : t('创建转发')}
                   </Button>
                 </ModalFooter>
               </>
@@ -1689,26 +1698,26 @@ export default function ForwardPage() {
             {(onClose) => (
               <>
                 <ModalHeader className="flex flex-col gap-1">
-                  <h2 className="text-lg font-bold text-danger">确认删除</h2>
+                  <h2 className="text-lg font-bold text-danger">{t("确认删除")}</h2>
                 </ModalHeader>
                 <ModalBody>
                   <p className="text-default-600">
-                    确定要删除转发 <span className="font-semibold text-foreground">"{forwardToDelete?.name}"</span> 吗？
+                    {t("确定要删除转发")} <span className="font-semibold text-foreground">"{forwardToDelete?.name}"</span> {t("吗？")}
                   </p>
                   <p className="text-small text-default-500 mt-2">
-                    此操作无法撤销，删除后该转发将永久消失。
+                    {t("此操作无法撤销，删除后该转发将永久消失。")}
                   </p>
                 </ModalBody>
                 <ModalFooter>
                   <Button variant="light" onPress={onClose}>
-                    取消
+                    {t("取消")}
                   </Button>
                   <Button 
                     color="danger" 
                     onPress={confirmDelete}
                     isLoading={deleteLoading}
                   >
-                    确认删除
+                    {t("确认删除")}
                   </Button>
                 </ModalFooter>
               </>
@@ -1723,7 +1732,7 @@ export default function ForwardPage() {
             <ModalBody className="pb-6">
               <div className="mb-4 text-right">
                 <Button size="sm" onClick={copyAllAddresses}>
-                  复制
+                  {t("复制")}
                 </Button>
               </div>
               
@@ -1737,7 +1746,7 @@ export default function ForwardPage() {
                       isLoading={item.copying}
                       onClick={() => copyAddress(item)}
                     >
-                      复制
+                      {t("复制")}
                     </Button>
                   </div>
                 ))}
@@ -1762,9 +1771,9 @@ export default function ForwardPage() {
         >
           <ModalContent>
             <ModalHeader className="flex flex-col gap-1">
-              <h2 className="text-xl font-bold">导出转发数据</h2>
+              <h2 className="text-xl font-bold">{t("导出转发数据")}</h2>
               <p className="text-small text-default-500">
-                格式：目标地址|转发名称|入口端口
+                {t("格式：目标地址|转发名称|入口端口")}
               </p>
             </ModalHeader>
             <ModalBody className="pb-6">
@@ -1772,8 +1781,8 @@ export default function ForwardPage() {
                 {/* 隧道选择 */}
                 <div>
                   <Select
-                    label="选择导出隧道"
-                    placeholder="请选择要导出的隧道"
+                    label={t("选择导出隧道")}
+                    placeholder={t("请选择要导出的隧道")}
                     selectedKeys={selectedTunnelForExport ? [selectedTunnelForExport.toString()] : []}
                     onSelectionChange={(keys) => {
                       const selectedKey = Array.from(keys)[0] as string;
@@ -1805,7 +1814,7 @@ export default function ForwardPage() {
                         </svg>
                       }
                     >
-                      重新生成
+                      {t("重新生成")}
                     </Button>
                     <Button 
                       color="secondary" 
@@ -1818,7 +1827,7 @@ export default function ForwardPage() {
                         </svg>
                       }
                     >
-                      复制
+                      {t("复制")}
                     </Button>
                   </div>
                 )}
@@ -1838,7 +1847,7 @@ export default function ForwardPage() {
                         </svg>
                       }
                     >
-                      生成导出数据
+                      {t("生成导出数据")}
                     </Button>
                   </div>
                 )}
@@ -1856,7 +1865,7 @@ export default function ForwardPage() {
                       classNames={{
                         input: "font-mono text-sm"
                       }}
-                      placeholder="暂无数据"
+                      placeholder={t("暂无数据")}
                     />
                   </div>
                 )}
@@ -1867,7 +1876,7 @@ export default function ForwardPage() {
                 variant="light" 
                 onPress={() => setExportModalOpen(false)}
               >
-                关闭
+                {t("关闭")}
               </Button>
             </ModalFooter>
           </ModalContent>
@@ -1885,12 +1894,12 @@ export default function ForwardPage() {
         >
           <ModalContent>
             <ModalHeader className="flex flex-col gap-1">
-              <h2 className="text-xl font-bold">导入转发数据</h2>
+              <h2 className="text-xl font-bold">{t("导入转发数据")}</h2>
               <p className="text-small text-default-500">
-                格式：目标地址|转发名称|入口端口，每行一个，入口端口留空将自动分配可用端口
+                {t("格式：目标地址|转发名称|入口端口，每行一个，入口端口留空将自动分配可用端口")}
               </p>
               <p className="text-small text-default-400">
-                目标地址支持单个地址(如：example.com:8080)或多个地址用逗号分隔(如：3.3.3.3:3,4.4.4.4:4)
+                {t("目标地址支持单个地址或多个地址用逗号分隔。")}
               </p>
             </ModalHeader>
             <ModalBody className="pb-6">
@@ -1898,8 +1907,8 @@ export default function ForwardPage() {
                 {/* 隧道选择 */}
                 <div>
                   <Select
-                    label="选择导入隧道"
-                    placeholder="请选择要导入的隧道"
+                    label={t("选择导入隧道")}
+                    placeholder={t("请选择要导入的隧道")}
                     selectedKeys={selectedTunnelForImport ? [selectedTunnelForImport.toString()] : []}
                     onSelectionChange={(keys) => {
                       const selectedKey = Array.from(keys)[0] as string;
@@ -1919,8 +1928,8 @@ export default function ForwardPage() {
                 {/* 输入区域 */}
                 <div>
                   <Textarea
-                    label="导入数据"
-                    placeholder="请输入要导入的转发数据，格式：目标地址|转发名称|入口端口"
+                    label={t("导入数据")}
+                    placeholder={t("请输入要导入的转发数据，格式：目标地址|转发名称|入口端口")}
                     value={importData}
                     onChange={(e) => setImportData(e.target.value)}
                     variant="flat"
@@ -1938,11 +1947,13 @@ export default function ForwardPage() {
                 {importResults.length > 0 && (
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-base font-semibold">导入结果</h3>
+                      <h3 className="text-base font-semibold">{t("导入结果")}</h3>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-default-500">
-                          成功：{importResults.filter(r => r.success).length} / 
-                          总计：{importResults.length}
+                          {t("成功：{success} / 总计：{total}", {
+                            success: importResults.filter(r => r.success).length,
+                            total: importResults.length
+                          })}
                         </span>
                       </div>
                     </div>
@@ -1975,7 +1986,7 @@ export default function ForwardPage() {
                                 <span className={`text-xs font-medium ${
                                   result.success ? 'text-success-700 dark:text-success-300' : 'text-danger-700 dark:text-danger-300'
                                 }`}>
-                                  {result.success ? '成功' : '失败'}
+                                  {result.success ? t('成功') : t('失败')}
                                 </span>
                                 <span className="text-xs text-default-500">|</span>
                                 <code className="text-xs font-mono text-default-600 truncate">{result.line}</code>
@@ -1999,7 +2010,7 @@ export default function ForwardPage() {
                 variant="light" 
                 onPress={() => setImportModalOpen(false)}
               >
-                关闭
+                {t("关闭")}
               </Button>
               <Button 
                 color="warning" 
@@ -2007,7 +2018,7 @@ export default function ForwardPage() {
                 isLoading={importLoading}
                 isDisabled={!importData.trim() || !selectedTunnelForImport}
               >
-                开始导入
+                {t("开始导入")}
               </Button>
             </ModalFooter>
           </ModalContent>
@@ -2027,7 +2038,7 @@ export default function ForwardPage() {
             {(onClose) => (
               <>
                 <ModalHeader className="flex flex-col gap-1">
-                  <h2 className="text-xl font-bold">转发诊断结果</h2>
+                  <h2 className="text-xl font-bold">{t("转发诊断结果")}</h2>
                   {currentDiagnosisForward && (
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-small text-default-500 truncate flex-1 min-w-0">{currentDiagnosisForward.name}</span>
@@ -2037,7 +2048,7 @@ export default function ForwardPage() {
                         size="sm"
                         className="flex-shrink-0"
                       >
-                        转发服务
+                        {t("转发服务")}
                       </Chip>
                     </div>
                   )}
@@ -2047,7 +2058,7 @@ export default function ForwardPage() {
                     <div className="flex items-center justify-center py-16">
                       <div className="flex items-center gap-3">
                         <Spinner size="sm" />
-                        <span className="text-default-600">正在诊断转发连接...</span>
+                        <span className="text-default-600">{t("正在诊断转发连接...")}</span>
                       </div>
                     </div>
                   ) : diagnosisResult ? (
@@ -2062,13 +2073,13 @@ export default function ForwardPage() {
                                 <div>
                                   <h3 className="text-lg font-semibold text-foreground">{result.description}</h3>
                                   <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-small text-default-500">节点: {result.nodeName}</span>
+                                    <span className="text-small text-default-500">{t("节点")}: {result.nodeName}</span>
                                     <Chip 
                                       color={result.success ? 'success' : 'danger'} 
                                       variant="flat" 
                                       size="sm"
                                     >
-                                      {result.success ? '连接成功' : '连接失败'}
+                                      {result.success ? t('连接成功') : t('连接失败')}
                                     </Chip>
                                   </div>
                                 </div>
@@ -2081,11 +2092,11 @@ export default function ForwardPage() {
                                   <div className="grid grid-cols-3 gap-4">
                                     <div className="text-center">
                                       <div className="text-2xl font-bold text-primary">{result.averageTime?.toFixed(0)}</div>
-                                      <div className="text-small text-default-500">平均延迟(ms)</div>
+                                      <div className="text-small text-default-500">{t("平均延迟(ms)")}</div>
                                     </div>
                                     <div className="text-center">
                                       <div className="text-2xl font-bold text-warning">{result.packetLoss?.toFixed(1)}</div>
-                                      <div className="text-small text-default-500">丢包率(%)</div>
+                                      <div className="text-small text-default-500">{t("丢包率(%)")}</div>
                                     </div>
                                     <div className="text-center">
                                       {quality && (
@@ -2093,13 +2104,13 @@ export default function ForwardPage() {
                                           <Chip color={quality.color as any} variant="flat" size="lg">
                                             {quality.text}
                                           </Chip>
-                                          <div className="text-small text-default-500 mt-1">连接质量</div>
+                                          <div className="text-small text-default-500 mt-1">{t("连接质量")}</div>
                                         </>
                                       )}
                                     </div>
                                   </div>
                                   <div className="text-small text-default-500 flex items-center gap-1">
-                                    <span className="flex-shrink-0">目标地址:</span>
+                                    <span className="flex-shrink-0">{t("目标地址")}:</span>
                                     <code className="font-mono truncate min-w-0" title={`${result.targetIp}${result.targetPort ? ':' + result.targetPort : ''}`}>
                                       {result.targetIp}{result.targetPort ? ':' + result.targetPort : ''}
                                     </code>
@@ -2108,7 +2119,7 @@ export default function ForwardPage() {
                               ) : (
                                 <div className="space-y-2">
                                   <div className="text-small text-default-500 flex items-center gap-1">
-                                    <span className="flex-shrink-0">目标地址:</span>
+                                    <span className="flex-shrink-0">{t("目标地址")}:</span>
                                     <code className="font-mono truncate min-w-0" title={`${result.targetIp}${result.targetPort ? ':' + result.targetPort : ''}`}>
                                       {result.targetIp}{result.targetPort ? ':' + result.targetPort : ''}
                                     </code>
@@ -2116,7 +2127,7 @@ export default function ForwardPage() {
                                   <Alert
                                     color="danger"
                                     variant="flat"
-                                    title="错误详情"
+                                    title={t("错误详情")}
                                     description={result.message}
                                   />
                                 </div>
@@ -2133,13 +2144,13 @@ export default function ForwardPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
-                      <h3 className="text-lg font-semibold text-foreground">暂无诊断数据</h3>
+                      <h3 className="text-lg font-semibold text-foreground">{t("暂无诊断数据")}</h3>
                     </div>
                   )}
                 </ModalBody>
                 <ModalFooter>
                   <Button variant="light" onPress={onClose}>
-                    关闭
+                    {t("关闭")}
                   </Button>
                   {currentDiagnosisForward && (
                     <Button 
@@ -2147,7 +2158,7 @@ export default function ForwardPage() {
                       onPress={() => handleDiagnose(currentDiagnosisForward)}
                       isLoading={diagnosisLoading}
                     >
-                      重新诊断
+                      {t("重新诊断")}
                     </Button>
                   )}
                 </ModalFooter>

@@ -26,7 +26,7 @@ Release and operations docs:
 
 The master panel keeps the Flux Panel direction: dense server cards, grouped operations, compact status chips and one unified rule view. The UI is meant for repeated operations rather than marketing pages: select one or many servers, generate agent tasks, manage 3x-ui inbound/outbound rules, run Snell as a managed protocol node, sync traffic and check certificate/service status from the same surface.
 
-The current product UI is Chinese-first by default and now includes a `zh-CN` / `en-US` language switch in the main layouts. The switch persists in local storage, updates the document language, and currently covers the master control center, server cards, orchestration modal, 3x-ui operations, Snell nodes, remote forwarding rules, agent maintenance actions and the main navigation. Older Flux forwarding pages can continue to be translated in batches on top of the same dictionary.
+The current product UI is Chinese-first by default and now includes a `zh-CN` / `en-US` language switch in the main layouts. The switch persists in local storage, updates the document language, and currently covers the master control center, server cards, orchestration modal, 3x-ui operations, Snell nodes, remote forwarding rules, agent maintenance actions, the main navigation and the legacy Flux forwarding page's main flows.
 
 The master control center now includes a first-run setup guide. It walks a new operator through registering servers, installing the controlled agent, orchestrating 3x-ui/Snell, syncing rules and traffic, then running release and firewall checks before exposing the deployment.
 
@@ -106,7 +106,7 @@ The main gaps before a formal `1.0` are:
 3. Snell boundary clarity: Snell is unified in the product layer and deployed by the Flux agent as a managed runtime service. It is not a native Xray/3x-ui core protocol, so docs and UI must keep that distinction explicit.
 4. Certificate and firewall diagnostics: ACME HTTP mode depends on DNS, port `80`, local firewall and cloud security groups. Failure messages should be more specific before broad production use.
 5. Security governance: add RBAC, visible audit logs, agent token expiry/revocation, planned encryption-key rotation and second confirmation for destructive operations.
-6. UI finish: continue polishing the Flux-style operations console. The first-run guide and protocol-node form checks are in place; mobile layout, legacy forwarding-page i18n, loading/error states and human-readable task failures still need more passes.
+6. UI finish: continue polishing the Flux-style operations console. The first-run guide, protocol-node form checks and legacy forwarding-page i18n are in place; mobile layout, loading/error states and human-readable task failures still need more passes.
 7. Operations loop: add agent self-upgrade verification, one-click health repair, remote log pull retention, configurable retry policy and stronger service recovery checks.
 
 Planned `future` branch direction:

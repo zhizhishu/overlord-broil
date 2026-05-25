@@ -391,3 +391,21 @@
 - 本地验证：`vite-frontend npm run build` 通过；Docker Maven JDK21 `mvn -B -DskipTests package` 通过；提权 Git Bash 路径下 `bash -n scripts/*.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh` 通过；`git diff --check` 通过。Vite 仍保留既有 `site.ts` 动静态混合导入 chunk 提示，不影响构建。
 - 环境限制：普通 Git Bash 在当前 Windows 会话中仍会偶发 `couldn't create signal pipe, Win32 error 5`；本轮改用已批准的提权 Git Bash 路径完成脚本验证。
 - 2026-05-24 17:11:17 追加：已推送 `origin/future` 提交 `09fe949`；GitHub Actions `CI` run `26376592654` 已通过，覆盖 frontend、backend、shell scripts、agent mock、3x-ui fixture、compose config、dry-run/full compose smoke、Debian/Ubuntu/Alpine/Rocky Linux/Oracle Linux install matrix；`Docker Images` run `26376592682` 已通过。
+
+## 2026-05-24 旧转发页面 i18n 与状态统一计划
+
+### 本轮计划（创建于: 2026-05-24 17:13:59）
+
+1. 接入语言上下文：让旧 `forward.tsx` 使用 `useLanguage().t`，覆盖 toast、表单校验、按钮、弹窗、空态、诊断结果和导入/导出结果。
+2. 保持 Flux 运维控制台方向：不重写业务流，只收紧状态、空状态、失败态文案，保持卡片密度和已有拖拽/诊断交互。
+3. 补齐英文词典：把旧转发页面新增的中文 key 加入轻量 i18n 字典，保证 `zh-CN/en-US` 切换后主流程可读。
+4. 验证与推送：运行 `vite-frontend npm run build`、`git diff --check`，必要时补远端 Actions 验证，再推送 `origin/future`。
+
+- [x] ~~**目标:** 完成旧转发页面中英文切换和状态/空态/失败态文案统一，并推送 `future` 分支~~ (创建于: 2026-05-24 17:13:59 | **完成于: 2026-05-24 17:31:47**)
+
+### 2026-05-24 17:31:47 进度记录
+
+- 旧 Flux 转发页 `forward.tsx` 已接入 `useLanguage().t`，覆盖 toast、表单校验、按钮、弹窗、地址复制、导入/导出、删除确认、空状态和诊断结果主流程。
+- `vite-frontend/src/i18n/index.tsx` 已补齐旧转发页英文词典；脚本复核 `forward.tsx` 内 139 个中文 `t(...)` key 缺失数为 0，并额外覆盖 `内容`、`地址`、`所有地址`、`转发数据` 等动态标签。
+- README、中文 README 和 Release Notes 已同步说明旧 Flux 转发页主流程已接入 `zh-CN/en-US`，同时保留移动端、加载态、失败态和任务详情继续打磨的 1.0 前差距。
+- 本地验证：`vite-frontend npm run build` 通过；`git diff --check` 通过。Vite 仍保留既有 `site.ts` 动静态混合导入 chunk 提示，不影响构建。
