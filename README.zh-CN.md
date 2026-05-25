@@ -108,7 +108,7 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
 | 被控节点业务端口 | 只放行你实际选择的 3x-ui 面板、Xray 入站、Snell、远端转发端口 |
 | 内部服务 | 后端 `6365`、MySQL `3306`、phpMyAdmin 默认不暴露 |
 
-默认 Docker Compose 只会看到一个 `0.0.0.0:5166->80/tcp` 的主控公网映射。被控 agent 的 `FLUX_PANEL_URL` 也填这个统一入口，例如 `http://your-master-panel:5166`，不要再填 `6365`。
+默认 Docker Compose 只会看到一个 `0.0.0.0:5166->5166/tcp` 的主控公网映射。被控 agent 的 `FLUX_PANEL_URL` 也填这个统一入口，例如 `http://your-master-panel:5166`，不要再填 `6365`。
 
 如果临时调试需要直连后端 API：
 

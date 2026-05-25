@@ -71,8 +71,3 @@ networks:
   gost-network:
     name: gost-network
     driver: bridge
-    enable_ipv6: true
-    ipam:
-      config:
-        - subnet: 172.66.0.0/16
-        - subnet: fd72:6666:beef::/48

@@ -21,7 +21,7 @@ spring:
     timeout-per-shutdown-phase: 30s
 
 server:
-  port: 6365
+  port: ${SERVER_PORT:6365}
   tomcat:
     uri-encoding: UTF-8
     max-thread: 800

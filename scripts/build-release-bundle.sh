@@ -110,12 +110,16 @@ Git commit: ${COMMIT}
 Built at UTC: ${BUILD_TIME}
 
 Primary entrypoints:
+- Dockerfile
+- docker-compose.yml
 - scripts/install-master.sh
 - scripts/install-master-bootstrap.sh
 - scripts/install-flux-agent.sh
 - scripts/install-flux-agent-bootstrap.sh
 - docker-compose-v4.yml
 - docker-compose-v6.yml
+- docker-compose.legacy-v4.yml
+- docker-compose.legacy-v6.yml
 - gost.sql
 - README.md
 - README.zh-CN.md
@@ -127,9 +131,13 @@ Recommended release gate before publishing:
 
 Default ports:
 - master public entry: 5166
-- backend API / agent callback: internal Docker network, proxied under the master entry /api/v1
+- backend API / agent callback: same flux-master entry, served under /api/v1
 - controlled 3x-ui panel default: 5168
 - ACME HTTP validation, only when selected: 80
+
+Runtime images:
+- default: ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest
+- legacy/debug only: ghcr.io/zhizhishu/flux-3xui-orchestrator-backend:latest and ...-frontend:latest
 EOF
 
 tar -czf "$ARCHIVE_PATH" -C "$WORK_DIR" "$BUNDLE_BASENAME"

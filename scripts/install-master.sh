@@ -298,10 +298,9 @@ download_source() {
 }
 
 build_local_images() {
-  echo "Building backend/frontend images locally from ${REPO}@${REF}..."
+  echo "Building flux-master single-image locally from ${REPO}@${REF}..."
   download_source
-  docker build -t ghcr.io/zhizhishu/flux-3xui-orchestrator-backend:latest "${SOURCE_DIR}/springboot-backend"
-  docker build -t ghcr.io/zhizhishu/flux-3xui-orchestrator-frontend:latest "${SOURCE_DIR}/vite-frontend"
+  docker build -t ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest "${SOURCE_DIR}"
 }
 
 read_env_value() {
@@ -395,7 +394,13 @@ resolve_restore_compose_file() {
     return
   fi
 
-  echo "Backup does not contain docker-compose-v4.yml or docker-compose-v6.yml." >&2
+  if [ -f docker-compose.yml ]; then
+    COMPOSE_FILE="docker-compose.yml"
+    echo "Using restored compose file: ${COMPOSE_FILE}"
+    return
+  fi
+
+  echo "Backup does not contain docker-compose-v4.yml, docker-compose-v6.yml or docker-compose.yml." >&2
   exit 2
 }
 
@@ -442,9 +447,9 @@ ensure_backend_override() {
   if [ "$configured_expose" = "1" ]; then
     cat > "$BACKEND_OVERRIDE_FILE" <<'YAML'
 services:
-  backend:
+  master:
     ports:
-      - "${BACKEND_PORT}:6365"
+      - "${BACKEND_PORT}:5166"
 YAML
   else
     rm -f "$BACKEND_OVERRIDE_FILE"
@@ -458,8 +463,20 @@ ensure_phpmyadmin_override() {
     cat > "$PHPMYADMIN_OVERRIDE_FILE" <<'YAML'
 services:
   phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: gost-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 1
     ports:
       - "${PHPMYADMIN_PORT}:80"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - gost-network
 YAML
   else
     rm -f "$PHPMYADMIN_OVERRIDE_FILE"
@@ -479,6 +496,11 @@ wait_for_mysql() {
 }
 
 download_runtime_files() {
+  download_file "${RAW_BASE}/docker-compose.yml" "docker-compose.yml"
+  download_file "${RAW_BASE}/docker-compose-v4.yml" "docker-compose-v4.yml"
+  download_file "${RAW_BASE}/docker-compose-v6.yml" "docker-compose-v6.yml"
+  download_file "${RAW_BASE}/docker-compose.legacy-v4.yml" "docker-compose.legacy-v4.yml"
+  download_file "${RAW_BASE}/docker-compose.legacy-v6.yml" "docker-compose.legacy-v6.yml"
   download_file "${RAW_BASE}/${COMPOSE_FILE}" "$COMPOSE_FILE"
   download_file "${RAW_BASE}/gost.sql" "gost.sql"
   download_file "${RAW_BASE}/scripts/install-master.sh" "install-master.sh"
@@ -572,7 +594,7 @@ validate_port_number() {
 port_owned_by_flux_container() {
   local port="$1"
   local container
-  for container in vite-frontend springboot-backend gost-phpmyadmin; do
+  for container in flux-master vite-frontend springboot-backend gost-phpmyadmin; do
     if docker port "$container" 2>/dev/null | grep -Eq ":${port}$"; then
       return 0
     fi
@@ -653,7 +675,7 @@ pull_or_build_images() {
       echo "Image pull failed and local build fallback is disabled." >&2
       exit 2
     fi
-    echo "Image pull failed. Falling back to local image build from the GitHub source archive."
+    echo "Image pull failed. Falling back to a local flux-master image build from the GitHub source archive."
     build_local_images
   fi
 }
@@ -672,7 +694,8 @@ Flux 3x-ui Orchestrator is running.
 Install dir: ${INSTALL_DIR}
 Panel URL:   http://${PANEL_HOST}:${FINAL_FRONTEND_PORT}
 Agent URL:   http://${PANEL_HOST}:${FINAL_FRONTEND_PORT}
-Backend API: $(if [ "$FINAL_EXPOSE_BACKEND" = "1" ]; then printf 'http://%s:%s  (debug only; agents should still use the Panel URL)' "$PANEL_HOST" "$FINAL_BACKEND_PORT"; else printf 'internal only; proxied through Panel URL /api/v1/*'; fi)
+Runtime:     flux-master single-image + MySQL
+Backend API: $(if [ "$FINAL_EXPOSE_BACKEND" = "1" ]; then printf 'http://%s:%s  (debug alias for the same flux-master app; agents should still use the Panel URL)' "$PANEL_HOST" "$FINAL_BACKEND_PORT"; else printf 'served by the same Panel URL under /api/v1/*'; fi)
 phpMyAdmin:  $(if [ -n "$FINAL_PHPMYADMIN_PORT" ]; then printf 'http://%s:%s  (restrict by firewall in production)' "$PANEL_HOST" "$FINAL_PHPMYADMIN_PORT"; else printf 'not publicly exposed; set FLUX_PHPMYADMIN_PORT or --phpmyadmin-port to expose temporarily'; fi)
 
 Default login from gost.sql:
@@ -860,7 +883,7 @@ create_backup() {
   archive="${BACKUP_DIR}/flux-master-backup-${stamp}.tar.gz"
 
   mkdir -p "${workdir}/files"
-  for file in "$ENV_FILE" "docker-compose-v4.yml" "docker-compose-v6.yml" "$BACKEND_OVERRIDE_FILE" "$PHPMYADMIN_OVERRIDE_FILE" "gost.sql"; do
+  for file in "$ENV_FILE" "docker-compose.yml" "docker-compose-v4.yml" "docker-compose-v6.yml" "docker-compose.legacy-v4.yml" "docker-compose.legacy-v6.yml" "$BACKEND_OVERRIDE_FILE" "$PHPMYADMIN_OVERRIDE_FILE" "gost.sql"; do
     if [ -f "$file" ]; then
       cp -p "$file" "${workdir}/files/${file}"
       file_count=$((file_count + 1))
@@ -880,7 +903,7 @@ create_backup() {
 
   if [ "$file_count" -eq 0 ] && [ ! -f "${workdir}/mysql.sql" ]; then
     rm -rf "$workdir"
-    echo "Nothing to back up in ${INSTALL_DIR}; expected .env, docker-compose-v4.yml/docker-compose-v6.yml, gost.sql or a running gost-mysql container." >&2
+    echo "Nothing to back up in ${INSTALL_DIR}; expected .env, docker-compose*.yml, gost.sql or a running gost-mysql container." >&2
     exit 2
   fi
 

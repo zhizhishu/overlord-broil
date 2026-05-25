@@ -8,10 +8,10 @@ This checklist is for running the public Flux 3x-ui Orchestrator repo as a small
 | --- | --- |
 | Master install root | `/opt/flux-3xui-orchestrator` |
 | Master environment | `/opt/flux-3xui-orchestrator/.env` |
-| Master compose files | `/opt/flux-3xui-orchestrator/docker-compose-v4.yml` or `docker-compose-v6.yml` |
+| Master compose files | `/opt/flux-3xui-orchestrator/docker-compose.yml`, `docker-compose-v4.yml` or `docker-compose-v6.yml` |
 | Database seed | `/opt/flux-3xui-orchestrator/gost.sql` |
 | Master backups | `/opt/flux-3xui-orchestrator/backups` |
-| Backend logs volume | Docker volume `backend_logs`, mounted at `/app/logs` |
+| Master logs volume | Docker volume `master_logs`, mounted at `/app/logs` |
 | MySQL data volume | Docker volume `mysql_data` |
 | Agent environment | `/etc/flux-agent.env` |
 | Agent binary script | `/usr/local/bin/flux-agent.sh` |
@@ -55,9 +55,9 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
   | sudo env FLUX_FRONTEND_PORT="8080" FLUX_NETWORK_STACK="v4" bash
 ```
 
-The production compose layout publishes only the master entry port. Backend
-`6365` stays on the Docker network and is reached through the frontend Nginx
-proxy under `/api/v1/*`. Expose it only for direct API debugging:
+The production compose layout publishes only the `flux-master` entry port.
+The same single image serves the embedded Web UI and `/api/v1/*`. Expose a
+second host port only for direct API debugging:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
@@ -121,9 +121,11 @@ The runtime doctor checks the panel URL, server id, token presence, writable wor
 The compose files use:
 
 ```text
-ghcr.io/zhizhishu/flux-3xui-orchestrator-backend:latest
-ghcr.io/zhizhishu/flux-3xui-orchestrator-frontend:latest
+ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest
 ```
+
+Legacy split backend/frontend images are still built for rollback and debug
+compose files, but the default installer no longer uses them.
 
 Public repository access does not always mean public GHCR package access. If pulls fail, either log in:
 
@@ -138,6 +140,8 @@ Validate compose before changing a live host:
 ```bash
 docker compose -f docker-compose-v4.yml config
 docker compose -f docker-compose-v6.yml config
+docker compose -f docker-compose.legacy-v4.yml config
+docker compose -f docker-compose.legacy-v6.yml config
 ```
 
 ## Agent Operations
@@ -253,7 +257,7 @@ Release readiness means:
 
 - `VERSION`, `README.md`, release notes and the public docs site name the same release.
 - CI is green on `main`.
-- Docker Images workflow is green on `main` and GHCR has fresh backend/frontend images.
+- Docker Images workflow is green on `main` and GHCR has a fresh `flux-master` image.
 - `scripts/install-master.sh` succeeds on a clean Linux host or falls back to local source builds when GHCR pulls are unavailable.
 - `scripts/install-master-bootstrap.sh` and `scripts/install-flux-agent-bootstrap.sh` are syntax-checked so minimal Alpine-style hosts can install base dependencies before handing off to bash installers.
 - `scripts/test-install-matrix.sh` passes on Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux container images.

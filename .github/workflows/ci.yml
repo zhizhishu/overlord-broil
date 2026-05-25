@@ -67,8 +67,11 @@ jobs:
           EXPOSE_BACKEND: "0"
           PHPMYADMIN_PORT: ""
         run: |
+          docker compose -f docker-compose.yml config --quiet
           docker compose -f docker-compose-v4.yml config --quiet
           docker compose -f docker-compose-v6.yml config --quiet
+          docker compose -f docker-compose.legacy-v4.yml config --quiet
+          docker compose -f docker-compose.legacy-v6.yml config --quiet
       - name: Dry-run compose smoke script
         run: bash scripts/test-compose-smoke.sh --build-local --dry-run
       - name: Run compose smoke test

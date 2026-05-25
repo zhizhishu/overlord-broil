@@ -69,8 +69,8 @@ Default master ports:
 
 | Port | Component | Notes |
 | --- | --- | --- |
-| `5166` | Master panel and agent callback entry | Change with `FLUX_FRONTEND_PORT`; this intentionally avoids occupying `80`. The frontend Nginx proxies `/api/v1/*` to the backend inside Docker. |
-| internal | Backend API | Container-internal `6365`; publish it only for debugging with `FLUX_EXPOSE_BACKEND=1`. |
+| `5166` | Master panel and agent callback entry | Change with `FLUX_FRONTEND_PORT`; this intentionally avoids occupying `80`. The `flux-master` single image serves the Web UI and `/api/v1/*` on the same entry. |
+| disabled | Backend debug alias | There is no separate public backend by default. `FLUX_EXPOSE_BACKEND=1` only publishes a second host port to the same `flux-master` app for debugging. |
 | disabled | phpMyAdmin | Internal container service only by default; set `FLUX_PHPMYADMIN_PORT` or `--phpmyadmin-port` to expose it temporarily. |
 | `3306` | MySQL | Container-internal only; not published to the host. |
 
@@ -158,10 +158,10 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
   | sudo env FLUX_FRONTEND_PORT="5166" FLUX_NETWORK_STACK="v4" bash
 ```
 
-The default compose layout publishes only the frontend/master entry port. The
-backend remains on the Docker network and is reached through the frontend Nginx
-proxy under `/api/v1/*`, so controlled agents should use the same URL as browser
-users, for example `http://your-master-panel:5166`.
+The default compose layout publishes only the `flux-master` entry port. The
+same Spring Boot process serves the embedded Web UI and `/api/v1/*`, so
+controlled agents should use the same URL as browser users, for example
+`http://your-master-panel:5166`.
 
 Expose the backend only when you are debugging direct API access:
 
@@ -177,7 +177,7 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
   | sudo env FLUX_PHPMYADMIN_PORT="18066" bash
 ```
 
-The installer downloads `docker-compose-v4.yml` or `docker-compose-v6.yml`, downloads `gost.sql`, creates `/opt/flux-3xui-orchestrator/.env`, pulls the backend/frontend images and starts the stack. If GHCR is not public yet or pull fails, it falls back to downloading the public GitHub source archive and building both images locally.
+The installer downloads `docker-compose.yml`, `docker-compose-v4.yml` or `docker-compose-v6.yml`, downloads `gost.sql`, creates `/opt/flux-3xui-orchestrator/.env`, pulls the `flux-master` image and starts the stack. If GHCR is not public yet or pull fails, it falls back to downloading the public GitHub source archive and building the single image locally.
 
 Before installing on a live host, run the non-destructive master preflight:
 
@@ -288,7 +288,7 @@ The current public release includes:
 - GitHub Actions:
   - CI builds backend Maven package and frontend production bundle
   - CI runs agent mock tests, tokenized 3x-ui fixture checks, compose validation and a disposable Docker compose smoke test built from the current checkout
-  - Docker image workflow builds backend and frontend images
+  - Docker image workflow builds the default `flux-master` image plus legacy backend/frontend images
   - pushes images to GitHub Container Registry on `main`, tags and manual dispatch
 
 ## Capability Matrix
@@ -296,8 +296,8 @@ The current public release includes:
 | Area | Current public repo capability |
 | --- | --- |
 | Master install | One-command GitHub raw installer, default install path `/opt/flux-3xui-orchestrator`. |
-| Master runtime | Docker Compose stack with MySQL, backend, frontend and optional phpMyAdmin. |
-| Images | GHCR backend/frontend images with local source-build fallback when package pulls are unavailable. |
+| Master runtime | Docker Compose stack with MySQL and the `flux-master` single image; phpMyAdmin is optional maintenance-only override. |
+| Images | GHCR `flux-master` image with local source-build fallback; legacy backend/frontend images are kept for debug/rollback. |
 | Agent install | One-command systemd/OpenRC installer; config in `/etc/flux-agent.env`, runner at `/usr/local/bin/flux-agent.sh`. |
 | Agent tasks | Poll, execute, timeout, retry and report flow for Snell, 3x-ui orchestration and port-forward tasks. |
 | Agent maintenance | Remote doctor/log/restart/upgrade task generation from the server card. |
@@ -794,18 +794,24 @@ bash scripts/test-compose-smoke.sh --build-local
 bash scripts/test-install-matrix.sh
 ```
 
-`scripts/test-three-xui-fixture.sh` starts a local stateful 3x-ui API fixture and covers Bearer-token success, missing-token and wrong-token paths plus inbound CRUD, client operations, Xray config/outbound/traffic reads and restart routes. `scripts/test-install-matrix.sh` runs non-destructive master/agent/agent-runtime doctor checks inside Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux containers. `scripts/test-compose-smoke.sh --build-local` builds backend/frontend images from the current checkout, starts disposable MySQL/backend/frontend services, checks `GET /flow/test` and the frontend `/`, then removes the smoke containers, volumes and network. It avoids depending on local GHCR pull permissions.
+`scripts/test-three-xui-fixture.sh` starts a local stateful 3x-ui API fixture and covers Bearer-token success, missing-token and wrong-token paths plus inbound CRUD, client operations, Xray config/outbound/traffic reads and restart routes. `scripts/test-install-matrix.sh` runs non-destructive master/agent/agent-runtime doctor checks inside Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux containers. `scripts/test-compose-smoke.sh --build-local` builds the `flux-master` image from the current checkout, starts disposable MySQL and master services, checks `GET /flow/test` inside the container and `/` through the public entry, then removes the smoke containers, volumes and network. It avoids depending on local GHCR pull permissions.
 
 ## GitHub Container Images
 
-`.github/workflows/docker-image.yml` builds and pushes two images to GHCR:
+`.github/workflows/docker-image.yml` builds and pushes the default master image to GHCR:
+
+```text
+ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest
+```
+
+The workflow also builds legacy split images for rollback/debug compatibility:
 
 ```text
 ghcr.io/zhizhishu/flux-3xui-orchestrator-backend:latest
 ghcr.io/zhizhishu/flux-3xui-orchestrator-frontend:latest
 ```
 
-Tags are published on `main`, Git tags and manual `workflow_dispatch`. Pull requests build the images without pushing them. The `future` branch also builds backend/frontend images for validation, but it does not push to GHCR; only `main` and `v*` tags publish pullable images. This keeps experimental validation branches from overwriting or polluting release images.
+Tags are published on `main`, Git tags and manual `workflow_dispatch`. Pull requests build the images without pushing them. The `future` branch builds images for validation, but it does not push to GHCR; only `main` and `v*` tags publish pullable images. This keeps experimental validation branches from overwriting or polluting release images.
 
 The compose files now point at these GHCR images:
 

@@ -15,7 +15,7 @@ Default checks:
   - shell syntax
   - agent mock test
   - tokenized 3x-ui fixture test
-  - compose v4/v6 config validation
+  - default/legacy compose config validation
   - frontend install and production build in Docker Node 22
   - git whitespace check
 
@@ -96,8 +96,11 @@ step "Run tokenized 3x-ui fixture tests"
 bash scripts/test-three-xui-fixture.sh
 
 step "Validate compose files"
+docker compose -f docker-compose.yml config --quiet
 docker compose -f docker-compose-v4.yml config --quiet
 docker compose -f docker-compose-v6.yml config --quiet
+docker compose -f docker-compose.legacy-v4.yml config --quiet
+docker compose -f docker-compose.legacy-v6.yml config --quiet
 
 step "Build frontend with Docker Node 22"
 docker run --rm \

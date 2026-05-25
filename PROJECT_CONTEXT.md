@@ -10,23 +10,21 @@ The project is currently a `0.6.0` public-trial reliability candidate, not a bro
 
 - Master stack runs through Docker Compose.
 - `mysql`: MySQL 5.7 with `gost.sql` seed data. Host port is not published by default.
-- `backend`: Spring Boot API service on container port `6365`. It is internal by default.
-- `frontend`: Vite build served by Nginx. It publishes the single public master entry `FRONTEND_PORT`, default `5166`.
-- `phpmyadmin`: present in Compose but internal by default. The installer creates an override only when `PHPMYADMIN_PORT` is set.
-- Frontend Nginx proxies `/api/v1/*` and selected service endpoints to the backend on the Docker network.
+- `master`: `flux-master` single image. The Dockerfile builds the Vite UI, embeds it into the Spring Boot jar, and serves both Web UI and API on container port `5166`.
+- `phpmyadmin`: optional maintenance override only. It is not part of the default compose stack and is created by the installer only when `PHPMYADMIN_PORT` is set.
+- Legacy split `backend`/`frontend` compose files are retained as `docker-compose.legacy-v4.yml` and `docker-compose.legacy-v6.yml` for rollback/debug only.
 
 Default public master exposure:
 
 ```text
-0.0.0.0:5166->80/tcp
+0.0.0.0:5166->5166/tcp
 ```
 
 Internal by default:
 
 ```text
-backend 6365
 mysql 3306
-phpMyAdmin 80
+phpMyAdmin 80, only when the optional override is enabled
 ```
 
 ## Controlled Server Model
@@ -102,8 +100,8 @@ CI currently covers:
 - Shell syntax.
 - Agent mock tests.
 - 3x-ui fixture tests.
-- Compose v4/v6 config.
-- Disposable compose smoke stack.
+- Default, v4/v6 and legacy compose config.
+- Disposable compose smoke stack with the `flux-master` single image.
 - Debian, Ubuntu, Alpine, Rocky Linux, and Oracle Linux installer diagnostics.
 
 Release gate:

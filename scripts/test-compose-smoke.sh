@@ -7,12 +7,13 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMPOSE_FILE="${FLUX_COMPOSE_FILE:-docker-compose-v4.yml}"
 BACKEND_PORT="${BACKEND_PORT:-16365}"
 FRONTEND_PORT="${FRONTEND_PORT:-18080}"
-BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:6365/flow/test}"
+MASTER_INTERNAL_URL="${MASTER_INTERNAL_URL:-http://localhost:5166/flow/test}"
 FRONTEND_URL="${FRONTEND_URL:-http://127.0.0.1:${FRONTEND_PORT}/}"
 DB_NAME="${DB_NAME:-gost_smoke}"
 DB_USER="${DB_USER:-gost_smoke}"
 DB_PASSWORD="${DB_PASSWORD:-test-password}"
 JWT_SECRET="${JWT_SECRET:-test-jwt-secret}"
+SECRET_ENCRYPTION_KEY="${SECRET_ENCRYPTION_KEY:-test-secret-encryption-key}"
 TIMEOUT_SECONDS="${FLUX_COMPOSE_SMOKE_TIMEOUT_SECONDS:-240}"
 POLL_SECONDS="${FLUX_COMPOSE_SMOKE_POLL_SECONDS:-5}"
 ALLOW_EXISTING="${FLUX_COMPOSE_SMOKE_ALLOW_EXISTING:-false}"
@@ -24,8 +25,8 @@ usage() {
 Usage: scripts/test-compose-smoke.sh [--compose-file FILE] [--backend-port PORT] [--frontend-port PORT] [--timeout SECONDS] [--build-local] [--dry-run]
 
 Starts the compose smoke stack with test environment values, checks:
-  - backend:  GET /flow/test from inside the backend container
-  - frontend: GET /
+  - flux-master: GET /flow/test from inside the single-image master container
+  - host:        GET / through the public master entry
 
 The script always runs docker compose down --volumes --remove-orphans before exit
 after a stack start attempt.
@@ -35,7 +36,7 @@ script fails before startup if those resources already exist. Set
 FLUX_COMPOSE_SMOKE_ALLOW_EXISTING=true to override this guard in disposable
 environments.
 
-Use --build-local to build backend/frontend images from the current checkout
+Use --build-local to build the flux-master image from the current checkout
 before startup. This avoids depending on GHCR pull permissions and makes CI
 smoke tests validate the current commit.
 EOF
@@ -49,7 +50,6 @@ while [ "$#" -gt 0 ]; do
       ;;
     --backend-port)
       BACKEND_PORT="${2:?missing value for --backend-port}"
-      BACKEND_URL="http://127.0.0.1:${BACKEND_PORT}/flow/test"
       shift 2
       ;;
     --frontend-port)
@@ -197,18 +197,19 @@ assert_no_existing_resource() {
 
 assert_clean_compose_resources() {
   assert_no_existing_resource container gost-mysql
+  assert_no_existing_resource container flux-master
   assert_no_existing_resource container gost-phpmyadmin
   assert_no_existing_resource container springboot-backend
   assert_no_existing_resource container vite-frontend
   assert_no_existing_resource volume mysql_data
+  assert_no_existing_resource volume master_logs
   assert_no_existing_resource volume backend_logs
   assert_no_existing_resource network gost-network
 }
 
 build_local_images() {
-  echo "Building local compose smoke images..."
-  docker build -t ghcr.io/zhizhishu/flux-3xui-orchestrator-backend:latest "${PROJECT_ROOT}/springboot-backend"
-  docker build -t ghcr.io/zhizhishu/flux-3xui-orchestrator-frontend:latest "${PROJECT_ROOT}/vite-frontend"
+  echo "Building local flux-master compose smoke image..."
+  docker build -t ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest "${PROJECT_ROOT}"
 }
 
 cleanup() {
@@ -225,20 +226,21 @@ cleanup() {
 require_command docker
 require_command curl
 
-export DB_NAME DB_USER DB_PASSWORD JWT_SECRET BACKEND_PORT FRONTEND_PORT
+export DB_NAME DB_USER DB_PASSWORD JWT_SECRET SECRET_ENCRYPTION_KEY BACKEND_PORT FRONTEND_PORT
 export EXPOSE_BACKEND="${EXPOSE_BACKEND:-0}"
+export PHPMYADMIN_PORT="${PHPMYADMIN_PORT:-}"
 
 echo "Compose file: ${COMPOSE_FILE}"
-echo "Backend internal URL: ${BACKEND_URL}"
-echo "Frontend URL: ${FRONTEND_URL}"
+echo "Master internal URL: ${MASTER_INTERNAL_URL}"
+echo "Public master URL: ${FRONTEND_URL}"
 
 compose config --quiet
 
 if [ "$DRY_RUN" = "true" ]; then
   if [ "$BUILD_LOCAL" = "true" ]; then
-    echo "Dry run passed. Would build local backend/frontend images, then run: docker compose -f ${COMPOSE_PATH} up -d mysql backend frontend"
+    echo "Dry run passed. Would build local flux-master image, then run: docker compose -f ${COMPOSE_PATH} up -d mysql master"
   else
-    echo "Dry run passed. Would run: docker compose -f ${COMPOSE_PATH} up -d mysql backend frontend"
+    echo "Dry run passed. Would run: docker compose -f ${COMPOSE_PATH} up -d mysql master"
   fi
   exit 0
 fi
@@ -250,8 +252,8 @@ if [ "$BUILD_LOCAL" = "true" ]; then
   build_local_images
 fi
 
-compose up -d mysql backend frontend
-wait_for_container_http "backend" springboot-backend "$BACKEND_URL"
-wait_for_http "frontend" "$FRONTEND_URL"
+compose up -d mysql master
+wait_for_container_http "flux-master" flux-master "$MASTER_INTERNAL_URL"
+wait_for_http "public master" "$FRONTEND_URL"
 
 echo "compose smoke test passed"
