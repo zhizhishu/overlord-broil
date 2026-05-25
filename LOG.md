@@ -106,4 +106,24 @@
   - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
   - 临时 Vite preview `http://127.0.0.1:4173/` 返回 HTTP 200，生产包中已确认包含 `运行时诊断`、`运行时修复` 和 `trigger: "state-sync"`。
 - 清理：临时 preview 进程 PID `11232` 已停止，复查 `4173` 无监听输出；内置浏览器验证时 `node_repl` 返回 `Transport closed`，已降级为 HTTP 和生产包检查，未保留可见浏览器页签。
-- 后续：提交并推送 `origin/main` 和 `origin/future`，等待 GitHub Actions / GHCR 镜像结果。
+- 推送：已推送 `15cf59c Add state sync runtime actions` 到 `origin/main` 和 `origin/future`。
+- 远端验证：`15cf59c` 的 main CI、main Docker Images、main Pages、future CI、future Docker Images 均成功；GHCR `flux-3xui-orchestrator-master:latest` 更新到 index digest `sha256:3daefd856e5f1b00d946ae15c75e26dc2d88a1885fca1a16f5090bfe77082e41`，linux/amd64 digest `sha256:56cec1c39a5e83aed1bd60e845beabb3284737d98fc14c3f565a11a51bb62b31`。
+- 后续：实现 Agent 远端运行时日志结构化回传和主控展示，继续补齐 `Agent -> Execute -> Report -> Master` 运维闭环。
+
+### Agent Remote Runtime Logs
+
+- 完成：`agent-maintenance logs` 现在会结构化回传 `logs.items`，覆盖 flux-agent、x-ui/Xray、Snell、转发服务和最近任务日志；主控任务卡新增“远端日志”摘要面板。
+- 修改：
+  - `DeployTaskServiceImpl` 的维护脚本新增 `LOG_FILE`、日志行数上限、systemd/OpenRC 日志采集、最近任务日志采集和 `payload["logs"]` 输出。
+  - `DeployTaskServiceImplTest` 覆盖 `logs.items` 在 runtime 元数据兜底时不丢失，并验证生成脚本包含结构化日志采集链路。
+  - `vite-frontend/src/pages/orchestrator.tsx` 新增远端日志解析和任务卡摘要面板，`vite-frontend/src/i18n/index.tsx` 补齐英文文案。
+  - README、中文 README、Operations、Release Notes 和 PROJECT_CONTEXT 补充远端日志说明。
+- 验证：
+  - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
+  - Docker Maven `RuntimeProviderServiceTest,DeployTaskServiceImplTest` 通过，13 个测试全部成功。
+  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
+  - `bash scripts/test-flux-agent-mock.sh` 通过。
+  - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
+  - 生产包已确认包含 `远端日志` 和 `查看完整日志`；后端脚本已确认包含 `FLUX_MAINTENANCE_LOG_LINES`、`capture_journal_log` 和 `payload["logs"]`。
+- 清理：Docker Maven 容器 `flux-remote-logs-test` 使用 `--rm`，已结束无残留；agent mock 临时服务随脚本结束；本阶段未启动长期 dev server。
+- 后续：提交并推送到 `origin/main` 和 `origin/future`，再检查 GitHub Actions 与 GHCR 镜像状态。

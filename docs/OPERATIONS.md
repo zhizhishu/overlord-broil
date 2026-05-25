@@ -151,6 +151,8 @@ State Sync row actions reuse the existing `agent-maintenance` task path instead 
 
 Install, certificate and firewall diagnostics write structured `diagnostics.items` into the task result. The master task card summarizes high-risk findings first: unresolved DNS, local port `80` occupancy, missing certificate files, missing ACME tooling, local firewall command availability and the cloud-security-group boundary.
 
+`agent-maintenance` log collection writes structured `logs.items` into the task result. Each item carries `runtime`, `source`, `title`, bounded `content`, line count and truncation state. The intended coverage is Flux agent runtime logs, x-ui/Xray service logs, Snell node service logs, remote forwarding service logs and task/work-directory logs. The master task card should use these items for a short remote-log summary first, then leave raw stdout/stderr available for deeper investigation.
+
 ## First-Run Operator Path
 
 1. Register the master and controlled servers in the asset list.

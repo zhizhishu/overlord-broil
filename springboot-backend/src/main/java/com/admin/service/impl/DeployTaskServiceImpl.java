@@ -1065,7 +1065,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 + "AGENT_ENV='${FLUX_AGENT_ENV:-/etc/flux-agent.env}'\n"
                 + "REPO_RAW_URL='${FLUX_REPO_RAW_URL:-https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main}'\n"
                 + "SOURCE_URL='${FLUX_AGENT_SOURCE_URL:-${REPO_RAW_URL}/scripts/flux-agent.sh}'\n"
-                + "LOG_LINES='${FLUX_MAINTENANCE_LOG_LINES:-160}'\n\n"
+                + "LOG_LINES=\"${FLUX_MAINTENANCE_LOG_LINES:-160}\"\n\n"
                 + "SERVER_HOST='" + escapeShell(server.getHost()) + "'\n"
                 + "XUI_ENDPOINT='" + escapeShell(server.getXuiEndpoint()) + "'\n"
                 + "CERTIFICATE_DOMAIN='" + escapeShell(server.getCertificateDomain()) + "'\n"
@@ -1085,6 +1085,16 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
 
                 DIAG_FILE="${TMPDIR:-/tmp}/flux-maintenance-diagnostics-$$.jsonl"
                 : > "$DIAG_FILE" 2>/dev/null || true
+                LOG_FILE="${TMPDIR:-/tmp}/flux-maintenance-logs-$$.jsonl"
+                : > "$LOG_FILE" 2>/dev/null || true
+                case "$LOG_LINES" in
+                  ''|*[!0-9]*)
+                    LOG_LINES=160
+                    ;;
+                esac
+                if [ "$LOG_LINES" -gt 1000 ]; then
+                  LOG_LINES=1000
+                fi
 
                 first_available_python() {
                   if command -v python3 >/dev/null 2>&1; then
@@ -1168,6 +1178,72 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     "hint": os.environ.get("FLUX_DIAG_HINT", ""),
                 }, ensure_ascii=False, separators=(",", ":")))
                 PY
+                }
+
+                log_file_item() {
+                  local runtime="$1"
+                  local source="$2"
+                  local title="$3"
+                  local file="$4"
+                  local python_bin
+                  [ -s "$file" ] || return 0
+                  python_bin="$(first_available_python 2>/dev/null || true)"
+                  if [ -z "$python_bin" ]; then
+                    printf '%s\\t%s\\t%s\\t%s\\n' "$runtime" "$source" "$title" "$file" >> "$LOG_FILE" 2>/dev/null || true
+                    return 0
+                  fi
+                  FLUX_LOG_RUNTIME="$runtime" FLUX_LOG_SOURCE="$source" FLUX_LOG_TITLE="$title" FLUX_LOG_PATH="$file" "$python_bin" - <<'PY' >> "$LOG_FILE" 2>/dev/null || true
+                import json
+                import os
+
+                max_len = 12000
+                path = os.environ.get("FLUX_LOG_PATH", "")
+                content = ""
+                truncated = False
+                try:
+                    with open(path, "r", encoding="utf-8", errors="replace") as handle:
+                        content = handle.read()
+                    if len(content) > max_len:
+                        content = content[-max_len:]
+                        truncated = True
+                except Exception as exc:
+                    content = "unable to read log: " + str(exc)
+                print(json.dumps({
+                    "runtime": os.environ.get("FLUX_LOG_RUNTIME", "agent"),
+                    "source": os.environ.get("FLUX_LOG_SOURCE", ""),
+                    "title": os.environ.get("FLUX_LOG_TITLE", ""),
+                    "content": content,
+                    "lines": len(content.splitlines()),
+                    "truncated": truncated,
+                }, ensure_ascii=False, separators=(",", ":")))
+                PY
+                }
+
+                capture_journal_log() {
+                  local runtime="$1"
+                  local unit="$2"
+                  local title="$3"
+                  local tmp
+                  tmp="$(mktemp "${TMPDIR:-/tmp}/flux-log-${runtime}-XXXXXX" 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/flux-log-$$-${runtime}")"
+                  journalctl -u "$unit" -n "$LOG_LINES" --no-pager > "$tmp" 2>&1 || true
+                  cat "$tmp" 2>/dev/null || true
+                  log_file_item "$runtime" "journalctl:${unit}" "$title" "$tmp"
+                  rm -f "$tmp" 2>/dev/null || true
+                }
+
+                capture_file_log() {
+                  local runtime="$1"
+                  local source="$2"
+                  local title="$3"
+                  local file="$4"
+                  local lines="${5:-80}"
+                  local tmp
+                  [ -f "$file" ] || return 0
+                  tmp="$(mktemp "${TMPDIR:-/tmp}/flux-log-${runtime}-XXXXXX" 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/flux-log-$$-${runtime}")"
+                  tail -n "$lines" "$file" > "$tmp" 2>&1 || true
+                  cat "$tmp" 2>/dev/null || true
+                  log_file_item "$runtime" "$source" "$title" "$tmp"
+                  rm -f "$tmp" 2>/dev/null || true
                 }
 
                 detect_service_manager() {
@@ -1276,16 +1352,49 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   echo "== service manager: ${manager}"
                   case "$manager" in
                     systemd)
-                      journalctl -u flux-agent.service -n "$LOG_LINES" --no-pager 2>/dev/null || true
+                      capture_journal_log "agent" "flux-agent.service" "flux-agent service log"
+                      for unit in x-ui.service xray.service; do
+                        if systemctl status "$unit" >/dev/null 2>&1; then
+                          capture_journal_log "xui" "$unit" "${unit} log"
+                        fi
+                      done
+                      units="$(systemctl list-unit-files 'snell*.service' --no-legend 2>/dev/null | awk '{print $1}' || true)"
+                      for unit in $units; do
+                        capture_journal_log "snell" "$unit" "${unit} log"
+                      done
+                      for pattern in 'flux-forward*.service' 'server-forward*.service' 'socat*.service'; do
+                        units="$(systemctl list-unit-files "$pattern" --no-legend 2>/dev/null | awk '{print $1}' || true)"
+                        for unit in $units; do
+                          capture_journal_log "forward" "$unit" "${unit} log"
+                        done
+                      done
                       ;;
                     openrc)
-                      tail -n "$LOG_LINES" /var/log/flux-agent.log 2>/dev/null || true
-                      tail -n "$LOG_LINES" /var/log/flux-agent.err 2>/dev/null || true
+                      capture_file_log "agent" "file:/var/log/flux-agent.log" "flux-agent log" "/var/log/flux-agent.log" "$LOG_LINES"
+                      capture_file_log "agent" "file:/var/log/flux-agent.err" "flux-agent error log" "/var/log/flux-agent.err" "$LOG_LINES"
+                      for file in /var/log/x-ui*.log /var/log/xray*.log; do
+                        capture_file_log "xui" "file:${file}" "$(basename "$file")" "$file" "$LOG_LINES"
+                      done
+                      for file in /var/log/snell*.log; do
+                        capture_file_log "snell" "file:${file}" "$(basename "$file")" "$file" "$LOG_LINES"
+                      done
+                      for file in /var/log/flux-forward*.log /var/log/server-forward*.log /var/log/socat*.log; do
+                        capture_file_log "forward" "file:${file}" "$(basename "$file")" "$file" "$LOG_LINES"
+                      done
                       ;;
                     *)
                       echo "no systemd/OpenRC logs available"
                       ;;
                   esac
+                  for file in /var/log/x-ui*.log /var/log/xray*.log; do
+                    capture_file_log "xui" "file:${file}" "$(basename "$file")" "$file" "$LOG_LINES"
+                  done
+                  for file in /var/log/snell*.log; do
+                    capture_file_log "snell" "file:${file}" "$(basename "$file")" "$file" "$LOG_LINES"
+                  done
+                  for file in /var/log/flux-forward*.log /var/log/server-forward*.log /var/log/socat*.log; do
+                    capture_file_log "forward" "file:${file}" "$(basename "$file")" "$file" "$LOG_LINES"
+                  done
                   echo "== recent task logs"
                   task_files="$(ls -t /var/lib/flux-agent/task-*.out /var/lib/flux-agent/task-*.err 2>/dev/null || true)"
                   if [ -z "$task_files" ]; then
@@ -1296,7 +1405,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     | head -n 6 \\
                     | while read -r file; do
                         echo "--- ${file}"
-                        tail -n 80 "$file" 2>/dev/null || true
+                        capture_file_log "agent-task" "file:${file}" "$(basename "$file")" "$file" 80
                       done
                 }
 
@@ -1649,7 +1758,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     echo "python3 or python is unavailable; skipping structured maintenance metadata." >&2
                     return 0
                   fi
-                  "$python_bin" - "$action" "$status" "$manager" "$(flux_agent_status)" "$(service_status x-ui.service)" "$(service_status snell.service)" "$AGENT_BIN" "$DIAG_FILE" <<'PY' || true
+                  "$python_bin" - "$action" "$status" "$manager" "$(flux_agent_status)" "$(service_status x-ui.service)" "$(service_status snell.service)" "$AGENT_BIN" "$DIAG_FILE" "$LOG_FILE" <<'PY' || true
                 import json
                 import os
                 import sys
@@ -1703,7 +1812,50 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                         })
                     return items
 
+                def load_logs(path):
+                    items = []
+                    if not path or not os.path.exists(path):
+                        return items
+                    try:
+                        with open(path, "r", encoding="utf-8", errors="replace") as handle:
+                            for line in handle:
+                                raw = line.strip()
+                                if not raw:
+                                    continue
+                                try:
+                                    item = json.loads(raw)
+                                except Exception:
+                                    parts = raw.split("\\t")
+                                    item = {
+                                        "runtime": parts[0] if len(parts) > 0 else "agent",
+                                        "source": parts[1] if len(parts) > 1 else "unknown",
+                                        "title": parts[2] if len(parts) > 2 else "log",
+                                        "content": parts[3] if len(parts) > 3 else "",
+                                    }
+                                if not isinstance(item, dict):
+                                    continue
+                                content = str(item.get("content") or "")
+                                items.append({
+                                    "runtime": str(item.get("runtime") or "agent"),
+                                    "source": str(item.get("source") or ""),
+                                    "title": str(item.get("title") or item.get("source") or "log"),
+                                    "content": content,
+                                    "lines": int(item.get("lines") or len(content.splitlines())),
+                                    "truncated": bool(item.get("truncated")),
+                                })
+                    except Exception as exc:
+                        items.append({
+                            "runtime": "agent",
+                            "source": "logs_parse_error",
+                            "title": "日志结果解析失败",
+                            "content": str(exc),
+                            "lines": 1,
+                            "truncated": False,
+                        })
+                    return items
+
                 items = load_diagnostics(sys.argv[8] if len(sys.argv) > 8 else "")
+                log_items = load_logs(sys.argv[9] if len(sys.argv) > 9 else "")
                 summary = {
                     "ok": sum(1 for item in items if item.get("state") == "ok"),
                     "warning": sum(1 for item in items if item.get("state") == "warning"),
@@ -1727,10 +1879,23 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                         "items": items,
                         "summary": summary,
                     }
+                if log_items:
+                    runtime_counts = {}
+                    for item in log_items:
+                        runtime = item.get("runtime") or "agent"
+                        runtime_counts[runtime] = runtime_counts.get(runtime, 0) + 1
+                    payload["logs"] = {
+                        "items": log_items,
+                        "summary": {
+                            "total": len(log_items),
+                            "runtimes": runtime_counts,
+                        },
+                    }
 
                 print("FLUX_AGENT_RESULT_JSON=" + json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
                 PY
                   rm -f "$DIAG_FILE" 2>/dev/null || true
+                  rm -f "$LOG_FILE" 2>/dev/null || true
                 }
 
                 case "$ACTION" in

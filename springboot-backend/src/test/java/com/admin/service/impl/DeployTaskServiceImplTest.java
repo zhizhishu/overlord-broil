@@ -1,7 +1,9 @@
 package com.admin.service.impl;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
+import com.admin.common.dto.DeployTaskDto;
 import com.admin.entity.ControlServer;
 import com.admin.entity.DeployTask;
 import com.admin.runtime.RuntimeProviderService;
@@ -15,6 +17,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DeployTaskServiceImplTest {
 
@@ -104,6 +107,65 @@ class DeployTaskServiceImplTest {
         assertEquals(1, summary.getIntValue("ok"));
         assertEquals(1, summary.getIntValue("warning"));
         assertEquals(1, summary.getIntValue("fail"));
+    }
+
+    @Test
+    void preservesRemoteLogsWhenAttachingRuntimeMetadata() {
+        DeployTask task = new DeployTask();
+        task.setProtocol("agent-maintenance");
+        task.setAction("logs");
+
+        String resultJson = attach("""
+                {
+                  "logs": {
+                    "items": [
+                      {
+                        "runtime": "snell",
+                        "source": "journalctl:snell.service",
+                        "title": "snell service log",
+                        "content": "line1\\nline2",
+                        "lines": 2,
+                        "truncated": false
+                      }
+                    ]
+                  }
+                }
+                """, task);
+        JSONObject result = JSON.parseObject(resultJson);
+        JSONArray items = result.getJSONObject("logs").getJSONArray("items");
+
+        assertEquals(1, items.size());
+        assertEquals("snell", items.getJSONObject(0).getString("runtime"));
+        assertEquals("journalctl:snell.service", items.getJSONObject(0).getString("source"));
+        assertEquals("line1\nline2", items.getJSONObject(0).getString("content"));
+        assertEquals("xui", result.getJSONObject("runtimeProvider").getString("key"));
+        assertNotNull(result.getJSONObject("runtimeState"));
+    }
+
+    @Test
+    void agentMaintenanceLogsScriptIncludesStructuredRemoteLogCollectors() {
+        DeployTaskDto dto = new DeployTaskDto();
+        dto.setServerId(7L);
+        dto.setProtocol("agent-maintenance");
+        dto.setAction("logs");
+
+        ControlServer server = new ControlServer();
+        server.setId(7L);
+        server.setName("edge-logs");
+        server.setHost("203.0.113.7");
+
+        String script = ReflectionTestUtils.invokeMethod(service, "buildAgentMaintenanceScript", dto, server);
+
+        assertNotNull(script);
+        assertTrue(script.contains("LOG_LINES=\"${FLUX_MAINTENANCE_LOG_LINES:-160}\""));
+        assertTrue(script.contains("LOG_FILE=\"${TMPDIR:-/tmp}/flux-maintenance-logs-$$.jsonl\""));
+        assertTrue(script.contains("capture_journal_log \"agent\" \"flux-agent.service\""));
+        assertTrue(script.contains("capture_journal_log \"xui\" \"$unit\""));
+        assertTrue(script.contains("capture_file_log \"snell\""));
+        assertTrue(script.contains("capture_file_log \"agent-task\""));
+        assertTrue(script.contains("def load_logs(path):"));
+        assertTrue(script.contains("payload[\"logs\"]"));
+        assertTrue(script.contains("rm -f \"$LOG_FILE\""));
     }
 
     @Test

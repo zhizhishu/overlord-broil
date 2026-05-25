@@ -2,7 +2,7 @@
 
 ## Handoff Summary
 
-当前目标：继续朝用户给出的 `flux-master` 单体主控架构推进，把 `Task -> Agent -> Execute -> Report -> Master` 链路做实；上一轮已完成并推送 `State Sync`，本轮已把 State Sync 面板升级为可直接下发 Runtime Provider 诊断/修复任务的运维入口，等待提交推送和远端验证。
+当前目标：继续朝用户给出的 `flux-master` 单体主控架构推进，把 `Task -> Agent -> Execute -> Report -> Master` 链路做实；上一轮已把 State Sync 面板升级为可直接下发 Runtime Provider 诊断/修复任务的运维入口并完成远端验证，本轮继续实现 Agent 远端运行时日志结构化回传和主控展示。
 
 已完成：
 - 已确认父级 `C:\Users\echo\Downloads\claude` 只是存放根目录，不在父级写日志或计划。
@@ -22,11 +22,16 @@
 - 已在 State Sync 行增加 Runtime Provider 诊断入口，按 provider 映射到 `install-diagnose`、`cert-diagnose`、`firewall-diagnose` 或 `doctor`。
 - 已在 XUI/Snell State Sync 行增加修复入口，生成 `repair-xui`、`repair-xray` 或 `repair-snell` 的普通 `agent-maintenance` 任务。
 - 已把 State Sync 来源元数据写入维护任务 `requestJson`，保留 provider、状态、来源任务和任务状态，方便后续 Agent 回报审计。
+- 已提交并推送 `15cf59c Add state sync runtime actions` 到 `origin/main` 和 `origin/future`。
+- 已确认 `15cf59c` 的 GitHub Actions：main CI、main Docker Images、main Pages、future CI、future Docker Images 均成功。
+- 已确认 GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 更新到 index digest `sha256:3daefd856e5f1b00d946ae15c75e26dc2d88a1885fca1a16f5090bfe77082e41`，linux/amd64 digest `sha256:56cec1c39a5e83aed1bd60e845beabb3284737d98fc14c3f565a11a51bb62b31`。
+- 本轮已实现 `agent-maintenance logs` 结构化远端日志回传，任务结果新增 `logs.items`，覆盖 flux-agent、x-ui/Xray、Snell、转发服务和最近任务日志。
+- 本轮已在主控任务卡增加“远端日志”摘要面板，并补齐中英文 i18n 文案。
+- 本轮已同步 README、中文 README、Operations、Release Notes 和 PROJECT_CONTEXT，说明远端日志结构化回传和主控展示。
 
 下一步：
-- 提交推送 `origin/main` 和 `origin/future`。
-- 检查 GitHub Actions / GHCR 镜像成果。
-- 继续补更深的 Runtime Provider 闭环：真实 3x-ui 容器烟测、Agent 远端日志拉取、Agent 升级/卸载/修复闭环和更完整错误诊断。
+- 提交并推送本轮 `Agent 远端运行时日志结构化回传和主控展示` 到 `origin/main` 和 `origin/future`。
+- 等待并核查 GitHub Actions / GHCR 镜像结果。
 
 关键文件：
 - `scripts/flux-agent.sh`
@@ -56,6 +61,13 @@
 - 本轮 State Sync 已通过 `bash scripts/test-flux-agent-mock.sh`。
 - 本轮 State Sync 已通过 Docker Maven：`mvn -B -DskipTests package`。
 - 本轮 State Sync 已通过 `git diff --check`，仅有 Windows LF/CRLF 提示。
+- 本轮 State Sync 行动作已通过远端 GitHub Actions / GHCR 验证。
+- 本轮远端日志已通过 `npm run build`，仅有既有 Vite dynamic/static import chunk 提示。
+- 本轮远端日志已通过 Docker Maven：`RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 13 个测试成功。
+- 本轮远端日志已通过 `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'`。
+- 本轮远端日志已通过 `bash scripts/test-flux-agent-mock.sh`。
+- 本轮远端日志已通过 `git diff --check`，仅有 Windows LF/CRLF 提示。
+- 本轮远端日志已确认生产包包含 `远端日志` 和 `查看完整日志`，后端脚本包含 `FLUX_MAINTENANCE_LOG_LINES`、`capture_journal_log` 和 `payload["logs"]`。
 
 风险/待确认：
 - Runtime Provider 已是融合架构关键层，但真实 VPS 矩阵和真实 3x-ui E2E 仍是正式 1.0 前最大缺口。
@@ -68,8 +80,10 @@
 - 本轮 agent mock server 随脚本结束并清理临时目录。
 - 本轮 State Sync 行动作启动过临时 Vite preview：`127.0.0.1:4173`，PID `11232`，验证后已停止；复查 `4173` 无监听输出。
 - 本轮尝试使用内置浏览器验证时 `node_repl` 返回 `Transport closed`，已降级为 HTTP 和生产包检查；未保留可见浏览器页签。
+- 本轮远端日志 Docker Maven 测试容器 `flux-remote-logs-test` 使用 `--rm`，已结束且无残留。
+- 本轮远端日志 agent mock server 随脚本结束并清理临时目录。
 
-最后更新：2026-05-25 15:27:43 -07:00
+最后更新：2026-05-25 16:12:55 -07:00
 
 ## Active Tasks
 
@@ -84,7 +98,8 @@
 - [x] **Goal:** State Sync 聚合 API 和主控状态面板落地。
 - [x] **Goal:** 提交推送并确认 State Sync 的 GitHub Actions / GHCR 成果。
 - [x] **Goal:** State Sync 面板直接发起 Runtime Provider 诊断/修复任务。
-- [ ] **Goal:** 提交推送并确认 State Sync 行动作的 GitHub Actions / GHCR 成果。
+- [x] **Goal:** 提交推送并确认 State Sync 行动作的 GitHub Actions / GHCR 成果。
+- [x] **Goal:** Agent 远端运行时日志结构化回传和主控展示。
 
 ## Notes For Next Agent
 

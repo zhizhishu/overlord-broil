@@ -52,6 +52,8 @@ State Sync now lifts those task-level runtime states into a server-by-provider o
 
 The same State Sync rows can also start Runtime Provider maintenance tasks. Operators can launch provider-aware diagnostics from the overview, and XUI/Snell rows expose repair actions that create normal `agent-maintenance` deployment tasks for the controlled agent to claim, execute and report.
 
+Remote log collection also uses the same `agent-maintenance` path. A `logs` action returns structured `logs.items` for the Flux agent runner, x-ui/Xray services, Snell node services, forwarding/task logs and related service managers, and the control-center task card renders a compact remote-log summary before operators open raw output.
+
 ## UI Preview
 
 ![Flux 3x-ui Orchestrator control plane](docs/assets/flux-orchestrator-screenshot.svg)
@@ -68,6 +70,7 @@ Current UI coverage includes:
 - State Sync runtime overview by server and provider
 - State Sync runtime diagnostics and repair task shortcuts
 - agent diagnostics, logs, restart, upgrade, uninstall and repair tasks
+- remote log summaries on agent-maintenance task cards
 - monitor alerts and a unified rule center
 - `zh-CN` / `en-US` language switching
 
@@ -233,6 +236,7 @@ POST /api/v1/agent-task/report
 ```
 
 Agent reports store both `resultJson.runtimeProvider` and `resultJson.runtimeState`, so task history can be audited by runtime owner and by resolved service/node/diagnostic status.
+`agent-maintenance` log reports additionally store structured `logs.items`, covering Flux agent, x-ui/Xray, Snell, forwarding and task-log sources for task-card summaries.
 
 Profiles, nodes, forwarding and 3x-ui:
 

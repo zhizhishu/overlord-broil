@@ -288,6 +288,15 @@ interface DiagnosticSummary {
   total: number;
 }
 
+interface RemoteLogItem {
+  runtime: string;
+  source: string;
+  title: string;
+  content: string;
+  lines: number;
+  truncated: boolean;
+}
+
 const NANO_MEMORY_MB = 256;
 const NANO_CRITICAL_MEMORY_MB = 200;
 
@@ -544,6 +553,26 @@ const taskDiagnostics = (task: DeployTask): DiagnosticItem[] => {
     }));
 };
 
+const taskRemoteLogs = (task: DeployTask): RemoteLogItem[] => {
+  const payload = deployTaskResultPayload(task);
+  const items = (payload as any)?.logs?.items;
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter(item => item && typeof item === "object")
+    .map(item => {
+      const content = String((item as any).content || "");
+      const lines = Number((item as any).lines);
+      return {
+        runtime: String((item as any).runtime || "agent"),
+        source: String((item as any).source || ""),
+        title: String((item as any).title || (item as any).source || "log"),
+        content,
+        lines: Number.isFinite(lines) ? lines : content.split(/\r?\n/).filter(Boolean).length,
+        truncated: Boolean((item as any).truncated)
+      };
+    });
+};
+
 const summarizeDiagnostics = (items: DiagnosticItem[]): DiagnosticSummary => ({
   ok: items.filter(item => item.state === "ok").length,
   warning: items.filter(item => item.state === "warning").length,
@@ -663,6 +692,15 @@ const runtimeStateColor = (status?: string): StatusColor => {
   return "danger";
 };
 
+const runtimeProviderColor = (key?: string) => {
+  if (key === "xui") return "primary";
+  if (key === "snell") return "secondary";
+  if (key === "forward") return "success";
+  if (key === "certificate") return "warning";
+  if (key === "firewall") return "danger";
+  return "default";
+};
+
 const diagnosticLabel = (state: DiagnosticState, t: (message: string, params?: Record<string, string | number>) => string) => {
   if (state === "ok") return t("正常");
   if (state === "fail") return t("异常");
@@ -777,6 +815,56 @@ const DiagnosticSummaryPanel = ({ task, onShowResult }: { task: DeployTask; onSh
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] text-gray-500">{t("仅展示最需要处理的前 {count} 条，完整细节保留在原始结果里。", { count: visibleItems.length })}</p>
         <Button size="sm" variant="light" onPress={() => onShowResult(task)}>{t("查看原始结果")}</Button>
+      </div>
+    </div>
+  );
+};
+
+const RemoteLogsPanel = ({ task, onShowResult }: { task: DeployTask; onShowResult: (task: DeployTask) => void }) => {
+  const { t } = useLanguage();
+  const logs = taskRemoteLogs(task);
+  if (!logs.length) return null;
+
+  const visibleLogs = logs.slice(0, 4);
+  const runtimes = Array.from(new Set(logs.map(item => item.runtime).filter(Boolean)));
+
+  return (
+    <div className="rounded-small border border-default-200 bg-default-50/70 p-3 dark:bg-default-100/5">
+      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-gray-900 dark:text-white">{t("远端日志")}</p>
+          <p className="truncate text-xs text-gray-500">{t("Agent 回传的运行时日志片段，完整内容保留在原始结果里。")}</p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <Chip size="sm" variant="flat">{t("{count} 份日志", { count: logs.length })}</Chip>
+          {runtimes.slice(0, 4).map(runtime => (
+            <Chip key={runtime} size="sm" variant="flat" color={runtimeProviderColor(runtime) as any}>{runtime}</Chip>
+          ))}
+        </div>
+      </div>
+      <div className="space-y-2">
+        {visibleLogs.map((item, index) => {
+          const preview = item.content.split(/\r?\n/).filter(Boolean).slice(-3).join("\n");
+          return (
+            <div key={`${item.runtime}-${item.source}-${index}`} className="rounded-small border border-default-200 bg-white px-2.5 py-2 dark:bg-default-50/5">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-900 dark:text-white">{item.title || item.source || item.runtime}</p>
+                  <p className="truncate text-[11px] text-gray-500">{item.source || item.runtime}</p>
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-1.5">
+                  <Chip size="sm" variant="flat">{t("{count} 行", { count: item.lines })}</Chip>
+                  {item.truncated && <Chip size="sm" variant="flat" color="warning">{t("已截断")}</Chip>}
+                </div>
+              </div>
+              {preview && <pre className="mt-2 max-h-24 overflow-hidden whitespace-pre-wrap break-words rounded-small bg-default-100/70 p-2 font-mono text-[11px] leading-4 text-gray-600 dark:bg-default-50/10 dark:text-gray-300">{preview}</pre>}
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] text-gray-500">{t("仅展示最近 {count} 份日志摘要。", { count: visibleLogs.length })}</p>
+        <Button size="sm" variant="light" onPress={() => onShowResult(task)}>{t("查看完整日志")}</Button>
       </div>
     </div>
   );
@@ -2234,15 +2322,6 @@ export default function OrchestratorPage() {
     return "default";
   };
 
-  const runtimeProviderColor = (key?: string) => {
-    if (key === "xui") return "primary";
-    if (key === "snell") return "secondary";
-    if (key === "forward") return "success";
-    if (key === "certificate") return "warning";
-    if (key === "firewall") return "danger";
-    return "default";
-  };
-
   const certificateText = (server: ControlServer) => {
     if (!server.certificateStatus) return t("证书 -");
     const domain = server.certificateDomain ? ` ${server.certificateDomain}` : "";
@@ -3029,6 +3108,7 @@ export default function OrchestratorPage() {
                   <p className="text-xs text-gray-500">{t("创建：{time}", { time: formatTime(task.createdTime) })}</p>
                   <RuntimeStatePanel task={task} />
                   <DiagnosticSummaryPanel task={task} onShowResult={showTaskResult} />
+                  <RemoteLogsPanel task={task} onShowResult={showTaskResult} />
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="flat" onPress={() => showTaskScript(task)}>{t("脚本")}</Button>
                     {task.resultJson && (

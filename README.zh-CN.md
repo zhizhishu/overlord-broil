@@ -52,6 +52,8 @@ State Sync 已把这些任务级运行时状态提升为“服务器 × Runtime 
 
 State Sync 面板现在也可以直接发起 Runtime Provider 运维任务。运维人员可以从状态行里启动对应运行时的诊断；XUI 和 Snell 行还会提供修复入口，实际生成普通的 `agent-maintenance` 部署任务，由被控 Agent 领取、执行并回报结果。
 
+远端日志采集也复用同一条 `agent-maintenance` 链路。`logs` 动作会结构化返回 `logs.items`，覆盖 Flux agent 运行器、x-ui/Xray 服务、Snell 节点服务、转发/任务日志和相关服务管理器；主控任务卡会先展示一段远端日志摘要，运维人员再按需打开原始输出。
+
 ## UI 方向
 
 UI 继续靠近 Flux Panel：高信息密度、服务器卡片、操作分组、状态 chip、统一规则视图。它不是营销落地页，而是运维控制台。
@@ -68,6 +70,7 @@ UI 继续靠近 Flux Panel：高信息密度、服务器卡片、操作分组、
 - State Sync 服务器 / 运行时聚合状态
 - State Sync 运行时诊断和修复任务快捷入口
 - Agent 诊断、日志、重启、升级、卸载和一键修复
+- `agent-maintenance` 任务卡上的远端日志摘要
 - 监控告警和统一规则中心
 - `zh-CN` / `en-US` 语言切换
 
@@ -236,6 +239,7 @@ POST /api/v1/agent-task/report
 ```
 
 Agent 回报结果会同时保存 `resultJson.runtimeProvider` 和 `resultJson.runtimeState`，任务历史既能按运行时归属审计，也能按服务、节点、证书或诊断状态排查。
+`agent-maintenance` 日志回报还会保存结构化 `logs.items`，覆盖 Flux agent、x-ui/Xray、Snell、转发和任务日志来源，供任务卡生成摘要。
 
 节点、转发和 3x-ui：
 

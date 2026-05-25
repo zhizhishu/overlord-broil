@@ -67,6 +67,7 @@ Controlled hosts may expose business ports depending on orchestration choices:
 - Runtime State is stored in `resultJson.runtimeState` and rendered on task cards, normalizing provider, protocol/action, task state, resolved status/source, services, nodes, forwarding, certificates and diagnostics.
 - State Sync overview aggregates latest `runtimeState` task results with server heartbeat service/certificate fields through `/api/v1/deploy-task/runtime-state/overview` and renders a server-by-provider panel in the master control center.
 - State Sync row actions reuse `agent-maintenance` tasks so operators can start provider diagnostics and XUI/Snell repair flows directly from the runtime overview.
+- Agent maintenance log collection returns structured `logs.items` for Flux agent, x-ui/Xray, Snell, forwarding and task-log sources, and the master task card renders a remote-log summary.
 - One-click orchestration tasks for 3x-ui/Xray and Snell.
 - 3x-ui API integration for inbound/outbound/config/traffic/restart operations.
 - Protocol-node form flow with validation and advanced payload preview.

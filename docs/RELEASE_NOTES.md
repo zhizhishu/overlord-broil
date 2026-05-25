@@ -28,6 +28,7 @@ This release moves the project from the first public production milestone into a
 - Future branch update: added normalized `resultJson.runtimeState` to task results and the master task card. Runtime status now records provider, protocol/action, task state, resolved status/source, service states, node/forward counts, certificate state and diagnostic summaries in one model.
 - Future branch update: added the State Sync runtime overview API and control-center panel. The master aggregates latest task runtime states with server heartbeat service/certificate fields, producing a server-by-provider view for XUI/Xray, Snell and certificate health.
 - Future branch update: State Sync rows can now create provider-aware `agent-maintenance` diagnostics and XUI/Snell repair tasks, keeping the visible state panel connected to the same controlled-agent execution/report path.
+- Future branch update: `agent-maintenance logs` now returns structured `logs.items` for Flux agent, x-ui/Xray, Snell, forwarding and task-log sources, and the master task card can show a remote-log summary before raw output.
 
 ### 0.6.0 Capability Matrix
 
@@ -46,6 +47,7 @@ This release moves the project from the first public production milestone into a
 | Runtime Provider / Runtime State audit | Task claim/report results carry provider metadata and normalized runtime state for `xui`, `snell`, `forward`, `certificate` and `firewall`, giving the master a stable audit trail across agent versions. |
 | State Sync overview | `/api/v1/deploy-task/runtime-state/overview` aggregates latest runtime states plus heartbeat fields into a server-by-provider operations panel. |
 | State Sync actions | Runtime rows can generate provider-aware diagnostics and XUI/Snell repairs as normal `agent-maintenance` tasks for the controlled agent. |
+| Remote runtime logs | `agent-maintenance logs` reports structured `logs.items` for Flux agent, x-ui/Xray, Snell, forwarding and task logs, with task-card summaries in the master UI. |
 | Linux coverage | Docker/CI diagnostics cover Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux userspaces. |
 | 3x-ui | API fixture remains API-level; full 3x-ui install/configure still targets systemd hosts. |
 | Snell | Product-level protocol node with separate systemd/OpenRC runtime, not a native Xray/3x-ui core protocol. |
