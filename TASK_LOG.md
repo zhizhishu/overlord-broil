@@ -449,3 +449,13 @@
 - 主控 UI 已在服务器卡片、服务器选择项、一键编排弹窗和协议节点表单展示 Nano 风险；中英文词典已补齐新增文案。
 - README、中文 README、Operations 和 Release Notes 已写清 Nano 边界、数据库升级字段和端口/协议建议。
 - 本地验证通过：`bash -n scripts/*.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、`vite-frontend npm run build`、Docker Maven `mvn -B -DskipTests package`、浏览器 dev server 烟测、`git diff --check`。浏览器烟测后已关闭 5173 端口；Docker Maven 容器已自动清理。
+
+## 2026-05-25 真机端口收敛修复验证
+
+### 2026-05-25 07:23:34 -07:00 进度记录
+
+- 修复结论：主控默认已改为单公网入口 `5166/tcp`，浏览器访问和被控 agent 回调都走 `http://<master>:5166`。
+- Compose 方案：`docker-compose-v4.yml` / `docker-compose-v6.yml` 默认只发布 `frontend:${FRONTEND_PORT}->80`；后端 `6365`、MySQL、phpMyAdmin 保持 Docker 内网。只有设置 `FLUX_EXPOSE_BACKEND=1` 或 `FLUX_PHPMYADMIN_PORT` 时，安装脚本才生成对应 override 文件暴露调试端口。
+- 旧安装迁移：`scripts/install-master.sh upgrade` 会把旧 `FRONTEND_PORT=80` 迁到 `5166`，把 `EXPOSE_BACKEND` 重置为 `0`，并默认清空 phpMyAdmin 公网端口，避免继续暴露 `6365/8066`。
+- 推送状态：修复提交 `639c621` 已推送到 `origin/main` 和 `origin/future`。
+- 验证状态：GitHub Actions `main`/`future` 的 CI 和 Docker Images 均成功，Pages 成功；GHCR backend/frontend `latest` manifest 可读取；本地 dry-run compose smoke 通过；本地未留下 Docker 容器或监听端口。
