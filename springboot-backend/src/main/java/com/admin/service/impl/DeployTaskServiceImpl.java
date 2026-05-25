@@ -605,6 +605,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   printf '\\n== %s ==\\n' "$*"
                 }
 
+                DIAG_FILE="${TMPDIR:-/tmp}/flux-maintenance-diagnostics-$$.jsonl"
+                : > "$DIAG_FILE" 2>/dev/null || true
+
                 first_available_python() {
                   if command -v python3 >/dev/null 2>&1; then
                     command -v python3
@@ -660,6 +663,32 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     print(json.dumps(value, ensure_ascii=False))
                 else:
                     print(value)
+                PY
+                }
+
+                diag_item() {
+                  local state="$1"
+                  local code="$2"
+                  local title="$3"
+                  local detail="${4:-}"
+                  local hint="${5:-}"
+                  local python_bin
+                  python_bin="$(first_available_python 2>/dev/null || true)"
+                  if [ -z "$python_bin" ]; then
+                    printf '%s\\t%s\\t%s\\t%s\\t%s\\n' "$state" "$code" "$title" "$detail" "$hint" >> "$DIAG_FILE" 2>/dev/null || true
+                    return 0
+                  fi
+                  FLUX_DIAG_STATE="$state" FLUX_DIAG_CODE="$code" FLUX_DIAG_TITLE="$title" FLUX_DIAG_DETAIL="$detail" FLUX_DIAG_HINT="$hint" "$python_bin" - <<'PY' >> "$DIAG_FILE" 2>/dev/null || true
+                import json
+                import os
+
+                print(json.dumps({
+                    "state": os.environ.get("FLUX_DIAG_STATE", "warning"),
+                    "code": os.environ.get("FLUX_DIAG_CODE", "unknown"),
+                    "title": os.environ.get("FLUX_DIAG_TITLE", ""),
+                    "detail": os.environ.get("FLUX_DIAG_DETAIL", ""),
+                    "hint": os.environ.get("FLUX_DIAG_HINT", ""),
+                }, ensure_ascii=False, separators=(",", ":")))
                 PY
                 }
 
@@ -910,19 +939,51 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   manager="$(detect_service_manager)"
                   section "Agent install diagnostics"
                   echo "service manager: ${manager}"
-                  [ -x "$AGENT_BIN" ] && echo "[ok] agent binary: ${AGENT_BIN}" || echo "[fail] agent binary missing or not executable: ${AGENT_BIN}"
-                  [ -r "$AGENT_ENV" ] && echo "[ok] agent env: ${AGENT_ENV}" || echo "[fail] agent env missing: ${AGENT_ENV}"
-                  [ -d /var/lib/flux-agent ] && echo "[ok] work dir: /var/lib/flux-agent" || echo "[warn] work dir missing: /var/lib/flux-agent"
+                  diag_item ok "agent_service_manager" "服务管理器" "detected ${manager}" "agent 需要 systemd 或 OpenRC 才能长期常驻。"
+                  if [ -x "$AGENT_BIN" ]; then
+                    echo "[ok] agent binary: ${AGENT_BIN}"
+                    diag_item ok "agent_binary" "agent 可执行文件存在" "$AGENT_BIN" ""
+                  else
+                    echo "[fail] agent binary missing or not executable: ${AGENT_BIN}"
+                    diag_item fail "agent_binary_missing" "agent 可执行文件缺失" "$AGENT_BIN" "重新执行被控端安装脚本或一键修复 agent。"
+                  fi
+                  if [ -r "$AGENT_ENV" ]; then
+                    echo "[ok] agent env: ${AGENT_ENV}"
+                    diag_item ok "agent_env" "agent 环境文件存在" "$AGENT_ENV" ""
+                  else
+                    echo "[fail] agent env missing: ${AGENT_ENV}"
+                    diag_item fail "agent_env_missing" "agent 环境文件缺失" "$AGENT_ENV" "重新安装 agent，并确认 FLUX_PANEL_URL、FLUX_SERVER_ID、FLUX_AGENT_TOKEN 已写入。"
+                  fi
+                  if [ -d /var/lib/flux-agent ]; then
+                    echo "[ok] work dir: /var/lib/flux-agent"
+                    diag_item ok "agent_work_dir" "agent 工作目录存在" "/var/lib/flux-agent" ""
+                  else
+                    echo "[warn] work dir missing: /var/lib/flux-agent"
+                    diag_item warning "agent_work_dir_missing" "agent 工作目录缺失" "/var/lib/flux-agent" "agent 首次运行会创建目录；若任务无法写日志，请检查目录权限。"
+                  fi
                   if [ -r "$AGENT_ENV" ]; then
                     grep -E '^(FLUX_PANEL_URL|FLUX_SERVER_ID|FLUX_POLL_INTERVAL)=' "$AGENT_ENV" || true
-                    grep -q '^FLUX_AGENT_TOKEN=' "$AGENT_ENV" && echo "[ok] agent token: configured" || echo "[fail] agent token missing"
+                    if grep -q '^FLUX_AGENT_TOKEN=' "$AGENT_ENV"; then
+                      echo "[ok] agent token: configured"
+                      diag_item ok "agent_token" "agent token 已配置" "$AGENT_ENV" ""
+                    else
+                      echo "[fail] agent token missing"
+                      diag_item fail "agent_token_missing" "agent token 缺失" "$AGENT_ENV" "在主控服务器卡片重新查看 Token，并重装/修复被控 agent。"
+                    fi
                   fi
                   run_agent_doctor || true
                   section "Agent service status"
                   case "$manager" in
-                    systemd) systemctl --no-pager --full status flux-agent.service || true ;;
-                    openrc) rc-service flux-agent status || true ;;
-                    *) echo "[fail] no running systemd/OpenRC service manager detected" ;;
+                    systemd)
+                      systemctl --no-pager --full status flux-agent.service || true
+                      ;;
+                    openrc)
+                      rc-service flux-agent status || true
+                      ;;
+                    *)
+                      echo "[fail] no running systemd/OpenRC service manager detected"
+                      diag_item fail "service_manager_missing" "未检测到 systemd/OpenRC" "$manager" "被控 agent 常驻服务需要 systemd 或 OpenRC；容器测试可忽略。"
+                      ;;
                   esac
                 }
 
@@ -964,83 +1025,132 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   section "DNS diagnostics"
                   if [ -z "$domain" ]; then
                     echo "[warn] DNS 未配置：没有证书域名，也无法从服务器主机名推断域名。"
+                    diag_item warning "dns_domain_missing" "DNS 未配置" "没有证书域名，也无法从服务器主机名推断域名。" "ACME HTTP 模式必须填写可公网解析的域名。"
                     return 0
                   fi
                   ips="$(resolve_domain "$domain" | sort -u || true)"
                   if [ -z "$ips" ]; then
                     echo "[fail] DNS 未解析：${domain} 没有解析到 A/AAAA 记录。"
+                    diag_item fail "dns_unresolved" "DNS 未解析" "${domain} 没有解析到 A/AAAA 记录。" "到 DNS 服务商添加 A/AAAA 记录，并等待生效后重试证书任务。"
                     return 1
                   fi
                   echo "[ok] DNS records for ${domain}:"
                   printf '%s\\n' "$ips"
+                  diag_item ok "dns_resolved" "DNS 已解析" "${domain} -> $(printf '%s' "$ips" | tr '\\n' ' ')" ""
                   ip="$(public_ip || true)"
                   if [ -n "$ip" ]; then
                     echo "detected public ip: ${ip}"
-                    printf '%s\\n' "$ips" | grep -qx "$ip" || echo "[warn] DNS 解析不指向本机公网 IP；如果使用云 NAT/负载均衡，请确认转发链路。"
+                    if printf '%s\\n' "$ips" | grep -qx "$ip"; then
+                      diag_item ok "dns_public_ip_match" "DNS 指向本机公网 IP" "${domain} -> ${ip}" ""
+                    else
+                      echo "[warn] DNS 解析不指向本机公网 IP；如果使用云 NAT/负载均衡，请确认转发链路。"
+                      diag_item warning "dns_public_ip_mismatch" "DNS 未指向本机公网 IP" "resolved=$(printf '%s' "$ips" | tr '\\n' ' '), public=${ip}" "如果使用云 NAT/负载均衡，请确认 80 端口转发到当前被控服务器。"
+                    fi
                   else
                     echo "[warn] 无法探测本机公网 IP，跳过 DNS 与公网 IP 对比。"
+                    diag_item warning "public_ip_unknown" "无法探测本机公网 IP" "api.ipify.org / ifconfig.me 不可达或 curl 缺失。" "可手动确认域名是否解析到当前服务器公网地址。"
                   fi
                 }
 
                 check_port_usage() {
-                  local port="$1"
+                  local port="$1" listeners
                   section "Port ${port} diagnostics"
                   if command -v ss >/dev/null 2>&1; then
-                    ss -ltnup 2>/dev/null | awk -v p=":${port}" '$0 ~ p {print}'
+                    listeners="$(ss -ltnup 2>/dev/null | awk -v p=":${port}" '$0 ~ p {print}' || true)"
                   elif command -v netstat >/dev/null 2>&1; then
-                    netstat -ltnup 2>/dev/null | awk -v p=":${port}" '$0 ~ p {print}'
+                    listeners="$(netstat -ltnup 2>/dev/null | awk -v p=":${port}" '$0 ~ p {print}' || true)"
                   elif command -v lsof >/dev/null 2>&1; then
-                    lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null || true
+                    listeners="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
                   else
                     echo "[warn] 缺少 ss/netstat/lsof，无法检查端口占用。"
+                    diag_item warning "port_check_tool_missing" "无法检查端口占用" "缺少 ss/netstat/lsof。" "安装 iproute2、net-tools 或 lsof 后可获得更准确的端口诊断。"
                     return 0
                   fi
+                  if [ -n "$listeners" ]; then
+                    printf '%s\\n' "$listeners"
+                    diag_item fail "port_${port}_occupied" "${port} 端口被占用" "$listeners" "释放本机 ${port}/tcp，或停止占用服务后再执行 ACME HTTP 证书任务。"
+                    return 1
+                  fi
+                  echo "[ok] TCP/${port} is not listening locally"
+                  diag_item ok "port_${port}_free" "${port} 端口本机未占用" "TCP/${port} 未发现监听进程。" ""
                 }
 
                 diagnose_firewall() {
+                  local firewall_seen
+                  firewall_seen=0
                   section "Firewall diagnostics"
                   check_port_usage 80 || true
                   echo "ACME HTTP 需要公网 TCP/80 能访问目标服务器；如果本机检查正常但外部仍失败，通常是云安全组/云防火墙未放行。"
+                  diag_item warning "cloud_firewall_check" "云防火墙需确认" "本机只能检查进程和系统防火墙，无法读取云厂商安全组。" "请在云控制台放行 TCP/80，并确认没有上游负载均衡或 NAT 拦截。"
                   if command -v ufw >/dev/null 2>&1; then
+                    firewall_seen=1
                     echo "-- ufw"
                     ufw status verbose || true
+                    diag_item ok "ufw_present" "检测到 ufw" "已输出 ufw status verbose。" "若 80 不通，请确认 ufw allow 80/tcp。"
                   fi
                   if command -v firewall-cmd >/dev/null 2>&1; then
+                    firewall_seen=1
                     echo "-- firewalld"
                     firewall-cmd --state 2>/dev/null || true
                     firewall-cmd --list-all 2>/dev/null || true
+                    diag_item ok "firewalld_present" "检测到 firewalld" "已输出 firewalld 状态和规则。" "若 80 不通，请确认 firewall-cmd 已放行 http 或 80/tcp。"
                   fi
                   if command -v nft >/dev/null 2>&1; then
+                    firewall_seen=1
                     echo "-- nftables summary"
                     nft list ruleset 2>/dev/null | head -n 120 || true
+                    diag_item ok "nftables_present" "检测到 nftables" "已输出前 120 行 nft ruleset。" "请确认 input 链允许 TCP/80。"
                   elif command -v iptables >/dev/null 2>&1; then
+                    firewall_seen=1
                     echo "-- iptables summary"
                     iptables -S 2>/dev/null | head -n 120 || true
+                    diag_item ok "iptables_present" "检测到 iptables" "已输出前 120 行 iptables 规则。" "请确认 INPUT 链允许 TCP/80。"
                   else
                     echo "[warn] 未发现 ufw/firewalld/nft/iptables 命令，无法读取本机防火墙规则。"
+                  fi
+                  if [ "$firewall_seen" -eq 0 ]; then
+                    diag_item warning "firewall_tool_missing" "无法读取本机防火墙规则" "未发现 ufw/firewalld/nft/iptables 命令。" "如果 80 不通，请手动检查系统防火墙和云安全组。"
                   fi
                 }
 
                 diagnose_certificate() {
-                  local domain
+                  local domain found_cert
+                  found_cert=0
                   domain="$(certificate_domain || true)"
                   section "Certificate / ACME diagnostics"
                   echo "stored certificate status: ${CERTIFICATE_STATUS:-unknown}"
                   if [ -z "$domain" ]; then
                     echo "[warn] 证书域名缺失：ACME HTTP 模式必须填写域名。"
+                    diag_item warning "certificate_domain_missing" "证书域名缺失" "ACME HTTP 模式必须填写域名。" "在一键编排或服务器配置中填写 certificateDomain。"
                   else
                     echo "certificate domain: ${domain}"
+                    diag_item ok "certificate_domain" "证书域名已配置" "$domain" ""
                   fi
                   if [ -n "$domain" ]; then
                     for cert in "/root/.acme.sh/${domain}_ecc/fullchain.cer" "/root/.acme.sh/${domain}/fullchain.cer" "/etc/letsencrypt/live/${domain}/fullchain.pem"; do
                       if [ -f "$cert" ]; then
+                        found_cert=1
                         echo "[ok] certificate file: ${cert}"
                         openssl x509 -in "$cert" -noout -subject -issuer -enddate 2>/dev/null || true
+                        diag_item ok "certificate_file_found" "证书文件存在" "$cert" ""
                       fi
                     done
+                    if [ "$found_cert" -eq 0 ]; then
+                      diag_item warning "certificate_file_missing" "未找到本机证书文件" "$domain" "如果这是首次申请证书，该提示可忽略；如果是续期失败，请检查 ACME 日志。"
+                    fi
                   fi
-                  command -v acme.sh >/dev/null 2>&1 && acme.sh --list || true
-                  command -v certbot >/dev/null 2>&1 && certbot certificates || true
+                  if command -v acme.sh >/dev/null 2>&1; then
+                    diag_item ok "acme_sh_present" "检测到 acme.sh" "$(command -v acme.sh)" ""
+                    acme.sh --list || true
+                  else
+                    diag_item warning "acme_sh_missing" "未检测到 acme.sh" "acme.sh 不在 PATH 中。" "如果使用 acme.sh 申请证书，请确认安装路径和 PATH。"
+                  fi
+                  if command -v certbot >/dev/null 2>&1; then
+                    diag_item ok "certbot_present" "检测到 certbot" "$(command -v certbot)" ""
+                    certbot certificates || true
+                  else
+                    diag_item warning "certbot_missing" "未检测到 certbot" "certbot 不在 PATH 中。" "如果使用 certbot 续期，请确认 certbot 已安装。"
+                  fi
                 }
 
                 diagnose_acme() {
@@ -1061,12 +1171,68 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     echo "python3 or python is unavailable; skipping structured maintenance metadata." >&2
                     return 0
                   fi
-                  "$python_bin" - "$action" "$status" "$manager" "$(flux_agent_status)" "$(service_status x-ui.service)" "$(service_status snell.service)" "$AGENT_BIN" <<'PY' || true
+                  "$python_bin" - "$action" "$status" "$manager" "$(flux_agent_status)" "$(service_status x-ui.service)" "$(service_status snell.service)" "$AGENT_BIN" "$DIAG_FILE" <<'PY' || true
                 import json
+                import os
                 import sys
                 import time
 
-                print("FLUX_AGENT_RESULT_JSON=" + json.dumps({
+                def normalize_state(value):
+                    normalized = (value or "").strip().lower()
+                    if normalized in ("ok", "success", "succeeded", "pass", "passed"):
+                        return "ok"
+                    if normalized in ("fail", "failed", "error", "missing", "danger"):
+                        return "fail"
+                    return "warning"
+
+                def load_diagnostics(path):
+                    items = []
+                    if not path or not os.path.exists(path):
+                        return items
+                    try:
+                        with open(path, "r", encoding="utf-8", errors="replace") as handle:
+                            for line in handle:
+                                raw = line.strip()
+                                if not raw:
+                                    continue
+                                try:
+                                    item = json.loads(raw)
+                                except Exception:
+                                    parts = raw.split("\\t")
+                                    item = {
+                                        "state": parts[0] if len(parts) > 0 else "warning",
+                                        "code": parts[1] if len(parts) > 1 else "unknown",
+                                        "title": parts[2] if len(parts) > 2 else raw,
+                                        "detail": parts[3] if len(parts) > 3 else "",
+                                        "hint": parts[4] if len(parts) > 4 else "",
+                                    }
+                                if not isinstance(item, dict):
+                                    continue
+                                items.append({
+                                    "state": normalize_state(item.get("state")),
+                                    "code": str(item.get("code") or "unknown"),
+                                    "title": str(item.get("title") or item.get("code") or "diagnostic"),
+                                    "detail": str(item.get("detail") or ""),
+                                    "hint": str(item.get("hint") or ""),
+                                })
+                    except Exception as exc:
+                        items.append({
+                            "state": "warning",
+                            "code": "diagnostics_parse_error",
+                            "title": "诊断结果解析失败",
+                            "detail": str(exc),
+                            "hint": "查看原始任务日志确认诊断输出。",
+                        })
+                    return items
+
+                items = load_diagnostics(sys.argv[8] if len(sys.argv) > 8 else "")
+                summary = {
+                    "ok": sum(1 for item in items if item.get("state") == "ok"),
+                    "warning": sum(1 for item in items if item.get("state") == "warning"),
+                    "fail": sum(1 for item in items if item.get("state") == "fail"),
+                    "total": len(items),
+                }
+                payload = {
                     "maintenance": {
                         "action": sys.argv[1],
                         "status": sys.argv[2],
@@ -1077,8 +1243,16 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                         "agentBinary": sys.argv[7],
                         "reportedAt": int(time.time() * 1000),
                     }
-                }, ensure_ascii=False))
+                }
+                if items:
+                    payload["diagnostics"] = {
+                        "items": items,
+                        "summary": summary,
+                    }
+
+                print("FLUX_AGENT_RESULT_JSON=" + json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
                 PY
+                  rm -f "$DIAG_FILE" 2>/dev/null || true
                 }
 
                 case "$ACTION" in

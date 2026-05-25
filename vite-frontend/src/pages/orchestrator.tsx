@@ -200,6 +200,7 @@ type RuleHealthFilter = "all" | "healthy" | "warning" | "error";
 type RuleHealth = Exclude<RuleHealthFilter, "all">;
 type SetupStepState = "done" | "active" | "todo" | "warning";
 type FormCheckState = "ok" | "warning" | "missing";
+type DiagnosticState = "ok" | "warning" | "fail";
 type AgentMaintenanceAction =
   | "doctor"
   | "logs"
@@ -247,6 +248,21 @@ interface FormCheck {
   label: string;
   detail: string;
   state: FormCheckState;
+}
+
+interface DiagnosticItem {
+  state: DiagnosticState;
+  code: string;
+  title: string;
+  detail?: string;
+  hint?: string;
+}
+
+interface DiagnosticSummary {
+  ok: number;
+  warning: number;
+  fail: number;
+  total: number;
 }
 
 const blankServerForm: ServerForm = {
@@ -444,6 +460,81 @@ const safeJsonParse = (value?: string) => {
   }
 };
 
+const parseEmbeddedAgentResult = (stdout?: string) => {
+  if (!stdout) return null;
+  const marker = "FLUX_AGENT_RESULT_JSON=";
+  const lines = stdout.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (lines[index].startsWith(marker)) {
+      return safeJsonParse(lines[index].slice(marker.length));
+    }
+  }
+  return null;
+};
+
+const deployTaskResultPayload = (task: DeployTask) => {
+  const parsed = safeJsonParse(task.resultJson);
+  if (!parsed || typeof parsed !== "object") return null;
+  if ((parsed as any).diagnostics) return parsed;
+  if (typeof (parsed as any).resultJson === "string") {
+    const nested = safeJsonParse((parsed as any).resultJson);
+    if (nested) return nested;
+  }
+  return parseEmbeddedAgentResult((parsed as any).stdout) || parsed;
+};
+
+const normalizeDiagnosticState = (value: unknown): DiagnosticState => {
+  const normalized = String(value || "").toLowerCase();
+  if (["ok", "success", "succeeded", "pass", "passed"].includes(normalized)) return "ok";
+  if (["fail", "failed", "error", "danger", "missing"].includes(normalized)) return "fail";
+  return "warning";
+};
+
+const taskDiagnostics = (task: DeployTask): DiagnosticItem[] => {
+  const payload = deployTaskResultPayload(task);
+  const items = (payload as any)?.diagnostics?.items;
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter(item => item && typeof item === "object")
+    .map(item => ({
+      state: normalizeDiagnosticState((item as any).state),
+      code: String((item as any).code || "unknown"),
+      title: String((item as any).title || (item as any).code || "diagnostic"),
+      detail: String((item as any).detail || ""),
+      hint: String((item as any).hint || "")
+    }));
+};
+
+const summarizeDiagnostics = (items: DiagnosticItem[]): DiagnosticSummary => ({
+  ok: items.filter(item => item.state === "ok").length,
+  warning: items.filter(item => item.state === "warning").length,
+  fail: items.filter(item => item.state === "fail").length,
+  total: items.length
+});
+
+const diagnosticTitleByCode: Record<string, string> = {
+  dns_domain_missing: "DNS 未配置",
+  dns_unresolved: "DNS 未解析",
+  dns_resolved: "DNS 已解析",
+  dns_public_ip_match: "DNS 指向本机公网 IP",
+  dns_public_ip_mismatch: "DNS 未指向本机公网 IP",
+  public_ip_unknown: "无法探测本机公网 IP",
+  port_80_occupied: "80 端口被占用",
+  port_80_free: "80 端口本机未占用",
+  port_check_tool_missing: "无法检查端口占用",
+  cloud_firewall_check: "云防火墙需确认",
+  firewall_tool_missing: "无法读取本机防火墙规则",
+  certificate_domain_missing: "证书域名缺失",
+  certificate_domain: "证书域名已配置",
+  certificate_file_found: "证书文件存在",
+  certificate_file_missing: "未找到本机证书文件",
+  acme_sh_present: "检测到 acme.sh",
+  acme_sh_missing: "未检测到 acme.sh",
+  certbot_present: "检测到 certbot",
+  certbot_missing: "未检测到 certbot",
+  diagnostics_parse_error: "诊断结果解析失败"
+};
+
 const collectOutboundTags = (value: any): string[] => {
   if (!value) return [];
   const parsed = typeof value === "string" ? safeJsonParse(value) : value;
@@ -495,6 +586,66 @@ const ServerActionGroup = ({ title, children }: { title: string; children: React
       <p className="mb-2 text-[11px] font-semibold uppercase tracking-normal text-gray-500">{t(title)}</p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3">
         {children}
+      </div>
+    </div>
+  );
+};
+
+const diagnosticColor = (state: DiagnosticState) => {
+  if (state === "ok") return "success";
+  if (state === "fail") return "danger";
+  return "warning";
+};
+
+const diagnosticLabel = (state: DiagnosticState, t: (message: string, params?: Record<string, string | number>) => string) => {
+  if (state === "ok") return t("正常");
+  if (state === "fail") return t("异常");
+  return t("提醒");
+};
+
+const DiagnosticSummaryPanel = ({ task, onShowResult }: { task: DeployTask; onShowResult: (task: DeployTask) => void }) => {
+  const { t } = useLanguage();
+  const diagnostics = taskDiagnostics(task);
+  if (!diagnostics.length) return null;
+
+  const summary = summarizeDiagnostics(diagnostics);
+  const visibleItems = [...diagnostics]
+    .sort((left, right) => {
+      const weight: Record<DiagnosticState, number> = { fail: 0, warning: 1, ok: 2 };
+      return weight[left.state] - weight[right.state];
+    })
+    .slice(0, 5);
+
+  return (
+    <div className="rounded-small border border-default-200 bg-default-50/70 p-3 dark:bg-default-100/5">
+      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-gray-900 dark:text-white">{t("诊断摘要")}</p>
+          <p className="text-xs text-gray-500">{t("ACME、DNS、80 端口、防火墙和证书线索会在这里汇总。")}</p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <Chip size="sm" variant="flat" color={summary.fail > 0 ? "danger" : "default"}>{t("{count} 异常", { count: summary.fail })}</Chip>
+          <Chip size="sm" variant="flat" color={summary.warning > 0 ? "warning" : "default"}>{t("{count} 提醒", { count: summary.warning })}</Chip>
+          <Chip size="sm" variant="flat" color="success">{t("{count} 正常", { count: summary.ok })}</Chip>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {visibleItems.map(item => (
+          <div key={`${item.code}-${item.title}`} className="rounded-small border border-default-200 bg-white px-2.5 py-2 dark:bg-default-50/5">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">{t(diagnosticTitleByCode[item.code] || item.title)}</p>
+                {item.detail && <p className="mt-1 break-words text-xs leading-5 text-gray-500">{item.detail}</p>}
+                {item.hint && <p className="mt-1 break-words text-xs leading-5 text-gray-600 dark:text-gray-300">{item.hint}</p>}
+              </div>
+              <Chip size="sm" variant="flat" color={diagnosticColor(item.state) as any}>{diagnosticLabel(item.state, t)}</Chip>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] text-gray-500">{t("仅展示最需要处理的前 {count} 条，完整细节保留在原始结果里。", { count: visibleItems.length })}</p>
+        <Button size="sm" variant="light" onPress={() => onShowResult(task)}>{t("查看原始结果")}</Button>
       </div>
     </div>
   );
@@ -1570,6 +1721,13 @@ export default function OrchestratorPage() {
     }
   };
 
+  const showTaskResult = (task: DeployTask) => {
+    const parsed = safeJsonParse(task.resultJson);
+    setScriptTitle(t("任务 #{id} 原始结果", { id: task.id }));
+    setScriptText(parsed ? JSON.stringify(parsed, null, 2) : task.resultJson || t("暂无原始结果"));
+    setScriptModalOpen(true);
+  };
+
   const isThreeXuiSuccess = (res: any) => res.code === 0 && (!res.data || res.data.success !== false);
 
   const showThreeXuiResult = (title: string, data: any) => {
@@ -2447,8 +2605,12 @@ export default function OrchestratorPage() {
                     </Chip>
                   </div>
                   <p className="text-xs text-gray-500">{t("创建：{time}", { time: formatTime(task.createdTime) })}</p>
+                  <DiagnosticSummaryPanel task={task} onShowResult={showTaskResult} />
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="flat" onPress={() => showTaskScript(task)}>{t("脚本")}</Button>
+                    {task.resultJson && (
+                      <Button size="sm" variant="flat" onPress={() => showTaskResult(task)}>{t("原始结果")}</Button>
+                    )}
                     {["failed", "timeout"].includes(task.state) && (
                       <Button size="sm" variant="flat" color="warning" onPress={() => retryTask(task)}>{t("重试")}</Button>
                     )}

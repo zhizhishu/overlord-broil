@@ -548,6 +548,8 @@ The master can also generate agent maintenance tasks from each server card:
 
 Failed or timed-out deployment tasks can be retried from the task card. The retry creates a new `generated` task with the same script and a `retryFromTaskId` record, so the original failure log remains intact.
 
+Certificate, firewall and install diagnostics also write structured `diagnostics.items` into the task result. The master task card summarizes failures and warnings first, so operators can see causes such as DNS not resolving, local port `80` occupancy, missing certificate files, missing ACME tools or cloud-firewall confirmation without opening raw logs. The raw result button remains available for full stdout/stderr evidence.
+
 Useful agent reliability knobs:
 
 ```bash
@@ -591,7 +593,7 @@ Click `生成一键任务`. The master creates one deployment task per selected 
 
 The one-click 3x-ui script validates duplicate ports before it is saved and requires a running systemd host because upstream 3x-ui ships systemd service units. Use Debian, Ubuntu, Rocky Linux or Oracle Linux for full 3x-ui installation/configuration. Alpine/OpenRC can still run the Flux agent, Snell node tasks and remote forwarding tasks, but the full 3x-ui install step is intentionally blocked with a clear preflight error.
 
-ACME HTTP mode requires the domain DNS to point at the target server and port `80` to be reachable. The current script uses standalone HTTP validation and expects the host firewall/cloud firewall to allow the challenge traffic. Use `Agent / 证书诊断` and `Agent / 防火墙诊断` before retrying failed ACME tasks; the report calls out DNS, port occupancy, local firewall and cloud-firewall boundaries explicitly.
+ACME HTTP mode requires the domain DNS to point at the target server and port `80` to be reachable. The current script uses standalone HTTP validation and expects the host firewall/cloud firewall to allow the challenge traffic. Use `Agent / 证书诊断` and `Agent / 防火墙诊断` before retrying failed ACME tasks; the task card calls out DNS, port occupancy, certificate-file, local firewall and cloud-firewall boundaries explicitly.
 
 ### 6. Manage unified protocol nodes
 

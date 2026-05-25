@@ -371,3 +371,22 @@
 - README、中文 README 和 Release Notes 已同步说明结构化节点表单、配置体检和高级 JSON 预览范围。
 - 本地验证：`vite-frontend npm run build` 通过；`git diff --check` 通过。Vite 仍保留既有 `site.ts` 动静态混合导入 chunk 提示，不影响本轮构建。
 - 2026-05-24 12:16:30 追加：已推送 `origin/future` 提交 `554dc29`；GitHub Actions `CI` run `26370288360` 已通过，`Docker Images` run `26370288342` 已通过。
+
+## 2026-05-24 证书与防火墙诊断产品化计划
+
+### 本轮计划（创建于: 2026-05-24 12:19:30）
+
+1. 结构化诊断输出：增强 agent maintenance 脚本，让 `cert-diagnose` / `firewall-diagnose` / `install-diagnose` 把 DNS、80 端口、证书文件、ACME 工具、防火墙命令、云防火墙提示等诊断项写入 `FLUX_AGENT_RESULT_JSON`。
+2. 主控 UI 呈现：在部署任务卡上解析 `resultJson.diagnostics.items`，用紧凑状态 chip 展示 “DNS 未解析 / 80 端口被占用 / 证书域名缺失 / 云安全组需检查”等结论，保留原始脚本日志入口。
+3. 文档同步：README、中文 README、Release Notes 说明诊断结果已从日志升级为结构化任务摘要。
+4. 验证与推送：运行后端/前端可用构建、agent mock 或脚本语法检查、`git diff --check`，推送 `origin/future` 并观察 GitHub Actions。
+
+- [x] ~~**目标:** 产品化 ACME/DNS/80 端口/防火墙/证书诊断结构化结果和主控任务卡展示，并推送 `future` 分支~~ (创建于: 2026-05-24 12:19:30 | **完成于: 2026-05-24 16:54:17**)
+
+### 2026-05-24 16:54:17 进度记录
+
+- 后端 agent maintenance 脚本生成逻辑已新增结构化诊断项：`cert-diagnose`、`firewall-diagnose`、`install-diagnose` 会把 DNS 解析、DNS 指向不一致、80 端口占用、证书文件缺失、ACME 工具缺失、防火墙工具状态、云安全组检查提示等写入 `FLUX_AGENT_RESULT_JSON.diagnostics.items`。
+- 主控 `/orchestrator` 部署任务卡已能解析 `resultJson.diagnostics.items`，用摘要和状态 chip 展示可读结论，并保留“原始结果 / 查看原始结果”入口，方便继续排查完整 stdout/stderr。
+- README、中文 README、Operations 和 Release Notes 已同步说明：安装/证书/防火墙诊断会先给结构化摘要，再保留原始日志。
+- 本地验证：`vite-frontend npm run build` 通过；Docker Maven JDK21 `mvn -B -DskipTests package` 通过；提权 Git Bash 路径下 `bash -n scripts/*.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh` 通过；`git diff --check` 通过。Vite 仍保留既有 `site.ts` 动静态混合导入 chunk 提示，不影响构建。
+- 环境限制：普通 Git Bash 在当前 Windows 会话中仍会偶发 `couldn't create signal pipe, Win32 error 5`；本轮改用已批准的提权 Git Bash 路径完成脚本验证。

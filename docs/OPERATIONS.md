@@ -182,6 +182,8 @@ Remote maintenance from the master panel:
 
 Failed or timed-out deployment tasks should be retried from the task card rather than edited in place. The retry endpoint creates a new `generated` task with the same script and stores `retryFromTaskId` in `request_json`, so the original stdout/stderr remains auditable.
 
+Install, certificate and firewall diagnostics write structured `diagnostics.items` into the task result. The master task card summarizes the highest-risk findings first: unresolved DNS, local port `80` occupancy, missing certificate files, missing ACME tooling, local firewall command availability and the cloud-security-group boundary. Use `原始结果` on the same card when you need the full stdout/stderr evidence.
+
 ## First-Run Operator Path
 
 The master control center includes a first-run setup guide for new operators. Treat it as the shortest safe path from an empty panel to a usable multi-server control plane:
@@ -206,7 +208,7 @@ The master control center includes a first-run setup guide for new operators. Tr
 - For each controlled server, rotate the agent token after handoff or suspected exposure.
 - Verify agent heartbeats before sending orchestration, Snell or forwarding tasks.
 - Send full 3x-ui install/configure orchestration only to normal systemd hosts. Alpine/OpenRC controlled hosts can run agent, Snell and forwarding tasks, but the upstream 3x-ui installation path is blocked by preflight.
-- For ACME HTTP certificate mode, run `Agent / 证书诊断` and `Agent / 防火墙诊断` before retrying. The report should distinguish DNS not resolving, local port `80` occupancy, local firewall rules and cloud security-group exposure.
+- For ACME HTTP certificate mode, run `Agent / 证书诊断` and `Agent / 防火墙诊断` before retrying. The task card should distinguish DNS not resolving, local port `80` occupancy, certificate-file state, local firewall rules and cloud security-group exposure.
 - Verify duplicate protocol and forwarding ports before deploying to a shared host.
 - Review task stdout/stderr before retrying failed deployment tasks.
 - Review `监控告警` after every orchestration batch; acknowledge only after the remote service, certificate, task or traffic condition has been checked.
