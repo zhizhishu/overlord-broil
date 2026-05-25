@@ -217,6 +217,28 @@ export interface RuntimeProviderAssignment {
   relatedProviders: string[];
 }
 
+export interface RuntimeState {
+  providerKey?: string;
+  providerName?: string;
+  protocol?: string;
+  action?: string;
+  taskState?: string;
+  status?: string;
+  statusSource?: string;
+  serviceStatuses?: Record<string, string>;
+  nodeCount?: number;
+  forwardRuleCount?: number;
+  certificateStatus?: string;
+  certificateDomain?: string;
+  diagnosticSummary?: {
+    ok?: number;
+    warning?: number;
+    fail?: number;
+    total?: number;
+  };
+  updatedAt?: number;
+}
+
 export interface DeployTask {
   id: number;
   serverId: number;

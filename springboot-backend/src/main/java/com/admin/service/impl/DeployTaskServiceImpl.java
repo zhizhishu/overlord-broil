@@ -1,6 +1,7 @@
 package com.admin.service.impl;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.admin.common.dto.AgentTaskClaimDto;
 import com.admin.common.dto.AgentTaskReportDto;
@@ -451,7 +452,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         DeployTask task = new DeployTask();
         task.setId(exists.getId());
         task.setState(state);
-        task.setResultJson(buildAgentResultJson(dto, exists));
+        task.setResultJson(buildAgentResultJson(dto, exists, state));
         task.setUpdatedTime(now);
         if (STATE_RUNNING.equals(state) && exists.getStartedTime() == null) {
             task.setStartedTime(now);
@@ -500,7 +501,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         return null;
     }
 
-    private String buildAgentResultJson(AgentTaskReportDto dto, DeployTask task) {
+    private String buildAgentResultJson(AgentTaskReportDto dto, DeployTask task, String state) {
         String resultJson;
         if (dto.getResultJson() != null && !dto.getResultJson().trim().isEmpty()) {
             resultJson = dto.getResultJson();
@@ -512,10 +513,10 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             result.put("reportedAt", System.currentTimeMillis());
             resultJson = JSON.toJSONString(result);
         }
-        return attachRuntimeProviderMetadata(resultJson, task);
+        return attachRuntimeMetadata(resultJson, task, state);
     }
 
-    private String attachRuntimeProviderMetadata(String resultJson, DeployTask task) {
+    private String attachRuntimeMetadata(String resultJson, DeployTask task, String taskState) {
         if (task == null) {
             return resultJson;
         }
@@ -523,18 +524,203 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         if (provider == null) {
             return resultJson;
         }
+        JSONObject result;
         try {
-            JSONObject result = JSON.parseObject(resultJson);
-            if (!result.containsKey("runtimeProvider")) {
-                result.put("runtimeProvider", provider);
-            }
-            return JSON.toJSONString(result);
+            result = JSON.parseObject(resultJson);
         } catch (Exception ignored) {
-            Map<String, Object> result = new LinkedHashMap<>();
+            result = new JSONObject();
             result.put("rawResultJson", resultJson);
-            result.put("runtimeProvider", provider);
             result.put("reportedAt", System.currentTimeMillis());
-            return JSON.toJSONString(result);
+        }
+        if (!result.containsKey("runtimeProvider")) {
+            result.put("runtimeProvider", provider);
+        }
+        if (!result.containsKey("runtimeState")) {
+            result.put("runtimeState", buildRuntimeState(result, task, provider, taskState));
+        }
+        return JSON.toJSONString(result);
+    }
+
+    private JSONObject buildRuntimeState(JSONObject result,
+                                         DeployTask task,
+                                         RuntimeProviderAssignment provider,
+                                         String taskState) {
+        JSONObject runtimeState = new JSONObject();
+        runtimeState.put("providerKey", provider.getKey());
+        runtimeState.put("providerName", provider.getName());
+        runtimeState.put("protocol", task.getProtocol());
+        runtimeState.put("action", task.getAction());
+        runtimeState.put("taskState", normalizeTaskStateForAudit(taskState));
+
+        JSONObject serviceStatuses = result.getJSONObject("services");
+        if (serviceStatuses != null && !serviceStatuses.isEmpty()) {
+            runtimeState.put("serviceStatuses", serviceStatuses);
+        }
+
+        JSONArray protocolNodes = result.getJSONArray("protocolNodes");
+        if (protocolNodes != null) {
+            runtimeState.put("nodeCount", protocolNodes.size());
+        }
+
+        JSONArray forwardRules = result.getJSONArray("forwardRules");
+        if (forwardRules != null) {
+            runtimeState.put("forwardRuleCount", forwardRules.size());
+        }
+
+        JSONObject certificate = result.getJSONObject("certificate");
+        if (certificate != null) {
+            runtimeState.put("certificateStatus", certificate.getString("status"));
+            runtimeState.put("certificateDomain", certificate.getString("domain"));
+        }
+
+        JSONObject diagnosticSummary = summarizeDiagnostics(result.getJSONObject("diagnostics"));
+        if (diagnosticSummary != null) {
+            runtimeState.put("diagnosticSummary", diagnosticSummary);
+        }
+
+        RuntimeStatus runtimeStatus = resolveRuntimeStatus(provider, taskState, serviceStatuses,
+                protocolNodes, forwardRules, certificate, diagnosticSummary);
+        runtimeState.put("status", runtimeStatus.status);
+        runtimeState.put("statusSource", runtimeStatus.source);
+        runtimeState.put("updatedAt", System.currentTimeMillis());
+        return runtimeState;
+    }
+
+    private RuntimeStatus resolveRuntimeStatus(RuntimeProviderAssignment provider,
+                                               String taskState,
+                                               JSONObject serviceStatuses,
+                                               JSONArray protocolNodes,
+                                               JSONArray forwardRules,
+                                               JSONObject certificate,
+                                               JSONObject diagnosticSummary) {
+        String normalizedTaskState = normalizeTaskStateForAudit(taskState);
+        if (STATE_FAILED.equals(normalizedTaskState) || STATE_TIMEOUT.equals(normalizedTaskState)) {
+            return new RuntimeStatus(normalizedTaskState, "task");
+        }
+        String providerKey = provider.getKey();
+        String serviceStatus = providerServiceStatus(providerKey, serviceStatuses);
+        if (notBlank(serviceStatus)) {
+            return new RuntimeStatus(serviceStatus, "services." + providerKey);
+        }
+        String nodeState = commonObjectState(protocolNodes, "state");
+        if (notBlank(nodeState)) {
+            return new RuntimeStatus(nodeState, "protocolNodes");
+        }
+        String forwardState = commonObjectState(forwardRules, "state");
+        if (notBlank(forwardState)) {
+            return new RuntimeStatus(forwardState, "forwardRules");
+        }
+        if (certificate != null && notBlank(certificate.getString("status"))) {
+            return new RuntimeStatus(certificate.getString("status"), "certificate.status");
+        }
+        if (diagnosticSummary != null) {
+            if (diagnosticSummary.getIntValue("fail") > 0) {
+                return new RuntimeStatus("failed", "diagnostics");
+            }
+            if (diagnosticSummary.getIntValue("warning") > 0) {
+                return new RuntimeStatus("warning", "diagnostics");
+            }
+            if (diagnosticSummary.getIntValue("ok") > 0) {
+                return new RuntimeStatus("ok", "diagnostics");
+            }
+        }
+        return new RuntimeStatus(notBlank(normalizedTaskState) ? normalizedTaskState : "unknown", "task");
+    }
+
+    private String providerServiceStatus(String providerKey, JSONObject services) {
+        if (services == null || services.isEmpty()) {
+            return null;
+        }
+        if ("xui".equals(providerKey)) {
+            String xray = services.getString("xray");
+            return notBlank(xray) ? xray : services.getString("xui");
+        }
+        if ("snell".equals(providerKey)) {
+            return services.getString("snell");
+        }
+        return services.getString(providerKey);
+    }
+
+    private String commonObjectState(JSONArray values, String fieldName) {
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+        String common = null;
+        for (Object value : values) {
+            if (!(value instanceof JSONObject)) {
+                continue;
+            }
+            String state = ((JSONObject) value).getString(fieldName);
+            if (!notBlank(state)) {
+                continue;
+            }
+            if (common == null) {
+                common = state;
+            } else if (!common.equalsIgnoreCase(state)) {
+                return "mixed";
+            }
+        }
+        return common;
+    }
+
+    private JSONObject summarizeDiagnostics(JSONObject diagnostics) {
+        if (diagnostics == null) {
+            return null;
+        }
+        JSONArray items = diagnostics.getJSONArray("items");
+        if (items == null || items.isEmpty()) {
+            return null;
+        }
+        int ok = 0;
+        int warning = 0;
+        int fail = 0;
+        for (Object item : items) {
+            if (!(item instanceof JSONObject)) {
+                continue;
+            }
+            String state = normalizeDiagnosticState(((JSONObject) item).getString("state"));
+            if ("ok".equals(state)) {
+                ok += 1;
+            } else if ("fail".equals(state)) {
+                fail += 1;
+            } else {
+                warning += 1;
+            }
+        }
+        JSONObject summary = new JSONObject();
+        summary.put("ok", ok);
+        summary.put("warning", warning);
+        summary.put("fail", fail);
+        summary.put("total", ok + warning + fail);
+        return summary;
+    }
+
+    private String normalizeDiagnosticState(String state) {
+        String normalized = state == null ? "" : state.trim().toLowerCase();
+        if (Arrays.asList("ok", "success", "succeeded", "pass", "passed").contains(normalized)) {
+            return "ok";
+        }
+        if (Arrays.asList("fail", "failed", "error", "danger", "missing").contains(normalized)) {
+            return "fail";
+        }
+        return "warning";
+    }
+
+    private String normalizeTaskStateForAudit(String state) {
+        return state == null ? null : state.trim().toLowerCase();
+    }
+
+    private boolean notBlank(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private static class RuntimeStatus {
+        private final String status;
+        private final String source;
+
+        private RuntimeStatus(String status, String source) {
+            this.status = status;
+            this.source = source;
         }
     }
 

@@ -64,6 +64,7 @@ Controlled hosts may expose business ports depending on orchestration choices:
 - Server registry, agent token generation/rotation, heartbeats, status updates, and Nano memory detection.
 - Runtime Provider registry and API for `xui`, `snell`, `forward`, `certificate`, and `firewall` task assignment.
 - Runtime Provider metadata travels through task claim/report and is stored in task result JSON for audit.
+- Runtime State is stored in `resultJson.runtimeState` and rendered on task cards, normalizing provider, protocol/action, task state, resolved status/source, services, nodes, forwarding, certificates and diagnostics.
 - One-click orchestration tasks for 3x-ui/Xray and Snell.
 - 3x-ui API integration for inbound/outbound/config/traffic/restart operations.
 - Protocol-node form flow with validation and advanced payload preview.
@@ -102,6 +103,7 @@ CI currently covers:
 - Frontend Vite build.
 - Shell syntax.
 - Agent mock tests, including Runtime Provider claim/report metadata.
+- Backend Runtime Provider / Runtime State tests for task-result audit metadata.
 - 3x-ui fixture tests.
 - Default, v4/v6 and legacy compose config.
 - Disposable compose smoke stack with the `flux-master` single image.

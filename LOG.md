@@ -53,3 +53,21 @@
   - Docker Maven `mvn -B -DskipTests package` 通过。
 - 清理：Docker 验证容器 `flux-backend-provider-audit-verify` 使用 `--rm`，无残留；agent mock 临时服务已结束；`5166/5168/6365/8066` 未发现本轮遗留监听。
 - 后续：提交并推送到 `origin/main` 和 `origin/future`，再检查 GitHub Actions 与 GHCR 镜像状态。
+
+### Runtime State Task Result Model
+
+- 完成：新增统一 `resultJson.runtimeState` 任务结果模型，让 XUI、Snell、转发、证书和防火墙任务共用一套运行时状态视图。
+- 修改：
+  - `DeployTaskServiceImpl` 保存 Agent report 时生成 `runtimeState`，包含 provider、协议/动作、任务状态、解析后的 `status/statusSource`、服务状态、节点数量、转发数量、证书状态和诊断摘要。
+  - `DeployTaskServiceImplTest` 新增服务/节点、诊断摘要和旧 Agent 兼容覆盖，验证运行时状态兜底逻辑。
+  - 前端新增 `RuntimeState` 类型，主控任务卡展示运行时状态、来源、节点/转发/证书摘要、服务 chip 和诊断摘要。
+  - README、中文 README、Operations、Release Notes 和 PROJECT_CONTEXT 补充 `runtimeState`、任务历史和 GHCR 可见性说明。
+- 验证：
+  - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
+  - Docker Maven `RuntimeProviderServiceTest,DeployTaskServiceImplTest` 通过，8 个测试全部成功。
+  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
+  - `bash scripts/test-flux-agent-mock.sh` 通过。
+  - Docker Maven `mvn -B -DskipTests package` 通过。
+  - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
+- 清理：Docker 验证容器 `flux-runtime-state-verify`、`flux-runtime-state-package` 使用 `--rm`，无残留；agent mock 临时服务已结束。
+- 后续：提交并推送 `origin/main` 和 `origin/future`，等待 GitHub Actions / GHCR 镜像结果。

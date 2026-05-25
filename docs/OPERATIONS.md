@@ -143,6 +143,8 @@ Deployment tasks carry Runtime Provider metadata so operators can see which runt
 
 Failed or timed-out deployment tasks should be retried from the task card rather than edited in place. The retry endpoint creates a new `generated` task with the same script, stores `retryFromTaskId` in `request_json`, and reattaches Runtime Provider metadata so the original stdout/stderr remains auditable.
 
+Agent reports store a normalized `resultJson.runtimeState` block beside `resultJson.runtimeProvider`. Operators should read `runtimeState.status` with `runtimeState.statusSource`: failed or timed-out task states win first, then provider service state, protocol-node state, forwarding-rule state, certificate state, diagnostic summary and finally the task state fallback. This keeps XUI, Snell, forwarding, certificate and firewall tasks comparable in the master task card.
+
 Install, certificate and firewall diagnostics write structured `diagnostics.items` into the task result. The master task card summarizes high-risk findings first: unresolved DNS, local port `80` occupancy, missing certificate files, missing ACME tooling, local firewall command availability and the cloud-security-group boundary.
 
 ## First-Run Operator Path
@@ -181,6 +183,7 @@ Release readiness means:
 - `VERSION`, `README.md`, release notes and the public docs site name the same release.
 - CI is green on `main`.
 - Docker Images workflow is green on `main` and GHCR has a fresh `flux-master` image.
+- GHCR package visibility is public or otherwise intentionally scoped, and `docker pull ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` works from the intended install environment.
 - `scripts/install-master.sh` succeeds on a clean Linux host or falls back to local source builds when GHCR pulls are unavailable.
 - `scripts/install-master-bootstrap.sh` and `scripts/install-flux-agent-bootstrap.sh` are syntax-checked.
 - `scripts/test-install-matrix.sh` passes on Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux container images.

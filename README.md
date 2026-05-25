@@ -46,6 +46,8 @@ Snell is unified at the product/node-management layer, but it is not a native Xr
 
 Runtime Provider metadata now follows the task from master claim to agent report. The agent logs the provider it executes, reports it inside `resultJson.runtimeProvider`, and the master attaches the same audit metadata when an older agent omits it.
 
+Task results also include a normalized `resultJson.runtimeState` block. It records `providerKey`, `providerName`, `protocol`, `action`, `taskState`, resolved `status`, `statusSource`, `updatedAt`, and optional summaries for service states, protocol nodes, forwarding rules, certificates and diagnostics. The control-center task card renders this block so XUI, Snell, forwarding, certificate and firewall tasks share one status model.
+
 ## UI Preview
 
 ![Flux 3x-ui Orchestrator control plane](docs/assets/flux-orchestrator-screenshot.svg)
@@ -223,6 +225,8 @@ POST /api/v1/deploy-task/retry
 POST /api/v1/agent-task/claim
 POST /api/v1/agent-task/report
 ```
+
+Agent reports store both `resultJson.runtimeProvider` and `resultJson.runtimeState`, so task history can be audited by runtime owner and by resolved service/node/diagnostic status.
 
 Profiles, nodes, forwarding and 3x-ui:
 

@@ -57,7 +57,7 @@ import {
   updateProtocolProfile,
   updateServerForwardRule
 } from "@/api";
-import type { ControlServer, DeployTask, MonitorAlert, ProtocolNode, ProtocolProfile, RuntimeProviderDescriptor, ServerForwardRule, ThreeXuiTrafficSnapshot } from "@/types";
+import type { ControlServer, DeployTask, MonitorAlert, ProtocolNode, ProtocolProfile, RuntimeProviderDescriptor, RuntimeState, ServerForwardRule, ThreeXuiTrafficSnapshot } from "@/types";
 
 interface ServerForm {
   id?: number;
@@ -202,6 +202,7 @@ type RuleHealth = Exclude<RuleHealthFilter, "all">;
 type SetupStepState = "done" | "active" | "todo" | "warning";
 type FormCheckState = "ok" | "warning" | "missing";
 type DiagnosticState = "ok" | "warning" | "fail";
+type StatusColor = "default" | "primary" | "secondary" | "success" | "warning" | "danger";
 type AgentMaintenanceAction =
   | "doctor"
   | "logs"
@@ -487,6 +488,19 @@ const deployTaskResultPayload = (task: DeployTask) => {
   return parseEmbeddedAgentResult((parsed as any).stdout) || parsed;
 };
 
+const taskRuntimeState = (task: DeployTask): RuntimeState | null => {
+  const parsed = safeJsonParse(task.resultJson);
+  const directState = parsed && typeof parsed === "object" ? (parsed as any).runtimeState : null;
+  if (directState && typeof directState === "object" && !Array.isArray(directState)) {
+    return directState as RuntimeState;
+  }
+  const payload = deployTaskResultPayload(task);
+  const runtimeState = (payload as any)?.runtimeState;
+  return runtimeState && typeof runtimeState === "object" && !Array.isArray(runtimeState)
+    ? runtimeState as RuntimeState
+    : null;
+};
+
 const normalizeDiagnosticState = (value: unknown): DiagnosticState => {
   const normalized = String(value || "").toLowerCase();
   if (["ok", "success", "succeeded", "pass", "passed"].includes(normalized)) return "ok";
@@ -620,10 +634,83 @@ const diagnosticColor = (state: DiagnosticState) => {
   return "warning";
 };
 
+const runtimeStateColor = (status?: string): StatusColor => {
+  if (!status) return "default";
+  const normalized = status.toLowerCase();
+  if (["active", "valid", "running", "healthy", "ok", "success", "succeeded", "synced"].includes(normalized)) return "success";
+  if (["mixed", "warning", "expiring", "unknown", "not-installed", "pending", "generated", "claimed"].includes(normalized)) return "warning";
+  return "danger";
+};
+
 const diagnosticLabel = (state: DiagnosticState, t: (message: string, params?: Record<string, string | number>) => string) => {
   if (state === "ok") return t("正常");
   if (state === "fail") return t("异常");
   return t("提醒");
+};
+
+const RuntimeStatePanel = ({ task }: { task: DeployTask }) => {
+  const { t } = useLanguage();
+  const state = taskRuntimeState(task);
+  if (!state) return null;
+
+  const serviceEntries = Object.entries(state.serviceStatuses || {}).filter(([, value]) => value);
+  const diagnostic = state.diagnosticSummary;
+  const nodeCount = typeof state.nodeCount === "number" ? state.nodeCount : null;
+  const forwardRuleCount = typeof state.forwardRuleCount === "number" ? state.forwardRuleCount : null;
+  const certificateText = [state.certificateStatus, state.certificateDomain].filter(Boolean).join(" ");
+
+  return (
+    <div className="rounded-small border border-default-200 bg-default-50/70 p-3 text-xs dark:bg-default-100/5">
+      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-gray-900 dark:text-white">{t("运行时状态")}</p>
+          <p className="truncate text-xs text-gray-500">
+            {state.providerName || state.providerKey || task.runtimeProvider?.name || task.protocol} · {state.protocol || task.protocol} / {state.action || task.action}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {state.providerKey && <Chip size="sm" variant="flat">{state.providerKey}</Chip>}
+          <Chip size="sm" variant="flat" color={runtimeStateColor(state.status) as any}>{state.status || state.taskState || "-"}</Chip>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <div className="rounded-small border border-default-200 bg-white px-2.5 py-2 dark:bg-default-50/5">
+          <p className="text-gray-500">{t("来源")}</p>
+          <p className="truncate font-medium text-gray-900 dark:text-white">{state.statusSource || "-"}</p>
+        </div>
+        <div className="rounded-small border border-default-200 bg-white px-2.5 py-2 dark:bg-default-50/5">
+          <p className="text-gray-500">{t("节点")}</p>
+          <p className="font-medium text-gray-900 dark:text-white">{nodeCount ?? "-"}</p>
+        </div>
+        <div className="rounded-small border border-default-200 bg-white px-2.5 py-2 dark:bg-default-50/5">
+          <p className="text-gray-500">{t("转发")}</p>
+          <p className="font-medium text-gray-900 dark:text-white">{forwardRuleCount ?? "-"}</p>
+        </div>
+        <div className="rounded-small border border-default-200 bg-white px-2.5 py-2 dark:bg-default-50/5">
+          <p className="text-gray-500">{t("证书")}</p>
+          <p className="truncate font-medium text-gray-900 dark:text-white">{certificateText || "-"}</p>
+        </div>
+      </div>
+      {(serviceEntries.length > 0 || diagnostic) && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {serviceEntries.map(([name, status]) => (
+            <Chip key={name} size="sm" variant="flat" color={runtimeStateColor(status) as any}>
+              {name} {status}
+            </Chip>
+          ))}
+          {diagnostic && (
+            <Chip size="sm" variant="flat" color={(diagnostic.fail || 0) > 0 ? "danger" : (diagnostic.warning || 0) > 0 ? "warning" : "success"}>
+              {t("诊断 {fail}/{warning}/{ok}", {
+                fail: diagnostic.fail || 0,
+                warning: diagnostic.warning || 0,
+                ok: diagnostic.ok || 0
+              })}
+            </Chip>
+          )}
+        </div>
+      )}
+    </div>
+  );
 };
 
 const DiagnosticSummaryPanel = ({ task, onShowResult }: { task: DeployTask; onShowResult: (task: DeployTask) => void }) => {
@@ -2764,6 +2851,7 @@ export default function OrchestratorPage() {
                     </div>
                   )}
                   <p className="text-xs text-gray-500">{t("创建：{time}", { time: formatTime(task.createdTime) })}</p>
+                  <RuntimeStatePanel task={task} />
                   <DiagnosticSummaryPanel task={task} onShowResult={showTaskResult} />
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="flat" onPress={() => showTaskScript(task)}>{t("脚本")}</Button>

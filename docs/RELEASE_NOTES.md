@@ -25,6 +25,7 @@ This release moves the project from the first public production milestone into a
 - Future branch update: added Nano controlled-server detection from agent heartbeat memory totals. The master stores `nano-critical` below `200 MB`, `nano` below `256 MB`, `small` below `512 MB`, raises low-memory alerts and blocks full 3x-ui/Xray orchestration plus Xray protocol-node creation on `nano-critical` hosts.
 - Future branch update: added the Runtime Provider registry for `xui`, `snell`, `forward`, `certificate` and `firewall`; deployment tasks now expose provider metadata to the master UI and controlled-agent claim payloads.
 - Future branch update: connected Runtime Provider metadata through the controlled-agent execution report path. Agents log and report the claimed provider, while the master attaches provider audit metadata to stored task results when older agents omit it.
+- Future branch update: added normalized `resultJson.runtimeState` to task results and the master task card. Runtime status now records provider, protocol/action, task state, resolved status/source, service states, node/forward counts, certificate state and diagnostic summaries in one model.
 
 ### 0.6.0 Capability Matrix
 
@@ -40,7 +41,7 @@ This release moves the project from the first public production milestone into a
 | Diagnostic UI | Future branch shows structured task-card diagnostics for install, ACME/certificate and firewall checks, with raw result access retained. |
 | Legacy forwarding UI | Future branch translates the main forwarding workflows through the shared `zh-CN` / `en-US` dictionary and unifies empty/failure/status wording. |
 | Nano controlled hosts | Agent heartbeat reports total memory; the master badges low-memory servers and keeps sub-200 MB hosts on Snell or remote-forwarding paths. |
-| Runtime Provider audit | Task claim/report results carry provider metadata for `xui`, `snell`, `forward`, `certificate` and `firewall`, giving the master a stable audit trail across agent versions. |
+| Runtime Provider / Runtime State audit | Task claim/report results carry provider metadata and normalized runtime state for `xui`, `snell`, `forward`, `certificate` and `firewall`, giving the master a stable audit trail across agent versions. |
 | Linux coverage | Docker/CI diagnostics cover Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux userspaces. |
 | 3x-ui | API fixture remains API-level; full 3x-ui install/configure still targets systemd hosts. |
 | Snell | Product-level protocol node with separate systemd/OpenRC runtime, not a native Xray/3x-ui core protocol. |
