@@ -2,9 +2,9 @@
 
 [English README](README.md)
 
-Flux 3x-ui Orchestrator 是一个基于 Flux Panel UI 和转发面板能力演进出来的主控/被控面板。目标是让一个主控面板统一管理多台服务器上的 3x-ui、Xray、Reality、Snell、远端端口转发、证书状态、流量同步和 agent 运维任务。
+Flux 3x-ui Orchestrator 是一个独立的主控 / 被控运维面板。它以 Flux Panel 的 UI 方向和转发面板能力为基础，融合 3x-ui / Xray / Reality、Snell、远端端口转发、证书、防火墙、流量同步和多服务器 Agent 运维。
 
-本项目是独立项目，不会向上游 Flux Panel 作者仓库提交 PR。上游仓库只作为 UI 和转发面板基础参考。
+当前版本：`0.6.0`，定位为公开试用 / 正式候选版本。它适合自用、小规模授权服务器和公开展示，但还不是承诺长期兼容的 `1.0` 商业级稳定版。
 
 项目站点：
 
@@ -13,236 +13,243 @@ https://zhizhishu.github.io/flux-3xui-orchestrator/
 https://zhizhishu.github.io/
 ```
 
-当前版本：`0.6.0`，定位是公开试用 / 可靠性候选版。可以用于自用和小规模授权服务器测试，但还不是承诺长期兼容的 `1.0` 商业级正式版。
+## 核心架构
 
-## UI 语言
+默认运行形态是 `flux-master` 单体主控镜像：
 
-当前控制台默认是中文 UI，并已加入 `zh-CN` / `en-US` 语言切换。切换按钮在主布局、H5 布局和公共导航中可见，语言会写入浏览器本地存储，并同步更新页面 `lang`。
+```text
+用户浏览器 / 被控 Agent
+        |
+        v
+flux-master :5166
+  - 内置 Web UI
+  - API
+  - 任务引擎
+  - 状态同步
+  - Runtime Provider 层
+        |
+        v
+MySQL Docker 内网
+```
 
-目前中英文切换已覆盖主控中心、服务器卡片、一键编排、3x-ui 入站/出站、Snell 节点、远端转发、Agent 诊断/日志/升级、主导航、密码弹窗，以及旧 Flux 转发页面的主流程。
+Runtime Provider 层把不同运行时统一到同一套任务和 UI 模型：
 
-## UI 预览
+| Provider | 作用 | 执行方式 | Nano 主机 |
+| --- | --- | --- | --- |
+| `xui` | 3x-ui / Xray / Reality / 入站 / 出站 / 流量 | 主控 API + Agent 任务 | 不建议 |
+| `snell` | Snell 节点服务 | Agent 任务 | 支持 |
+| `forward` | TCP/UDP 远端端口转发 | Agent 任务 | 支持 |
+| `certificate` | 自签 / ACME / 证书诊断 | Agent 任务 | 视任务而定 |
+| `firewall` | 防火墙诊断和运行时端口放行 | Agent 任务 | 支持 |
 
-![Flux 3x-ui Orchestrator 主控工作台](docs/assets/flux-orchestrator-screenshot.svg)
+Snell 已统一到产品层的“协议节点”管理里，但它不是 Xray 或 3x-ui 的原生协议。底层仍然由 Agent 在被控服务器上部署独立 Snell 服务，这样更符合 Snell 的实际运行方式。
 
-UI 方向继续贴近 Flux Panel：信息密度高、服务器卡片清晰、操作分组明确、状态 chip 紧凑、规则视图统一。它不是落地页，而是运维控制台：选择一台或多台服务器，然后生成 agent 任务、管理 3x-ui 出入站、部署 Snell、同步流量、查看证书和服务状态。
+## UI 方向
 
-主控中心已经加入首次配置向导，会按 `登记服务器 -> 安装被控 agent -> 编排 3x-ui / Snell -> 同步规则与流量 -> 发布前检查` 串起首次上手流程。向导按钮会直接打开添加服务器、查看 Token、一键编排、同步流量和刷新告警等操作。
+UI 继续靠近 Flux Panel：高信息密度、服务器卡片、操作分组、状态 chip、统一规则视图。它不是营销落地页，而是运维控制台。
 
-协议节点创建现在默认走结构化表单，不再把大段 JSON 直接压给用户。弹窗顶部会做配置体检，检查目标服务器、端口复用、UUID/密码、Reality 关键字段、Snell PSK/版本和 outbound tag；生成的 inbound payload 仍保留在高级预览里，排查 3x-ui 字段时再展开。
+![Flux 3x-ui Orchestrator 主控预览](docs/assets/flux-orchestrator-screenshot.svg)
 
-## 已覆盖能力
+当前主控 UI 包含：
 
-- 主控面板：
-  - Docker Compose 一键安装。
-  - MySQL、后端、前端、可选 phpMyAdmin。
-  - 服务器注册、Token 生成/轮换、心跳、状态回写。
-  - 主控自控保护，避免误操作破坏主控端口和核心服务。
-- 被控 agent：
-  - systemd/OpenRC 常驻安装。
-  - `claim/report` 任务通道。
-  - Snell、3x-ui 编排、远端转发和 agent 维护任务。
-  - 远程诊断、日志、重启、升级、卸载、失败任务重试、一键修复。
-  - 安装诊断、证书诊断、防火墙诊断，会明确提示 `DNS 未解析`、`80 端口被占用`、云安全组需放行等问题。
-- 3x-ui / Xray：
-  - 连接测试。
-  - 入站列表、新增、更新、删除。
-  - 客户端操作、流量重置、Xray 配置读取、出站读取、Xray 重启。
-  - 3x-ui 流量快照同步到本地数据库。
-- Snell：
-  - 作为产品层统一协议节点管理。
-  - 通过 agent 在被控服务器上安装为 systemd/OpenRC 服务。
-  - 与 Xray/Reality 节点一起进入节点和规则视图。
-  - 节点创建表单会检查 PSK、端口和版本，减少直接编辑 JSON 的误操作。
-- 远端端口转发：
-  - 通过 `socat` + systemd/OpenRC 创建远端转发服务。
-  - 纳入统一规则视图。
-- 验证：
-  - 后端 Maven 构建。
-  - 前端 Vite 构建。
-  - agent mock。
-  - 3x-ui API fixture。
-  - Docker Compose smoke。
-  - Debian / Ubuntu / Alpine / Rocky Linux / Oracle Linux 安装矩阵预检。
+- 服务器注册、Token、心跳、状态卡片
+- 3x-ui / Xray 入站、出站、配置、流量和重启
+- Snell 节点创建、重启和卸载
+- 远端端口转发规则
+- Runtime Provider 可视化入口
+- Agent 诊断、日志、重启、升级、卸载和一键修复
+- 监控告警和统一规则中心
+- `zh-CN` / `en-US` 语言切换
+
+## 默认端口
+
+主控默认只暴露一个公网入口：
+
+| 端口 | 用途 | 默认是否暴露 |
+| --- | --- | --- |
+| `5166/tcp` | 主控 Web UI、API、Agent 回调 | 是 |
+| `6365/tcp` | 后端调试别名 | 否，仅 `FLUX_EXPOSE_BACKEND=1` 时暴露 |
+| `3306/tcp` | MySQL | 否，仅 Docker 内网 |
+| phpMyAdmin | 临时维护 | 否，仅设置 `FLUX_PHPMYADMIN_PORT` 时暴露 |
+
+被控服务器不需要暴露 Agent 管理端口。Agent 主动连接主控，例如：
+
+```text
+http://MASTER_IP:5166
+```
+
+被控服务器只会根据你创建的业务节点暴露端口，例如：
+
+- 3x-ui 面板端口，默认建议 `5168`
+- Xray / Reality 入站端口
+- Snell 监听端口
+- 远端转发监听端口
+- ACME HTTP 模式需要的 `80/tcp`
 
 ## 一键安装主控
-
-默认使用 GitHub Actions 构建的 GHCR 镜像：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash
 ```
 
-Alpine 或极简系统没有 `bash` 时，先用 POSIX bootstrap：
+Alpine 或极简系统没有 `bash` 时：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master-bootstrap.sh | sudo sh
 ```
 
-安装前建议先跑预检：
+安装前预检：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
   | sudo bash -s -- doctor
 ```
 
-常用端口：
-
-| 端口 | 组件 | 说明 |
-| --- | --- | --- |
-| `5166` | 主控面板和 agent 回调统一入口 | 默认唯一公网入口，可用 `FLUX_FRONTEND_PORT` 修改；前端 Nginx 会把 `/api/v1/*` 反代到 Docker 内网后端 |
-| 内部 | 后端 API | 容器内 `6365`，默认不发布到宿主机；只有调试直连 API 时才设置 `FLUX_EXPOSE_BACKEND=1` |
-| 默认不暴露 | phpMyAdmin | 容器内部服务；需要临时维护时才设置 `FLUX_PHPMYADMIN_PORT` 或 `--phpmyadmin-port` 暴露 |
-| `3306` | MySQL | 默认只在容器内部使用，不发布到宿主机 |
-
-被控服务器还会根据你的编排选择产生额外端口：3x-ui 面板默认 `5168`、Xray 入站端口、Snell 监听端口、远端转发监听端口，以及 ACME HTTP 模式需要的 `80` 端口。
-
-超小内存被控会由 agent 心跳自动识别：低于 `256 MB` 会在主控显示 `Nano 被控`，低于 `200 MB` 会阻止完整 3x-ui/Xray 一键编排和 Xray 入站节点创建。这个档位仍建议跑轻量 agent、Snell 或远端端口转发；如果确实要跑 3x-ui/Xray，请先开启 swap 并换到更大的机器。
-
-推荐公网防火墙基线：
-
-| 范围 | 推荐放行 |
-| --- | --- |
-| 主控面板用户访问和被控 agent 回调 | `5166/tcp` |
-| ACME HTTP 验证 | 仅使用 `acme-http` 的域名/主机放行 `80/tcp` |
-| 被控节点业务端口 | 只放行你实际选择的 3x-ui 面板、Xray 入站、Snell、远端转发端口 |
-| 内部服务 | 后端 `6365`、MySQL `3306`、phpMyAdmin 默认不暴露 |
-
-默认 Docker Compose 只会看到一个 `0.0.0.0:5166->5166/tcp` 的主控公网映射。被控 agent 的 `FLUX_PANEL_URL` 也填这个统一入口，例如 `http://your-master-panel:5166`，不要再填 `6365`。
-
-如果临时调试需要直连后端 API：
+常用参数：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo env FLUX_EXPOSE_BACKEND="1" FLUX_BACKEND_PORT="6365" bash
+  | sudo env FLUX_FRONTEND_PORT="5166" FLUX_NETWORK_STACK="v4" bash
 ```
 
-如果确实需要临时打开 phpMyAdmin：
+升级、备份、恢复、卸载：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo env FLUX_PHPMYADMIN_PORT="18066" bash
+sudo bash /opt/flux-3xui-orchestrator/install-master.sh upgrade
+sudo bash /opt/flux-3xui-orchestrator/install-master.sh backup
+sudo bash /opt/flux-3xui-orchestrator/install-master.sh restore --backup-file /opt/flux-3xui-orchestrator/backups/flux-master-backup-YYYYMMDD-HHMMSS.tar.gz
+sudo bash /opt/flux-3xui-orchestrator/install-master.sh uninstall --yes
 ```
 
-## 安装被控 agent
+## 安装被控 Agent
 
-先在主控面板的 `主控中心` 创建服务器，点击服务器卡片上的 `Token`，拿到 `FLUX_SERVER_ID` 和 `FLUX_AGENT_TOKEN`。
+先在主控的“主控中心”创建服务器，点击服务器卡片上的 `Token` 获取 `FLUX_SERVER_ID` 和 `FLUX_AGENT_TOKEN`。
 
 然后在被控服务器执行：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
-  | sudo env FLUX_PANEL_URL="http://your-master-panel:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash
+  | sudo env FLUX_PANEL_URL="http://MASTER_IP:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash
 ```
 
 Alpine 或极简系统：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent-bootstrap.sh \
-  | sudo env FLUX_PANEL_URL="http://your-master-panel:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" sh
+  | sudo env FLUX_PANEL_URL="http://MASTER_IP:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" sh
 ```
 
 被控端预检：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
-  | sudo env FLUX_PANEL_URL="http://your-master-panel:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
+  | sudo env FLUX_PANEL_URL="http://MASTER_IP:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
 ```
 
-agent 心跳会上报 CPU、内存使用率、总内存 MB、3x-ui/Xray/Snell 服务状态、证书状态和最近错误。主控会把总内存分成 `nano-critical`（低于 `200 MB`）、`nano`（低于 `256 MB`）、`small`（低于 `512 MB`）和 `standard`，并在低内存服务器卡片、一键编排弹窗和告警里提示风险。
+Agent 安装后会通过 systemd 或 OpenRC 常驻运行，主动向主控拉取任务、在本机执行、再回报结果。
 
-## 数据库升级
+## 怎么用
 
-全新安装直接导入 `gost.sql` 即可。已经跑过旧版 3x-ui 主控的数据库，如果还没有 Nano 字段，执行：
+1. 安装主控，打开 `http://MASTER_IP:5166`。
+2. 登录后台，进入“主控中心”。
+3. 创建服务器，获取 Agent 安装命令。
+4. 在被控服务器安装 Agent，等待心跳在线。
+5. 选择一台或多台服务器，执行一键编排：
+   - 安装或复用 3x-ui
+   - 创建 VLESS Reality、VMess WebSocket、Trojan TLS、Shadowsocks 节点
+   - 部署 Snell 节点
+   - 申请或配置证书
+   - 同步规则和流量
+6. 后续在服务器卡片中管理入站、出站、Snell、转发、证书、防火墙和 Agent 运维任务。
 
-```sql
-ALTER TABLE `control_server`
-  ADD COLUMN `memory_total_mb` bigint(20) DEFAULT NULL AFTER `memory_usage`,
-  ADD COLUMN `low_memory_mode` int(1) NOT NULL DEFAULT '0' AFTER `memory_total_mb`,
-  ADD COLUMN `low_memory_profile` varchar(30) DEFAULT NULL AFTER `low_memory_mode`,
-  ADD COLUMN `low_memory_advice` varchar(512) DEFAULT NULL AFTER `low_memory_profile`;
+## 低内存服务器
+
+Agent 心跳会上报总内存。主控会自动识别低内存档位：
+
+| 档位 | 内存 | 策略 |
+| --- | --- | --- |
+| `nano-critical` | `< 200 MB` | 阻止完整 3x-ui / Xray 编排，建议 Snell 或端口转发 |
+| `nano` | `< 256 MB` | 显示 Nano 提醒，谨慎创建重运行时任务 |
+| `small` | `< 512 MB` | 建议开启 swap 后再跑复杂节点 |
+| `standard` | `>= 512 MB` | 正常路径 |
+
+## 支持系统
+
+| 目标 | Debian / Ubuntu | Rocky / Oracle Linux | Alpine / OpenRC |
+| --- | --- | --- | --- |
+| 主控 Docker 栈 | 支持 | 支持 | 支持 bootstrap |
+| Agent 服务 | systemd | systemd | OpenRC |
+| Snell 节点 | systemd | systemd | OpenRC |
+| 远端转发 | systemd + `socat` | systemd + `socat` | OpenRC + `socat` |
+| 完整 3x-ui 安装配置 | 支持 | 支持 | `0.6.0` 暂不支持 |
+
+## Docker / GHCR 镜像
+
+默认主控镜像：
+
+```text
+ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest
 ```
 
-## 主控怎么用
+遗留前后端分离镜像保留用于回滚和调试：
 
-1. 打开主控面板，登录后台。
-2. 进入 `主控中心`。
-3. 添加服务器，填写被控服务器名称、地址、3x-ui 地址/API Token 等信息。
-4. 点击 `Token`，把 agent 安装命令放到被控服务器执行。
-5. 被控服务器上线后，在主控里选择一台或多台服务器。
-6. 点击 `一键编排`：
-   - 可安装/配置 3x-ui。
-   - 可创建 VLESS Reality、VMess WebSocket、Trojan TLS、Shadowsocks。
-   - 可部署 Snell。
-   - 可配置证书模式。
-7. 后续在服务器卡片上可以继续：
-   - 看 `入站`、`出站`、`配置`、`出站流量`。
-   - `同步节点`、`同步流量`。
-   - 查看 `规则总览`。
-   - 执行 agent `诊断`、`日志`、`安装诊断`、`证书诊断`、`防火墙诊断`、`重启`、`升级`、`卸载 agent`。
-   - 点 `一键修复` 修复 3x-ui / Xray / Snell；也可以单独点 `修复 3x-ui`、`修复 Xray`、`修复 Snell`。
-   - 失败或超时的部署任务可以点 `重试`，主控会复制原脚本生成一个新任务，原失败日志保留。
+```text
+ghcr.io/zhizhishu/flux-3xui-orchestrator-backend:latest
+ghcr.io/zhizhishu/flux-3xui-orchestrator-frontend:latest
+```
 
-如果服务器卡片出现 `Nano 被控`，优先选择 Snell 或远端端口转发。低于 `200 MB` 时，主控会直接阻止 3x-ui/Xray 全栈编排和 Xray 入站节点创建，避免被控机器 OOM 后失联。
+`main` 和 `v*` tag 会推送 GHCR 镜像。`future` 分支用于验证未来能力，默认只构建检查，不覆盖正式镜像。
 
-安装诊断、证书诊断和防火墙诊断会把结构化 `diagnostics.items` 写入任务结果。主控部署任务卡会优先展示异常和提醒，例如 `DNS 未解析`、`80 端口被占用`、证书文件缺失、ACME 工具缺失、云防火墙需确认等；需要深挖时仍可点 `原始结果` 查看完整 stdout/stderr。
+## API 摘要
 
-## 发布包与 GitHub Release
+Runtime Provider：
 
-本仓库提供可下载发布包脚本：
+```text
+POST /api/v1/runtime-provider/list
+POST /api/v1/runtime-provider/resolve
+```
+
+核心任务链路：
+
+```text
+POST /api/v1/control-server/create
+POST /api/v1/control-server/list
+POST /api/v1/control-server/token
+POST /api/v1/control-server/heartbeat
+POST /api/v1/deploy-task/create
+POST /api/v1/deploy-task/orchestrate
+POST /api/v1/deploy-task/list
+POST /api/v1/deploy-task/retry
+POST /api/v1/agent-task/claim
+POST /api/v1/agent-task/report
+```
+
+节点、转发和 3x-ui：
+
+```text
+POST /api/v1/protocol-node/create
+POST /api/v1/protocol-node/list
+POST /api/v1/protocol-node/sync
+POST /api/v1/server-forward/create
+POST /api/v1/server-forward/list
+POST /api/v1/server-rule/overview
+POST /api/v1/three-xui/inbounds/list
+POST /api/v1/three-xui/outbounds
+POST /api/v1/three-xui/traffic/sync
+POST /api/v1/three-xui/restart-xray
+```
+
+## 本地验证
 
 ```bash
-bash scripts/build-release-bundle.sh --version "$(cat VERSION)"
+bash scripts/release-check.sh --full
 ```
 
-产物会写入 `dist/release/flux-3xui-orchestrator-<version>.tar.gz`，旁边生成 `.sha256` 校验文件。压缩包内带 `RELEASE_MANIFEST.txt`，包含版本号、Git commit、构建时间、主要入口脚本和默认端口说明。
+没有本机 Maven 时可以用 Docker：
 
-发布 `v*` tag 或手动触发 `Release` workflow 时，会先校验 `VERSION`，执行 `scripts/release-check.sh --full`，再构建发布包并上传到 GitHub Releases。`1.x` 之前的版本会自动标记为 prerelease。
-
-## Snell 和 3x-ui 的关系
-
-Snell 已经融合到产品层的“协议节点”管理里，所以你可以在主控里把 Snell 和 3x-ui/Xray 节点放在同一个视图里管理。
-
-但底层实现上，Snell 不是 Xray 内核协议，也不是 3x-ui 原生协议。它由 Flux agent 在被控服务器上部署成独立服务。这样做更稳，也更符合 Snell 的实际运行方式。
-
-## `future` 分支和 GHCR 镜像策略
-
-`future` 是后续正式版能力的验证分支。它会触发 GitHub Actions，做完整 CI 和 Docker 镜像构建验证。
-
-但是 `future` 不会把镜像推送到 GHCR。原因是：
-
-- `future` 是试验/验证分支，不应该覆盖或污染正式镜像。
-- GHCR 权限和包可见性通常按发布路径配置，非正式分支推送容易遇到权限拒绝。
-- 只有 `main` 和 `v*` tag 才代表正式发布入口，适合推送可被用户拉取的镜像。
-
-当前策略：
-
-| 分支/标签 | 是否构建镜像 | 是否推送 GHCR | 用途 |
-| --- | --- | --- | --- |
-| `future` | 是 | 否 | 验证未来功能能不能构建 |
-| `main` | 是 | 是 | 当前正式可安装版本 |
-| `v*` tag | 是 | 是 | 发布版本 |
-| PR | 是 | 否 | 只做检查 |
-
-## 离 1.0 正式版还差什么
-
-当前已经是可公开试用的 `0.6.0 RC`，但离长期稳定的 `1.0` 还差这些：
-
-1. 真机 VPS 矩阵：Debian、Ubuntu、Rocky Linux、Oracle Linux、Alpine 各拉真实机器，从主控安装到被控编排完整跑一遍。
-2. 真实 3x-ui E2E：现在有 API fixture，还需要真实 3x-ui 容器或 VPS 端到端烟测。
-3. 证书和防火墙诊断：任务卡已能展示 DNS、80 端口、系统防火墙、云安全组等结构化摘要；下一步还要做真实公网连通性探测和更细的云厂商指引。
-4. 安全治理：RBAC、审计日志、agent token 过期/吊销、密钥轮换、危险操作二次确认。
-5. UI 收尾：首次向导、协议节点表单体检和旧转发页面 i18n 已经补上；移动端、加载态、失败态、错误文案和任务详情还要继续打磨。
-6. 运维闭环：agent 自动升级验证、一键健康修复、远端日志保留、失败重试策略。
-
-`future` 分支下一步优先级：
-
-- P0：真实 VPS 矩阵 + 真实 3x-ui E2E。
-- P1：agent 升级、修复、日志拉取硬化。
-- P2：RBAC、审计日志、token 生命周期。
-- P3：UI/移动端/错误态继续打磨。
-
-## 本地开发验证
+```bash
+docker run --rm -v "$PWD/springboot-backend:/workspace" -w /workspace maven:3.9-eclipse-temurin-21 mvn -B -DskipTests package
+```
 
 前端：
 
@@ -252,32 +259,23 @@ npm install --legacy-peer-deps
 npm run build
 ```
 
-后端：
+## 离 1.0 还差什么
 
-```bash
-cd springboot-backend
-mvn package
-```
+- 真实 VPS 矩阵：Debian、Ubuntu、Rocky、Oracle Linux、Alpine。
+- 真实 3x-ui 容器或 VPS 端到端烟测。
+- 更完整的证书、防火墙和云安全组诊断。
+- RBAC、审计日志、Agent token 过期 / 吊销、密钥轮换。
+- 移动端、加载态、失败态和任务详情继续打磨。
 
-推荐发布前验证：
+## 致谢
 
-```bash
-bash scripts/release-check.sh --full
-```
+本项目是独立项目，不是下列项目的官方发行版，但参考并感谢它们：
 
-如果本机没有 Java/Maven，可以用 Docker Maven：
-
-```bash
-docker run --rm -v "$PWD/springboot-backend:/workspace" -w /workspace maven:3.9-eclipse-temurin-21 mvn -B -DskipTests package
-```
-
-## 致谢与参考
-
-- [Flux Panel](https://github.com/zhizhishu/flux-panel)：UI 风格、转发面板基础和原始项目结构参考。
-- [3x-ui](https://github.com/MHSanaei/3x-ui)：Xray/3x-ui 协议管理模型和远程面板 API 行为参考。
+- [Flux Panel](https://github.com/zhizhishu/flux-panel)：UI 风格、转发面板基础和项目结构参考。
+- [3x-ui](https://github.com/MHSanaei/3x-ui)：Xray / 3x-ui 协议管理模型和远端面板 API 行为参考。
 - [snell.sh](https://github.com/jinqians/snell.sh)：Snell 安装流程和部署脚本行为参考。
-- [Komari Monitor](https://github.com/komari-monitor/komari)：主控/agent 监控思路参考。
+- [Komari Monitor](https://github.com/komari-monitor/komari)：主控 / Agent 监控和多服务器运维思路参考。
 
 ## 安全说明
 
-本项目仅用于你拥有或被授权管理的服务器。不要用于未授权访问、滥用、绕过监管、违法用途或违反服务条款的行为。
+本项目仅用于你拥有或被授权管理的服务器。请不要用于未授权访问、滥用、规避监管、违法用途或违反服务条款的行为。

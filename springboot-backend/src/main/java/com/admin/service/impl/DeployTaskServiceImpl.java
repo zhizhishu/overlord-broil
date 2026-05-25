@@ -23,6 +23,7 @@ import com.admin.service.ProtocolProfileService;
 import com.admin.service.ServerForwardRuleService;
 import com.admin.service.SnellTemplateService;
 import com.admin.service.XuiOrchestrationScriptService;
+import com.admin.runtime.RuntimeProviderService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ import javax.annotation.Resource;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -69,6 +71,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
 
     @Resource
     private SecretCryptoUtils secretCryptoUtils;
+
+    @Resource
+    private RuntimeProviderService runtimeProviderService;
 
     @Override
     public R createTask(DeployTaskDto dto) {
@@ -121,7 +126,11 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         task.setCreatedTime(now);
         task.setUpdatedTime(now);
 
-        return this.save(task) ? R.ok(task) : R.err("deploy task create failed");
+        if (!this.save(task)) {
+            return R.err("deploy task create failed");
+        }
+        runtimeProviderService.applyToTask(task);
+        return R.ok(task);
     }
 
     @Override
@@ -149,7 +158,11 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         task.setCreatedTime(now);
         task.setUpdatedTime(now);
 
-        return this.save(task) ? R.ok(task) : R.err("orchestration task create failed");
+        if (!this.save(task)) {
+            return R.err("orchestration task create failed");
+        }
+        runtimeProviderService.applyToTask(task);
+        return R.ok(task);
     }
 
     private String validateOrchestration(OrchestrationPlanDto dto, ControlServer server) {
@@ -290,7 +303,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
 
     @Override
     public R getAllTasks() {
-        return R.ok(this.list());
+        List<DeployTask> tasks = this.list();
+        tasks.forEach(runtimeProviderService::applyToTask);
+        return R.ok(tasks);
     }
 
     @Override
@@ -299,6 +314,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         if (task == null) {
             return R.err("deploy task not found");
         }
+        runtimeProviderService.applyToTask(task);
         return R.ok(task.getScript());
     }
 
@@ -364,7 +380,11 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         retry.setCreatedTime(now);
         retry.setUpdatedTime(now);
 
-        return this.save(retry) ? R.ok(retry) : R.err("deploy task retry failed");
+        if (!this.save(retry)) {
+            return R.err("deploy task retry failed");
+        }
+        runtimeProviderService.applyToTask(retry);
+        return R.ok(retry);
     }
 
     @Override
@@ -403,6 +423,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         claimed.put("state", STATE_CLAIMED);
         claimed.put("requestJson", task.getRequestJson());
         claimed.put("script", task.getScript());
+        claimed.put("runtimeProvider", runtimeProviderService.assign(task.getProtocol(), task.getAction()));
         claimed.put("createdTime", task.getCreatedTime());
         claimed.put("startedTime", now);
         return R.ok(claimed);

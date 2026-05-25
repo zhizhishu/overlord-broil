@@ -31,6 +31,7 @@ import {
   getControlServerToken,
   getDeployTaskList,
   getDeployTaskScript,
+  getRuntimeProviderList,
   listMonitorAlerts,
   getProtocolNodeList,
   getProtocolProfileList,
@@ -56,7 +57,7 @@ import {
   updateProtocolProfile,
   updateServerForwardRule
 } from "@/api";
-import type { ControlServer, DeployTask, MonitorAlert, ProtocolNode, ProtocolProfile, ServerForwardRule, ThreeXuiTrafficSnapshot } from "@/types";
+import type { ControlServer, DeployTask, MonitorAlert, ProtocolNode, ProtocolProfile, RuntimeProviderDescriptor, ServerForwardRule, ThreeXuiTrafficSnapshot } from "@/types";
 
 interface ServerForm {
   id?: number;
@@ -895,6 +896,7 @@ export default function OrchestratorPage() {
   const [forwardRules, setForwardRules] = useState<ServerForwardRule[]>([]);
   const [profiles, setProfiles] = useState<ProtocolProfile[]>([]);
   const [tasks, setTasks] = useState<DeployTask[]>([]);
+  const [runtimeProviders, setRuntimeProviders] = useState<RuntimeProviderDescriptor[]>([]);
   const [trafficSnapshots, setTrafficSnapshots] = useState<ThreeXuiTrafficSnapshot[]>([]);
   const [monitorAlerts, setMonitorAlerts] = useState<MonitorAlert[]>([]);
   const [serverModalOpen, setServerModalOpen] = useState(false);
@@ -963,6 +965,25 @@ export default function OrchestratorPage() {
   }, [monitorAlerts]);
 
   const recentAlerts = useMemo(() => monitorAlerts.slice(0, 5), [monitorAlerts]);
+
+  const runtimeProviderTaskCounts = useMemo(() => {
+    return tasks.reduce<Record<string, number>>((counts, task) => {
+      const key = task.runtimeProvider?.key || "unknown";
+      counts[key] = (counts[key] || 0) + 1;
+      return counts;
+    }, {});
+  }, [tasks]);
+
+  const runtimeProviderActiveTasks = useMemo(() => {
+    return tasks.reduce<Record<string, number>>((counts, task) => {
+      if (!["generated", "claimed", "running"].includes(task.state)) {
+        return counts;
+      }
+      const key = task.runtimeProvider?.key || "unknown";
+      counts[key] = (counts[key] || 0) + 1;
+      return counts;
+    }, {});
+  }, [tasks]);
 
   const outboundTagOptions = useMemo(() => uniqueStrings([
     ...DEFAULT_OUTBOUND_TAGS,
@@ -1251,13 +1272,14 @@ export default function OrchestratorPage() {
     setLoading(true);
     try {
       await ensureDefaultProtocolProfiles();
-      const [serverRes, profileRes, taskRes, nodeRes, forwardRes, alertRes] = await Promise.all([
+      const [serverRes, profileRes, taskRes, nodeRes, forwardRes, alertRes, providerRes] = await Promise.all([
         getControlServerList(),
         getProtocolProfileList(),
         getDeployTaskList(),
         getProtocolNodeList({ limit: 300 }),
         getServerForwardRuleList({ limit: 300 }),
-        listMonitorAlerts({ acknowledged: 0, limit: 100 })
+        listMonitorAlerts({ acknowledged: 0, limit: 100 }),
+        getRuntimeProviderList()
       ]);
 
       if (serverRes.code === 0) setServers(serverRes.data || []);
@@ -1266,7 +1288,8 @@ export default function OrchestratorPage() {
       if (nodeRes.code === 0) setProtocolNodes(nodeRes.data || []);
       if (forwardRes.code === 0) setForwardRules(forwardRes.data || []);
       if (alertRes.code === 0) setMonitorAlerts(alertRes.data || []);
-      if (serverRes.code !== 0 || profileRes.code !== 0 || taskRes.code !== 0 || nodeRes.code !== 0 || forwardRes.code !== 0 || alertRes.code !== 0) {
+      if (providerRes.code === 0) setRuntimeProviders(providerRes.data || []);
+      if (serverRes.code !== 0 || profileRes.code !== 0 || taskRes.code !== 0 || nodeRes.code !== 0 || forwardRes.code !== 0 || alertRes.code !== 0 || providerRes.code !== 0) {
         toast.error(t("主控数据加载不完整"));
       }
     } catch (error) {
@@ -2091,6 +2114,15 @@ export default function OrchestratorPage() {
     return "default";
   };
 
+  const runtimeProviderColor = (key?: string) => {
+    if (key === "xui") return "primary";
+    if (key === "snell") return "secondary";
+    if (key === "forward") return "success";
+    if (key === "certificate") return "warning";
+    if (key === "firewall") return "danger";
+    return "default";
+  };
+
   const certificateText = (server: ControlServer) => {
     if (!server.certificateStatus) return t("证书 -");
     const domain = server.certificateDomain ? ` ${server.certificateDomain}` : "";
@@ -2210,6 +2242,61 @@ export default function OrchestratorPage() {
             </CardBody>
           </Card>
         </div>
+
+        <section>
+          <Card radius="sm">
+            <CardHeader className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("Runtime Provider 层")}</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  {t("主控按运行时边界分派任务：Xray/3x-ui、Snell、转发、证书和防火墙统一进入 agent 执行链。")}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Chip size="sm" variant="flat" color="primary">{t("{count} 个运行时", { count: runtimeProviders.length })}</Chip>
+                <Chip size="sm" variant="flat">{t("{count} 个活跃任务", { count: Object.values(runtimeProviderActiveTasks).reduce((sum, count) => sum + count, 0) })}</Chip>
+              </div>
+            </CardHeader>
+            <CardBody>
+              {runtimeProviders.length === 0 ? (
+                <div className="rounded-small border border-dashed border-default-300 p-5 text-center">
+                  <p className="font-medium text-gray-900 dark:text-white">{t("Runtime Provider 尚未加载")}</p>
+                  <p className="text-sm text-gray-500 mt-1">{t("刷新后会显示 XUI、Snell、转发、证书和防火墙运行时注册表。")}</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  {runtimeProviders.map(provider => (
+                    <div key={provider.key} className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{provider.name}</p>
+                          <p className="mt-1 truncate text-[11px] text-gray-500">{provider.runtimeType}</p>
+                        </div>
+                        <Chip size="sm" variant="flat" color={runtimeProviderColor(provider.key) as any}>{provider.key}</Chip>
+                      </div>
+                      <p className="mt-3 min-h-14 text-xs leading-5 text-gray-500">{provider.summary}</p>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <p className="text-gray-500">{t("执行器")}</p>
+                          <p className="truncate text-gray-900 dark:text-white">{provider.executor}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">{t("任务")}</p>
+                          <p className="text-gray-900 dark:text-white">{runtimeProviderTaskCounts[provider.key] || 0} / {runtimeProviderActiveTasks[provider.key] || 0}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {provider.agentRequired && <Chip size="sm" variant="flat">{t("Agent 执行")}</Chip>}
+                        {provider.masterApiSupported && <Chip size="sm" variant="flat" color="primary">{t("主控 API")}</Chip>}
+                        {provider.nanoSupported && <Chip size="sm" variant="flat" color="success">{t("Nano 支持")}</Chip>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        </section>
 
         <section>
           <Card radius="sm">
@@ -2657,10 +2744,25 @@ export default function OrchestratorPage() {
                       <p className="font-semibold text-gray-900 dark:text-white">#{task.id} {task.serverName || task.serverId}</p>
                       <p className="text-xs text-gray-500">{task.protocol} / {task.action}</p>
                     </div>
-                    <Chip size="sm" variant="flat" color={task.state === "succeeded" ? "success" : task.state === "failed" ? "danger" : "primary"}>
-                      {task.state}
-                    </Chip>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {task.runtimeProvider && (
+                        <Chip size="sm" variant="flat" color={runtimeProviderColor(task.runtimeProvider.key) as any}>
+                          {task.runtimeProvider.key}
+                        </Chip>
+                      )}
+                      <Chip size="sm" variant="flat" color={task.state === "succeeded" ? "success" : task.state === "failed" ? "danger" : "primary"}>
+                        {task.state}
+                      </Chip>
+                    </div>
                   </div>
+                  {task.runtimeProvider && (
+                    <div className="rounded-small border border-default-200 bg-default-50/60 px-3 py-2 text-xs dark:bg-default-50/5">
+                      <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                        <span className="font-medium text-gray-900 dark:text-white">{task.runtimeProvider.name}</span>
+                        <span className="text-gray-500">{task.runtimeProvider.executor} / {task.runtimeProvider.stateSource}</span>
+                      </div>
+                    </div>
+                  )}
                   <p className="text-xs text-gray-500">{t("创建：{time}", { time: formatTime(task.createdTime) })}</p>
                   <DiagnosticSummaryPanel task={task} onShowResult={showTaskResult} />
                   <div className="flex flex-wrap gap-2">

@@ -1,5 +1,7 @@
 package com.admin.entity;
 
+import com.admin.runtime.RuntimeProviderAssignment;
+import com.baomidou.mybatisplus.annotation.TableField;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -28,4 +30,7 @@ public class DeployTask extends BaseEntity {
     private Long startedTime;
 
     private Long finishedTime;
+
+    @TableField(exist = false)
+    private RuntimeProviderAssignment runtimeProvider;
 }

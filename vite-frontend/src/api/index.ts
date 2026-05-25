@@ -74,6 +74,10 @@ export const updateDeployTaskState = (data: any) => Network.post("/deploy-task/s
 export const retryDeployTask = (id: number) => Network.post("/deploy-task/retry", { id });
 export const deleteDeployTask = (id: number) => Network.post("/deploy-task/delete", { id });
 
+// Runtime Provider 注册表：XUI / Snell / Forward / Certificate / Firewall
+export const getRuntimeProviderList = () => Network.post("/runtime-provider/list");
+export const resolveRuntimeProvider = (data: { protocol?: string; action?: string }) => Network.post("/runtime-provider/resolve", data);
+
 // 主控监控告警
 export const listMonitorAlerts = (data: any = {}) => Network.post("/monitor-alert/list", data);
 export const acknowledgeMonitorAlert = (id: number) => Network.post("/monitor-alert/ack", { id });

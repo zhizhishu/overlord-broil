@@ -47,6 +47,7 @@ Controlled hosts may expose business ports depending on orchestration choices:
 
 - `springboot-backend/`: Spring Boot 2.7, Java 21 backend.
 - `springboot-backend/src/main/java/com/admin/controller/`: REST endpoints under `/api/v1/*` plus `/flow/test` health endpoint.
+- `springboot-backend/src/main/java/com/admin/runtime/`: Runtime Provider registry for XUI, Snell, Forward, Certificate and Firewall task boundaries.
 - `springboot-backend/src/main/java/com/admin/service/`: orchestration, 3x-ui, Snell, forwarding, agent task, traffic, alert, and control-server services.
 - `springboot-backend/src/main/resources/mapper/`: MyBatis mapper XML.
 - `vite-frontend/`: React 18 + Vite + HeroUI frontend.
@@ -61,6 +62,7 @@ Controlled hosts may expose business ports depending on orchestration choices:
 
 - Flux-style dense operations UI with Chinese-first language and `zh-CN` / `en-US` switch.
 - Server registry, agent token generation/rotation, heartbeats, status updates, and Nano memory detection.
+- Runtime Provider registry and API for `xui`, `snell`, `forward`, `certificate`, and `firewall` task assignment.
 - One-click orchestration tasks for 3x-ui/Xray and Snell.
 - 3x-ui API integration for inbound/outbound/config/traffic/restart operations.
 - Protocol-node form flow with validation and advanced payload preview.

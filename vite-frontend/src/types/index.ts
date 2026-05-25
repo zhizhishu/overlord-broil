@@ -185,6 +185,38 @@ export interface ServerRuleOverview {
   xuiOutbounds?: any;
 }
 
+export interface RuntimeProviderDescriptor {
+  key: string;
+  name: string;
+  runtimeType: string;
+  executor: string;
+  stateSource: string;
+  summary: string;
+  agentRequired: boolean;
+  masterApiSupported: boolean;
+  nanoSupported: boolean;
+  protocols: string[];
+  actions: string[];
+  capabilities: string[];
+  requiredServerFields: string[];
+  exposedPorts: string[];
+  relatedProviders: string[];
+}
+
+export interface RuntimeProviderAssignment {
+  key: string;
+  name: string;
+  protocol: string;
+  action: string;
+  executor: string;
+  stateSource: string;
+  agentRequired: boolean;
+  masterApiSupported: boolean;
+  nanoSupported: boolean;
+  capabilities: string[];
+  relatedProviders: string[];
+}
+
 export interface DeployTask {
   id: number;
   serverId: number;
@@ -198,6 +230,7 @@ export interface DeployTask {
   startedTime?: number;
   finishedTime?: number;
   createdTime?: number;
+  runtimeProvider?: RuntimeProviderAssignment;
   status: number;
 }
 

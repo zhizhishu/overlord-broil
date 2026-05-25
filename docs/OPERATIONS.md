@@ -1,6 +1,6 @@
 # Operations
 
-This checklist is for running the public Flux 3x-ui Orchestrator repo as a small master/agent deployment.
+This checklist is for running Flux 3x-ui Orchestrator as a small authorized master/agent deployment.
 
 ## Install Paths
 
@@ -14,29 +14,38 @@ This checklist is for running the public Flux 3x-ui Orchestrator repo as a small
 | Master logs volume | Docker volume `master_logs`, mounted at `/app/logs` |
 | MySQL data volume | Docker volume `mysql_data` |
 | Agent environment | `/etc/flux-agent.env` |
-| Agent binary script | `/usr/local/bin/flux-agent.sh` |
-| Agent systemd unit | `flux-agent.service` |
-| Agent OpenRC service | `/etc/init.d/flux-agent` |
+| Agent runner | `/usr/local/bin/flux-agent.sh` |
 | Agent work directory | `/var/lib/flux-agent` |
 | Snell node configs | `/etc/snell/users/node-<id>.conf` |
 | Snell services | `snell-node-<id>.service` on systemd, `/etc/init.d/snell-node-<id>` on OpenRC |
 | Forwarding services | `flux-forward-<id>.service` on systemd, `/etc/init.d/flux-forward-<id>` on OpenRC |
 
+## Ports
+
+| Port | Component | Production note |
+| --- | --- | --- |
+| `5166/tcp` | Master panel, API and controlled-agent callback | Default public entry. Change with `FLUX_FRONTEND_PORT`. |
+| `6365/tcp` | Backend debug alias | Not exposed by default. Publish only with `FLUX_EXPOSE_BACKEND=1`. |
+| `3306/tcp` | MySQL | Docker internal only in shipped compose files. |
+| phpMyAdmin | Maintenance UI | Disabled by default. Expose temporarily with `FLUX_PHPMYADMIN_PORT`. |
+
+Controlled hosts do not need an inbound agent port. Agents call the same master entry URL that users open in the browser, for example `http://master:5166`.
+
+Controlled-host business ports are created by your orchestration choices: optional 3x-ui panel port `5168`, Xray/Snell node ports, remote-forward listen ports and ACME HTTP `80/tcp` when selected.
+
 ## Linux Support Matrix
 
 | Target | Debian / Ubuntu | Rocky / Oracle Linux | Alpine / OpenRC |
 | --- | --- | --- | --- |
-| Master Docker stack | Supported | Supported | Supported with the bootstrap installer when `bash` is missing |
+| Master Docker stack | Supported | Supported | Supported with bootstrap installer |
 | Agent service | systemd | systemd | OpenRC |
 | Snell node tasks | systemd | systemd | OpenRC |
 | Remote forwarding tasks | systemd + `socat` | systemd + `socat` | OpenRC + `socat` |
 | Full 3x-ui install/configure | Supported | Supported | Not supported in `0.6.0`; use a systemd host |
 
-The master installer and agent installer are bash scripts. On minimal systems, use the `*-bootstrap.sh` installers; they run under `/bin/sh`, install `bash` plus base dependencies, then hand off to the normal installer.
-
 ## Master Install And Upgrade
 
-Install the master with the default IPv4 compose stack:
+Install:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash
@@ -48,27 +57,18 @@ Bootstrap form for Alpine or minimal images without `bash`:
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master-bootstrap.sh | sudo sh
 ```
 
+Preflight:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+  | sudo bash -s -- doctor
+```
+
 Common overrides:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo env FLUX_FRONTEND_PORT="8080" FLUX_NETWORK_STACK="v4" bash
-```
-
-The production compose layout publishes only the `flux-master` entry port.
-The same single image serves the embedded Web UI and `/api/v1/*`. Expose a
-second host port only for direct API debugging:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo env FLUX_EXPOSE_BACKEND="1" FLUX_BACKEND_PORT="6365" bash
-```
-
-Expose phpMyAdmin only for short maintenance windows:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo env FLUX_PHPMYADMIN_PORT="18066" bash
+  | sudo env FLUX_FRONTEND_PORT="5166" FLUX_NETWORK_STACK="v4" bash
 ```
 
 Day-2 actions:
@@ -80,68 +80,11 @@ sudo bash /opt/flux-3xui-orchestrator/install-master.sh restore --backup-file /o
 sudo bash /opt/flux-3xui-orchestrator/install-master.sh uninstall --yes
 ```
 
-If the installer script is not present locally, use the same raw GitHub command with `bash -s -- <action>`.
-
-## Doctor Preflight
-
-Run the master doctor before installing on a new host or changing ports:
+Expose direct backend or phpMyAdmin only during maintenance:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo bash -s -- doctor
-```
-
-It checks OS/package-manager detection, root status, Docker/Compose, Docker daemon reachability, existing `.env` values and whether the public frontend port, plus backend/phpMyAdmin only when explicitly exposed, are already occupied. For CI/container checks where Docker is intentionally unavailable:
-
-```bash
-FLUX_DOCTOR_REQUIRE_DOCKER=0 \
-FLUX_FRONTEND_PORT=18080 \
-FLUX_BACKEND_PORT=16365 \
-FLUX_EXPOSE_BACKEND=0 \
-  bash scripts/install-master.sh doctor
-```
-
-Run the agent installer doctor before installing a controlled host:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
-  | sudo env FLUX_PANEL_URL="https://your-master-panel.example.com" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
-```
-
-After an agent is installed, run the local runtime doctor:
-
-```bash
-sudo -E /usr/local/bin/flux-agent.sh --doctor
-```
-
-The runtime doctor checks the panel URL, server id, token presence, writable work directory, Python/Bash/Curl dependencies, procfs counters and service-manager availability.
-
-## Docker And GHCR Notes
-
-The compose files use:
-
-```text
-ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest
-```
-
-Legacy split backend/frontend images are still built for rollback and debug
-compose files, but the default installer no longer uses them.
-
-Public repository access does not always mean public GHCR package access. If pulls fail, either log in:
-
-```bash
-echo "$GITHUB_TOKEN" | docker login ghcr.io -u zhizhishu --password-stdin
-```
-
-or let the installer fall back to building images from the public source archive.
-
-Validate compose before changing a live host:
-
-```bash
-docker compose -f docker-compose-v4.yml config
-docker compose -f docker-compose-v6.yml config
-docker compose -f docker-compose.legacy-v4.yml config
-docker compose -f docker-compose.legacy-v6.yml config
+sudo env FLUX_EXPOSE_BACKEND="1" FLUX_BACKEND_PORT="6365" bash /opt/flux-3xui-orchestrator/install-master.sh upgrade
+sudo env FLUX_PHPMYADMIN_PORT="18066" bash /opt/flux-3xui-orchestrator/install-master.sh upgrade
 ```
 
 ## Agent Operations
@@ -150,14 +93,14 @@ Install an agent on each controlled server:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
-  | sudo env FLUX_PANEL_URL="https://your-master-panel.example.com" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash
+  | sudo env FLUX_PANEL_URL="http://MASTER_IP:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash
 ```
 
-Bootstrap form for Alpine or minimal images:
+Bootstrap form:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent-bootstrap.sh \
-  | sudo env FLUX_PANEL_URL="https://your-master-panel.example.com" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" sh
+  | sudo env FLUX_PANEL_URL="http://MASTER_IP:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" sh
 ```
 
 Useful checks:
@@ -174,7 +117,7 @@ tail -n 100 /var/log/flux-agent.log
 tail -n 100 /var/log/flux-agent.err
 ```
 
-Tune reliability in `/etc/flux-agent.env`:
+Reliability knobs in `/etc/flux-agent.env`:
 
 ```bash
 FLUX_HTTP_RETRIES=4
@@ -186,27 +129,23 @@ FLUX_TASK_TIMEOUT_SECONDS=7200
 FLUX_TASK_TIMEOUT_KILL_SECONDS=30
 ```
 
-Remote maintenance from the master panel:
+## Runtime Provider Operations
 
-| Server-card action | What it does |
-| --- | --- |
-| `Agent / 诊断` | Creates an `agent-maintenance` task that runs `/usr/local/bin/flux-agent.sh --doctor` on the controlled host. |
-| `Agent / 日志` | Collects recent systemd/OpenRC logs plus recent `/var/lib/flux-agent/task-*.out|err` task logs. |
-| `Agent / 安装诊断` | Checks the agent binary, env file, service manager, token configuration, work directory and current service status. |
-| `Agent / 证书诊断` | Checks ACME HTTP prerequisites: DNS records, local/public IP hint, port `80`, existing certificate files and acme.sh/certbot clues. |
-| `Agent / 防火墙诊断` | Prints port `80` listener information plus ufw/firewalld/nftables/iptables summaries; cloud security groups still need manual confirmation. |
-| `Agent / 重启` | Runs the doctor, then schedules a delayed `flux-agent` service restart so the report can return before restart. |
-| `Agent / 升级` | Downloads the latest `scripts/flux-agent.sh`, runs `bash -n`, installs it and schedules a service restart. |
-| `Agent / 一键修复` | Attempts to restart/repair 3x-ui, Xray and Snell services through systemd/OpenRC, without changing panel data. |
-| `Agent / 卸载 agent` | Schedules a delayed uninstall after the current task report returns; removes the service, env file and runner. |
+Deployment tasks carry Runtime Provider metadata so operators can see which runtime owns the task and where state is expected to come from.
 
-Failed or timed-out deployment tasks should be retried from the task card rather than edited in place. The retry endpoint creates a new `generated` task with the same script and stores `retryFromTaskId` in `request_json`, so the original stdout/stderr remains auditable.
+| Provider | Runtime boundary | Operational note |
+| --- | --- | --- |
+| `xui` | 3x-ui, Xray, Reality, inbounds, outbounds and traffic | Uses master-side 3x-ui API calls plus agent tasks for install/orchestration; avoid full orchestration on sub-200 MB hosts. |
+| `snell` | Snell node services | Runs through agent-created systemd/OpenRC services and is the preferred proxy runtime for Nano hosts. |
+| `forward` | Remote TCP/UDP forwarding | Runs through agent-created `socat` services and stays visible in the unified rule center. |
+| `certificate` | Self-signed, ACME and certificate diagnostics | ACME HTTP mode needs DNS and `80/tcp`; diagnose before retrying failed issuance. |
+| `firewall` | Runtime port diagnostics and opening | Reports local firewall state; cloud security groups still need manual confirmation. |
 
-Install, certificate and firewall diagnostics write structured `diagnostics.items` into the task result. The master task card summarizes the highest-risk findings first: unresolved DNS, local port `80` occupancy, missing certificate files, missing ACME tooling, local firewall command availability and the cloud-security-group boundary. Use `原始结果` on the same card when you need the full stdout/stderr evidence.
+Failed or timed-out deployment tasks should be retried from the task card rather than edited in place. The retry endpoint creates a new `generated` task with the same script, stores `retryFromTaskId` in `request_json`, and reattaches Runtime Provider metadata so the original stdout/stderr remains auditable.
+
+Install, certificate and firewall diagnostics write structured `diagnostics.items` into the task result. The master task card summarizes high-risk findings first: unresolved DNS, local port `80` occupancy, missing certificate files, missing ACME tooling, local firewall command availability and the cloud-security-group boundary.
 
 ## First-Run Operator Path
-
-The master control center includes a first-run setup guide for new operators. Treat it as the shortest safe path from an empty panel to a usable multi-server control plane:
 
 1. Register the master and controlled servers in the asset list.
 2. Copy each server token and install the controlled agent.
@@ -220,38 +159,22 @@ The master control center includes a first-run setup guide for new operators. Tr
 - Confirm `.env` has non-default `DB_PASSWORD`, `JWT_SECRET` and `SECRET_ENCRYPTION_KEY`.
 - Back up `SECRET_ENCRYPTION_KEY` with `.env`; encrypted 3x-ui credentials and API tokens cannot be restored safely if the key is lost or rotated without planning.
 - Keep controlled-server agents off the master host unless you are deliberately testing self-control behavior. A `role=master` server can self-manage safe tasks, while destructive actions and protected listen ports such as frontend/backend/MySQL/SSH are blocked.
-- Confirm the frontend and backend ports are reachable only from the intended networks.
-- Confirm `docker compose ps` shows healthy `mysql`, `backend` and `frontend` services.
-- Check `GET /flow/test` through the backend port after every upgrade.
+- Confirm only `5166/tcp` is publicly reachable for the master unless you intentionally exposed debug or maintenance ports.
+- Confirm `docker compose ps` shows healthy `mysql` and `master` services.
+- Check `GET /flow/test` through the master entry after every upgrade.
 - Create a backup before upgrades and before schema-affecting changes.
 - Store 3x-ui API tokens only in the panel fields intended for that purpose; do not paste tokens into issue reports or logs.
-- For each controlled server, rotate the agent token after handoff or suspected exposure.
+- Rotate each controlled-server agent token after handoff or suspected exposure.
 - Verify agent heartbeats before sending orchestration, Snell or forwarding tasks.
 - Treat hosts below `256 MB` as Nano nodes. Hosts below `200 MB` should only receive Snell or remote-forwarding tasks until swap and real-host testing prove they can survive 3x-ui/Xray.
 - Send full 3x-ui install/configure orchestration only to normal systemd hosts. Alpine/OpenRC controlled hosts can run agent, Snell and forwarding tasks, but the upstream 3x-ui installation path is blocked by preflight.
-- For ACME HTTP certificate mode, run `Agent / 证书诊断` and `Agent / 防火墙诊断` before retrying. The task card should distinguish DNS not resolving, local port `80` occupancy, certificate-file state, local firewall rules and cloud security-group exposure.
+- For ACME HTTP certificate mode, run certificate and firewall diagnostics before retrying. The task card should distinguish DNS, local port `80`, certificate-file state, local firewall rules and cloud security-group exposure.
 - Verify duplicate protocol and forwarding ports before deploying to a shared host.
 - Review task stdout/stderr before retrying failed deployment tasks.
-- Review `监控告警` after every orchestration batch; acknowledge only after the remote service, certificate, task or traffic condition has been checked.
+- Review monitor alerts after every orchestration batch; acknowledge only after the remote condition has been checked.
 - Keep GHCR package visibility and tag policy aligned with the public README commands.
 
-## Production Release Gate
-
-Run the full release gate before publishing a Git tag, GitHub Release or live-host install announcement:
-
-```bash
-bash scripts/release-check.sh --full
-```
-
-Build a release bundle from the current commit:
-
-```bash
-bash scripts/build-release-bundle.sh --version "$(cat VERSION)"
-```
-
-The bundle lands in `dist/release/flux-3xui-orchestrator-<version>.tar.gz` with a `.sha256` checksum. It contains tracked installers, compose files, SQL, docs, workflows and `RELEASE_MANIFEST.txt`; it intentionally excludes `.git`, local build output, `node_modules`, backend `target` directories and `_references`.
-
-Publishing a `v*` tag or manually running the `Release` workflow validates `VERSION`, runs `scripts/release-check.sh --full`, builds the bundle with a clean-tree requirement and uploads the archive plus checksum to GitHub Releases. Versions below `1.x` are prereleases.
+## Release Readiness
 
 Release readiness means:
 
@@ -259,26 +182,13 @@ Release readiness means:
 - CI is green on `main`.
 - Docker Images workflow is green on `main` and GHCR has a fresh `flux-master` image.
 - `scripts/install-master.sh` succeeds on a clean Linux host or falls back to local source builds when GHCR pulls are unavailable.
-- `scripts/install-master-bootstrap.sh` and `scripts/install-flux-agent-bootstrap.sh` are syntax-checked so minimal Alpine-style hosts can install base dependencies before handing off to bash installers.
+- `scripts/install-master-bootstrap.sh` and `scripts/install-flux-agent-bootstrap.sh` are syntax-checked.
 - `scripts/test-install-matrix.sh` passes on Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux container images.
 - `.env` and backup handling are understood before the first live install.
-- Public firewall rules intentionally expose only the frontend/API ports needed for your environment.
+- Public firewall rules intentionally expose only the ports needed for your environment.
 - The release notes clearly state whether the release was verified through Docker/CI only or through real VPS hosts.
 
-Default master ports:
-
-| Port | Component | Production note |
-| --- | --- | --- |
-| `5166` | Master panel and agent callback entry | Change with `FLUX_FRONTEND_PORT`; default avoids occupying port `80`; `/api/v1/*` proxies to backend internally. |
-| internal | Backend API | Container-internal `6365`; publish only for debugging with `FLUX_EXPOSE_BACKEND=1`. |
-| disabled | phpMyAdmin | Internal only by default; set `FLUX_PHPMYADMIN_PORT` or `--phpmyadmin-port` only during maintenance. |
-| `3306` | MySQL | Container-internal in the shipped compose files. |
-
-Controlled hosts do not need an inbound agent port. Agents call the same master entry URL that users open in the browser, for example `http://master:5166`. Controlled hosts only expose the default 3x-ui panel port `5168` when you intentionally allow it, Xray/Snell node ports, remote-forward listen ports, and ACME HTTP `80` when selected by your orchestration plan. Nano hosts below `200 MB` should not expose new Xray/3x-ui ports through the master; keep them on Snell or forwarding unless you deliberately override outside the supported path.
-
 ## Local And CI Verification
-
-Use these before publishing a release candidate:
 
 ```bash
 docker run --rm -v "$PWD/springboot-backend:/workspace" -w /workspace maven:3.9-eclipse-temurin-21 mvn -B -DskipTests package
@@ -292,4 +202,4 @@ bash scripts/test-compose-smoke.sh --build-local --dry-run
 bash scripts/test-compose-smoke.sh --build-local
 ```
 
-The 3x-ui fixture test uses a short-lived local Python HTTP server, checks Bearer-token success/missing/wrong-token paths plus inbound/outbound/config/traffic/restart routes, and exits without leaving ports open. The install matrix runs non-destructive doctor checks in Docker containers; it is useful coverage for shell portability and package-manager detection, but it is not a substitute for a real VPS matrix with systemd/OpenRC, cloud firewall and public DNS. The full compose smoke test should remove its disposable containers, network and volumes when it exits. If it is interrupted, inspect Docker resources manually before rerunning.
+The 3x-ui fixture test uses a short-lived local Python HTTP server and exits without leaving ports open. The install matrix is useful shell portability coverage, but it is not a substitute for a real VPS matrix with systemd/OpenRC, cloud firewall and public DNS. The full compose smoke test should remove its disposable containers, network and volumes when it exits.

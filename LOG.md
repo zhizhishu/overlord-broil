@@ -4,36 +4,35 @@
 
 ### Project Agent Context Bootstrap
 
-- 完成：按全局 Agent 协议为项目新增 `PROJECT_ID.md`、`AGENTS.md`、`PROJECT_CONTEXT.md`、`TASK.md` 和 `LOG.md`。
-- 修改：将项目身份、读写边界、验证命令、运行架构、单端口策略、Snell/3x-ui 边界和后续接力入口写入项目根目录。
-- 兼容：保留旧 `TASK_LOG.md` 作为历史档案，没有强制迁移或删除。
-- 验证：`git diff --check` 曾通过；该阶段只新增项目上下文和接力文档，未改业务代码。
-- 后续：新任务使用 `TASK.md` 维护当前接力，阶段完成后追加到 `LOG.md`。
-
-### Flux Master Single-Image Architecture Start
-
-- 完成：启动 P0/P1 单体主控改造，把当前任务接力切换到 `flux-master` 单体镜像、默认 Compose 和 GHCR 镜像成果。
-- 修改：新增根级 `Dockerfile` 和 `.dockerignore`，准备将 Vite 前端嵌入 Spring Boot；新增 Spring Boot SPA 路由承载；默认 Compose 初步改为 `mysql + master`；旧分离 Compose 保留为 legacy。
-- 验证：后续需要以当前 worktree 复跑脚本语法、compose config、Docker build/smoke 和 GitHub Actions。
-- 后续：继续修改安装脚本、CI、文档并推送。
+- 完成：为项目建立 `PROJECT_ID.md`、`AGENTS.md`、`PROJECT_CONTEXT.md`、`TASK.md` 和 `LOG.md`，明确父级目录只是存放根目录。
+- 修改：记录项目边界、读写范围、验证命令、推送目标和不要向 upstream 开 PR 的规则。
+- 验证：只新增项目上下文和接力文档，未改业务代码。
+- 后续：新任务继续使用项目内 `TASK.md` / `LOG.md` 接力。
 
 ### Flux Master Single-Image Runtime Milestone
 
-- 完成：将默认运行形态收敛为 `mysql + flux-master`，主控 Web UI 与 API 由同一个 Spring Boot 进程在 `5166` 提供。
-- 修改：更新 `Dockerfile`、Compose、安装脚本、release 脚本、CI、Docker Images workflow、README、中文 README、Operations、Release Notes 和项目上下文文档。
-- 验证记录：上一轮已通过 compose config、shell syntax、agent mock、3x-ui fixture、dry-run compose smoke 和真实 Docker smoke；真实 smoke 中 `flux-master` `/flow/test` 通过，`http://127.0.0.1:18080/` 返回 `200`，测试容器/网络/卷/端口已清理。
-- 后续：本轮需复跑关键验证，以当前 worktree 为准；之后提交并推送 `origin/main` 和 `origin/future`，再检查 GitHub Actions 与 GHCR master 镜像。
+- 完成：把默认运行形态收敛为 `mysql + flux-master`，主控 Web UI 和 API 由同一个 Spring Boot 进程在 `5166` 提供。
+- 修改：更新根 `Dockerfile`、Compose、安装脚本、release 脚本、CI、Docker Images workflow、README、中文 README、Operations、Release Notes 和项目上下文。
+- 验证：通过 compose config、shell syntax、agent mock、3x-ui fixture、dry-run compose smoke 和真实 Docker smoke；真实 smoke 中 `/flow/test` 与公共入口 `http://127.0.0.1:18080/` 均通过。
+- 推送：已推送 `ad9bb2e Add flux-master single image runtime` 到 `origin/main` 和 `origin/future`。
+- 清理：Docker smoke 自动删除测试容器、网络、卷；复查 `18080` 无监听。
 
-### Flux Master Local Verification Before Push
+### Runtime Provider Registry Milestone
 
-- 完成：以当前 worktree 复跑关键验证，确认单镜像主控里程碑可以提交。
+- 完成：新增 Runtime Provider 层，主控可枚举并解析 `xui`、`snell`、`forward`、`certificate`、`firewall` 五类运行时。
+- 修改：
+  - 后端新增 `RuntimeProviderDescriptor`、`RuntimeProviderAssignment`、`RuntimeProviderService` 和 `RuntimeProviderController`。
+  - `DeployTask` 增加非数据库字段 `runtimeProvider`。
+  - `DeployTaskServiceImpl` 在创建、重试、列表、脚本读取和 Agent claim payload 中挂载 provider 元数据。
+  - 前端新增 Runtime Provider API/type，主控页展示 provider 卡片、任务数量和任务 provider chip。
+  - README / README.zh-CN / Operations / Release Notes / PROJECT_CONTEXT 更新为可公开阅读的 Runtime Provider、端口、安装、API、GHCR 和致谢说明。
 - 验证：
-  - `git diff --check` 通过；只有 Windows LF/CRLF 提示。
-  - `bash -n scripts/*.sh` 和 `sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh` 通过。
-  - `docker compose config --quiet` 覆盖 `docker-compose.yml`、`docker-compose-v4.yml`、`docker-compose-v6.yml`、`docker-compose.legacy-v4.yml`、`docker-compose.legacy-v6.yml` 并通过。
-  - `bash scripts/test-flux-agent-mock.sh` 通过。
-  - `bash scripts/test-three-xui-fixture.sh` 通过。
-  - `bash scripts/test-compose-smoke.sh --build-local --dry-run` 通过。
-  - `bash scripts/test-compose-smoke.sh --build-local` 通过；本地构建 `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest`，启动 `mysql + master`，`flux-master` 内部 `/flow/test` 通过，公共入口 `http://127.0.0.1:18080/` 返回 `200`。
-- 清理：Docker smoke 自动删除 `flux-master`、`gost-mysql`、`gost-network`、`mysql_data`、`master_logs`；已复查 `18080` 无监听。
-- 后续：提交并推送 `origin/main` 和 `origin/future`，检查 GitHub Actions 与 GHCR manifest。
+  - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
+  - `bash -n scripts/*.sh` 和 bootstrap 脚本语法检查通过。
+  - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
+  - Docker Maven `RuntimeProviderServiceTest` 通过，3 个测试全部成功。
+  - Docker Maven `mvn -B -DskipTests package` 通过。
+- 清理：
+  - 慢速 bind-mount Maven 容器 `flux-runtime-provider-test-2` 已停止并清理。
+  - 复制源码验证容器 `flux-backend-copy-verify` 使用 `--rm` 退出，无容器残留。
+- 后续：提交并推送到 `origin/main` 和 `origin/future`，再检查 GitHub Actions 与 GHCR 镜像状态。

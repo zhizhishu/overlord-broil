@@ -3,72 +3,54 @@
 ## Handoff Summary
 
 当前目标：
-朝用户给出的 `flux-master` 单体主控架构推进，先完成并推送 P0/P1 里程碑：单镜像主控、默认 `mysql + flux-master` Compose、安装脚本切换、CI/GHCR 可见镜像成果。
+继续朝用户给出的 `flux-master` 单体主控架构推进。本轮目标是把架构图里的 `Runtime Provider 层`落成真实模块，让主控可以枚举 XUI / Snell / Forward / Certificate / Firewall，并让任务创建、任务列表和 Agent 领取结果都带上 provider 元数据。
 
 已完成：
 - 已确认父级 `C:\Users\echo\Downloads\claude` 只是存放根目录，不在父级写日志或计划。
 - 已确认真实项目根目录为 `C:\Users\echo\Downloads\claude\flux-panel-3xui-orchestrator`。
-- 已建立并读取项目级 `PROJECT_ID.md`、`AGENTS.md`、`PROJECT_CONTEXT.md`、`TASK.md`、`LOG.md`。
-- 已新增根级 `Dockerfile`，用于构建 Vite 前端并嵌入 Spring Boot jar，形成 `flux-master` 单体镜像。
-- 已新增 `.dockerignore`，减少单镜像构建上下文。
-- 已让 Spring Boot 支持 `SERVER_PORT` 配置，并新增 SPA 路由承载。
-- 已把默认 `docker-compose.yml`、`docker-compose-v4.yml`、`docker-compose-v6.yml` 收敛为 `mysql + master`。
-- 已保留旧前后端分离方案为 `docker-compose.legacy-v4.yml` / `docker-compose.legacy-v6.yml`。
-- 已更新安装脚本，使默认安装/升级下载单体 Compose，并以 `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 为默认运行镜像。
-- 已更新 CI、Docker Images workflow、release check、release bundle 和 compose smoke 测试，纳入 master 单镜像。
-- 已更新 README、中文 README、Operations、Release Notes、PROJECT_CONTEXT 的架构、端口和使用说明。
+- 已读取项目 `PROJECT_ID.md`、`AGENTS.md`、`PROJECT_CONTEXT.md`、`TASK.md`；`serena.enabled=false`，不调用 Serena。
+- 之前已完成并推送 `flux-master` 单体镜像里程碑：默认 `mysql + flux-master`，主控 Web UI/API 统一走 `5166`。
+- 本轮已新增后端 Runtime Provider 注册表、分配对象、查询 API 和单元测试。
+- 本轮已让 `DeployTask` 响应和 Agent claim payload 携带 `runtimeProvider` 元数据。
+- 本轮已让前端主控页加载 Runtime Provider 注册表，展示 provider 卡片和任务 provider chip。
+- 本轮已清理 README / README.zh-CN 公开入口文档，补充 Runtime Provider、端口、安装、API、GHCR、致谢和 1.0 差距说明。
 
 下一步：
-- 快速复核关键 diff，确认没有把旧前后端分离路径误设为默认。
-- 运行关键本地验证：compose config、shell 语法、agent mock、3x-ui fixture、compose smoke。
-- 检查并清理 Docker 容器、网络、卷和端口。
-- 提交并推送到 `origin/main` 和 `origin/future`，不要推送 `upstream`。
-- 检查 GitHub Actions 和 GHCR master 镜像 manifest；如果 workflow 仍在跑，记录 Actions URL 和当前状态。
+- 提交并只推送到 `origin/main` 和 `origin/future`，不要推送 `upstream`。
+- 检查 GitHub Actions / GHCR，确认镜像成果在 GitHub 可见。
 
 关键文件：
-- `Dockerfile`
-- `.dockerignore`
-- `docker-compose.yml`
-- `docker-compose-v4.yml`
-- `docker-compose-v6.yml`
-- `docker-compose.legacy-v4.yml`
-- `docker-compose.legacy-v6.yml`
-- `scripts/install-master.sh`
-- `scripts/test-compose-smoke.sh`
-- `scripts/release-check.sh`
-- `scripts/build-release-bundle.sh`
-- `.github/workflows/ci.yml`
-- `.github/workflows/docker-image.yml`
-- `springboot-backend/src/main/java/com/admin/controller/SpaController.java`
-- `springboot-backend/src/main/java/com/admin/config/WebMvcConfig.java`
-- `springboot-backend/src/main/resources/application.yml`
+- `springboot-backend/src/main/java/com/admin/runtime/*`
+- `springboot-backend/src/main/java/com/admin/controller/RuntimeProviderController.java`
+- `springboot-backend/src/main/java/com/admin/entity/DeployTask.java`
+- `springboot-backend/src/main/java/com/admin/service/impl/DeployTaskServiceImpl.java`
+- `springboot-backend/src/test/java/com/admin/runtime/RuntimeProviderServiceTest.java`
+- `vite-frontend/src/api/index.ts`
+- `vite-frontend/src/types/index.ts`
+- `vite-frontend/src/pages/orchestrator.tsx`
+- `vite-frontend/src/i18n/index.tsx`
 - `README.md`
 - `README.zh-CN.md`
 - `docs/OPERATIONS.md`
-- `docs/RELEASE_NOTES.md`
+- `PROJECT_CONTEXT.md`
 
 验证状态：
-- 本轮已通过 `git diff --check`，只有 Windows LF/CRLF 提示，无空白错误。
-- 本轮已通过 `bash -n scripts/*.sh` 和 `sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh`。
-- 本轮已通过默认、v4/v6、legacy v4/v6 Compose config 校验。
-- 本轮已通过 `bash scripts/test-flux-agent-mock.sh`。
-- 本轮已通过 `bash scripts/test-three-xui-fixture.sh`。
-- 本轮已通过 `bash scripts/test-compose-smoke.sh --build-local --dry-run`。
-- 本轮已通过 `bash scripts/test-compose-smoke.sh --build-local`：本地构建 `flux-master` 单镜像，启动 `mysql + master`，`/flow/test` 通过，`http://127.0.0.1:18080/` 返回 `200`。
+- 已通过一次 Docker Maven 单测：`RuntimeProviderServiceTest`，3 个测试全部成功。
+- 已通过本轮 `git diff --check`，只有 Windows LF/CRLF 提示，无空白错误。
+- 已通过 `bash -n scripts/*.sh` 和 bootstrap 脚本语法检查。
+- 已通过前端 `npm run build`，仅有既有 Vite dynamic/static import chunk 提示。
+- 已通过 Docker Maven `RuntimeProviderServiceTest`，3 个测试全部成功。
+- 已通过 Docker Maven `mvn -B -DskipTests package`。
 
 风险/待确认：
-- 这是朝目标架构推进的单镜像/默认运行里程碑，不等于 Runtime Provider 层、Task 引擎和 UI 全量融合都已经完成。
-- 真实 VPS 矩阵和真实 3x-ui 容器级端到端仍是 `1.0` 前的主要缺口。
-- Snell 当前是产品层统一、agent 执行的独立 runtime，不是原生塞进 Xray/3x-ui 内核。
-- Docker Images workflow 只在 `main` 和 tag 推送公开 GHCR 镜像；`future` 主要用于同步未来分支状态。
+- Runtime Provider 是融合架构的关键层，但还不是完整 1.0。真实 VPS 矩阵和真实 3x-ui E2E 仍是正式版前最大缺口。
+- Snell 仍是产品层统一、Agent 执行的独立 runtime，不是 Xray/3x-ui 内核原生协议。
+- `future` 分支用于验证，正式 GHCR 镜像以 `main` 和 `v*` tag 为准。
 
 资源清理：
-- Docker smoke 已自动清理测试容器、网络和卷。
-- 已复查无 `flux-master` / `gost-mysql` 测试容器残留。
-- 已复查无 `mysql_data` / `master_logs` 测试卷残留。
-- 已复查无 `gost-network` 测试网络残留。
-- 已复查 `18080` 无监听。
-- 不关闭不属于本任务的 Docker、浏览器、MCP Router 或用户手动服务。
+- 上轮遗留 Maven Docker 测试容器已结束。
+- 本轮慢速 bind-mount Maven 容器 `flux-runtime-provider-test-2` 已停止并清理。
+- 本轮复制源码验证容器 `flux-backend-copy-verify` 使用 `--rm` 退出，无容器残留。
 
 最后更新：
 2026-05-25
@@ -78,7 +60,9 @@
 - [x] **Goal:** 建立项目级 Agent 边界和上下文文件。
 - [x] **Goal:** P0/P1 单体主控镜像和默认 Compose 落地。
 - [x] **Goal:** 安装脚本、CI、文档同步到单体架构。
-- [ ] **Goal:** 提交、推送并确认 GitHub 镜像成果。
+- [x] **Goal:** 提交、推送并确认 GitHub 镜像成果。
+- [x] **Goal:** Runtime Provider 层、任务元数据和主控可见入口落地。
+- [ ] **Goal:** 提交推送并确认 GitHub Actions / GHCR 成果。
 
 ## Notes For Next Agent
 
@@ -86,5 +70,5 @@
 - 修改代码前先读 `PROJECT_ID.md`、`AGENTS.md`、`PROJECT_CONTEXT.md`、`TASK.md`。
 - 推送只面向 `origin`：`zhizhishu/flux-3xui-orchestrator`。
 - 不要向 `upstream`：`zhizhishu/flux-panel` 推送或开 PR。
-- 主控目标形态是 `flux-master` 单体镜像，默认公网入口是 `5166`。
-- 被控 agent 使用 `http://MASTER_IP:5166` 作为 `FLUX_PANEL_URL`。
+- 主控默认公网入口是 `5166`。
+- 被控 Agent 使用 `http://MASTER_IP:5166` 作为 `FLUX_PANEL_URL`。

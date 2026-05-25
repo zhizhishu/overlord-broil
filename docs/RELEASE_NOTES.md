@@ -23,6 +23,7 @@ This release moves the project from the first public production milestone into a
 - Future branch update: install, certificate and firewall diagnostics now emit structured `diagnostics.items`; the master task card summarizes DNS, port `80`, certificate-file, ACME-tooling, local-firewall and cloud-firewall findings before users open raw logs.
 - Future branch update: connected the legacy Flux forwarding page to the shared `zh-CN` / `en-US` dictionary for its main flows, including toasts, form validation, empty states, import/export, delete confirmation, address copy and diagnostics modals.
 - Future branch update: added Nano controlled-server detection from agent heartbeat memory totals. The master stores `nano-critical` below `200 MB`, `nano` below `256 MB`, `small` below `512 MB`, raises low-memory alerts and blocks full 3x-ui/Xray orchestration plus Xray protocol-node creation on `nano-critical` hosts.
+- Future branch update: added the Runtime Provider registry for `xui`, `snell`, `forward`, `certificate` and `firewall`; deployment tasks now expose provider metadata to the master UI and controlled-agent claim payloads.
 
 ### 0.6.0 Capability Matrix
 
