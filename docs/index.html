@@ -44,7 +44,7 @@
       <section id="install" class="section">
         <div class="section-header">
           <h2>0.6.0 reliability gate，公开试用前先预检</h2>
-          <p>主控优先拉取 GitHub Actions 发布到 GHCR 的镜像；如果 GHCR 暂未公开，安装脚本会回退到下载公开源码并本地构建镜像。默认端口是前端 5166、后端/agent 回调 6365；phpMyAdmin 默认不暴露，只有显式设置端口时才发布。0.6.0 新增主控/被控 doctor、Docker/CI 多发行版安装矩阵、Release 发布包和主控首次配置向导。</p>
+          <p>主控优先拉取 GitHub Actions 发布到 GHCR 的镜像；如果 GHCR 暂未公开，安装脚本会回退到下载公开源码并本地构建镜像。默认只公开一个主控入口 5166，浏览器和被控 agent 都走这个入口；后端 6365、MySQL 和 phpMyAdmin 默认只在 Docker 内网。0.6.0 新增主控/被控 doctor、Docker/CI 多发行版安装矩阵、Release 发布包和主控首次配置向导。</p>
         </div>
         <div class="grid two">
           <article class="card">

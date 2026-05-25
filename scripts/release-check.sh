@@ -82,7 +82,8 @@ export JWT_SECRET="${JWT_SECRET:-release-check-jwt-secret}"
 export SECRET_ENCRYPTION_KEY="${SECRET_ENCRYPTION_KEY:-release-check-secret-encryption-key}"
 export FRONTEND_PORT="${FRONTEND_PORT:-18080}"
 export BACKEND_PORT="${BACKEND_PORT:-16365}"
-export PHPMYADMIN_PORT="${PHPMYADMIN_PORT:-18066}"
+export EXPOSE_BACKEND="${EXPOSE_BACKEND:-0}"
+export PHPMYADMIN_PORT="${PHPMYADMIN_PORT:-}"
 
 step "Validate shell scripts"
 bash -n scripts/*.sh

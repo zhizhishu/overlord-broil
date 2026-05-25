@@ -54,10 +54,11 @@ services:
       FRONTEND_PORT: ${FRONTEND_PORT}
       BACKEND_PORT: ${BACKEND_PORT}
       PHPMYADMIN_PORT: ${PHPMYADMIN_PORT:-}
+      EXPOSE_BACKEND: ${EXPOSE_BACKEND:-0}
       LOG_DIR: /app/logs
       JAVA_OPTS: "-Xms256m -Xmx512m -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
-    ports:
-      - "${BACKEND_PORT}:6365"
+    # Backend stays on the Docker network by default.
+    # install-master.sh creates docker-compose-backend.yml only when EXPOSE_BACKEND=1.
     volumes:
       - backend_logs:/app/logs
     depends_on:

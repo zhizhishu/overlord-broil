@@ -126,8 +126,8 @@ Recommended release gate before publishing:
   bash scripts/release-check.sh --full
 
 Default ports:
-- master frontend: 5166
-- backend API / agent callback: 6365
+- master public entry: 5166
+- backend API / agent callback: internal Docker network, proxied under the master entry /api/v1
 - controlled 3x-ui panel default: 5168
 - ACME HTTP validation, only when selected: 80
 EOF

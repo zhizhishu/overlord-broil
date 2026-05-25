@@ -90,8 +90,8 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
 
 | 端口 | 组件 | 说明 |
 | --- | --- | --- |
-| `5166` | 前端面板 | 默认公开访问入口，可用 `FLUX_FRONTEND_PORT` 修改；不再默认占用 `80` |
-| `6365` | 后端 API / agent 回调 | 可用 `FLUX_BACKEND_PORT` 修改 |
+| `5166` | 主控面板和 agent 回调统一入口 | 默认唯一公网入口，可用 `FLUX_FRONTEND_PORT` 修改；前端 Nginx 会把 `/api/v1/*` 反代到 Docker 内网后端 |
+| 内部 | 后端 API | 容器内 `6365`，默认不发布到宿主机；只有调试直连 API 时才设置 `FLUX_EXPOSE_BACKEND=1` |
 | 默认不暴露 | phpMyAdmin | 容器内部服务；需要临时维护时才设置 `FLUX_PHPMYADMIN_PORT` 或 `--phpmyadmin-port` 暴露 |
 | `3306` | MySQL | 默认只在容器内部使用，不发布到宿主机 |
 
@@ -103,11 +103,19 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
 
 | 范围 | 推荐放行 |
 | --- | --- |
-| 主控面板用户访问 | `5166/tcp` |
-| 被控 agent 回调主控后端 | `6365/tcp` |
+| 主控面板用户访问和被控 agent 回调 | `5166/tcp` |
 | ACME HTTP 验证 | 仅使用 `acme-http` 的域名/主机放行 `80/tcp` |
 | 被控节点业务端口 | 只放行你实际选择的 3x-ui 面板、Xray 入站、Snell、远端转发端口 |
-| 内部服务 | MySQL `3306`、phpMyAdmin 默认不暴露 |
+| 内部服务 | 后端 `6365`、MySQL `3306`、phpMyAdmin 默认不暴露 |
+
+默认 Docker Compose 只会看到一个 `0.0.0.0:5166->80/tcp` 的主控公网映射。被控 agent 的 `FLUX_PANEL_URL` 也填这个统一入口，例如 `http://your-master-panel:5166`，不要再填 `6365`。
+
+如果临时调试需要直连后端 API：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+  | sudo env FLUX_EXPOSE_BACKEND="1" FLUX_BACKEND_PORT="6365" bash
+```
 
 如果确实需要临时打开 phpMyAdmin：
 

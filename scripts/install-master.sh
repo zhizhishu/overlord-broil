@@ -10,6 +10,7 @@ NETWORK_STACK="${FLUX_NETWORK_STACK:-v4}"
 FRONTEND_PORT="${FLUX_FRONTEND_PORT:-5166}"
 BACKEND_PORT="${FLUX_BACKEND_PORT:-6365}"
 PHPMYADMIN_PORT="${FLUX_PHPMYADMIN_PORT:-}"
+EXPOSE_BACKEND="${FLUX_EXPOSE_BACKEND:-0}"
 DB_NAME="${FLUX_DB_NAME:-gost}"
 DB_USER="${FLUX_DB_USER:-gost}"
 DB_PASSWORD="${FLUX_DB_PASSWORD:-}"
@@ -26,6 +27,14 @@ BACKUP_FILE="${FLUX_BACKUP_FILE:-}"
 ASSUME_YES="0"
 ACTION_SET="0"
 STACK_EXPLICIT="0"
+FRONTEND_PORT_EXPLICIT="0"
+BACKEND_PORT_EXPLICIT="0"
+PHPMYADMIN_PORT_EXPLICIT="0"
+EXPOSE_BACKEND_EXPLICIT="0"
+if [ "${FLUX_FRONTEND_PORT+x}" = "x" ]; then FRONTEND_PORT_EXPLICIT="1"; fi
+if [ "${FLUX_BACKEND_PORT+x}" = "x" ]; then BACKEND_PORT_EXPLICIT="1"; fi
+if [ "${FLUX_PHPMYADMIN_PORT+x}" = "x" ]; then PHPMYADMIN_PORT_EXPLICIT="1"; fi
+if [ "${FLUX_EXPOSE_BACKEND+x}" = "x" ]; then EXPOSE_BACKEND_EXPLICIT="1"; fi
 
 usage() {
   cat <<'EOF'
@@ -44,7 +53,9 @@ Options:
   --dir PATH              Install directory, default /opt/flux-3xui-orchestrator
   --stack v4|v6           Compose network stack, default v4
   --frontend-port PORT    Public frontend port, default 5166
-  --backend-port PORT     Public backend API port, default 6365
+  --backend-port PORT     Backend debug port when --expose-backend is enabled, default 6365
+  --expose-backend        Publish backend API port for debugging; disabled by default
+  --no-expose-backend     Keep backend API internal to Docker network
   --phpmyadmin-port PORT  Expose phpMyAdmin on this host port; disabled by default
   --backup-dir PATH       Backup output directory, default /opt/flux-3xui-orchestrator/backups
   --backup-file PATH      Backup archive used by restore
@@ -61,6 +72,7 @@ Environment:
   FLUX_DB_PASSWORD          Optional database password; generated when empty
   FLUX_JWT_SECRET           Optional JWT secret; generated when empty
   FLUX_SECRET_ENCRYPTION_KEY Optional credential encryption key; generated when empty
+  FLUX_EXPOSE_BACKEND        Optional backend public exposure flag, default 0
   FLUX_PHPMYADMIN_PORT       Optional phpMyAdmin public port; unset disables public exposure
   FLUX_BACKUP_DIR           Optional backup output directory
   FLUX_BACKUP_FILE          Optional restore archive path
@@ -93,14 +105,27 @@ while [ "$#" -gt 0 ]; do
       ;;
     --frontend-port)
       FRONTEND_PORT="$2"
+      FRONTEND_PORT_EXPLICIT="1"
       shift 2
       ;;
     --backend-port)
       BACKEND_PORT="$2"
+      BACKEND_PORT_EXPLICIT="1"
       shift 2
+      ;;
+    --expose-backend)
+      EXPOSE_BACKEND="1"
+      EXPOSE_BACKEND_EXPLICIT="1"
+      shift
+      ;;
+    --no-expose-backend)
+      EXPOSE_BACKEND="0"
+      EXPOSE_BACKEND_EXPLICIT="1"
+      shift
       ;;
     --phpmyadmin-port)
       PHPMYADMIN_PORT="$2"
+      PHPMYADMIN_PORT_EXPLICIT="1"
       shift 2
       ;;
     --backup-dir)
@@ -155,10 +180,16 @@ if [ "$NETWORK_STACK" != "v4" ] && [ "$NETWORK_STACK" != "v6" ]; then
   exit 2
 fi
 
+if [ "$EXPOSE_BACKEND" != "0" ] && [ "$EXPOSE_BACKEND" != "1" ]; then
+  echo "FLUX_EXPOSE_BACKEND must be 0 or 1." >&2
+  exit 2
+fi
+
 BACKUP_DIR="${BACKUP_DIR:-${INSTALL_DIR}/backups}"
 COMPOSE_FILE="docker-compose-${NETWORK_STACK}.yml"
 ENV_FILE=".env"
 PHPMYADMIN_OVERRIDE_FILE="docker-compose-phpmyadmin.yml"
+BACKEND_OVERRIDE_FILE="docker-compose-backend.yml"
 
 detect_os_name() {
   if [ -r /etc/os-release ]; then
@@ -285,6 +316,38 @@ env_key_exists() {
   grep -qE "^${key}=" "$file"
 }
 
+write_env_value() {
+  local key="$1"
+  local value="$2"
+  local file="$3"
+  local tmp
+  tmp="$(mktemp)"
+  if grep -qE "^${key}=" "$file"; then
+    awk -v key="$key" -v value="$value" '
+      BEGIN { done = 0 }
+      $0 ~ "^" key "=" {
+        if (done == 0) {
+          print key "=" value
+          done = 1
+        }
+        next
+      }
+      { print }
+      END {
+        if (done == 0) {
+          print key "=" value
+        }
+      }
+    ' "$file" > "$tmp"
+  else
+    cp "$file" "$tmp"
+    printf '%s=%s\n' "$key" "$value" >> "$tmp"
+  fi
+  cat "$tmp" > "$file"
+  rm -f "$tmp"
+  chmod 600 "$file"
+}
+
 require_env_values() {
   local file="$1"
   local missing=""
@@ -295,7 +358,7 @@ require_env_values() {
     exit 2
   fi
 
-  for key in DB_NAME DB_USER DB_PASSWORD JWT_SECRET SECRET_ENCRYPTION_KEY FRONTEND_PORT BACKEND_PORT; do
+  for key in DB_NAME DB_USER DB_PASSWORD JWT_SECRET SECRET_ENCRYPTION_KEY FRONTEND_PORT BACKEND_PORT EXPOSE_BACKEND; do
     value="$(read_env_value "$key" "$file")"
     if [ -z "$value" ]; then
       missing="${missing} ${key}"
@@ -358,14 +421,33 @@ load_existing_env() {
     DB_USER="${DB_USER:-gost}"
     DB_PASSWORD="${DB_PASSWORD:-}"
     PHPMYADMIN_PORT="${PHPMYADMIN_PORT:-}"
+    EXPOSE_BACKEND="${EXPOSE_BACKEND:-0}"
   fi
 }
 
 compose_cmd() {
+  local files=("-f" "$COMPOSE_FILE")
+  if [ -f "$BACKEND_OVERRIDE_FILE" ]; then
+    files+=("-f" "$BACKEND_OVERRIDE_FILE")
+  fi
   if [ -f "$PHPMYADMIN_OVERRIDE_FILE" ]; then
-    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -f "$PHPMYADMIN_OVERRIDE_FILE" "$@"
+    files+=("-f" "$PHPMYADMIN_OVERRIDE_FILE")
+  fi
+  docker compose --env-file "$ENV_FILE" "${files[@]}" "$@"
+}
+
+ensure_backend_override() {
+  local configured_expose
+  configured_expose="$(read_env_value EXPOSE_BACKEND "$ENV_FILE")"
+  if [ "$configured_expose" = "1" ]; then
+    cat > "$BACKEND_OVERRIDE_FILE" <<'YAML'
+services:
+  backend:
+    ports:
+      - "${BACKEND_PORT}:6365"
+YAML
   else
-    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
+    rm -f "$BACKEND_OVERRIDE_FILE"
   fi
 }
 
@@ -418,6 +500,7 @@ SECRET_ENCRYPTION_KEY=${SECRET_ENCRYPTION_KEY}
 FRONTEND_PORT=${FRONTEND_PORT}
 BACKEND_PORT=${BACKEND_PORT}
 PHPMYADMIN_PORT=${PHPMYADMIN_PORT}
+EXPOSE_BACKEND=${EXPOSE_BACKEND}
 ENV
     chmod 600 "$ENV_FILE"
     echo "Generated ${INSTALL_DIR}/${ENV_FILE}"
@@ -425,16 +508,49 @@ ENV
     echo "Keeping existing ${INSTALL_DIR}/${ENV_FILE}"
     if [ -z "$(read_env_value SECRET_ENCRYPTION_KEY "$ENV_FILE")" ]; then
       SECRET_ENCRYPTION_KEY="${SECRET_ENCRYPTION_KEY:-$(random_hex 32)}"
-      umask 077
-      printf '\nSECRET_ENCRYPTION_KEY=%s\n' "$SECRET_ENCRYPTION_KEY" >> "$ENV_FILE"
-      chmod 600 "$ENV_FILE"
+      write_env_value SECRET_ENCRYPTION_KEY "$SECRET_ENCRYPTION_KEY" "$ENV_FILE"
       echo "Added SECRET_ENCRYPTION_KEY to existing ${INSTALL_DIR}/${ENV_FILE}"
     fi
+    if ! env_key_exists FRONTEND_PORT "$ENV_FILE"; then
+      write_env_value FRONTEND_PORT "$FRONTEND_PORT" "$ENV_FILE"
+      echo "Added FRONTEND_PORT to existing ${INSTALL_DIR}/${ENV_FILE}"
+    fi
+    if ! env_key_exists BACKEND_PORT "$ENV_FILE"; then
+      write_env_value BACKEND_PORT "$BACKEND_PORT" "$ENV_FILE"
+      echo "Added BACKEND_PORT to existing ${INSTALL_DIR}/${ENV_FILE}"
+    fi
+    if ! env_key_exists EXPOSE_BACKEND "$ENV_FILE"; then
+      write_env_value EXPOSE_BACKEND "$EXPOSE_BACKEND" "$ENV_FILE"
+      echo "Added EXPOSE_BACKEND to existing ${INSTALL_DIR}/${ENV_FILE}"
+    fi
     if ! env_key_exists PHPMYADMIN_PORT "$ENV_FILE"; then
-      printf '\nPHPMYADMIN_PORT=%s\n' "$PHPMYADMIN_PORT" >> "$ENV_FILE"
-      chmod 600 "$ENV_FILE"
+      write_env_value PHPMYADMIN_PORT "$PHPMYADMIN_PORT" "$ENV_FILE"
       echo "Added PHPMYADMIN_PORT to existing ${INSTALL_DIR}/${ENV_FILE}"
     fi
+  fi
+
+  if [ "$FRONTEND_PORT_EXPLICIT" = "1" ]; then
+    write_env_value FRONTEND_PORT "$FRONTEND_PORT" "$ENV_FILE"
+  elif [ "$(read_env_value FRONTEND_PORT "$ENV_FILE")" = "80" ]; then
+    write_env_value FRONTEND_PORT "5166" "$ENV_FILE"
+    echo "Migrated legacy FRONTEND_PORT=80 to the single-entry default 5166. Set FLUX_FRONTEND_PORT=80 if you intentionally want port 80."
+  fi
+
+  if [ "$BACKEND_PORT_EXPLICIT" = "1" ]; then
+    write_env_value BACKEND_PORT "$BACKEND_PORT" "$ENV_FILE"
+  fi
+
+  if [ "$EXPOSE_BACKEND_EXPLICIT" = "1" ]; then
+    write_env_value EXPOSE_BACKEND "$EXPOSE_BACKEND" "$ENV_FILE"
+  else
+    write_env_value EXPOSE_BACKEND "0" "$ENV_FILE"
+  fi
+
+  if [ "$PHPMYADMIN_PORT_EXPLICIT" = "1" ]; then
+    write_env_value PHPMYADMIN_PORT "$PHPMYADMIN_PORT" "$ENV_FILE"
+  elif [ "${FLUX_PRESERVE_PHPMYADMIN_PORT:-0}" != "1" ] && [ -n "$(read_env_value PHPMYADMIN_PORT "$ENV_FILE")" ]; then
+    write_env_value PHPMYADMIN_PORT "" "$ENV_FILE"
+    echo "Disabled public phpMyAdmin exposure. Set FLUX_PHPMYADMIN_PORT or --phpmyadmin-port when temporary maintenance access is needed."
   fi
 }
 
@@ -480,33 +596,41 @@ port_is_listening() {
 
 preflight_ports() {
   load_existing_env
-  local final_frontend final_backend final_phpmyadmin
+  local final_frontend final_backend final_phpmyadmin final_expose_backend
   final_frontend="$(read_env_value FRONTEND_PORT "$ENV_FILE")"
   final_backend="$(read_env_value BACKEND_PORT "$ENV_FILE")"
   final_phpmyadmin="$(read_env_value PHPMYADMIN_PORT "$ENV_FILE")"
+  final_expose_backend="$(read_env_value EXPOSE_BACKEND "$ENV_FILE")"
 
   validate_port_number FRONTEND_PORT "$final_frontend"
   validate_port_number BACKEND_PORT "$final_backend"
   if [ -n "$final_phpmyadmin" ]; then
     validate_port_number PHPMYADMIN_PORT "$final_phpmyadmin"
   fi
+  if [ "$final_expose_backend" != "0" ] && [ "$final_expose_backend" != "1" ]; then
+    echo "EXPOSE_BACKEND must be 0 or 1." >&2
+    exit 2
+  fi
 
-  if [ "$final_frontend" = "$final_backend" ] || { [ -n "$final_phpmyadmin" ] && { [ "$final_frontend" = "$final_phpmyadmin" ] || [ "$final_backend" = "$final_phpmyadmin" ]; }; }; then
-    echo "FRONTEND_PORT, BACKEND_PORT and PHPMYADMIN_PORT must be different." >&2
+  if { [ "$final_expose_backend" = "1" ] && [ "$final_frontend" = "$final_backend" ]; } || { [ -n "$final_phpmyadmin" ] && { [ "$final_frontend" = "$final_phpmyadmin" ] || { [ "$final_expose_backend" = "1" ] && [ "$final_backend" = "$final_phpmyadmin" ]; }; }; }; then
+    echo "Public FRONTEND_PORT, exposed BACKEND_PORT and PHPMYADMIN_PORT must be different." >&2
     exit 2
   fi
 
   local label port
-  for label in FRONTEND_PORT BACKEND_PORT; do
+  for label in FRONTEND_PORT; do
     case "$label" in
       FRONTEND_PORT) port="$final_frontend" ;;
-      BACKEND_PORT) port="$final_backend" ;;
     esac
     if port_is_listening "$port" && ! port_owned_by_flux_container "$port"; then
       echo "${label}=${port} is already listening on this host. Set a different FLUX_${label} or stop the conflicting service." >&2
       exit 2
     fi
   done
+  if [ "$final_expose_backend" = "1" ] && port_is_listening "$final_backend" && ! port_owned_by_flux_container "$final_backend"; then
+    echo "BACKEND_PORT=${final_backend} is already listening on this host. Set a different FLUX_BACKEND_PORT or disable FLUX_EXPOSE_BACKEND." >&2
+    exit 2
+  fi
   if [ -n "$final_phpmyadmin" ] && port_is_listening "$final_phpmyadmin" && ! port_owned_by_flux_container "$final_phpmyadmin"; then
     echo "PHPMYADMIN_PORT=${final_phpmyadmin} is already listening on this host. Set a different FLUX_PHPMYADMIN_PORT or stop the conflicting service." >&2
     exit 2
@@ -538,6 +662,7 @@ print_success() {
   FINAL_FRONTEND_PORT="$(read_env_value FRONTEND_PORT "$ENV_FILE")"
   FINAL_BACKEND_PORT="$(read_env_value BACKEND_PORT "$ENV_FILE")"
   FINAL_PHPMYADMIN_PORT="$(read_env_value PHPMYADMIN_PORT "$ENV_FILE")"
+  FINAL_EXPOSE_BACKEND="$(read_env_value EXPOSE_BACKEND "$ENV_FILE")"
   PANEL_HOST="$(detect_host)"
 
   cat <<EOF
@@ -545,8 +670,9 @@ print_success() {
 Flux 3x-ui Orchestrator is running.
 
 Install dir: ${INSTALL_DIR}
-Frontend:    http://${PANEL_HOST}:${FINAL_FRONTEND_PORT}
-Backend API: http://${PANEL_HOST}:${FINAL_BACKEND_PORT}
+Panel URL:   http://${PANEL_HOST}:${FINAL_FRONTEND_PORT}
+Agent URL:   http://${PANEL_HOST}:${FINAL_FRONTEND_PORT}
+Backend API: $(if [ "$FINAL_EXPOSE_BACKEND" = "1" ]; then printf 'http://%s:%s  (debug only; agents should still use the Panel URL)' "$PANEL_HOST" "$FINAL_BACKEND_PORT"; else printf 'internal only; proxied through Panel URL /api/v1/*'; fi)
 phpMyAdmin:  $(if [ -n "$FINAL_PHPMYADMIN_PORT" ]; then printf 'http://%s:%s  (restrict by firewall in production)' "$PANEL_HOST" "$FINAL_PHPMYADMIN_PORT"; else printf 'not publicly exposed; set FLUX_PHPMYADMIN_PORT or --phpmyadmin-port to expose temporarily'; fi)
 
 Default login from gost.sql:
@@ -644,6 +770,7 @@ run_master_doctor() {
   local frontend_port="${FRONTEND_PORT}"
   local backend_port="${BACKEND_PORT}"
   local phpmyadmin_port="${PHPMYADMIN_PORT}"
+  local expose_backend="${EXPOSE_BACKEND}"
 
   echo "Flux master doctor"
   doctor_item ok "os" "$(detect_os_name)"
@@ -682,23 +809,36 @@ run_master_doctor() {
     frontend_port="$(read_env_value FRONTEND_PORT "${INSTALL_DIR}/${ENV_FILE}")"
     backend_port="$(read_env_value BACKEND_PORT "${INSTALL_DIR}/${ENV_FILE}")"
     phpmyadmin_port="$(read_env_value PHPMYADMIN_PORT "${INSTALL_DIR}/${ENV_FILE}")"
+    expose_backend="$(read_env_value EXPOSE_BACKEND "${INSTALL_DIR}/${ENV_FILE}")"
+    expose_backend="${expose_backend:-0}"
     doctor_item ok "env-file" "found ${INSTALL_DIR}/${ENV_FILE}"
   else
     doctor_item warn "env-file" "not found yet; using requested/default ports"
   fi
 
   doctor_port FRONTEND_PORT "$frontend_port"
-  doctor_port BACKEND_PORT "$backend_port"
+  if [ "$expose_backend" != "0" ] && [ "$expose_backend" != "1" ]; then
+    doctor_item fail "EXPOSE_BACKEND" "invalid flag '${expose_backend}', expected 0 or 1"
+  fi
+  if [ "$expose_backend" = "1" ]; then
+    doctor_port BACKEND_PORT "$backend_port"
+  else
+    doctor_item ok "BACKEND_PORT" "${backend_port} internal only; not published"
+  fi
   if [ -n "$phpmyadmin_port" ]; then
     doctor_port PHPMYADMIN_PORT "$phpmyadmin_port"
   else
     doctor_item ok "PHPMYADMIN_PORT" "not publicly exposed"
   fi
 
-  if [ "$frontend_port" = "$backend_port" ] || { [ -n "$phpmyadmin_port" ] && { [ "$frontend_port" = "$phpmyadmin_port" ] || [ "$backend_port" = "$phpmyadmin_port" ]; }; }; then
-    doctor_item fail "port-matrix" "FRONTEND_PORT, BACKEND_PORT and PHPMYADMIN_PORT must be different"
+  if { [ "$expose_backend" = "1" ] && [ "$frontend_port" = "$backend_port" ]; } || { [ -n "$phpmyadmin_port" ] && { [ "$frontend_port" = "$phpmyadmin_port" ] || { [ "$expose_backend" = "1" ] && [ "$backend_port" = "$phpmyadmin_port" ]; }; }; }; then
+    doctor_item fail "port-matrix" "public FRONTEND_PORT, exposed BACKEND_PORT and PHPMYADMIN_PORT must be different"
   else
-    doctor_item ok "port-matrix" "frontend=${frontend_port}, backend=${backend_port}, phpmyadmin=${phpmyadmin_port:-disabled}"
+    if [ "$expose_backend" = "1" ]; then
+      doctor_item ok "port-matrix" "frontend=${frontend_port}, backend=${backend_port} exposed, phpmyadmin=${phpmyadmin_port:-disabled}"
+    else
+      doctor_item ok "port-matrix" "frontend=${frontend_port}, backend=internal, phpmyadmin=${phpmyadmin_port:-disabled}"
+    fi
   fi
 
   if [ "$doctor_failed" -eq 0 ]; then
@@ -720,7 +860,7 @@ create_backup() {
   archive="${BACKUP_DIR}/flux-master-backup-${stamp}.tar.gz"
 
   mkdir -p "${workdir}/files"
-  for file in "$ENV_FILE" "docker-compose-v4.yml" "docker-compose-v6.yml" "$PHPMYADMIN_OVERRIDE_FILE" "gost.sql"; do
+  for file in "$ENV_FILE" "docker-compose-v4.yml" "docker-compose-v6.yml" "$BACKEND_OVERRIDE_FILE" "$PHPMYADMIN_OVERRIDE_FILE" "gost.sql"; do
     if [ -f "$file" ]; then
       cp -p "$file" "${workdir}/files/${file}"
       file_count=$((file_count + 1))
@@ -773,6 +913,7 @@ restore_backup() {
 
   require_env_values "$ENV_FILE"
   resolve_restore_compose_file
+  ensure_backend_override
   ensure_phpmyadmin_override
 
   docker_login_if_configured
@@ -794,6 +935,7 @@ install_or_upgrade() {
   download_runtime_files
   ensure_env_file
   require_env_values "$ENV_FILE"
+  ensure_backend_override
   ensure_phpmyadmin_override
   preflight_ports
   docker_login_if_configured

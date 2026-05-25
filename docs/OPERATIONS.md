@@ -52,7 +52,23 @@ Common overrides:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo env FLUX_FRONTEND_PORT="8080" FLUX_BACKEND_PORT="6365" FLUX_PHPMYADMIN_PORT="18066" FLUX_NETWORK_STACK="v4" bash
+  | sudo env FLUX_FRONTEND_PORT="8080" FLUX_NETWORK_STACK="v4" bash
+```
+
+The production compose layout publishes only the master entry port. Backend
+`6365` stays on the Docker network and is reached through the frontend Nginx
+proxy under `/api/v1/*`. Expose it only for direct API debugging:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+  | sudo env FLUX_EXPOSE_BACKEND="1" FLUX_BACKEND_PORT="6365" bash
+```
+
+Expose phpMyAdmin only for short maintenance windows:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+  | sudo env FLUX_PHPMYADMIN_PORT="18066" bash
 ```
 
 Day-2 actions:
@@ -75,13 +91,13 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
   | sudo bash -s -- doctor
 ```
 
-It checks OS/package-manager detection, root status, Docker/Compose, Docker daemon reachability, existing `.env` values and whether frontend/backend ports, plus phpMyAdmin when explicitly exposed, are already occupied. For CI/container checks where Docker is intentionally unavailable:
+It checks OS/package-manager detection, root status, Docker/Compose, Docker daemon reachability, existing `.env` values and whether the public frontend port, plus backend/phpMyAdmin only when explicitly exposed, are already occupied. For CI/container checks where Docker is intentionally unavailable:
 
 ```bash
 FLUX_DOCTOR_REQUIRE_DOCKER=0 \
 FLUX_FRONTEND_PORT=18080 \
 FLUX_BACKEND_PORT=16365 \
-FLUX_PHPMYADMIN_PORT=18066 \
+FLUX_EXPOSE_BACKEND=0 \
   bash scripts/install-master.sh doctor
 ```
 
@@ -249,12 +265,12 @@ Default master ports:
 
 | Port | Component | Production note |
 | --- | --- | --- |
-| `5166` | Frontend panel | Change with `FLUX_FRONTEND_PORT`; default avoids occupying port `80`. |
-| `6365` | Backend API and agent callback | Change with `FLUX_BACKEND_PORT`; agents must use the same URL. |
+| `5166` | Master panel and agent callback entry | Change with `FLUX_FRONTEND_PORT`; default avoids occupying port `80`; `/api/v1/*` proxies to backend internally. |
+| internal | Backend API | Container-internal `6365`; publish only for debugging with `FLUX_EXPOSE_BACKEND=1`. |
 | disabled | phpMyAdmin | Internal only by default; set `FLUX_PHPMYADMIN_PORT` or `--phpmyadmin-port` only during maintenance. |
 | `3306` | MySQL | Container-internal in the shipped compose files. |
 
-Controlled hosts do not need an inbound agent port. They only expose the default 3x-ui panel port `5168`, Xray/Snell node ports, remote-forward listen ports, and ACME HTTP `80` when selected by your orchestration plan. Nano hosts below `200 MB` should not expose new Xray/3x-ui ports through the master; keep them on Snell or forwarding unless you deliberately override outside the supported path.
+Controlled hosts do not need an inbound agent port. Agents call the same master entry URL that users open in the browser, for example `http://master:5166`. Controlled hosts only expose the default 3x-ui panel port `5168` when you intentionally allow it, Xray/Snell node ports, remote-forward listen ports, and ACME HTTP `80` when selected by your orchestration plan. Nano hosts below `200 MB` should not expose new Xray/3x-ui ports through the master; keep them on Snell or forwarding unless you deliberately override outside the supported path.
 
 ## Local And CI Verification
 

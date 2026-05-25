@@ -1,5 +1,24 @@
 # TASK_LOG
 
+## 2026-05-25 主控单端口安装修复计划
+
+### 本轮计划（创建于: 2026-05-25 05:45:38）
+1. 复核 `install-master.sh`、`docker-compose-v4.yml`、`docker-compose-v6.yml` 当前端口映射，定位为什么真机默认暴露 `80/6365/phpMyAdmin`。
+2. 将正式默认部署收口为单公网入口：主控前端 `5166` 公开，后端 `6365` 仅 Docker 内网，phpMyAdmin 默认不外露。
+3. 保留调试开关：需要直连后端时才显式启用 `FLUX_EXPOSE_BACKEND=1`，需要 phpMyAdmin 时才设置 `FLUX_PHPMYADMIN_PORT`。
+4. 更新 README / 运维文档 / release notes，把 Docker Compose 单端口方案、升级命令和被控 agent 回调方式写清楚。
+5. 跑本地可用验证，提交并推送；如确认 `main` 安装路径仍旧，需同步发布路径让一键安装马上生效。
+
+- [x] ~~**目标:** 修复主控安装默认暴露多个公网端口的问题，并补齐单端口 Docker Compose 方案~~ (创建于: 2026-05-25 05:45:38 | **完成于: 2026-05-25 06:55:50**)
+
+### 2026-05-25 06:55:50 进度记录
+
+- `docker-compose-v4.yml` / `docker-compose-v6.yml` 已移除默认 backend 宿主机端口映射；正式默认只发布 frontend/master 入口，backend `6365` 留在 Docker 内网，由 frontend Nginx 反代 `/api/v1/*`。
+- `scripts/install-master.sh` 新增 `FLUX_EXPOSE_BACKEND` / `--expose-backend` 调试开关；默认 `EXPOSE_BACKEND=0`，只有显式开启时才生成 `docker-compose-backend.yml` 并发布 `${BACKEND_PORT}:6365`。
+- 安装脚本会把老安装遗留的 `FRONTEND_PORT=80` 自动迁移为 `5166`；老 `.env` 里的 phpMyAdmin 公网端口会默认清空，除非显式传 `FLUX_PHPMYADMIN_PORT` 或 `FLUX_PRESERVE_PHPMYADMIN_PORT=1`。
+- 文档已更新为单公网入口方案：主控和被控 agent 都使用 `http://master:5166`，phpMyAdmin/backend 只在调试或维护时显式外露。
+- 本地验证通过：`bash -n scripts/*.sh`、compose v4/v6 config、master doctor、`scripts/test-compose-smoke.sh --build-local --dry-run`、完整 `scripts/test-compose-smoke.sh --build-local`、`scripts/test-flux-agent-mock.sh`、`scripts/test-three-xui-fixture.sh`、Alpine install matrix、`git diff --check`。完整 Docker smoke 后已清理临时容器、卷、网络，18080/16365 未监听。
+
 ## 接力摘要
 
 - 当前目标：主控面板已经从“节点创建/脚本生成”推进到“按被控服务器统一管理规则”，覆盖 3x-ui 出入站查看与调整入口、统一协议节点、Snell 节点、远端端口转发和规则总览。

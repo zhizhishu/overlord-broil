@@ -56,7 +56,7 @@ Manual `Release` workflow runs use the same path: pass a version that matches `V
 
 Formal runtime assumptions for this release:
 
-- Use a fresh Linux host or a host where ports `5166` and `6365` are either free or intentionally remapped.
+- Use a fresh Linux host or a host where the single public master entry port `5166` is free or intentionally remapped.
 - Supported master hosts are Docker-capable Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux. Minimal hosts without `bash` can use the bootstrap commands below.
 - Full 3x-ui install/configure orchestration requires a normal systemd host, such as Debian, Ubuntu, Rocky Linux or Oracle Linux. Alpine/OpenRC is supported for the Flux agent, Snell tasks and remote port-forward tasks, but not for upstream 3x-ui service installation.
 - Nano controlled servers are detected from agent heartbeat memory totals. Below `256 MB` the UI marks the host as `Nano`; below `200 MB` the master blocks full 3x-ui/Xray orchestration and recommends Snell, remote port forwarding or enabling swap first.
@@ -69,8 +69,8 @@ Default master ports:
 
 | Port | Component | Notes |
 | --- | --- | --- |
-| `5166` | Frontend panel | Change with `FLUX_FRONTEND_PORT`; this intentionally avoids occupying `80`. |
-| `6365` | Backend API / agent callback | Change with `FLUX_BACKEND_PORT`. |
+| `5166` | Master panel and agent callback entry | Change with `FLUX_FRONTEND_PORT`; this intentionally avoids occupying `80`. The frontend Nginx proxies `/api/v1/*` to the backend inside Docker. |
+| internal | Backend API | Container-internal `6365`; publish it only for debugging with `FLUX_EXPOSE_BACKEND=1`. |
 | disabled | phpMyAdmin | Internal container service only by default; set `FLUX_PHPMYADMIN_PORT` or `--phpmyadmin-port` to expose it temporarily. |
 | `3306` | MySQL | Container-internal only; not published to the host. |
 
@@ -80,11 +80,10 @@ Recommended public firewall baseline:
 
 | Scope | Ports |
 | --- | --- |
-| Master panel users | `5166/tcp` |
-| Agents calling back to backend | `6365/tcp` |
+| Master panel users and controlled agents | `5166/tcp` |
 | ACME HTTP validation | `80/tcp` only on hosts/domains using `acme-http` |
 | Controlled nodes | Open only the selected 3x-ui panel, Xray inbound, Snell and remote-forward ports |
-| Internal only | MySQL `3306`, phpMyAdmin unless temporarily exposed |
+| Internal only | Backend `6365`, MySQL `3306`, phpMyAdmin unless temporarily exposed |
 
 Linux support matrix:
 
@@ -156,7 +155,19 @@ Common options:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo env FLUX_FRONTEND_PORT="5166" FLUX_BACKEND_PORT="6365" FLUX_NETWORK_STACK="v4" bash
+  | sudo env FLUX_FRONTEND_PORT="5166" FLUX_NETWORK_STACK="v4" bash
+```
+
+The default compose layout publishes only the frontend/master entry port. The
+backend remains on the Docker network and is reached through the frontend Nginx
+proxy under `/api/v1/*`, so controlled agents should use the same URL as browser
+users, for example `http://your-master-panel:5166`.
+
+Expose the backend only when you are debugging direct API access:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+  | sudo env FLUX_EXPOSE_BACKEND="1" FLUX_BACKEND_PORT="6365" bash
 ```
 
 phpMyAdmin is not publicly exposed by default. Expose it only for maintenance:

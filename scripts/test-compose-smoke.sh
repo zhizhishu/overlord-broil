@@ -7,7 +7,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMPOSE_FILE="${FLUX_COMPOSE_FILE:-docker-compose-v4.yml}"
 BACKEND_PORT="${BACKEND_PORT:-16365}"
 FRONTEND_PORT="${FRONTEND_PORT:-18080}"
-BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:${BACKEND_PORT}/flow/test}"
+BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:6365/flow/test}"
 FRONTEND_URL="${FRONTEND_URL:-http://127.0.0.1:${FRONTEND_PORT}/}"
 DB_NAME="${DB_NAME:-gost_smoke}"
 DB_USER="${DB_USER:-gost_smoke}"
@@ -24,7 +24,7 @@ usage() {
 Usage: scripts/test-compose-smoke.sh [--compose-file FILE] [--backend-port PORT] [--frontend-port PORT] [--timeout SECONDS] [--build-local] [--dry-run]
 
 Starts the compose smoke stack with test environment values, checks:
-  - backend:  GET /flow/test
+  - backend:  GET /flow/test from inside the backend container
   - frontend: GET /
 
 The script always runs docker compose down --volumes --remove-orphans before exit
@@ -116,6 +116,20 @@ check_http() {
   esac
 }
 
+check_container_http() {
+  local label="$1"
+  local container="$2"
+  local url="$3"
+
+  if docker exec "$container" sh -c "wget --no-verbose --tries=1 --spider '$url'" >/dev/null 2>&1; then
+    echo "${label} healthy inside ${container}: ${url}"
+    return 0
+  fi
+
+  echo "${label} not ready inside ${container}: ${url}"
+  return 1
+}
+
 wait_for_http() {
   local label="$1"
   local url="$2"
@@ -124,6 +138,24 @@ wait_for_http() {
 
   while [ "$SECONDS" -lt "$deadline" ]; do
     if check_http "$label" "$url"; then
+      return 0
+    fi
+    sleep "$POLL_SECONDS"
+  done
+
+  echo "${label} did not become healthy within ${TIMEOUT_SECONDS}s." >&2
+  return 1
+}
+
+wait_for_container_http() {
+  local label="$1"
+  local container="$2"
+  local url="$3"
+  local deadline
+  deadline=$((SECONDS + TIMEOUT_SECONDS))
+
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if check_container_http "$label" "$container" "$url"; then
       return 0
     fi
     sleep "$POLL_SECONDS"
@@ -194,9 +226,10 @@ require_command docker
 require_command curl
 
 export DB_NAME DB_USER DB_PASSWORD JWT_SECRET BACKEND_PORT FRONTEND_PORT
+export EXPOSE_BACKEND="${EXPOSE_BACKEND:-0}"
 
 echo "Compose file: ${COMPOSE_FILE}"
-echo "Backend URL: ${BACKEND_URL}"
+echo "Backend internal URL: ${BACKEND_URL}"
 echo "Frontend URL: ${FRONTEND_URL}"
 
 compose config --quiet
@@ -218,7 +251,7 @@ if [ "$BUILD_LOCAL" = "true" ]; then
 fi
 
 compose up -d mysql backend frontend
-wait_for_http "backend" "$BACKEND_URL"
+wait_for_container_http "backend" springboot-backend "$BACKEND_URL"
 wait_for_http "frontend" "$FRONTEND_URL"
 
 echo "compose smoke test passed"

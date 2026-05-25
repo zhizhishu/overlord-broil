@@ -64,7 +64,8 @@ jobs:
           SECRET_ENCRYPTION_KEY: test-secret-encryption-key
           FRONTEND_PORT: "18080"
           BACKEND_PORT: "16365"
-          PHPMYADMIN_PORT: "18066"
+          EXPOSE_BACKEND: "0"
+          PHPMYADMIN_PORT: ""
         run: |
           docker compose -f docker-compose-v4.yml config --quiet
           docker compose -f docker-compose-v6.yml config --quiet
