@@ -85,7 +85,23 @@ class Handler(BaseHTTPRequestHandler):
                 self._send({"success": True, "data": None})
             else:
                 claimed = True
-                self._send({"success": True, "data": {"id": 101, "script": task_script}})
+                self._send({"success": True, "data": {
+                    "id": 101,
+                    "script": task_script,
+                    "runtimeProvider": {
+                        "key": "snell",
+                        "name": "Snell Runtime",
+                        "protocol": "snell",
+                        "action": "present",
+                        "executor": "flux-agent",
+                        "stateSource": "agent-report",
+                        "agentRequired": True,
+                        "masterApiSupported": False,
+                        "nanoSupported": True,
+                        "capabilities": ["install-snell", "restart-service"],
+                        "relatedProviders": ["firewall"],
+                    },
+                }})
             return
 
         if self.path == "/api/v1/agent-task/report":
@@ -160,6 +176,11 @@ if not final_reports:
 
 final = final_reports[-1]
 result = json.loads(final.get("resultJson") or "{}")
+for report in reports:
+    report_result = json.loads(report.get("resultJson") or "{}")
+    provider = report_result.get("runtimeProvider") or {}
+    if provider.get("key") != "snell":
+        raise SystemExit(f"report missing runtimeProvider snell metadata: {report_result}")
 
 if final.get("state") != expected_state:
     raise SystemExit(f"expected state {expected_state}, got {final.get('state')}: {final}")

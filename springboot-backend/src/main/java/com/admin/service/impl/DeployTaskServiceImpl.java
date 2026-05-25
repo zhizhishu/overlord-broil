@@ -1,6 +1,7 @@
 package com.admin.service.impl;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.admin.common.dto.AgentTaskClaimDto;
 import com.admin.common.dto.AgentTaskReportDto;
 import com.admin.common.dto.DeployTaskDto;
@@ -23,6 +24,7 @@ import com.admin.service.ProtocolProfileService;
 import com.admin.service.ServerForwardRuleService;
 import com.admin.service.SnellTemplateService;
 import com.admin.service.XuiOrchestrationScriptService;
+import com.admin.runtime.RuntimeProviderAssignment;
 import com.admin.runtime.RuntimeProviderService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -449,7 +451,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         DeployTask task = new DeployTask();
         task.setId(exists.getId());
         task.setState(state);
-        task.setResultJson(buildAgentResultJson(dto));
+        task.setResultJson(buildAgentResultJson(dto, exists));
         task.setUpdatedTime(now);
         if (STATE_RUNNING.equals(state) && exists.getStartedTime() == null) {
             task.setStartedTime(now);
@@ -498,16 +500,42 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         return null;
     }
 
-    private String buildAgentResultJson(AgentTaskReportDto dto) {
+    private String buildAgentResultJson(AgentTaskReportDto dto, DeployTask task) {
+        String resultJson;
         if (dto.getResultJson() != null && !dto.getResultJson().trim().isEmpty()) {
-            return dto.getResultJson();
+            resultJson = dto.getResultJson();
+        } else {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("exitCode", dto.getExitCode());
+            result.put("stdout", truncate(dto.getStdout(), 60000));
+            result.put("stderr", truncate(dto.getStderr(), 60000));
+            result.put("reportedAt", System.currentTimeMillis());
+            resultJson = JSON.toJSONString(result);
         }
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("exitCode", dto.getExitCode());
-        result.put("stdout", truncate(dto.getStdout(), 60000));
-        result.put("stderr", truncate(dto.getStderr(), 60000));
-        result.put("reportedAt", System.currentTimeMillis());
-        return JSON.toJSONString(result);
+        return attachRuntimeProviderMetadata(resultJson, task);
+    }
+
+    private String attachRuntimeProviderMetadata(String resultJson, DeployTask task) {
+        if (task == null) {
+            return resultJson;
+        }
+        RuntimeProviderAssignment provider = runtimeProviderService.assign(task.getProtocol(), task.getAction());
+        if (provider == null) {
+            return resultJson;
+        }
+        try {
+            JSONObject result = JSON.parseObject(resultJson);
+            if (!result.containsKey("runtimeProvider")) {
+                result.put("runtimeProvider", provider);
+            }
+            return JSON.toJSONString(result);
+        } catch (Exception ignored) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("rawResultJson", resultJson);
+            result.put("runtimeProvider", provider);
+            result.put("reportedAt", System.currentTimeMillis());
+            return JSON.toJSONString(result);
+        }
     }
 
     private void applyAgentResultMetadata(DeployTask task, String resultJson, String state) {
@@ -515,13 +543,13 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             return;
         }
         try {
-            com.alibaba.fastjson2.JSONObject root = JSON.parseObject(resultJson);
+            JSONObject root = JSON.parseObject(resultJson);
             protocolNodeService.applyAgentResultNodes(task, root);
             serverForwardRuleService.applyAgentResultForwardRules(task, root);
 
-            com.alibaba.fastjson2.JSONObject serverMeta = root.getJSONObject("server");
-            com.alibaba.fastjson2.JSONObject serviceMeta = root.getJSONObject("services");
-            com.alibaba.fastjson2.JSONObject certificateMeta = root.getJSONObject("certificate");
+            JSONObject serverMeta = root.getJSONObject("server");
+            JSONObject serviceMeta = root.getJSONObject("services");
+            JSONObject certificateMeta = root.getJSONObject("certificate");
             if (serverMeta == null && serviceMeta == null && certificateMeta == null) {
                 return;
             }

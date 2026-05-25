@@ -44,6 +44,8 @@ Runtime Providers are the product boundary between the master task engine and co
 
 Snell is unified at the product/node-management layer, but it is not a native Xray or 3x-ui core protocol. The controlled agent deploys Snell as an independent service on the target host.
 
+Runtime Provider metadata now follows the task from master claim to agent report. The agent logs the provider it executes, reports it inside `resultJson.runtimeProvider`, and the master attaches the same audit metadata when an older agent omits it.
+
 ## UI Preview
 
 ![Flux 3x-ui Orchestrator control plane](docs/assets/flux-orchestrator-screenshot.svg)
@@ -143,6 +145,7 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
 ```
 
 The agent runs through systemd or OpenRC, claims tasks from the master, executes them locally and reports results back.
+Claimed tasks include their Runtime Provider assignment, so task history can be audited by `xui`, `snell`, `forward`, `certificate` or `firewall`.
 
 ## Operator Flow
 

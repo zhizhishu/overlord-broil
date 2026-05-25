@@ -400,8 +400,9 @@ build_report_payload() {
   local finished_at="${7:-}"
   local stdout_path="${8:-}"
   local stderr_path="${9:-}"
+  local runtime_provider_json="${10:-}"
 
-  "$PYTHON_BIN" - "$task_id" "$state" "$exit_code" "$timed_out" "$timeout_seconds" "$started_at" "$finished_at" "$stdout_path" "$stderr_path" <<'PY'
+  "$PYTHON_BIN" - "$task_id" "$state" "$exit_code" "$timed_out" "$timeout_seconds" "$started_at" "$finished_at" "$stdout_path" "$stderr_path" "$runtime_provider_json" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -415,6 +416,16 @@ started_at = None if sys.argv[6] == "" else int(sys.argv[6])
 finished_at = None if sys.argv[7] == "" else int(sys.argv[7])
 stdout_path = Path(sys.argv[8]) if sys.argv[8] else None
 stderr_path = Path(sys.argv[9]) if sys.argv[9] else None
+runtime_provider_raw = sys.argv[10] if len(sys.argv) > 10 else ""
+
+runtime_provider = None
+if runtime_provider_raw:
+    try:
+        parsed_provider = json.loads(runtime_provider_raw)
+        if isinstance(parsed_provider, dict):
+            runtime_provider = parsed_provider
+    except json.JSONDecodeError:
+        runtime_provider = {"metadataParseError": runtime_provider_raw}
 
 def read_limited(path):
     if path is None or not path.exists():
@@ -452,6 +463,8 @@ if started_at is not None and finished_at is not None:
 result.setdefault("stdout", "\n".join(clean_stdout_lines)[-60000:])
 result.setdefault("stderr", stderr_text[-60000:])
 result.setdefault("reportedAt", int(__import__("time").time() * 1000))
+if runtime_provider is not None:
+    result.setdefault("runtimeProvider", runtime_provider)
 
 print(json.dumps({
     "taskId": task_id,
@@ -474,9 +487,10 @@ report_state() {
   local finished_at="${7:-}"
   local stdout_path="${8:-}"
   local stderr_path="${9:-}"
+  local runtime_provider_json="${10:-}"
   local payload
 
-  payload="$(build_report_payload "$task_id" "$state" "$exit_code" "$timed_out" "$timeout_seconds" "$started_at" "$finished_at" "$stdout_path" "$stderr_path")"
+  payload="$(build_report_payload "$task_id" "$state" "$exit_code" "$timed_out" "$timeout_seconds" "$started_at" "$finished_at" "$stdout_path" "$stderr_path" "$runtime_provider_json")"
   post_json "/api/v1/agent-task/report" "$payload" "agent task report" >/dev/null
 }
 
@@ -799,7 +813,7 @@ PY
 
 run_task() {
   local response="$1"
-  local task_id script task_file stdout_file stderr_file started_at finished_at exit_code timed_out report_error
+  local task_id script runtime_provider runtime_provider_key task_file stdout_file stderr_file started_at finished_at exit_code timed_out report_error
 
   task_id="$(printf '%s' "$response" | json_get "data.id" || true)"
   if [ -z "$task_id" ]; then
@@ -813,6 +827,9 @@ run_task() {
     return 1
   fi
 
+  runtime_provider="$(printf '%s' "$response" | json_get "data.runtimeProvider" || true)"
+  runtime_provider_key="$(printf '%s' "$response" | json_get "data.runtimeProvider.key" || true)"
+
   task_file="${WORK_DIR}/task-${task_id}.sh"
   stdout_file="${WORK_DIR}/task-${task_id}.out"
   stderr_file="${WORK_DIR}/task-${task_id}.err"
@@ -821,8 +838,12 @@ run_task() {
   chmod 700 "$task_file"
 
   started_at="$(now_ms)"
-  info "task ${task_id} claimed; timeout=${TASK_TIMEOUT_SECONDS}s"
-  if report_state "$task_id" "running" "" "0" "$TASK_TIMEOUT_SECONDS" "$started_at" "$started_at" "$stdout_file" "$stderr_file"; then
+  if [ -n "$runtime_provider_key" ]; then
+    info "task ${task_id} claimed; provider=${runtime_provider_key}; timeout=${TASK_TIMEOUT_SECONDS}s"
+  else
+    info "task ${task_id} claimed; timeout=${TASK_TIMEOUT_SECONDS}s"
+  fi
+  if report_state "$task_id" "running" "" "0" "$TASK_TIMEOUT_SECONDS" "$started_at" "$started_at" "$stdout_file" "$stderr_file" "$runtime_provider"; then
     :
   else
     warn "task ${task_id} running state report failed"
@@ -841,7 +862,7 @@ run_task() {
 
   if [ "$exit_code" -eq 0 ]; then
     info "task ${task_id} completed successfully"
-    if ! report_state "$task_id" "succeeded" "$exit_code" "$timed_out" "$TASK_TIMEOUT_SECONDS" "$started_at" "$finished_at" "$stdout_file" "$stderr_file"; then
+    if ! report_state "$task_id" "succeeded" "$exit_code" "$timed_out" "$TASK_TIMEOUT_SECONDS" "$started_at" "$finished_at" "$stdout_file" "$stderr_file" "$runtime_provider"; then
       report_error="task ${task_id} succeeded but report delivery failed"
       warn "$report_error"
       send_heartbeat "$report_error"
@@ -850,7 +871,7 @@ run_task() {
     fi
   else
     warn "task ${task_id} failed with exit code ${exit_code}"
-    if ! report_state "$task_id" "failed" "$exit_code" "$timed_out" "$TASK_TIMEOUT_SECONDS" "$started_at" "$finished_at" "$stdout_file" "$stderr_file"; then
+    if ! report_state "$task_id" "failed" "$exit_code" "$timed_out" "$TASK_TIMEOUT_SECONDS" "$started_at" "$finished_at" "$stdout_file" "$stderr_file" "$runtime_provider"; then
       report_error="task ${task_id} failed and report delivery failed"
       warn "$report_error"
       send_heartbeat "$report_error"

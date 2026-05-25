@@ -44,6 +44,8 @@ Runtime Provider 层把不同运行时统一到同一套任务和 UI 模型：
 
 Snell 已统一到产品层的“协议节点”管理里，但它不是 Xray 或 3x-ui 的原生协议。底层仍然由 Agent 在被控服务器上部署独立 Snell 服务，这样更符合 Snell 的实际运行方式。
 
+Runtime Provider 元数据现在会从主控领取任务一路跟到 Agent 回报结果。Agent 会记录正在执行的 provider，并把它写入 `resultJson.runtimeProvider`；如果旧 Agent 没带这段信息，主控保存任务结果时也会兜底补上审计元数据。
+
 ## UI 方向
 
 UI 继续靠近 Flux Panel：高信息密度、服务器卡片、操作分组、状态 chip、统一规则视图。它不是营销落地页，而是运维控制台。
@@ -147,6 +149,7 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/ma
 ```
 
 Agent 安装后会通过 systemd 或 OpenRC 常驻运行，主动向主控拉取任务、在本机执行、再回报结果。
+领取到的任务会携带 Runtime Provider 分配结果，后续任务历史可以按 `xui`、`snell`、`forward`、`certificate`、`firewall` 审计。
 
 ## 怎么用
 

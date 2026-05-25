@@ -32,7 +32,24 @@
   - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
   - Docker Maven `RuntimeProviderServiceTest` 通过，3 个测试全部成功。
   - Docker Maven `mvn -B -DskipTests package` 通过。
-- 清理：
-  - 慢速 bind-mount Maven 容器 `flux-runtime-provider-test-2` 已停止并清理。
-  - 复制源码验证容器 `flux-backend-copy-verify` 使用 `--rm` 退出，无容器残留。
+- 推送：已推送 `fb2556d Add runtime provider registry` 到 `origin/main` 和 `origin/future`。
+- 清理：慢速 bind-mount Maven 容器 `flux-runtime-provider-test-2` 已停止并清理；复制源码验证容器 `flux-backend-copy-verify` 使用 `--rm` 退出，无容器残留。
+- 后续：打通 Runtime Provider 到 Agent 执行报告的审计闭环，再检查 GitHub Actions 与 GHCR 镜像状态。
+
+### Runtime Provider Agent Report Audit
+
+- 完成：打通 Runtime Provider 从主控 claim 到 Agent 执行报告的审计闭环。
+- 修改：
+  - `scripts/flux-agent.sh` 读取 claim payload 中的 `runtimeProvider`，执行日志标记 provider，并在 running/final report 的 `resultJson.runtimeProvider` 中回传。
+  - `DeployTaskServiceImpl` 保存 Agent report 时兜底补写 Runtime Provider 元数据，旧 Agent 没上报时仍能保留审计信息。
+  - `scripts/test-flux-agent-mock.sh` 增加 provider claim payload，并断言 running/final report 都带 `runtimeProvider.key=snell`。
+  - 新增 `DeployTaskServiceImplTest` 覆盖后端兜底、保留 Agent 上报 provider、非 JSON 结果包装三种情况。
+  - README、中文 README、Release Notes、PROJECT_CONTEXT 更新 Runtime Provider claim/report 审计说明。
+- 验证：
+  - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
+  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
+  - `bash scripts/test-flux-agent-mock.sh` 通过。
+  - Docker Maven `RuntimeProviderServiceTest,DeployTaskServiceImplTest` 通过，6 个测试全部成功。
+  - Docker Maven `mvn -B -DskipTests package` 通过。
+- 清理：Docker 验证容器 `flux-backend-provider-audit-verify` 使用 `--rm`，无残留；agent mock 临时服务已结束；`5166/5168/6365/8066` 未发现本轮遗留监听。
 - 后续：提交并推送到 `origin/main` 和 `origin/future`，再检查 GitHub Actions 与 GHCR 镜像状态。

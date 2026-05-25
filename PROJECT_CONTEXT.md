@@ -63,6 +63,7 @@ Controlled hosts may expose business ports depending on orchestration choices:
 - Flux-style dense operations UI with Chinese-first language and `zh-CN` / `en-US` switch.
 - Server registry, agent token generation/rotation, heartbeats, status updates, and Nano memory detection.
 - Runtime Provider registry and API for `xui`, `snell`, `forward`, `certificate`, and `firewall` task assignment.
+- Runtime Provider metadata travels through task claim/report and is stored in task result JSON for audit.
 - One-click orchestration tasks for 3x-ui/Xray and Snell.
 - 3x-ui API integration for inbound/outbound/config/traffic/restart operations.
 - Protocol-node form flow with validation and advanced payload preview.
@@ -100,7 +101,7 @@ CI currently covers:
 - Backend Maven build.
 - Frontend Vite build.
 - Shell syntax.
-- Agent mock tests.
+- Agent mock tests, including Runtime Provider claim/report metadata.
 - 3x-ui fixture tests.
 - Default, v4/v6 and legacy compose config.
 - Disposable compose smoke stack with the `flux-master` single image.

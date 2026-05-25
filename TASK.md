@@ -2,58 +2,51 @@
 
 ## Handoff Summary
 
-当前目标：
-继续朝用户给出的 `flux-master` 单体主控架构推进。本轮目标是把架构图里的 `Runtime Provider 层`落成真实模块，让主控可以枚举 XUI / Snell / Forward / Certificate / Firewall，并让任务创建、任务列表和 Agent 领取结果都带上 provider 元数据。
+当前目标：继续朝用户给出的 `flux-master` 单体主控架构推进，把 `Task -> Agent -> Execute -> Report -> Master` 链路做实，让 Runtime Provider 不只在 UI/API 展示，也进入被控端执行报告和本地审计结果。
 
 已完成：
 - 已确认父级 `C:\Users\echo\Downloads\claude` 只是存放根目录，不在父级写日志或计划。
 - 已确认真实项目根目录为 `C:\Users\echo\Downloads\claude\flux-panel-3xui-orchestrator`。
 - 已读取项目 `PROJECT_ID.md`、`AGENTS.md`、`PROJECT_CONTEXT.md`、`TASK.md`；`serena.enabled=false`，不调用 Serena。
-- 之前已完成并推送 `flux-master` 单体镜像里程碑：默认 `mysql + flux-master`，主控 Web UI/API 统一走 `5166`。
-- 本轮已新增后端 Runtime Provider 注册表、分配对象、查询 API 和单元测试。
-- 本轮已让 `DeployTask` 响应和 Agent claim payload 携带 `runtimeProvider` 元数据。
-- 本轮已让前端主控页加载 Runtime Provider 注册表，展示 provider 卡片和任务 provider chip。
-- 本轮已清理 README / README.zh-CN 公开入口文档，补充 Runtime Provider、端口、安装、API、GHCR、致谢和 1.0 差距说明。
+- 已完成并推送 `flux-master` 单体镜像里程碑：默认 `mysql + flux-master`，主控 Web UI/API 统一走 `5166`。
+- 已完成并推送 Runtime Provider 注册表：`xui`、`snell`、`forward`、`certificate`、`firewall` 可枚举、可解析，任务和 Agent claim payload 已带 provider 元数据。
+- 本轮已打通 Runtime Provider 到 Agent 执行报告的审计闭环：Agent 读取 claim payload 的 provider、日志标记 provider、report 写入 `resultJson.runtimeProvider`，后端保存 report 时兜底补 provider 审计元数据。
 
 下一步：
-- 提交并只推送到 `origin/main` 和 `origin/future`，不要推送 `upstream`。
-- 检查 GitHub Actions / GHCR，确认镜像成果在 GitHub 可见。
+- 提交本轮改动。
+- 推送到 `origin/main` 和 `origin/future`。
+- 检查 GitHub Actions / GHCR 镜像成果。
 
 关键文件：
-- `springboot-backend/src/main/java/com/admin/runtime/*`
-- `springboot-backend/src/main/java/com/admin/controller/RuntimeProviderController.java`
-- `springboot-backend/src/main/java/com/admin/entity/DeployTask.java`
+- `scripts/flux-agent.sh`
+- `scripts/test-flux-agent-mock.sh`
 - `springboot-backend/src/main/java/com/admin/service/impl/DeployTaskServiceImpl.java`
-- `springboot-backend/src/test/java/com/admin/runtime/RuntimeProviderServiceTest.java`
-- `vite-frontend/src/api/index.ts`
-- `vite-frontend/src/types/index.ts`
-- `vite-frontend/src/pages/orchestrator.tsx`
-- `vite-frontend/src/i18n/index.tsx`
+- `springboot-backend/src/test/java/com/admin/service/impl/DeployTaskServiceImplTest.java`
+- `springboot-backend/src/main/java/com/admin/runtime/*`
 - `README.md`
 - `README.zh-CN.md`
-- `docs/OPERATIONS.md`
+- `docs/RELEASE_NOTES.md`
 - `PROJECT_CONTEXT.md`
 
 验证状态：
-- 已通过一次 Docker Maven 单测：`RuntimeProviderServiceTest`，3 个测试全部成功。
-- 已通过本轮 `git diff --check`，只有 Windows LF/CRLF 提示，无空白错误。
-- 已通过 `bash -n scripts/*.sh` 和 bootstrap 脚本语法检查。
-- 已通过前端 `npm run build`，仅有既有 Vite dynamic/static import chunk 提示。
-- 已通过 Docker Maven `RuntimeProviderServiceTest`，3 个测试全部成功。
-- 已通过 Docker Maven `mvn -B -DskipTests package`。
+- 上一轮已通过 `RuntimeProviderServiceTest`、前端 build、脚本语法、Docker Maven package。
+- 本轮已通过 `git diff --check`。
+- 本轮已通过 `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'`。
+- 本轮已通过 `bash scripts/test-flux-agent-mock.sh`，mock 中 running/final report 均断言带 `runtimeProvider.key=snell`。
+- 本轮已通过 Docker Maven：`RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 6 个测试成功。
+- 本轮已通过 Docker Maven：`mvn -B -DskipTests package`。
 
 风险/待确认：
-- Runtime Provider 是融合架构的关键层，但还不是完整 1.0。真实 VPS 矩阵和真实 3x-ui E2E 仍是正式版前最大缺口。
-- Snell 仍是产品层统一、Agent 执行的独立 runtime，不是 Xray/3x-ui 内核原生协议。
-- `future` 分支用于验证，正式 GHCR 镜像以 `main` 和 `v*` tag 为准。
+- Runtime Provider 已是融合架构关键层，但真实 VPS 矩阵和真实 3x-ui E2E 仍是正式 1.0 前最大缺口。
+- Snell 是产品层统一、Agent 执行的独立 runtime，不是 Xray/3x-ui 内核原生协议。
+- `future` 分支用于持续验证；正式 GHCR 镜像以 `main` 和 `v*` tag 为准。
 
 资源清理：
-- 上轮遗留 Maven Docker 测试容器已结束。
-- 本轮慢速 bind-mount Maven 容器 `flux-runtime-provider-test-2` 已停止并清理。
-- 本轮复制源码验证容器 `flux-backend-copy-verify` 使用 `--rm` 退出，无容器残留。
+- 本轮 Docker Maven 验证容器 `flux-backend-provider-audit-verify` 使用 `--rm`，已结束且无残留。
+- 本轮 agent mock server 随脚本结束并清理临时目录。
+- 已复查 `5166`、`5168`、`6365`、`8066`，未发现本轮遗留监听。
 
-最后更新：
-2026-05-25
+最后更新：2026-05-25 13:13:18 -07:00
 
 ## Active Tasks
 
@@ -61,14 +54,15 @@
 - [x] **Goal:** P0/P1 单体主控镜像和默认 Compose 落地。
 - [x] **Goal:** 安装脚本、CI、文档同步到单体架构。
 - [x] **Goal:** 提交、推送并确认 GitHub 镜像成果。
-- [x] **Goal:** Runtime Provider 层、任务元数据和主控可见入口落地。
+- [x] **Goal:** Runtime Provider 层、任务元数据和主控可视入口落地。
+- [x] **Goal:** 打通 Runtime Provider 到 Agent 执行报告的审计闭环。
 - [ ] **Goal:** 提交推送并确认 GitHub Actions / GHCR 成果。
 
 ## Notes For Next Agent
 
 - 不要在父级存放根目录创建日志、计划或报告。
 - 修改代码前先读 `PROJECT_ID.md`、`AGENTS.md`、`PROJECT_CONTEXT.md`、`TASK.md`。
-- 推送只面向 `origin`：`zhizhishu/flux-3xui-orchestrator`。
-- 不要向 `upstream`：`zhizhishu/flux-panel` 推送或开 PR。
+- 推送只面向 `origin`: `zhizhishu/flux-3xui-orchestrator`。
+- 不要向 `upstream`: `zhizhishu/flux-panel` 推送或开 PR。
 - 主控默认公网入口是 `5166`。
 - 被控 Agent 使用 `http://MASTER_IP:5166` 作为 `FLUX_PANEL_URL`。
