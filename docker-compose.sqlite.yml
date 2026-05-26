@@ -1,0 +1,41 @@
+services:
+  master:
+    image: ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest
+    container_name: flux-master
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT}:5166"
+    environment:
+      SPRING_PROFILES_ACTIVE: sqlite
+      SQLITE_DB_PATH: ${SQLITE_DB_PATH:-/app/data/flux-master.sqlite}
+      JWT_SECRET: ${JWT_SECRET}
+      SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
+      SERVER_PORT: 5166
+      FRONTEND_PORT: ${FRONTEND_PORT}
+      BACKEND_PORT: ${BACKEND_PORT}
+      PHPMYADMIN_PORT: ""
+      EXPOSE_BACKEND: ${EXPOSE_BACKEND:-0}
+      DB_MODE: sqlite
+      LOG_DIR: /app/logs
+      JAVA_OPTS: "-Xms128m -Xmx384m -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
+    volumes:
+      - ${SQLITE_DATA_DIR:-./data}:/app/data
+      - master_logs:/app/logs
+    networks:
+      - gost-network
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget --no-verbose --tries=1 --spider http://localhost:5166/flow/test || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+volumes:
+  master_logs:
+    name: master_logs
+    driver: local
+
+networks:
+  gost-network:
+    name: gost-network
+    driver: bridge

@@ -103,16 +103,25 @@ public class RuntimeProviderService {
     }
 
     public boolean isAllowedAgentMaintenanceAction(String action) {
+        return getAgentMaintenanceAction(action) != null;
+    }
+
+    public RuntimeProviderAction getAgentMaintenanceAction(String action) {
         String normalizedAction = normalize(action);
         if (normalizedAction.isEmpty()) {
             normalizedAction = "doctor";
         }
         for (RuntimeProviderAction candidate : listAgentMaintenanceActions()) {
             if (normalizedAction.equals(normalize(candidate.getKey()))) {
-                return true;
+                return candidate;
             }
         }
-        return false;
+        return null;
+    }
+
+    public boolean isDangerAgentMaintenanceAction(String action) {
+        RuntimeProviderAction actionDescriptor = getAgentMaintenanceAction(action);
+        return actionDescriptor != null && actionDescriptor.isDanger();
     }
 
     public void applyToTask(DeployTask task) {

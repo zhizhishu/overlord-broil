@@ -8,8 +8,9 @@ This checklist is for running Flux 3x-ui Orchestrator as a small authorized mast
 | --- | --- |
 | Master install root | `/opt/flux-3xui-orchestrator` |
 | Master environment | `/opt/flux-3xui-orchestrator/.env` |
-| Master compose files | `/opt/flux-3xui-orchestrator/docker-compose.yml`, `docker-compose-v4.yml` or `docker-compose-v6.yml` |
+| Master compose files | `/opt/flux-3xui-orchestrator/docker-compose.yml`, `docker-compose-v4.yml`, `docker-compose-v6.yml` or `docker-compose.sqlite.yml` |
 | Database seed | `/opt/flux-3xui-orchestrator/gost.sql` |
+| SQLite data directory | `/opt/flux-3xui-orchestrator/data`, only when `FLUX_DB_MODE=sqlite` |
 | Master backups | `/opt/flux-3xui-orchestrator/backups` |
 | Master logs volume | Docker volume `master_logs`, mounted at `/app/logs` |
 | MySQL data volume | Docker volume `mysql_data` |
@@ -27,6 +28,7 @@ This checklist is for running Flux 3x-ui Orchestrator as a small authorized mast
 | `5166/tcp` | Master panel, API and controlled-agent callback | Default public entry. Change with `FLUX_FRONTEND_PORT`. |
 | `6365/tcp` | Backend debug alias | Not exposed by default. Publish only with `FLUX_EXPOSE_BACKEND=1`. |
 | `3306/tcp` | MySQL | Docker internal only in shipped compose files. |
+| SQLite | Local DB file | Optional mode only; no network port. |
 | phpMyAdmin | Maintenance UI | Disabled by default. Expose temporarily with `FLUX_PHPMYADMIN_PORT`. |
 
 The installer removes legacy split-stack containers named `vite-frontend`, `springboot-backend` and `gost-phpmyadmin` during install/upgrade. This prevents old Flux-derived deployments from leaving public `80/6365/8066` ports active after the default runtime has moved to the single `flux-master` entry.
@@ -71,7 +73,13 @@ Common overrides:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
   | sudo env FLUX_FRONTEND_PORT="5166" FLUX_NETWORK_STACK="v4" bash
+
+# optional SQLite mode for small labs or single-node trials
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+  | sudo env FLUX_DB_MODE="sqlite" FLUX_FRONTEND_PORT="5166" bash
 ```
+
+`FLUX_DB_MODE=mysql` is still the default and keeps the MySQL sidecar plus optional phpMyAdmin maintenance path. `FLUX_DB_MODE=sqlite` switches the master to `docker-compose.sqlite.yml`, disables phpMyAdmin, mounts `/opt/flux-3xui-orchestrator/data` into the `flux-master` container, and initializes the schema from the embedded SQLite schema on boot.
 
 Day-2 actions:
 
@@ -81,6 +89,8 @@ sudo bash /opt/flux-3xui-orchestrator/install-master.sh backup
 sudo bash /opt/flux-3xui-orchestrator/install-master.sh restore --backup-file /opt/flux-3xui-orchestrator/backups/flux-master-backup-YYYYMMDD-HHMMSS.tar.gz
 sudo bash /opt/flux-3xui-orchestrator/install-master.sh uninstall --yes
 ```
+
+In SQLite mode, `backup` stores the resolved data directory as a separate `sqlite-data/` payload and `restore` writes it back to the `SQLITE_DATA_DIR` recorded in `.env`. If `flux-master` is running, the backup command briefly stops the master container before copying SQLite files, then starts it again for a consistent file-level backup.
 
 Expose direct backend or phpMyAdmin only during maintenance:
 
@@ -159,6 +169,10 @@ State Sync row actions reuse the existing `agent-maintenance` task path instead 
 
 Runtime Provider descriptors expose an Action Catalog for these `agent-maintenance` operations. Treat that catalog as the supported action contract: backend validation, State Sync row shortcuts and server-card Agent buttons should all derive from it so new provider actions have a single auditable registration point.
 
+Dangerous Action Catalog entries require explicit confirmation before they enter the controlled-agent queue. The master UI asks the operator to confirm, and the backend rejects dangerous `agent-maintenance` tasks unless `request_json` includes `dangerConfirmed=true` and `confirmAction=<action>`. Current dangerous actions include agent uninstall and runtime-port closure.
+
+Task claiming is guarded by an atomic state transition: the agent can only move a task from `generated` to `claimed` when the row still belongs to the same server and still has `state=generated`. If another agent loop wins the race, the loser receives no task and polls again instead of executing the same script twice.
+
 Xray/3x-ui deployment scripts are now executable by the controlled agent. They resolve `XUI_ENDPOINT`, `XUI_BASE_PATH` and `XUI_API_TOKEN` from saved server metadata or local agent environment, call `/panel/api/inbounds/add`, `/panel/api/inbounds/del/{id}` or `/panel/api/server/restartXrayService`, and report inbound metadata through `FLUX_AGENT_RESULT_JSON`. A missing API token should be treated as an operator configuration error unless the target host can read it from `/usr/local/x-ui/x-ui`.
 
 Agent reports are sanitized before task-history storage. Raw installation/orchestration reports may contain new 3x-ui credentials long enough for the master to update encrypted server fields, but stored `resultJson` removes `xuiApiToken`, `xuiPassword`, `xuiTwoFactorCode` and any `serverSecrets` block, replacing them with configured flags where useful.
@@ -182,11 +196,11 @@ Install, certificate and firewall diagnostics write structured `diagnostics.item
 
 ## Operational Checklist
 
-- Confirm `.env` has non-default `DB_PASSWORD`, `JWT_SECRET` and `SECRET_ENCRYPTION_KEY`.
+- Confirm `.env` has non-default `JWT_SECRET` and `SECRET_ENCRYPTION_KEY`; MySQL mode also needs a non-default `DB_PASSWORD`.
 - Back up `SECRET_ENCRYPTION_KEY` with `.env`; encrypted 3x-ui credentials and API tokens cannot be restored safely if the key is lost or rotated without planning.
 - Keep controlled-server agents off the master host unless you are deliberately testing self-control behavior. A `role=master` server can self-manage safe tasks, while destructive actions and protected listen ports such as frontend/backend/MySQL/SSH are blocked.
 - Confirm only `5166/tcp` is publicly reachable for the master unless you intentionally exposed debug or maintenance ports.
-- Confirm `docker compose ps` shows healthy `mysql` and `master` services.
+- Confirm `docker compose ps` shows healthy `mysql` and `master` services in MySQL mode, or a healthy `master` service plus `/opt/flux-3xui-orchestrator/data` in SQLite mode.
 - Check `GET /flow/test` through the master entry after every upgrade.
 - Create a backup before upgrades and before schema-affecting changes.
 - Store 3x-ui API tokens only in the panel fields intended for that purpose; do not paste tokens into issue reports or logs.
@@ -228,6 +242,9 @@ bash scripts/test-three-xui-e2e.sh
 bash scripts/test-install-matrix.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
 bash scripts/test-compose-smoke.sh --build-local
+bash scripts/test-sqlite-schema.sh
+bash scripts/test-compose-smoke.sh --compose-file docker-compose.sqlite.yml --build-local --dry-run
+bash scripts/test-compose-smoke.sh --compose-file docker-compose.sqlite.yml --build-local
 ```
 
 The 3x-ui fixture test uses a short-lived local Python HTTP server and exits without leaving ports open. The real 3x-ui E2E script is a gated contract smoke: it exits as skipped unless `THREE_XUI_E2E_URL` and `THREE_XUI_E2E_TOKEN` are set, and write checks require `THREE_XUI_E2E_WRITE=1` plus `THREE_XUI_E2E_PORT`. The install matrix is useful shell portability coverage, but it is not a substitute for a real VPS matrix with systemd/OpenRC, cloud firewall and public DNS. The full compose smoke test should remove its disposable containers, network and volumes when it exits.

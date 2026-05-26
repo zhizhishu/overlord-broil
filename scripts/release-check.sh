@@ -14,6 +14,7 @@ Runs the release gate for Flux 3x-ui Orchestrator.
 Default checks:
   - shell syntax
   - agent mock test
+  - SQLite schema smoke test
   - tokenized 3x-ui fixture test
   - optional real 3x-ui E2E contract when THREE_XUI_E2E_URL/TOKEN are set
   - default/legacy compose config validation
@@ -93,6 +94,9 @@ sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.s
 step "Run agent mock tests"
 bash scripts/test-flux-agent-mock.sh
 
+step "Run SQLite schema smoke test"
+bash scripts/test-sqlite-schema.sh
+
 step "Run tokenized 3x-ui fixture tests"
 bash scripts/test-three-xui-fixture.sh
 
@@ -103,6 +107,7 @@ step "Validate compose files"
 docker compose -f docker-compose.yml config --quiet
 docker compose -f docker-compose-v4.yml config --quiet
 docker compose -f docker-compose-v6.yml config --quiet
+docker compose -f docker-compose.sqlite.yml config --quiet
 docker compose -f docker-compose.legacy-v4.yml config --quiet
 docker compose -f docker-compose.legacy-v6.yml config --quiet
 
@@ -130,9 +135,15 @@ if [ "$FULL" = "true" ]; then
 
   step "Run disposable compose smoke test"
   bash scripts/test-compose-smoke.sh --build-local
+
+  step "Run disposable SQLite compose smoke test"
+  bash scripts/test-compose-smoke.sh --compose-file docker-compose.sqlite.yml --build-local
 else
   step "Dry-run compose smoke test"
   bash scripts/test-compose-smoke.sh --build-local --dry-run
+
+  step "Dry-run SQLite compose smoke test"
+  bash scripts/test-compose-smoke.sh --compose-file docker-compose.sqlite.yml --build-local --dry-run
 fi
 
 step "Check git whitespace"

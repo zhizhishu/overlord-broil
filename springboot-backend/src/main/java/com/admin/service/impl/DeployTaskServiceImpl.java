@@ -26,9 +26,11 @@ import com.admin.service.ServerForwardRuleService;
 import com.admin.service.SnellTemplateService;
 import com.admin.service.XuiOrchestrationScriptService;
 import com.admin.runtime.RuntimeProviderAssignment;
+import com.admin.runtime.RuntimeProviderAction;
 import com.admin.runtime.RuntimeProviderDescriptor;
 import com.admin.runtime.RuntimeProviderService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 
@@ -260,7 +262,14 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             String action = dto.getAction() == null || dto.getAction().trim().isEmpty()
                     ? "doctor"
                     : dto.getAction().trim().toLowerCase();
-            return runtimeProviderService.isAllowedAgentMaintenanceAction(action) ? null : "unsupported agent maintenance action";
+            RuntimeProviderAction actionDescriptor = runtimeProviderService.getAgentMaintenanceAction(action);
+            if (actionDescriptor == null) {
+                return "unsupported agent maintenance action";
+            }
+            if (actionDescriptor.isDanger() && !isDangerActionConfirmed(dto.getRequestJson(), action)) {
+                return "dangerous agent maintenance action requires dangerConfirmed=true and confirmAction=" + action;
+            }
+            return null;
         }
         Integer listenPort = dto.getListenPort() != null ? dto.getListenPort() : profile == null ? null : profile.getListenPort();
         if (listenPort != null && !ProtocolValidationUtils.isValidPort(listenPort)) {
@@ -435,9 +444,13 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         item.put("action", runtimeState.getString("action"));
         item.put("taskState", runtimeState.getString("taskState"));
         item.put("taskId", task.getId());
+        item.put("sourceTaskId", runtimeState.getLong("sourceTaskId"));
         item.put("taskUpdatedAt", task.getUpdatedTime());
         item.put("stateUpdatedAt", runtimeState.getLong("updatedAt"));
         item.put("source", "task");
+        putIfPresent(item, "resourceType", runtimeState.getString("resourceType"));
+        putIfPresent(item, "resourceId", runtimeState.get("resourceId"));
+        putIfPresent(item, "danger", runtimeState.getBoolean("danger"));
 
         JSONObject serviceStatuses = runtimeState.getJSONObject("serviceStatuses");
         if (serviceStatuses != null && !serviceStatuses.isEmpty()) {
@@ -473,6 +486,25 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             return null;
         }
         return null;
+    }
+
+    private boolean isDangerActionConfirmed(String requestJson, String action) {
+        if (!notBlank(requestJson) || !notBlank(action)) {
+            return false;
+        }
+        try {
+            JSONObject request = JSON.parseObject(requestJson);
+            if (request == null || !request.getBooleanValue("dangerConfirmed")) {
+                return false;
+            }
+            String confirmAction = request.getString("confirmAction");
+            if (!notBlank(confirmAction)) {
+                confirmAction = request.getString("confirmText");
+            }
+            return action.trim().equalsIgnoreCase(confirmAction == null ? null : confirmAction.trim());
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private Map<String, Integer> countRuntimeOverview(List<Map<String, Object>> items) {
@@ -610,27 +642,40 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         if (server == null) {
             return R.err(401, "invalid agent token");
         }
-        QueryWrapper<DeployTask> query = new QueryWrapper<>();
-        query.eq("server_id", server.getId())
-                .eq("status", STATUS_ACTIVE)
-                .in("state", Arrays.asList(STATE_GENERATED))
-                .orderByAsc("id")
-                .last("LIMIT 1");
-        DeployTask task = this.getOne(query, false);
-        if (task == null) {
-            return R.ok();
-        }
+        for (int attempt = 0; attempt < 3; attempt++) {
+            QueryWrapper<DeployTask> query = new QueryWrapper<>();
+            query.eq("server_id", server.getId())
+                    .eq("status", STATUS_ACTIVE)
+                    .eq("state", STATE_GENERATED)
+                    .orderByAsc("id")
+                    .last("LIMIT 1");
+            DeployTask task = this.getOne(query, false);
+            if (task == null) {
+                return R.ok();
+            }
 
-        long now = System.currentTimeMillis();
+            long now = System.currentTimeMillis();
+            if (markTaskClaimed(task.getId(), server.getId(), now)) {
+                return R.ok(claimedTaskPayload(task, now));
+            }
+        }
+        return R.ok();
+    }
+
+    private boolean markTaskClaimed(Long taskId, Long serverId, long now) {
         DeployTask update = new DeployTask();
-        update.setId(task.getId());
         update.setState(STATE_CLAIMED);
         update.setStartedTime(now);
         update.setUpdatedTime(now);
-        if (!this.updateById(update)) {
-            return R.err("deploy task claim failed");
-        }
+        UpdateWrapper<DeployTask> wrapper = new UpdateWrapper<>();
+        wrapper.eq("id", taskId)
+                .eq("server_id", serverId)
+                .eq("status", STATUS_ACTIVE)
+                .eq("state", STATE_GENERATED);
+        return this.update(update, wrapper);
+    }
 
+    private Map<String, Object> claimedTaskPayload(DeployTask task, long now) {
         Map<String, Object> claimed = new LinkedHashMap<>();
         claimed.put("id", task.getId());
         claimed.put("serverId", task.getServerId());
@@ -643,7 +688,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         claimed.put("runtimeProvider", runtimeProviderService.assign(task.getProtocol(), task.getAction()));
         claimed.put("createdTime", task.getCreatedTime());
         claimed.put("startedTime", now);
-        return R.ok(claimed);
+        return claimed;
     }
 
     @Override
@@ -773,11 +818,12 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             result.put("rawResultJson", resultJson);
             result.put("reportedAt", System.currentTimeMillis());
         }
-        if (!result.containsKey("runtimeProvider")) {
-            result.put("runtimeProvider", provider);
-        }
-        if (!result.containsKey("runtimeState")) {
+        result.put("runtimeProvider", provider);
+        Object runtimeStateValue = result.get("runtimeState");
+        if (!(runtimeStateValue instanceof JSONObject)) {
             result.put("runtimeState", buildRuntimeState(result, task, provider, taskState));
+        } else {
+            enrichRuntimeStateTrace((JSONObject) runtimeStateValue, result, task, provider, taskState);
         }
         return JSON.toJSONString(result);
     }
@@ -792,6 +838,13 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         runtimeState.put("protocol", task.getProtocol());
         runtimeState.put("action", task.getAction());
         runtimeState.put("taskState", normalizeTaskStateForAudit(taskState));
+        runtimeState.put("source", "task");
+        runtimeState.put("sourceTaskId", task.getId());
+        runtimeState.put("serverId", task.getServerId());
+        runtimeState.put("serverName", task.getServerName());
+        runtimeState.put("resourceType", runtimeResourceType(provider.getKey()));
+        putRuntimeValue(runtimeState, "resourceId", runtimeResourceId(result));
+        runtimeState.put("danger", runtimeProviderService.isDangerAgentMaintenanceAction(task.getAction()));
 
         JSONObject serviceStatuses = result.getJSONObject("services");
         if (serviceStatuses != null && !serviceStatuses.isEmpty()) {
@@ -825,6 +878,106 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         runtimeState.put("statusSource", runtimeStatus.source);
         runtimeState.put("updatedAt", System.currentTimeMillis());
         return runtimeState;
+    }
+
+    private void enrichRuntimeStateTrace(JSONObject runtimeState,
+                                         JSONObject result,
+                                         DeployTask task,
+                                         RuntimeProviderAssignment provider,
+                                         String taskState) {
+        runtimeState.put("providerKey", provider.getKey());
+        runtimeState.put("providerName", provider.getName());
+        runtimeState.put("protocol", task.getProtocol());
+        runtimeState.put("action", task.getAction());
+        runtimeState.put("taskState", normalizeTaskStateForAudit(taskState));
+        runtimeState.put("source", "task");
+        runtimeState.put("sourceTaskId", task.getId());
+        runtimeState.put("serverId", task.getServerId());
+        runtimeState.put("serverName", task.getServerName());
+        runtimeState.put("resourceType", runtimeResourceType(provider.getKey()));
+        Object resourceId = runtimeResourceId(result);
+        if (resourceId == null) {
+            runtimeState.remove("resourceId");
+        } else {
+            runtimeState.put("resourceId", resourceId);
+        }
+        runtimeState.put("danger", runtimeProviderService.isDangerAgentMaintenanceAction(task.getAction()));
+        JSONObject serviceStatuses = result.getJSONObject("services");
+        if (serviceStatuses == null || serviceStatuses.isEmpty()) {
+            serviceStatuses = runtimeState.getJSONObject("serviceStatuses");
+        }
+        JSONArray protocolNodes = result.getJSONArray("protocolNodes");
+        JSONArray forwardRules = result.getJSONArray("forwardRules");
+        JSONObject certificate = result.getJSONObject("certificate");
+        if (certificate == null && (notBlank(runtimeState.getString("certificateStatus")) || notBlank(runtimeState.getString("certificateDomain")))) {
+            certificate = new JSONObject();
+            putRuntimeValue(certificate, "status", runtimeState.getString("certificateStatus"));
+            putRuntimeValue(certificate, "domain", runtimeState.getString("certificateDomain"));
+        }
+        JSONObject diagnosticSummary = summarizeDiagnostics(result.getJSONObject("diagnostics"));
+        if (diagnosticSummary == null) {
+            diagnosticSummary = runtimeState.getJSONObject("diagnosticSummary");
+        }
+        RuntimeStatus runtimeStatus = resolveRuntimeStatus(provider, taskState, serviceStatuses,
+                protocolNodes, forwardRules, certificate, diagnosticSummary);
+        runtimeState.put("status", runtimeStatus.status);
+        runtimeState.put("statusSource", runtimeStatus.source);
+        runtimeState.put("updatedAt", System.currentTimeMillis());
+    }
+
+    private String runtimeResourceType(String providerKey) {
+        if ("xui".equals(providerKey) || "snell".equals(providerKey)) {
+            return "protocol-node";
+        }
+        if ("forward".equals(providerKey)) {
+            return "forward-rule";
+        }
+        if ("certificate".equals(providerKey)) {
+            return "certificate";
+        }
+        if ("firewall".equals(providerKey)) {
+            return "firewall-rule";
+        }
+        return "runtime";
+    }
+
+    private Object runtimeResourceId(JSONObject result) {
+        if (result == null) {
+            return null;
+        }
+        for (String key : Arrays.asList("resourceId", "remoteId", "inboundId", "serviceName")) {
+            Object value = result.get(key);
+            if (value != null && notBlank(String.valueOf(value))) {
+                return value;
+            }
+        }
+        JSONArray protocolNodes = result.getJSONArray("protocolNodes");
+        Object nodeResource = firstArrayResourceId(protocolNodes);
+        if (nodeResource != null) {
+            return nodeResource;
+        }
+        JSONArray forwardRules = result.getJSONArray("forwardRules");
+        return firstArrayResourceId(forwardRules);
+    }
+
+    private Object firstArrayResourceId(JSONArray items) {
+        if (items == null || items.size() != 1 || !(items.get(0) instanceof JSONObject)) {
+            return null;
+        }
+        JSONObject item = items.getJSONObject(0);
+        for (String key : Arrays.asList("id", "remoteId", "serviceName", "listenPort")) {
+            Object value = item.get(key);
+            if (value != null && notBlank(String.valueOf(value))) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private void putRuntimeValue(JSONObject item, String key, Object value) {
+        if (value != null) {
+            item.put(key, value);
+        }
     }
 
     private RuntimeStatus resolveRuntimeStatus(RuntimeProviderAssignment provider,

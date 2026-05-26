@@ -118,6 +118,7 @@ Primary entrypoints:
 - scripts/install-flux-agent-bootstrap.sh
 - docker-compose-v4.yml
 - docker-compose-v6.yml
+- docker-compose.sqlite.yml
 - docker-compose.legacy-v4.yml
 - docker-compose.legacy-v6.yml
 - gost.sql

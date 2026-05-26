@@ -30,6 +30,7 @@ flux-master :5166
         |
         v
 MySQL on the Docker network
+or optional SQLite in /app/data
 ```
 
 Runtime Providers are the product boundary between the master task engine and concrete host runtimes:
@@ -46,13 +47,15 @@ Snell is unified at the product/node-management layer, but it is not a native Xr
 
 Runtime Provider metadata now follows the task from master claim to agent report. The agent logs the provider it executes, reports it inside `resultJson.runtimeProvider`, and the master attaches the same audit metadata when an older agent omits it.
 
-Task results also include a normalized `resultJson.runtimeState` block. It records `providerKey`, `providerName`, `protocol`, `action`, `taskState`, resolved `status`, `statusSource`, `updatedAt`, and optional summaries for service states, protocol nodes, forwarding rules, certificates and diagnostics. The control-center task card renders this block so XUI, Snell, forwarding, certificate and firewall tasks share one status model.
+Task results also include a normalized `resultJson.runtimeState` block. It records `providerKey`, `providerName`, `protocol`, `action`, `taskState`, `sourceTaskId`, `serverId`, `resourceType`, resolved `status`, `statusSource`, `updatedAt`, and optional summaries for service states, protocol nodes, forwarding rules, certificates and diagnostics. The control-center task card renders this block so XUI, Snell, forwarding, certificate and firewall tasks share one status model.
 
 State Sync now lifts those task-level runtime states into a server-by-provider overview. The master exposes `/api/v1/deploy-task/runtime-state/overview`, aggregating latest task results with server heartbeat fields for XUI/Xray, Snell and certificates, and the control center renders the same view as a Flux-style operations panel.
 
 The same State Sync rows can also start Runtime Provider maintenance tasks. Operators can launch provider-aware diagnostics from the overview, and XUI/Snell rows expose repair actions that create normal `agent-maintenance` deployment tasks for the controlled agent to claim, execute and report.
 
 Runtime Provider descriptors now include an Action Catalog for `agent-maintenance` operations. The backend validates maintenance actions from this catalog, and the master UI derives State Sync row actions plus server-card Agent buttons from the same metadata instead of keeping separate hard-coded button lists.
+
+Dangerous maintenance actions, such as agent uninstall or runtime-port closure, require an explicit confirmation contract. The UI asks for confirmation and the backend rejects the task unless `requestJson` carries `dangerConfirmed=true` and `confirmAction=<action>`.
 
 Xray/3x-ui orchestration tasks now generate agent-executable scripts instead of placeholder payloads. The controlled agent resolves the local or saved 3x-ui endpoint/token, calls the 3x-ui inbound API to add/delete protocol nodes, can restart Xray, and reports inbound metadata back through `FLUX_AGENT_RESULT_JSON`.
 
@@ -94,9 +97,19 @@ The master exposes one public entry by default:
 | `5166/tcp` | Master Web UI, API and controlled-agent callback | yes |
 | `6365/tcp` | backend debug alias | no, only with `FLUX_EXPOSE_BACKEND=1` |
 | `3306/tcp` | MySQL | no, Docker network only |
+| SQLite | Optional local master DB file | no network port |
 | phpMyAdmin | temporary maintenance | no, only with `FLUX_PHPMYADMIN_PORT` |
 
 During install or upgrade, the script removes legacy split-stack containers named `vite-frontend`, `springboot-backend` and `gost-phpmyadmin` so old `80/6365/8066` exposures do not survive the move to the single `flux-master` entry. CI and the release gate run `scripts/test-master-port-contract.sh` to keep the default compose files publishing only the master entry.
+
+MySQL remains the default production path. For tiny labs or single-node trials, the master can run without the MySQL sidecar by selecting SQLite:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+  | sudo env FLUX_DB_MODE="sqlite" FLUX_FRONTEND_PORT="5166" bash
+```
+
+SQLite mode still exposes only `5166/tcp`; it stores the database under `/opt/flux-3xui-orchestrator/data` and disables phpMyAdmin because there is no MySQL service.
 
 Controlled agents do not need an inbound management port. They call the same master URL users open in the browser, for example:
 
@@ -132,6 +145,10 @@ Common install overrides:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
   | sudo env FLUX_FRONTEND_PORT="5166" FLUX_NETWORK_STACK="v4" bash
+
+# optional lightweight DB mode, no MySQL sidecar
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+  | sudo env FLUX_DB_MODE="sqlite" FLUX_FRONTEND_PORT="5166" bash
 ```
 
 Day-2 operations:
@@ -142,6 +159,8 @@ sudo bash /opt/flux-3xui-orchestrator/install-master.sh backup
 sudo bash /opt/flux-3xui-orchestrator/install-master.sh restore --backup-file /opt/flux-3xui-orchestrator/backups/flux-master-backup-YYYYMMDD-HHMMSS.tar.gz
 sudo bash /opt/flux-3xui-orchestrator/install-master.sh uninstall --yes
 ```
+
+SQLite backups store the resolved data directory as `sqlite-data/` and restore it back to the `SQLITE_DATA_DIR` recorded in `.env`. A running SQLite master is briefly stopped during `backup` so the copied DB files are consistent.
 
 ## Controlled Agent Install
 
@@ -248,7 +267,7 @@ POST /api/v1/agent-task/claim
 POST /api/v1/agent-task/report
 ```
 
-Agent reports store both `resultJson.runtimeProvider` and `resultJson.runtimeState`, so task history can be audited by runtime owner and by resolved service/node/diagnostic status.
+Agent reports store both `resultJson.runtimeProvider` and `resultJson.runtimeState`, so task history can be audited by runtime owner, source task, target server, resource type and resolved service/node/diagnostic status.
 `agent-maintenance` log reports additionally store structured `logs.items`, covering Flux agent, x-ui/Xray, Snell, forwarding and task-log sources for task-card summaries.
 
 Profiles, nodes, forwarding and 3x-ui:

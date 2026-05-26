@@ -9,8 +9,9 @@ The project is currently a `0.6.0` public-trial reliability candidate, not a bro
 ## Runtime Architecture
 
 - Master stack runs through Docker Compose.
-- `mysql`: MySQL 5.7 with `gost.sql` seed data. Host port is not published by default.
+- `mysql`: MySQL 5.7 with `gost.sql` seed data. Host port is not published by default. This remains the default production DB mode.
 - `master`: `flux-master` single image. The Dockerfile builds the Vite UI, embeds it into the Spring Boot jar, and serves both Web UI and API on container port `5166`.
+- Optional SQLite mode uses `docker-compose.sqlite.yml`, `SPRING_PROFILES_ACTIVE=sqlite`, the embedded `schema-sqlite.sql`, and `/app/data/flux-master.sqlite` mounted from the install directory. It is meant for small labs or single-node trials, not as a forced replacement for MySQL.
 - `phpmyadmin`: optional maintenance override only. It is not part of the default compose stack and is created by the installer only when `PHPMYADMIN_PORT` is set.
 - Legacy split `backend`/`frontend` compose files are retained as `docker-compose.legacy-v4.yml` and `docker-compose.legacy-v6.yml` for rollback/debug only.
 - During install or upgrade, the installer removes old split-stack containers named `vite-frontend`, `springboot-backend`, and `gost-phpmyadmin` before starting the single-image master stack.
@@ -25,6 +26,7 @@ Internal by default:
 
 ```text
 mysql 3306
+sqlite local file, when FLUX_DB_MODE=sqlite
 phpMyAdmin 80, only when the optional override is enabled
 ```
 
@@ -66,7 +68,9 @@ Controlled hosts may expose business ports depending on orchestration choices:
 - Runtime Provider registry and API for `xui`, `snell`, `forward`, `certificate`, and `firewall` task assignment.
 - Runtime Provider Action Catalog for `agent-maintenance` labels, categories, danger flags and State Sync visibility; backend validation and master UI buttons reuse it.
 - Runtime Provider metadata travels through task claim/report and is stored in task result JSON for audit.
-- Runtime State is stored in `resultJson.runtimeState` and rendered on task cards, normalizing provider, protocol/action, task state, resolved status/source, services, nodes, forwarding, certificates and diagnostics.
+- Agent task claim uses an atomic `generated -> claimed` transition so competing agent loops cannot execute the same generated task twice.
+- Dangerous `agent-maintenance` actions require both UI confirmation and backend `dangerConfirmed=true` / `confirmAction=<action>` validation before entering the controlled-agent queue.
+- Runtime State is stored in `resultJson.runtimeState` and rendered on task cards, normalizing provider, protocol/action, source task, server, resource type/id, danger flag, task state, resolved status/source, services, nodes, forwarding, certificates and diagnostics.
 - Xray/3x-ui deployment scripts are executable by the controlled agent: they resolve saved/local 3x-ui API metadata, call inbound add/delete or restart-Xray APIs, and return inbound metadata through `FLUX_AGENT_RESULT_JSON`.
 - Agent task results are sanitized before storage: the master can use raw reports to update encrypted 3x-ui credentials, but stored task history removes API tokens, passwords, 2FA codes and `serverSecrets`.
 - Firewall Runtime Provider maintenance includes executable `open-runtime-ports` and `close-runtime-ports` tasks that parse task ports, apply local `ufw`, `firewalld` or `iptables` rules, and return structured diagnostics. Cloud security groups remain an operator boundary.
@@ -83,6 +87,7 @@ Controlled hosts may expose business ports depending on orchestration choices:
 - Structured certificate/firewall/install diagnostic summaries in task results.
 - Local traffic snapshot sync for 3x-ui.
 - Master port contract check: `scripts/test-master-port-contract.sh` validates that default compose files publish only the `flux-master` entry and that installer migration guards stay in place.
+- Optional SQLite master mode with a dedicated Spring profile, SQLite schema, compose file, installer `--db mysql|sqlite` / `FLUX_DB_MODE` switch, and SQLite schema/compose smoke coverage.
 
 ## Install And Upgrade
 
@@ -117,6 +122,7 @@ CI currently covers:
 - 3x-ui fixture tests.
 - Optional real 3x-ui E2E contract smoke through `scripts/test-three-xui-e2e.sh`; it skips unless endpoint/token are configured and only performs write checks when explicitly enabled.
 - Default, v4/v6 and legacy compose config.
+- Optional SQLite compose config and schema smoke.
 - Disposable compose smoke stack with the `flux-master` single image.
 - Debian, Ubuntu, Alpine, Rocky Linux, and Oracle Linux installer diagnostics.
 

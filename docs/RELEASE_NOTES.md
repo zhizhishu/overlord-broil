@@ -36,13 +36,15 @@ This release moves the project from the first public production milestone into a
 - Future branch update: Xray/3x-ui deployment tasks now produce agent-executable scripts that call the 3x-ui inbound add/delete/restart APIs and report inbound metadata back to the master.
 - Future branch update: agent task results now redact 3x-ui API tokens, passwords, 2FA codes and `serverSecrets` before storing task history, while still allowing encrypted server metadata updates.
 - Future branch update: firewall Runtime Provider actions now include executable `open-runtime-ports` and `close-runtime-ports` tasks, parsing task ports and applying local `ufw`, `firewalld` or `iptables` rules before returning diagnostics.
+- Future branch update: added optional SQLite master mode through `FLUX_DB_MODE=sqlite`, `application-sqlite.yml`, an embedded SQLite schema, `docker-compose.sqlite.yml`, installer backup/restore awareness and CI/release smoke coverage. MySQL remains the default production path.
+- Future branch update: hardened the task engine with atomic agent task claiming, dangerous `agent-maintenance` confirmation checks and richer Runtime State trace fields (`sourceTaskId`, `serverId`, `resourceType`, `resourceId`, `danger`).
 
 ### 0.6.0 Capability Matrix
 
 | Area | 0.6.0 stance |
 | --- | --- |
 | Master install | Same one-command installer as 0.5.0, now with a pre-install doctor for ports, Docker/Compose and `.env` checks. |
-| Master runtime | Default Docker Compose uses MySQL plus the `flux-master` single image on port `5166`; legacy split backend/frontend compose files are retained for rollback/debug only. |
+| Master runtime | Default Docker Compose uses MySQL plus the `flux-master` single image on port `5166`; optional SQLite mode removes the MySQL sidecar for small labs; legacy split backend/frontend compose files are retained for rollback/debug only. |
 | Agent install | systemd/OpenRC installer plus preflight doctor and local runtime doctor. |
 | Agent maintenance | Remote diagnostics, log collection, restart and upgrade tasks generated from the master panel. |
 | Release packaging | Future branch includes a clean-tree release bundle builder and GitHub Release workflow; release assets include the tarball and `.sha256`. |
@@ -55,12 +57,13 @@ This release moves the project from the first public production milestone into a
 | State Sync overview | `/api/v1/deploy-task/runtime-state/overview` aggregates latest runtime states plus heartbeat fields into a server-by-provider operations panel. |
 | State Sync actions | Runtime rows can generate provider-aware diagnostics and XUI/Snell repairs as normal `agent-maintenance` tasks for the controlled agent. |
 | Runtime Provider Action Catalog | Provider descriptors register maintenance action labels, categories, danger flags and State Sync visibility; backend validation and master UI buttons reuse that catalog. |
+| Task engine safety | Agent claims use an atomic `generated -> claimed` state transition, and dangerous maintenance tasks require explicit UI/backend confirmation before an agent can execute them. |
 | Remote runtime logs | `agent-maintenance logs` reports structured `logs.items` for Flux agent, x-ui/Xray, Snell, forwarding and task logs, with task-card summaries in the master UI. |
 | Master port contract | Default compose files publish only one host port for `flux-master`; installer upgrades remove legacy split containers so old `80/6365/8066` mappings do not remain. |
 | Linux coverage | Docker/CI diagnostics cover Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux userspaces. |
 | 3x-ui | API fixture remains API-level; optional real 3x-ui contract smoke can run from local env or manual GitHub workflow; full install/configure still targets systemd hosts. |
 | Snell | Product-level protocol node with separate systemd/OpenRC runtime, not a native Xray/3x-ui core protocol. |
-| Verification | Shell syntax, agent mock, 3x-ui fixture, optional real 3x-ui E2E gate, master port contract, frontend build, backend Maven build, install matrix and single-image compose smoke. |
+| Verification | Shell syntax, agent mock, SQLite schema smoke, 3x-ui fixture, optional real 3x-ui E2E gate, master port contract, frontend build, backend Maven build, install matrix and MySQL/SQLite single-image compose smoke. |
 
 ### Honest Boundaries
 

@@ -11,9 +11,12 @@ FRONTEND_PORT="${FLUX_FRONTEND_PORT:-5166}"
 BACKEND_PORT="${FLUX_BACKEND_PORT:-6365}"
 PHPMYADMIN_PORT="${FLUX_PHPMYADMIN_PORT:-}"
 EXPOSE_BACKEND="${FLUX_EXPOSE_BACKEND:-0}"
+DB_MODE="${FLUX_DB_MODE:-mysql}"
 DB_NAME="${FLUX_DB_NAME:-gost}"
 DB_USER="${FLUX_DB_USER:-gost}"
 DB_PASSWORD="${FLUX_DB_PASSWORD:-}"
+SQLITE_DB_PATH="${FLUX_SQLITE_DB_PATH:-/app/data/flux-master.sqlite}"
+SQLITE_DATA_DIR="${FLUX_SQLITE_DATA_DIR:-./data}"
 JWT_SECRET="${FLUX_JWT_SECRET:-}"
 SECRET_ENCRYPTION_KEY="${FLUX_SECRET_ENCRYPTION_KEY:-}"
 INSTALL_DOCKER="${FLUX_INSTALL_DOCKER:-1}"
@@ -31,10 +34,12 @@ FRONTEND_PORT_EXPLICIT="0"
 BACKEND_PORT_EXPLICIT="0"
 PHPMYADMIN_PORT_EXPLICIT="0"
 EXPOSE_BACKEND_EXPLICIT="0"
+DB_MODE_EXPLICIT="0"
 if [ "${FLUX_FRONTEND_PORT+x}" = "x" ]; then FRONTEND_PORT_EXPLICIT="1"; fi
 if [ "${FLUX_BACKEND_PORT+x}" = "x" ]; then BACKEND_PORT_EXPLICIT="1"; fi
 if [ "${FLUX_PHPMYADMIN_PORT+x}" = "x" ]; then PHPMYADMIN_PORT_EXPLICIT="1"; fi
 if [ "${FLUX_EXPOSE_BACKEND+x}" = "x" ]; then EXPOSE_BACKEND_EXPLICIT="1"; fi
+if [ "${FLUX_DB_MODE+x}" = "x" ]; then DB_MODE_EXPLICIT="1"; fi
 
 usage() {
   cat <<'EOF'
@@ -45,7 +50,7 @@ Actions:
   doctor                  Run non-destructive host diagnostics and exit
   install                 Install or repair the master stack (default)
   upgrade                 Back up, refresh compose/sql files, pull images and restart
-  backup                  Create a tar.gz backup of config files and a MySQL dump when running
+  backup                  Create a tar.gz backup of config files and DB data when available
   restore                 Restore from --backup-file and restart the stack
   uninstall               Stop and remove stack containers; requires --yes and keeps data files
 
@@ -56,6 +61,7 @@ Options:
   --backend-port PORT     Backend debug port when --expose-backend is enabled, default 6365
   --expose-backend        Publish backend API port for debugging; disabled by default
   --no-expose-backend     Keep backend API internal to Docker network
+  --db mysql|sqlite       Database runtime, default mysql
   --phpmyadmin-port PORT  Expose phpMyAdmin on this host port; disabled by default
   --backup-dir PATH       Backup output directory, default /opt/flux-3xui-orchestrator/backups
   --backup-file PATH      Backup archive used by restore
@@ -73,6 +79,9 @@ Environment:
   FLUX_JWT_SECRET           Optional JWT secret; generated when empty
   FLUX_SECRET_ENCRYPTION_KEY Optional credential encryption key; generated when empty
   FLUX_EXPOSE_BACKEND        Optional backend public exposure flag, default 0
+  FLUX_DB_MODE               Optional database runtime: mysql or sqlite, default mysql
+  FLUX_SQLITE_DB_PATH        SQLite path inside flux-master, default /app/data/flux-master.sqlite
+  FLUX_SQLITE_DATA_DIR       SQLite data directory on the host, default ./data under install root
   FLUX_PHPMYADMIN_PORT       Optional phpMyAdmin public port; unset disables public exposure
   FLUX_BACKUP_DIR           Optional backup output directory
   FLUX_BACKUP_FILE          Optional restore archive path
@@ -122,6 +131,11 @@ while [ "$#" -gt 0 ]; do
       EXPOSE_BACKEND="0"
       EXPOSE_BACKEND_EXPLICIT="1"
       shift
+      ;;
+    --db)
+      DB_MODE="$2"
+      DB_MODE_EXPLICIT="1"
+      shift 2
       ;;
     --phpmyadmin-port)
       PHPMYADMIN_PORT="$2"
@@ -185,11 +199,27 @@ if [ "$EXPOSE_BACKEND" != "0" ] && [ "$EXPOSE_BACKEND" != "1" ]; then
   exit 2
 fi
 
+if [ "$DB_MODE" != "mysql" ] && [ "$DB_MODE" != "sqlite" ]; then
+  echo "FLUX_DB_MODE must be mysql or sqlite." >&2
+  exit 2
+fi
+
 BACKUP_DIR="${BACKUP_DIR:-${INSTALL_DIR}/backups}"
 COMPOSE_FILE="docker-compose-${NETWORK_STACK}.yml"
+if [ "$DB_MODE" = "sqlite" ]; then
+  COMPOSE_FILE="docker-compose.sqlite.yml"
+fi
 ENV_FILE=".env"
 PHPMYADMIN_OVERRIDE_FILE="docker-compose-phpmyadmin.yml"
 BACKEND_OVERRIDE_FILE="docker-compose-backend.yml"
+
+select_compose_file() {
+  if [ "$DB_MODE" = "sqlite" ]; then
+    COMPOSE_FILE="docker-compose.sqlite.yml"
+  else
+    COMPOSE_FILE="docker-compose-${NETWORK_STACK}.yml"
+  fi
+}
 
 detect_os_name() {
   if [ -r /etc/os-release ]; then
@@ -359,18 +389,42 @@ require_env_values() {
   local file="$1"
   local missing=""
   local key value
+  local db_mode
 
   if [ ! -f "$file" ]; then
     echo "Required env file is missing: ${file}" >&2
     exit 2
   fi
 
-  for key in DB_NAME DB_USER DB_PASSWORD JWT_SECRET SECRET_ENCRYPTION_KEY FRONTEND_PORT BACKEND_PORT EXPOSE_BACKEND; do
+  db_mode="$(read_env_value DB_MODE "$file")"
+  db_mode="${db_mode:-mysql}"
+  if [ "$db_mode" != "mysql" ] && [ "$db_mode" != "sqlite" ]; then
+    echo "DB_MODE must be mysql or sqlite in ${file}, got '${db_mode}'." >&2
+    exit 2
+  fi
+
+  for key in JWT_SECRET SECRET_ENCRYPTION_KEY FRONTEND_PORT BACKEND_PORT EXPOSE_BACKEND; do
     value="$(read_env_value "$key" "$file")"
     if [ -z "$value" ]; then
       missing="${missing} ${key}"
     fi
   done
+
+  if [ "$db_mode" = "mysql" ]; then
+    for key in DB_NAME DB_USER DB_PASSWORD; do
+      value="$(read_env_value "$key" "$file")"
+      if [ -z "$value" ]; then
+        missing="${missing} ${key}"
+      fi
+    done
+  else
+    for key in SQLITE_DB_PATH SQLITE_DATA_DIR; do
+      value="$(read_env_value "$key" "$file")"
+      if [ -z "$value" ]; then
+        missing="${missing} ${key}"
+      fi
+    done
+  fi
 
   if [ -n "$missing" ]; then
     echo "Required value(s) missing from ${file}:${missing}" >&2
@@ -402,13 +456,20 @@ resolve_restore_compose_file() {
     return
   fi
 
+  if [ -f docker-compose.sqlite.yml ]; then
+    DB_MODE="sqlite"
+    COMPOSE_FILE="docker-compose.sqlite.yml"
+    echo "Using restored compose file: ${COMPOSE_FILE}"
+    return
+  fi
+
   if [ -f docker-compose.yml ]; then
     COMPOSE_FILE="docker-compose.yml"
     echo "Using restored compose file: ${COMPOSE_FILE}"
     return
   fi
 
-  echo "Backup does not contain docker-compose-v4.yml, docker-compose-v6.yml or docker-compose.yml." >&2
+  echo "Backup does not contain docker-compose-v4.yml, docker-compose-v6.yml, docker-compose.sqlite.yml or docker-compose.yml." >&2
   exit 2
 }
 
@@ -426,13 +487,20 @@ detect_host() {
 
 load_existing_env() {
   if [ -f "${INSTALL_DIR}/${ENV_FILE}" ]; then
+    local requested_db_mode="${DB_MODE}"
     # shellcheck disable=SC1090
     set -a
     . "${INSTALL_DIR}/${ENV_FILE}"
     set +a
+    if [ "$DB_MODE_EXPLICIT" = "1" ]; then
+      DB_MODE="$requested_db_mode"
+    fi
+    DB_MODE="${DB_MODE:-mysql}"
     DB_NAME="${DB_NAME:-gost}"
     DB_USER="${DB_USER:-gost}"
     DB_PASSWORD="${DB_PASSWORD:-}"
+    SQLITE_DB_PATH="${SQLITE_DB_PATH:-/app/data/flux-master.sqlite}"
+    SQLITE_DATA_DIR="${SQLITE_DATA_DIR:-./data}"
     PHPMYADMIN_PORT="${PHPMYADMIN_PORT:-}"
     EXPOSE_BACKEND="${EXPOSE_BACKEND:-0}"
   fi
@@ -465,6 +533,11 @@ YAML
 }
 
 ensure_phpmyadmin_override() {
+  if [ "$(read_env_value DB_MODE "$ENV_FILE")" = "sqlite" ]; then
+    rm -f "$PHPMYADMIN_OVERRIDE_FILE"
+    return
+  fi
+
   local configured_port
   configured_port="$(read_env_value PHPMYADMIN_PORT "$ENV_FILE")"
   if [ -n "$configured_port" ]; then
@@ -507,6 +580,7 @@ download_runtime_files() {
   download_file "${RAW_BASE}/docker-compose.yml" "docker-compose.yml"
   download_file "${RAW_BASE}/docker-compose-v4.yml" "docker-compose-v4.yml"
   download_file "${RAW_BASE}/docker-compose-v6.yml" "docker-compose-v6.yml"
+  download_file "${RAW_BASE}/docker-compose.sqlite.yml" "docker-compose.sqlite.yml"
   download_file "${RAW_BASE}/docker-compose.legacy-v4.yml" "docker-compose.legacy-v4.yml"
   download_file "${RAW_BASE}/docker-compose.legacy-v6.yml" "docker-compose.legacy-v6.yml"
   download_file "${RAW_BASE}/${COMPOSE_FILE}" "$COMPOSE_FILE"
@@ -522,9 +596,12 @@ ensure_env_file() {
     SECRET_ENCRYPTION_KEY="${SECRET_ENCRYPTION_KEY:-$(random_hex 32)}"
     umask 077
     cat > "$ENV_FILE" <<ENV
+DB_MODE=${DB_MODE}
 DB_NAME=${DB_NAME}
 DB_USER=${DB_USER}
 DB_PASSWORD=${DB_PASSWORD}
+SQLITE_DB_PATH=${SQLITE_DB_PATH}
+SQLITE_DATA_DIR=${SQLITE_DATA_DIR}
 JWT_SECRET=${JWT_SECRET}
 SECRET_ENCRYPTION_KEY=${SECRET_ENCRYPTION_KEY}
 FRONTEND_PORT=${FRONTEND_PORT}
@@ -536,6 +613,18 @@ ENV
     echo "Generated ${INSTALL_DIR}/${ENV_FILE}"
   else
     echo "Keeping existing ${INSTALL_DIR}/${ENV_FILE}"
+    if ! env_key_exists DB_MODE "$ENV_FILE"; then
+      write_env_value DB_MODE "$DB_MODE" "$ENV_FILE"
+      echo "Added DB_MODE to existing ${INSTALL_DIR}/${ENV_FILE}"
+    fi
+    if ! env_key_exists SQLITE_DB_PATH "$ENV_FILE"; then
+      write_env_value SQLITE_DB_PATH "$SQLITE_DB_PATH" "$ENV_FILE"
+      echo "Added SQLITE_DB_PATH to existing ${INSTALL_DIR}/${ENV_FILE}"
+    fi
+    if ! env_key_exists SQLITE_DATA_DIR "$ENV_FILE"; then
+      write_env_value SQLITE_DATA_DIR "$SQLITE_DATA_DIR" "$ENV_FILE"
+      echo "Added SQLITE_DATA_DIR to existing ${INSTALL_DIR}/${ENV_FILE}"
+    fi
     if [ -z "$(read_env_value SECRET_ENCRYPTION_KEY "$ENV_FILE")" ]; then
       SECRET_ENCRYPTION_KEY="${SECRET_ENCRYPTION_KEY:-$(random_hex 32)}"
       write_env_value SECRET_ENCRYPTION_KEY "$SECRET_ENCRYPTION_KEY" "$ENV_FILE"
@@ -576,12 +665,30 @@ ENV
     write_env_value EXPOSE_BACKEND "0" "$ENV_FILE"
   fi
 
-  if [ "$PHPMYADMIN_PORT_EXPLICIT" = "1" ]; then
+  if [ "$DB_MODE_EXPLICIT" = "1" ]; then
+    write_env_value DB_MODE "$DB_MODE" "$ENV_FILE"
+  fi
+
+  if [ "$(read_env_value DB_MODE "$ENV_FILE")" = "sqlite" ]; then
+    write_env_value PHPMYADMIN_PORT "" "$ENV_FILE"
+  elif [ "$PHPMYADMIN_PORT_EXPLICIT" = "1" ]; then
     write_env_value PHPMYADMIN_PORT "$PHPMYADMIN_PORT" "$ENV_FILE"
   elif [ "${FLUX_PRESERVE_PHPMYADMIN_PORT:-0}" != "1" ] && [ -n "$(read_env_value PHPMYADMIN_PORT "$ENV_FILE")" ]; then
     write_env_value PHPMYADMIN_PORT "" "$ENV_FILE"
     echo "Disabled public phpMyAdmin exposure. Set FLUX_PHPMYADMIN_PORT or --phpmyadmin-port when temporary maintenance access is needed."
   fi
+}
+
+ensure_sqlite_data_dir() {
+  if [ "$(read_env_value DB_MODE "$ENV_FILE")" != "sqlite" ]; then
+    return
+  fi
+
+  local data_dir
+  data_dir="$(read_env_value SQLITE_DATA_DIR "$ENV_FILE")"
+  data_dir="${data_dir:-./data}"
+  mkdir -p "$data_dir"
+  chmod 700 "$data_dir" 2>/dev/null || true
 }
 
 validate_port_number() {
@@ -713,6 +820,7 @@ pull_or_build_images() {
 }
 
 print_success() {
+  FINAL_DB_MODE="$(read_env_value DB_MODE "$ENV_FILE")"
   FINAL_FRONTEND_PORT="$(read_env_value FRONTEND_PORT "$ENV_FILE")"
   FINAL_BACKEND_PORT="$(read_env_value BACKEND_PORT "$ENV_FILE")"
   FINAL_PHPMYADMIN_PORT="$(read_env_value PHPMYADMIN_PORT "$ENV_FILE")"
@@ -726,11 +834,11 @@ Flux 3x-ui Orchestrator is running.
 Install dir: ${INSTALL_DIR}
 Panel URL:   http://${PANEL_HOST}:${FINAL_FRONTEND_PORT}
 Agent URL:   http://${PANEL_HOST}:${FINAL_FRONTEND_PORT}
-Runtime:     flux-master single-image + MySQL
+Runtime:     flux-master single-image + $(if [ "$FINAL_DB_MODE" = "sqlite" ]; then printf 'SQLite'; else printf 'MySQL'; fi)
 Backend API: $(if [ "$FINAL_EXPOSE_BACKEND" = "1" ]; then printf 'http://%s:%s  (debug alias for the same flux-master app; agents should still use the Panel URL)' "$PANEL_HOST" "$FINAL_BACKEND_PORT"; else printf 'served by the same Panel URL under /api/v1/*'; fi)
-phpMyAdmin:  $(if [ -n "$FINAL_PHPMYADMIN_PORT" ]; then printf 'http://%s:%s  (restrict by firewall in production)' "$PANEL_HOST" "$FINAL_PHPMYADMIN_PORT"; else printf 'not publicly exposed; set FLUX_PHPMYADMIN_PORT or --phpmyadmin-port to expose temporarily'; fi)
+phpMyAdmin:  $(if [ "$FINAL_DB_MODE" = "sqlite" ]; then printf 'not available in SQLite mode'; elif [ -n "$FINAL_PHPMYADMIN_PORT" ]; then printf 'http://%s:%s  (restrict by firewall in production)' "$PANEL_HOST" "$FINAL_PHPMYADMIN_PORT"; else printf 'not publicly exposed; set FLUX_PHPMYADMIN_PORT or --phpmyadmin-port to expose temporarily'; fi)
 
-Default login from gost.sql:
+Default login:
   username: admin_user
   password: admin_user
 
@@ -822,6 +930,7 @@ doctor_port() {
 
 run_master_doctor() {
   local require_docker="${FLUX_DOCTOR_REQUIRE_DOCKER:-1}"
+  local db_mode="${DB_MODE}"
   local frontend_port="${FRONTEND_PORT}"
   local backend_port="${BACKEND_PORT}"
   local phpmyadmin_port="${PHPMYADMIN_PORT}"
@@ -864,6 +973,8 @@ run_master_doctor() {
   fi
 
   if [ -f "${INSTALL_DIR}/${ENV_FILE}" ]; then
+    db_mode="$(read_env_value DB_MODE "${INSTALL_DIR}/${ENV_FILE}")"
+    db_mode="${db_mode:-mysql}"
     frontend_port="$(read_env_value FRONTEND_PORT "${INSTALL_DIR}/${ENV_FILE}")"
     backend_port="$(read_env_value BACKEND_PORT "${INSTALL_DIR}/${ENV_FILE}")"
     phpmyadmin_port="$(read_env_value PHPMYADMIN_PORT "${INSTALL_DIR}/${ENV_FILE}")"
@@ -872,6 +983,12 @@ run_master_doctor() {
     doctor_item ok "env-file" "found ${INSTALL_DIR}/${ENV_FILE}"
   else
     doctor_item warn "env-file" "not found yet; using requested/default ports"
+  fi
+
+  if [ "$db_mode" = "mysql" ] || [ "$db_mode" = "sqlite" ]; then
+    doctor_item ok "DB_MODE" "$db_mode"
+  else
+    doctor_item fail "DB_MODE" "invalid '${db_mode}', expected mysql or sqlite"
   fi
 
   doctor_port FRONTEND_PORT "$frontend_port"
@@ -883,7 +1000,9 @@ run_master_doctor() {
   else
     doctor_item ok "BACKEND_PORT" "${backend_port} internal only; not published"
   fi
-  if [ -n "$phpmyadmin_port" ]; then
+  if [ "$db_mode" = "sqlite" ]; then
+    doctor_item ok "PHPMYADMIN_PORT" "not available in SQLite mode"
+  elif [ -n "$phpmyadmin_port" ]; then
     doctor_port PHPMYADMIN_PORT "$phpmyadmin_port"
   else
     doctor_item ok "PHPMYADMIN_PORT" "not publicly exposed"
@@ -899,7 +1018,7 @@ run_master_doctor() {
     fi
   fi
 
-  if { [ "$expose_backend" = "1" ] && [ "$frontend_port" = "$backend_port" ]; } || { [ -n "$phpmyadmin_port" ] && { [ "$frontend_port" = "$phpmyadmin_port" ] || { [ "$expose_backend" = "1" ] && [ "$backend_port" = "$phpmyadmin_port" ]; }; }; }; then
+  if { [ "$expose_backend" = "1" ] && [ "$frontend_port" = "$backend_port" ]; } || { [ "$db_mode" != "sqlite" ] && [ -n "$phpmyadmin_port" ] && { [ "$frontend_port" = "$phpmyadmin_port" ] || { [ "$expose_backend" = "1" ] && [ "$backend_port" = "$phpmyadmin_port" ]; }; }; }; then
     doctor_item fail "port-matrix" "public FRONTEND_PORT, exposed BACKEND_PORT and PHPMYADMIN_PORT must be different"
   else
     if [ "$expose_backend" = "1" ]; then
@@ -917,6 +1036,74 @@ run_master_doctor() {
   return 1
 }
 
+resolve_install_path() {
+  local path="$1"
+  case "$path" in
+    /*) printf '%s\n' "$path" ;;
+    ./*) printf '%s/%s\n' "$INSTALL_DIR" "${path#./}" ;;
+    *) printf '%s/%s\n' "$INSTALL_DIR" "$path" ;;
+  esac
+}
+
+backup_sqlite_data() {
+  local target_dir="$1"
+  local sqlite_data_dir
+  local sqlite_data_abs
+  local was_running="0"
+
+  sqlite_data_dir="${SQLITE_DATA_DIR:-./data}"
+  sqlite_data_abs="$(resolve_install_path "$sqlite_data_dir")"
+  if [ ! -d "$sqlite_data_abs" ]; then
+    return 1
+  fi
+
+  if docker ps --format '{{.Names}}' | grep -qx 'flux-master'; then
+    echo "Stopping flux-master briefly for a consistent SQLite file backup..."
+    compose_cmd stop master
+    was_running="1"
+  fi
+
+  mkdir -p "$target_dir"
+  if ! cp -a "${sqlite_data_abs}/." "$target_dir/"; then
+    if [ "$was_running" = "1" ]; then
+      compose_cmd up -d master || true
+    fi
+    echo "SQLite data backup failed from ${sqlite_data_abs}." >&2
+    exit 1
+  fi
+
+  if [ "$was_running" = "1" ] && [ "$ACTION" = "backup" ]; then
+    compose_cmd up -d master
+  fi
+  return 0
+}
+
+restore_sqlite_data() {
+  local workdir="$1"
+  local source_dir=""
+  local sqlite_data_dir
+  local sqlite_data_abs
+
+  if [ "${DB_MODE:-mysql}" != "sqlite" ]; then
+    return
+  fi
+
+  if [ -d "${workdir}/sqlite-data" ]; then
+    source_dir="${workdir}/sqlite-data"
+  elif [ -d "${workdir}/files/data" ]; then
+    source_dir="${workdir}/files/data"
+  fi
+  if [ -z "$source_dir" ]; then
+    return
+  fi
+
+  sqlite_data_dir="${SQLITE_DATA_DIR:-./data}"
+  sqlite_data_abs="$(resolve_install_path "$sqlite_data_dir")"
+  mkdir -p "$sqlite_data_abs"
+  cp -a "${source_dir}/." "$sqlite_data_abs/"
+  chmod 700 "$sqlite_data_abs" 2>/dev/null || true
+}
+
 create_backup() {
   mkdir -p "$BACKUP_DIR"
   local stamp
@@ -928,7 +1115,7 @@ create_backup() {
   archive="${BACKUP_DIR}/flux-master-backup-${stamp}.tar.gz"
 
   mkdir -p "${workdir}/files"
-  for file in "$ENV_FILE" "docker-compose.yml" "docker-compose-v4.yml" "docker-compose-v6.yml" "docker-compose.legacy-v4.yml" "docker-compose.legacy-v6.yml" "$BACKEND_OVERRIDE_FILE" "$PHPMYADMIN_OVERRIDE_FILE" "gost.sql"; do
+  for file in "$ENV_FILE" "docker-compose.yml" "docker-compose-v4.yml" "docker-compose-v6.yml" "docker-compose.sqlite.yml" "docker-compose.legacy-v4.yml" "docker-compose.legacy-v6.yml" "$BACKEND_OVERRIDE_FILE" "$PHPMYADMIN_OVERRIDE_FILE" "gost.sql"; do
     if [ -f "$file" ]; then
       cp -p "$file" "${workdir}/files/${file}"
       file_count=$((file_count + 1))
@@ -936,7 +1123,13 @@ create_backup() {
   done
 
   load_existing_env
-  if docker ps --format '{{.Names}}' | grep -qx 'gost-mysql' && [ -n "$DB_PASSWORD" ]; then
+  if [ "${DB_MODE:-mysql}" = "sqlite" ] && [ -d "${SQLITE_DATA_DIR:-./data}" ]; then
+    if backup_sqlite_data "${workdir}/sqlite-data"; then
+      file_count=$((file_count + 1))
+    fi
+  fi
+
+  if [ "${DB_MODE:-mysql}" != "sqlite" ] && docker ps --format '{{.Names}}' | grep -qx 'gost-mysql' && [ -n "$DB_PASSWORD" ]; then
     echo "Creating MySQL logical dump..."
     if docker exec gost-mysql mysqldump -u"${DB_USER}" -p"${DB_PASSWORD}" --single-transaction --routines --triggers "${DB_NAME}" > "${workdir}/mysql.sql"; then
       :
@@ -972,7 +1165,7 @@ restore_backup() {
   tar -xzf "$BACKUP_FILE" -C "$workdir"
 
   if [ -d "${workdir}/files" ]; then
-    cp -p "${workdir}/files/"* . 2>/dev/null || true
+    cp -a "${workdir}/files/." .
   else
     rm -rf "$workdir"
     echo "Backup archive does not contain a files directory." >&2
@@ -980,9 +1173,18 @@ restore_backup() {
   fi
 
   require_env_values "$ENV_FILE"
+  DB_MODE="$(read_env_value DB_MODE "$ENV_FILE")"
+  DB_MODE="${DB_MODE:-mysql}"
+  SQLITE_DB_PATH="$(read_env_value SQLITE_DB_PATH "$ENV_FILE")"
+  SQLITE_DB_PATH="${SQLITE_DB_PATH:-/app/data/flux-master.sqlite}"
+  SQLITE_DATA_DIR="$(read_env_value SQLITE_DATA_DIR "$ENV_FILE")"
+  SQLITE_DATA_DIR="${SQLITE_DATA_DIR:-./data}"
+  select_compose_file
   resolve_restore_compose_file
   ensure_backend_override
   ensure_phpmyadmin_override
+  ensure_sqlite_data_dir
+  restore_sqlite_data "$workdir"
 
   docker_login_if_configured
   pull_or_build_images
@@ -1000,11 +1202,21 @@ restore_backup() {
 }
 
 install_or_upgrade() {
+  load_existing_env
+  if [ "$DB_MODE" != "mysql" ] && [ "$DB_MODE" != "sqlite" ]; then
+    echo "DB_MODE must be mysql or sqlite, got '${DB_MODE}'." >&2
+    exit 2
+  fi
+  select_compose_file
   download_runtime_files
   ensure_env_file
+  DB_MODE="$(read_env_value DB_MODE "$ENV_FILE")"
+  DB_MODE="${DB_MODE:-mysql}"
+  select_compose_file
   require_env_values "$ENV_FILE"
   ensure_backend_override
   ensure_phpmyadmin_override
+  ensure_sqlite_data_dir
   remove_legacy_split_containers
   preflight_ports
   docker_login_if_configured
@@ -1018,6 +1230,8 @@ uninstall_stack() {
     echo "uninstall requires --yes. This removes containers but keeps ${INSTALL_DIR} and Docker volumes." >&2
     exit 2
   fi
+  load_existing_env
+  select_compose_file
   if [ -f "$ENV_FILE" ] && [ -f "$COMPOSE_FILE" ]; then
     create_backup
     compose_cmd down

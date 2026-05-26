@@ -255,3 +255,35 @@
   - Agent 任务结果脱敏修正后，Docker Maven targeted test：`RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 20 个测试成功。
 - 清理：Docker Maven 容器 `flux-runtime-provider-clean-test`、`flux-runtime-provider-ret-test` 和 `flux-runtime-provider-sanitize-test` 均使用 `--rm` 并已退出；release-check 使用的 Docker Node 22 容器、agent mock 和 3x-ui fixture 的临时目录、临时服务和临时 inbound 已清理；未保留本轮端口监听。
 - 后续：提交推送到 `origin/main` 和 `origin/future`，确认 GitHub Actions、Pages 和 GHCR 镜像成果。
+
+### Runtime Provider Agent Execution Remote Verification
+
+- 完成：确认 `2e2a0e8 Complete runtime provider agent execution` 已同步到 `origin/main` 和 `origin/future`，并完成远端 CI、Pages、Docker Images 与 GHCR 镜像验证。
+- 验证：
+  - `origin/main` 和 `origin/future` 均指向 `2e2a0e8bc262a57b78bd1b9ff5223e1d78a4af83`。
+  - main CI run `26434051689` 成功，main Docker Images run `26434051681` 成功，main Pages deployment run `26434051078` 成功。
+  - future CI run `26434064343` 成功，future Docker Images run `26434064354` 成功。
+  - GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 可读取，index digest 为 `sha256:4be0416f955d89153d9560fe14a2fce27d37f94be9ee460084a1507e7ab19a5e`，linux/amd64 digest 为 `sha256:4263b75e715d095a0e7af53de714bd143451b297afdd91e1a4a641edc08687d7`。
+- 清理：本阶段只使用 `gh` 和 Docker imagetools 读取远端状态，未启动本地服务、未占用端口、未创建持久容器。
+- 后续：继续推进正式版缺口，优先评估并落地可选 SQLite 主控运行模式。
+
+### SQLite Master Mode And Task Safety
+
+- 完成：把目标架构里的 `DB: MySQL / 后续可选 SQLite` 推进为可安装的 SQLite 主控模式，同时补强 agent claim、危险维护动作确认和 Runtime State 主控审计。
+- 修改：
+  - 新增 `docker-compose.sqlite.yml`、`application-sqlite.yml`、`schema-sqlite.sql` 和 `scripts/test-sqlite-schema.sh`。
+  - `install-master.sh` 支持 `FLUX_DB_MODE=mysql|sqlite` / `--db mysql|sqlite`，SQLite 模式只启动 `flux-master`，不启动 MySQL/phpMyAdmin。
+  - SQLite 备份保存为 `sqlite-data/`，恢复写回 `.env` 中的 `SQLITE_DATA_DIR`；旧 MySQL 备份缺少 `DB_MODE` 时按 `mysql` 兼容。
+  - Agent claim 使用 `generated -> claimed` 条件更新，危险 `agent-maintenance` 动作要求 `dangerConfirmed=true` 和匹配的 `confirmAction`。
+  - 保存 agent 回报时由 master 覆盖 Runtime Provider/Runtime State 审计字段，并重新计算 `status/statusSource`，避免被控端伪造 State Sync 状态。
+  - 主控 UI 为危险动作增加确认，并在 State Sync 行展示资源类型/ID与危险标记。
+- 验证：
+  - `bash scripts/test-master-port-contract.sh` 通过。
+  - `bash scripts/test-sqlite-schema.sh` 通过。
+  - `bash -n scripts/*.sh` 通过。
+  - `bash -lc 'sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
+  - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
+  - Docker Maven targeted test `RuntimeProviderServiceTest,DeployTaskServiceImplTest` 通过：22 tests, 0 failures。
+  - `bash scripts/release-check.sh` 通过，覆盖 shell、agent mock、SQLite schema、3x-ui fixture、可选真实 3x-ui E2E skip、compose config、master port contract、Docker Node 22 前端 build、MySQL/SQLite compose dry-run 和 `git diff --check`。
+- 清理：Docker Maven 容器 `flux-task-safety-test` 使用 `--rm` 并已退出；release-check 使用的 Docker Node 22 容器、agent mock 和 3x-ui fixture 临时资源已清理；未保留本轮端口监听。
+- 后续：提交推送到 `origin/main` 和 `origin/future`，确认 GitHub Actions、Pages 和 GHCR 镜像成果。

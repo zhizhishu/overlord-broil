@@ -99,6 +99,8 @@ const en: Record<string, string> = {
   "运行时诊断": "Runtime doctor",
   "运行时修复": "Runtime repair",
   "任务 #{id}": "Task #{id}",
+  "危险动作": "Dangerous action",
+  "确认执行危险操作：{action}？": "Confirm dangerous action: {action}?",
   "仅显示最近 {shown} 条，后端已聚合 {total} 条运行时状态。": "Showing the latest {shown}; backend aggregated {total} runtime states.",
   "Runtime Provider 层": "Runtime Provider Layer",
   "主控按运行时边界分派任务：Xray/3x-ui、Snell、转发、证书和防火墙统一进入 agent 执行链。": "The master dispatches tasks by runtime boundary: Xray/3x-ui, Snell, forwarding, certificates and firewall all enter the agent execution chain.",

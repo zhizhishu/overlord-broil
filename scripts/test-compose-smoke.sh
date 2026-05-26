@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 COMPOSE_FILE="${FLUX_COMPOSE_FILE:-docker-compose-v4.yml}"
+DB_MODE="${FLUX_DB_MODE:-mysql}"
 BACKEND_PORT="${BACKEND_PORT:-16365}"
 FRONTEND_PORT="${FRONTEND_PORT:-18080}"
 MASTER_INTERNAL_URL="${MASTER_INTERNAL_URL:-http://localhost:5166/flow/test}"
@@ -12,6 +13,14 @@ FRONTEND_URL="${FRONTEND_URL:-http://127.0.0.1:${FRONTEND_PORT}/}"
 DB_NAME="${DB_NAME:-gost_smoke}"
 DB_USER="${DB_USER:-gost_smoke}"
 DB_PASSWORD="${DB_PASSWORD:-test-password}"
+SQLITE_DB_PATH="${FLUX_SQLITE_DB_PATH:-/app/data/flux-master.sqlite}"
+SQLITE_DATA_OWNED="false"
+if [ "${FLUX_SQLITE_DATA_DIR+x}" = "x" ]; then
+  SQLITE_DATA_DIR="$FLUX_SQLITE_DATA_DIR"
+else
+  SQLITE_DATA_DIR="${PROJECT_ROOT}/.tmp/compose-smoke-sqlite-data"
+  SQLITE_DATA_OWNED="true"
+fi
 JWT_SECRET="${JWT_SECRET:-test-jwt-secret}"
 SECRET_ENCRYPTION_KEY="${SECRET_ENCRYPTION_KEY:-test-secret-encryption-key}"
 TIMEOUT_SECONDS="${FLUX_COMPOSE_SMOKE_TIMEOUT_SECONDS:-240}"
@@ -86,6 +95,12 @@ if [ ! -f "$COMPOSE_PATH" ]; then
   echo "Compose file not found: ${COMPOSE_PATH}" >&2
   exit 2
 fi
+
+case "$COMPOSE_FILE" in
+  *sqlite*)
+    DB_MODE="sqlite"
+    ;;
+esac
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -196,15 +211,22 @@ assert_no_existing_resource() {
 }
 
 assert_clean_compose_resources() {
-  assert_no_existing_resource container gost-mysql
   assert_no_existing_resource container flux-master
   assert_no_existing_resource container gost-phpmyadmin
   assert_no_existing_resource container springboot-backend
   assert_no_existing_resource container vite-frontend
-  assert_no_existing_resource volume mysql_data
   assert_no_existing_resource volume master_logs
   assert_no_existing_resource volume backend_logs
   assert_no_existing_resource network gost-network
+  if [ "$DB_MODE" = "sqlite" ]; then
+    if [ "$ALLOW_EXISTING" != "true" ] && [ -e "$SQLITE_DATA_DIR" ]; then
+      echo "Refusing to run: existing SQLite data dir '${SQLITE_DATA_DIR}' would be affected by cleanup." >&2
+      exit 1
+    fi
+  else
+    assert_no_existing_resource container gost-mysql
+    assert_no_existing_resource volume mysql_data
+  fi
 }
 
 build_local_images() {
@@ -220,17 +242,21 @@ cleanup() {
 
   echo "Cleaning up compose smoke stack..."
   compose down --volumes --remove-orphans
+  if [ "$DB_MODE" = "sqlite" ] && [ "$SQLITE_DATA_OWNED" = "true" ]; then
+    rm -rf "$SQLITE_DATA_DIR"
+  fi
   return "$exit_code"
 }
 
 require_command docker
 require_command curl
 
-export DB_NAME DB_USER DB_PASSWORD JWT_SECRET SECRET_ENCRYPTION_KEY BACKEND_PORT FRONTEND_PORT
+export DB_MODE DB_NAME DB_USER DB_PASSWORD SQLITE_DB_PATH SQLITE_DATA_DIR JWT_SECRET SECRET_ENCRYPTION_KEY BACKEND_PORT FRONTEND_PORT
 export EXPOSE_BACKEND="${EXPOSE_BACKEND:-0}"
 export PHPMYADMIN_PORT="${PHPMYADMIN_PORT:-}"
 
 echo "Compose file: ${COMPOSE_FILE}"
+echo "Database mode: ${DB_MODE}"
 echo "Master internal URL: ${MASTER_INTERNAL_URL}"
 echo "Public master URL: ${FRONTEND_URL}"
 
@@ -238,9 +264,17 @@ compose config --quiet
 
 if [ "$DRY_RUN" = "true" ]; then
   if [ "$BUILD_LOCAL" = "true" ]; then
-    echo "Dry run passed. Would build local flux-master image, then run: docker compose -f ${COMPOSE_PATH} up -d mysql master"
+    if [ "$DB_MODE" = "sqlite" ]; then
+      echo "Dry run passed. Would build local flux-master image, then run: docker compose -f ${COMPOSE_PATH} up -d master"
+    else
+      echo "Dry run passed. Would build local flux-master image, then run: docker compose -f ${COMPOSE_PATH} up -d mysql master"
+    fi
   else
-    echo "Dry run passed. Would run: docker compose -f ${COMPOSE_PATH} up -d mysql master"
+    if [ "$DB_MODE" = "sqlite" ]; then
+      echo "Dry run passed. Would run: docker compose -f ${COMPOSE_PATH} up -d master"
+    else
+      echo "Dry run passed. Would run: docker compose -f ${COMPOSE_PATH} up -d mysql master"
+    fi
   fi
   exit 0
 fi
@@ -252,7 +286,12 @@ if [ "$BUILD_LOCAL" = "true" ]; then
   build_local_images
 fi
 
-compose up -d mysql master
+if [ "$DB_MODE" = "sqlite" ]; then
+  mkdir -p "$SQLITE_DATA_DIR"
+  compose up -d master
+else
+  compose up -d mysql master
+fi
 wait_for_container_http "flux-master" flux-master "$MASTER_INTERNAL_URL"
 wait_for_http "public master" "$FRONTEND_URL"
 

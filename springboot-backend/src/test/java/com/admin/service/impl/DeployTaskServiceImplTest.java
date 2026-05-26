@@ -53,7 +53,7 @@ class DeployTaskServiceImplTest {
     }
 
     @Test
-    void keepsAgentReportedRuntimeProvider() {
+    void overwritesAgentReportedRuntimeProviderWithMasterAuditMetadata() {
         DeployTask task = new DeployTask();
         task.setProtocol("vless");
         task.setAction("present");
@@ -61,8 +61,56 @@ class DeployTaskServiceImplTest {
         String resultJson = attach("{\"runtimeProvider\":{\"key\":\"custom-agent\"}}", task);
         JSONObject result = JSON.parseObject(resultJson);
 
-        assertEquals("custom-agent", result.getJSONObject("runtimeProvider").getString("key"));
+        assertEquals("xui", result.getJSONObject("runtimeProvider").getString("key"));
         assertEquals("xui", result.getJSONObject("runtimeState").getString("providerKey"));
+    }
+
+    @Test
+    void overwritesAgentReportedRuntimeStateTraceWithMasterAuditMetadata() {
+        DeployTask task = new DeployTask();
+        task.setId(202L);
+        task.setServerId(9L);
+        task.setServerName("edge-xui");
+        task.setProtocol("vless");
+        task.setAction("present");
+
+        String resultJson = attach("""
+                {
+                  "runtimeState": {
+                    "providerKey": "snell",
+                    "providerName": "Forged Runtime",
+                    "protocol": "snell",
+                    "action": "close-runtime-ports",
+                    "taskState": "failed",
+                    "source": "agent",
+                    "sourceTaskId": 999,
+                    "serverId": 888,
+                    "serverName": "wrong-server",
+                    "resourceType": "firewall-rule",
+                    "resourceId": "forged-resource",
+                    "danger": false,
+                    "status": "active",
+                    "statusSource": "services.snell"
+                  }
+                }
+                """, task);
+
+        JSONObject runtimeState = JSON.parseObject(resultJson).getJSONObject("runtimeState");
+
+        assertEquals("xui", runtimeState.getString("providerKey"));
+        assertEquals("3x-ui / Xray Runtime", runtimeState.getString("providerName"));
+        assertEquals("vless", runtimeState.getString("protocol"));
+        assertEquals("present", runtimeState.getString("action"));
+        assertEquals("succeeded", runtimeState.getString("taskState"));
+        assertEquals("task", runtimeState.getString("source"));
+        assertEquals(202L, runtimeState.getLongValue("sourceTaskId"));
+        assertEquals(9L, runtimeState.getLongValue("serverId"));
+        assertEquals("edge-xui", runtimeState.getString("serverName"));
+        assertEquals("protocol-node", runtimeState.getString("resourceType"));
+        assertNull(runtimeState.get("resourceId"));
+        assertEquals(false, runtimeState.getBooleanValue("danger"));
+        assertEquals("succeeded", runtimeState.getString("status"));
+        assertEquals("task", runtimeState.getString("statusSource"));
     }
 
     @Test
@@ -112,10 +160,13 @@ class DeployTaskServiceImplTest {
     @Test
     void buildsRuntimeStateFromServicesAndNodes() {
         DeployTask task = new DeployTask();
+        task.setId(101L);
+        task.setServerId(7L);
+        task.setServerName("edge-snell");
         task.setProtocol("snell");
         task.setAction("present");
 
-        String resultJson = attach("{\"services\":{\"snell\":\"active\"},\"protocolNodes\":[{\"state\":\"active\"}]}", task);
+        String resultJson = attach("{\"services\":{\"snell\":\"active\"},\"protocolNodes\":[{\"remoteId\":\"snell-8390\",\"state\":\"active\"}]}", task);
         JSONObject runtimeState = JSON.parseObject(resultJson).getJSONObject("runtimeState");
 
         assertEquals("snell", runtimeState.getString("providerKey"));
@@ -123,6 +174,12 @@ class DeployTaskServiceImplTest {
         assertEquals("services.snell", runtimeState.getString("statusSource"));
         assertEquals(1, runtimeState.getIntValue("nodeCount"));
         assertEquals("active", runtimeState.getJSONObject("serviceStatuses").getString("snell"));
+        assertEquals("task", runtimeState.getString("source"));
+        assertEquals(101L, runtimeState.getLongValue("sourceTaskId"));
+        assertEquals(7L, runtimeState.getLongValue("serverId"));
+        assertEquals("protocol-node", runtimeState.getString("resourceType"));
+        assertEquals("snell-8390", runtimeState.getString("resourceId"));
+        assertEquals(false, runtimeState.getBooleanValue("danger"));
     }
 
     @Test
@@ -332,6 +389,21 @@ class DeployTaskServiceImplTest {
     }
 
     @Test
+    void dangerousAgentMaintenanceActionsRequireExplicitConfirmation() {
+        DeployTaskDto dto = new DeployTaskDto();
+        dto.setProtocol("agent-maintenance");
+        dto.setAction("close-runtime-ports");
+        dto.setRequestJson("{\"ports\":[{\"port\":443,\"protocol\":\"tcp\"}]}");
+
+        assertEquals("dangerous agent maintenance action requires dangerConfirmed=true and confirmAction=close-runtime-ports",
+                ReflectionTestUtils.invokeMethod(service, "validateDeployTask", dto, null, "agent-maintenance"));
+
+        dto.setRequestJson("{\"dangerConfirmed\":true,\"confirmAction\":\"close-runtime-ports\",\"ports\":[{\"port\":443,\"protocol\":\"tcp\"}]}");
+
+        assertNull(ReflectionTestUtils.invokeMethod(service, "validateDeployTask", dto, null, "agent-maintenance"));
+    }
+
+    @Test
     void extractsRuntimeStateFromTaskResultJson() {
         DeployTask task = new DeployTask();
         task.setResultJson("{\"runtimeState\":{\"providerKey\":\"snell\",\"status\":\"active\"}}");
@@ -359,6 +431,10 @@ class DeployTaskServiceImplTest {
                   "taskState":"succeeded",
                   "status":"active",
                   "statusSource":"services.snell",
+                  "sourceTaskId":42,
+                  "resourceType":"protocol-node",
+                  "resourceId":"snell-8390",
+                  "danger":false,
                   "serviceStatuses":{"snell":"active"},
                   "nodeCount":1,
                   "updatedAt":5678
@@ -374,6 +450,10 @@ class DeployTaskServiceImplTest {
         assertEquals("snell", item.get("providerKey"));
         assertEquals("active", item.get("status"));
         assertEquals(42L, item.get("taskId"));
+        assertEquals(42L, item.get("sourceTaskId"));
+        assertEquals("protocol-node", item.get("resourceType"));
+        assertEquals("snell-8390", item.get("resourceId"));
+        assertEquals(false, item.get("danger"));
         assertEquals("task", item.get("source"));
         assertEquals(1, item.get("nodeCount"));
     }

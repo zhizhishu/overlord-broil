@@ -235,6 +235,13 @@ export interface RuntimeState {
   protocol?: string;
   action?: string;
   taskState?: string;
+  source?: "task" | "heartbeat" | string;
+  sourceTaskId?: number;
+  serverId?: number;
+  serverName?: string;
+  resourceType?: string;
+  resourceId?: string | number;
+  danger?: boolean;
   status?: string;
   statusSource?: string;
   serviceStatuses?: Record<string, string>;
@@ -262,6 +269,10 @@ export interface RuntimeStateOverviewItem {
   action?: string;
   taskState?: string;
   taskId?: number;
+  sourceTaskId?: number;
+  resourceType?: string;
+  resourceId?: string | number;
+  danger?: boolean;
   taskUpdatedAt?: number;
   stateUpdatedAt?: number;
   lastHeartbeat?: number;

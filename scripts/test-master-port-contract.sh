@@ -75,6 +75,26 @@ assert_installer_migration_guard() {
     exit 1
   }
 
+  grep -q 'FLUX_SQLITE_DATA_DIR' "$installer" || {
+    echo "install-master.sh usage must document FLUX_SQLITE_DATA_DIR." >&2
+    exit 1
+  }
+
+  grep -q 'sqlite-data' "$installer" || {
+    echo "install-master.sh must back up SQLite data separately from compose/env files." >&2
+    exit 1
+  }
+
+  if grep -q 'for key in DB_MODE JWT_SECRET' "$installer"; then
+    echo "install-master.sh restore validation must accept legacy MySQL .env files without DB_MODE." >&2
+    exit 1
+  fi
+
+  grep -q 'compose_cmd up -d master || true' "$installer" || {
+    echo "install-master.sh must restart a stopped SQLite master if file backup fails." >&2
+    exit 1
+  }
+
   echo "install-master.sh: migration guards passed"
 }
 
@@ -83,6 +103,7 @@ require_command docker
 assert_single_public_entry docker-compose.yml
 assert_single_public_entry docker-compose-v4.yml
 assert_single_public_entry docker-compose-v6.yml
+assert_single_public_entry docker-compose.sqlite.yml
 assert_installer_migration_guard
 
 echo "master port contract tests passed"

@@ -3,6 +3,8 @@ package com.admin.runtime;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RuntimeProviderServiceTest {
@@ -54,6 +56,12 @@ class RuntimeProviderServiceTest {
         assertTrue(service.isAllowedAgentMaintenanceAction("close-runtime-ports"));
         assertTrue(service.isAllowedAgentMaintenanceAction(null));
         assertEquals(15, service.listAgentMaintenanceActions().size());
+
+        RuntimeProviderAction closePorts = service.getAgentMaintenanceAction("close-runtime-ports");
+        assertNotNull(closePorts);
+        assertTrue(closePorts.isDanger());
+        assertFalse(service.isDangerAgentMaintenanceAction("open-runtime-ports"));
+        assertTrue(service.isDangerAgentMaintenanceAction("uninstall-agent"));
     }
 
     @Test

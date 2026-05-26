@@ -1,0 +1,20 @@
+spring:
+  datasource:
+    driver-class-name: org.sqlite.JDBC
+    url: jdbc:sqlite:${SQLITE_DB_PATH:/app/data/flux-master.sqlite}
+    username:
+    password:
+    hikari:
+      max-lifetime: 500000
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-pool-size: 1
+      minimum-idle: 1
+      pool-name: HikariCP-SQLite
+      auto-commit: true
+      connection-test-query: SELECT 1
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-sqlite.sql
+      continue-on-error: false

@@ -2,12 +2,12 @@
 
 ## Handoff Summary
 
-当前目标：继续朝用户给出的 `flux-master` 单体主控架构推进，把 `Task -> Agent -> Execute -> Report -> Master` 链路做实；Runtime Provider Action Catalog 和单端口主控契约均已完成本地验证、提交推送和远端 GitHub Actions / GHCR 镜像验证。
+当前目标：继续朝用户给出的 `flux-master` 单体主控架构推进，把 `Task -> Agent -> Execute -> Report -> Master` 链路做实；本轮可选 SQLite 主控模式、任务引擎安全和 Runtime State 审计硬化已完成本地 release gate，下一步提交推送并确认 GitHub Actions / GHCR 镜像成果。
 
 已完成：
 - 已确认父级 `C:\Users\echo\Downloads\claude` 只是存放根目录，不在父级写日志或计划。
 - 已确认真实项目根目录为 `C:\Users\echo\Downloads\claude\flux-panel-3xui-orchestrator`。
-- 已读取项目 `PROJECT_ID.md`、`AGENTS.md`、`PROJECT_CONTEXT.md`、`TASK.md`；`serena.enabled=false`，不调用 Serena。
+- 已读取项目 `PROJECT_ID.md`、`AGENTS.md`、`PROJECT_CONTEXT.md`、`TASK.md`；Serena / ACE 是否启用以项目 `PROJECT_ID.md` 和当前会话工具表为准。
 - 已完成并推送 `flux-master` 单体镜像里程碑：默认 `mysql + flux-master`，主控 Web UI/API 统一走 `5166`。
 - 已完成并推送 Runtime Provider 注册表：`xui`、`snell`、`forward`、`certificate`、`firewall` 可枚举、可解析，任务和 Agent claim payload 已带 provider 元数据。
 - 本轮已打通 Runtime Provider 到 Agent 执行报告的审计闭环：Agent 读取 claim payload 的 provider、日志标记 provider、report 写入 `resultJson.runtimeProvider`，后端保存 report 时兜底补 provider 审计元数据。
@@ -64,9 +64,18 @@
 - 本轮已补齐 Firewall Runtime Provider 的执行动作：`open-runtime-ports` / `close-runtime-ports` 可从 `requestJson` 解析运行时端口，尝试应用本机 `ufw`、`firewalld` 或 `iptables` 规则，并回传结构化诊断。
 - 本轮已增强后端测试：生成的 Xray 和 firewall agent 脚本会被写入临时文件并执行 `bash -n`，防止 Java text block / shell 拼接错误。
 - 本轮已同步 README、中文 README、Operations、Release Notes、GitHub Pages 和 PROJECT_CONTEXT，说明 Xray agent 执行和 firewall runtime port open/close 能力。
+- 已提交并推送 `2e2a0e8 Complete runtime provider agent execution` 到 `origin/main` 和 `origin/future`。
+- 已确认 `2e2a0e8` 的 GitHub Actions：main CI、main Docker Images、main Pages、future CI、future Docker Images 均成功。
+- 已确认 GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 更新到 index digest `sha256:4be0416f955d89153d9560fe14a2fce27d37f94be9ee460084a1507e7ab19a5e`，linux/amd64 digest `sha256:4263b75e715d095a0e7af53de714bd143451b297afdd91e1a4a641edc08687d7`。
+- 本轮已落地可选 SQLite 主控模式：新增 `docker-compose.sqlite.yml`、`application-sqlite.yml`、`schema-sqlite.sql` 和 `scripts/test-sqlite-schema.sh`，安装器支持 `FLUX_DB_MODE=sqlite` / `--db sqlite`。
+- 本轮已补强 SQLite 安装/备份/恢复：SQLite 模式不启动 MySQL/phpMyAdmin，数据目录单独备份为 `sqlite-data/`，旧 MySQL 备份 `.env` 缺少 `DB_MODE` 时按 `mysql` 兼容恢复，SQLite 备份失败会尝试恢复已停止的 `flux-master`。
+- 本轮已补强任务引擎安全：agent claim 改为 `generated -> claimed` 条件更新，危险 `agent-maintenance` 动作需要 UI 确认和后端 `dangerConfirmed=true` / `confirmAction=<action>` 校验。
+- 本轮已补强 Runtime State 审计：master 保存 agent 回报时覆盖 provider、来源任务、服务器、资源类型、danger 和重新计算的 `status/statusSource`，避免被控端伪造状态进入 State Sync。
+- 本轮已在主控 UI 为危险动作增加确认，并在 State Sync 行显示资源类型/ID和危险动作标记。
+- 本轮已同步 README、中文 README、Operations、Release Notes、GitHub Pages 和 PROJECT_CONTEXT，说明 SQLite 模式、单端口、备份恢复和安全边界。
 
 下一步：
-- 提交并推送本轮 Xray agent 执行和 firewall runtime port 动作，让 GitHub 上保留 Actions/GHCR 结果。
+- 提交并推送本轮 SQLite 主控模式和安全硬化，让 GitHub 上保留 Actions/GHCR 镜像成果。
 - 后续在 repo secrets 配置真实 `THREE_XUI_E2E_URL` / `THREE_XUI_E2E_TOKEN` 后，手动运行 `Real 3x-ui E2E` workflow 取得真实 3x-ui 容器或 VPS 证明。
 
 关键文件：
@@ -86,6 +95,10 @@
 - `scripts/test-three-xui-fixture.sh`
 - `scripts/three-xui-fixture.py`
 - `scripts/release-check.sh`
+- `docker-compose.sqlite.yml`
+- `scripts/test-sqlite-schema.sh`
+- `springboot-backend/src/main/resources/application-sqlite.yml`
+- `springboot-backend/src/main/resources/schema-sqlite.sql`
 - `README.md`
 - `README.zh-CN.md`
 - `docs/OPERATIONS.md`
@@ -142,6 +155,13 @@
 - 本轮 Xray/firewall runtime 执行已通过 `bash scripts/test-flux-agent-mock.sh`。
 - 本轮 Xray/firewall runtime 执行已通过 `bash scripts/test-three-xui-fixture.sh`，fixture 完成 3x-ui 状态、入站、Xray config、临时 inbound 创建/切换/删除。
 - 本轮 Xray/firewall runtime 执行已通过 `bash scripts/release-check.sh`，覆盖 shell、agent mock、3x-ui fixture + E2E fixture 反打、可选真实 E2E skip、compose config、master port contract、Docker Node 22 前端 build、compose dry-run 和 `git diff --check`。
+- 本轮 Xray/firewall runtime 执行已通过远端 GitHub Actions / GHCR 验证：`2e2a0e8` 的 main/future CI 和 Docker Images 成功，main Pages 成功；GHCR latest index digest 为 `sha256:4be0416f955d89153d9560fe14a2fce27d37f94be9ee460084a1507e7ab19a5e`。
+- 本轮 SQLite / task safety 已通过 `bash scripts/test-master-port-contract.sh`，覆盖 MySQL/v4/v6/SQLite 单端口契约、旧容器迁移保护、SQLite 数据目录文档、旧 MySQL `.env` 兼容和 SQLite 备份失败恢复保护。
+- 本轮 SQLite / task safety 已通过 `bash scripts/test-sqlite-schema.sh`，验证 SQLite schema 可重复执行并包含核心表和默认配置。
+- 本轮 SQLite / task safety 已通过 `bash -n scripts/*.sh` 和 `bash -lc 'sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'`。
+- 本轮 SQLite / task safety 已通过 `npm run build`，仅有既有 Vite dynamic/static import chunk 提示。
+- 本轮 SQLite / task safety 已通过 Docker Maven targeted test：`RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 22 个测试成功。
+- 本轮 SQLite / task safety 已通过 `bash scripts/release-check.sh`，覆盖 shell、agent mock、SQLite schema、3x-ui fixture + E2E fixture 反打、可选真实 E2E skip、compose config、master port contract、Docker Node 22 前端 build、MySQL/SQLite compose dry-run 和 `git diff --check`。
 
 风险/待确认：
 - Runtime Provider 已是融合架构关键层；真实 3x-ui E2E harness 已具备，但还需要配置真实 endpoint/token 并跑出实际容器或 VPS 记录，不能把 skip 当真机证明。
@@ -163,9 +183,10 @@
 - 本轮 `release-check.sh` 使用 Docker Node 22 容器 `--rm` 运行，未保留容器；复查 `4173/5166/6365/12101` 无本轮端口监听。
 - 本轮远端验证只使用 `gh` 和 Docker imagetools 读取/触发 GitHub Actions 与 GHCR；未启动本地服务、未占用端口、未创建持久容器。
 - 本轮 Xray/firewall runtime 执行使用 Docker Maven 容器 `flux-runtime-provider-clean-test`、`flux-runtime-provider-ret-test` 和 `flux-runtime-provider-sanitize-test`，容器均使用 `--rm` 并已随测试成功退出；release-check 使用的 Docker Node 22 容器、agent mock 和 3x-ui fixture 脚本也已结束并清理临时资源。
+- 本轮 SQLite / task safety 的 Docker Maven 容器 `flux-task-safety-test` 使用 `--rm` 并已随测试成功退出；release-check 使用的 Docker Node 22 容器、agent mock 和 3x-ui fixture 临时资源已清理；未保留本轮端口监听。
 - 本轮保留 Docker Desktop 和 Codex/Cursor/MCP 常驻进程；未关闭归属不明进程。
 
-最后更新：2026-05-25 22:23:36 -07:00
+最后更新：2026-05-26 01:55:00 -07:00
 
 ## Active Tasks
 
@@ -194,7 +215,9 @@
 - [x] **Goal:** 提交推送并确认 Agent 安全升级闭环的 GitHub Actions / Pages / GHCR 镜像成果。
 - [x] **Goal:** Xray/3x-ui 编排任务从占位 payload 推进为 Agent 可执行 inbound add/delete/restart 脚本。
 - [x] **Goal:** Firewall Runtime Provider 增加 `open-runtime-ports` / `close-runtime-ports` 真执行动作和测试覆盖。
-- [ ] **Goal:** 提交推送并确认 Xray agent 执行与 firewall runtime port 动作的 GitHub Actions / Pages / GHCR 镜像成果。
+- [x] **Goal:** 提交推送并确认 Xray agent 执行与 firewall runtime port 动作的 GitHub Actions / Pages / GHCR 镜像成果。
+- [x] **Goal:** 评估并推进可选 SQLite 主控运行模式，贴合 `DB: MySQL / 后续可选 SQLite` 架构目标。
+- [ ] **Goal:** 提交推送并确认 SQLite 主控模式和任务安全硬化的 GitHub Actions / Pages / GHCR 镜像成果。
 
 ## Notes For Next Agent
 

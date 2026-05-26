@@ -48,6 +48,8 @@ sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.s
 bash scripts/test-flux-agent-mock.sh
 bash scripts/test-three-xui-fixture.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
+bash scripts/test-sqlite-schema.sh
+bash scripts/test-compose-smoke.sh --compose-file docker-compose.sqlite.yml --build-local --dry-run
 ```
 
 Frontend:

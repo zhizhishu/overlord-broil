@@ -44,13 +44,16 @@
       <section id="install" class="section">
         <div class="section-header">
           <h2>0.6.0 reliability gate，公开试用前先预检</h2>
-          <p>主控优先拉取 GitHub Actions 发布到 GHCR 的镜像；如果 GHCR 暂未公开，安装脚本会回退到下载公开源码并本地构建镜像。默认只公开一个主控入口 5166，浏览器和被控 agent 都走这个入口；后端 6365、MySQL 和 phpMyAdmin 默认只在 Docker 内网。0.6.0 新增主控/被控 doctor、Docker/CI 多发行版安装矩阵、Release 发布包和主控首次配置向导。</p>
+          <p>主控优先拉取 GitHub Actions 发布到 GHCR 的镜像；如果 GHCR 暂未公开，安装脚本会回退到下载公开源码并本地构建镜像。默认只公开一个主控入口 5166，浏览器和被控 agent 都走这个入口；后端 6365、MySQL 和 phpMyAdmin 默认只在 Docker 内网。小规模试用可以显式选择 SQLite 模式，不启动 MySQL sidecar，也不额外占用数据库端口。</p>
         </div>
         <div class="grid two">
           <article class="card">
             <h3>主控面板</h3>
             <pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash</code></pre>
-            <p>安装脚本会创建 `/opt/flux-3xui-orchestrator/.env`，下载 compose 和 `gost.sql`，然后拉取或构建镜像并启动 MySQL、后端和前端。</p>
+            <p>安装脚本会创建 `/opt/flux-3xui-orchestrator/.env`，下载 compose 和 `gost.sql`，然后拉取或构建 `flux-master` 单体镜像。默认启动 MySQL + master；设置 `FLUX_DB_MODE=sqlite` 时改用本地 SQLite 文件。</p>
+            <pre class="runbook"><code># 可选 SQLite 模式，不启动 MySQL sidecar
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+  | sudo env FLUX_DB_MODE="sqlite" FLUX_FRONTEND_PORT="5166" bash</code></pre>
             <pre class="runbook"><code># Alpine / 极简系统没有 bash 时
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master-bootstrap.sh | sudo sh</code></pre>
             <pre class="runbook"><code># 显式运维动作
@@ -86,7 +89,7 @@ sudo -E /usr/local/bin/flux-agent.sh --doctor</code></pre>
           </div>
           <div class="status-item">
             <span>发布门禁</span>
-            <span class="tag green">release-check + install matrix</span>
+            <span class="tag green">release-check + MySQL/SQLite smoke</span>
           </div>
           <div class="status-item">
             <span>GitHub Release</span>

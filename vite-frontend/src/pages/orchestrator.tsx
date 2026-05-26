@@ -2064,7 +2064,17 @@ export default function OrchestratorPage() {
 
   const createAgentMaintenance = async (server: ControlServer, action: AgentMaintenanceAction, meta: Record<string, unknown> = {}) => {
     const actionKey = typeof action === "string" ? action : action.key;
-    const actionText = actionLabel(action, agentMaintenanceActions);
+    const actionMeta = typeof action === "string"
+      ? agentMaintenanceActions.find(item => item.key === actionKey)
+      : action;
+    const actionText = actionLabel(actionMeta || action, agentMaintenanceActions);
+    const dangerConfirmed = actionMeta?.danger
+      ? window.confirm(t("确认执行危险操作：{action}？", { action: t(actionText) }))
+      : true;
+
+    if (!dangerConfirmed) {
+      return;
+    }
 
     setSubmitting(true);
     const res = await createDeployTask({
@@ -2078,8 +2088,10 @@ export default function OrchestratorPage() {
         serverName: server.name,
         action: actionKey,
         actionLabel: actionText,
-        actionProvider: typeof action === "string" ? undefined : action.providerKey,
-        actionCategory: typeof action === "string" ? undefined : action.category
+        actionProvider: actionMeta?.providerKey,
+        actionCategory: actionMeta?.category,
+        dangerConfirmed: Boolean(actionMeta?.danger),
+        confirmAction: actionMeta?.danger ? actionKey : undefined
       })
     });
     setSubmitting(false);
@@ -2722,6 +2734,12 @@ export default function OrchestratorPage() {
                               <p className="truncate text-sm text-gray-900 dark:text-white">{detailParts.length > 0 ? detailParts.join(" · ") : t("等待 Agent 回报")}</p>
                               <div className="mt-2 flex flex-wrap gap-1.5">
                                 {item.taskId && <Chip size="sm" variant="flat">{t("任务 #{id}", { id: item.taskId })}</Chip>}
+                                {item.resourceType && (
+                                  <Chip size="sm" variant="flat">
+                                    {[item.resourceType, item.resourceId].filter(Boolean).join(" #")}
+                                  </Chip>
+                                )}
+                                {item.danger && <Chip size="sm" variant="flat" color="danger">{t("危险动作")}</Chip>}
                                 {serviceEntries.map(([name, status]) => (
                                   <Chip key={name} size="sm" variant="flat" color={runtimeStateColor(status) as any}>{name} {status}</Chip>
                                 ))}
