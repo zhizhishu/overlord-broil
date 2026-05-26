@@ -56,6 +56,8 @@ Runtime Provider descriptors now include an Action Catalog for `agent-maintenanc
 
 Remote log collection also uses the same `agent-maintenance` path. A `logs` action returns structured `logs.items` for the Flux agent runner, x-ui/Xray services, Snell node services, forwarding/task logs and related service managers, and the control-center task card renders a compact remote-log summary before operators open raw output.
 
+Agent upgrade now uses the same controlled task loop with a safer lifecycle: the agent binary reports `--version`, the upgrade task downloads to a temporary file, verifies Bash syntax, calculates SHA-256, backs up the previous binary, installs the new file, schedules a service restart, and returns structured `maintenance.upgrade` metadata for the master task card.
+
 ## UI Preview
 
 ![Flux 3x-ui Orchestrator control plane](docs/assets/flux-orchestrator-screenshot.svg)

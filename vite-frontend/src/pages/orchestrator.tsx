@@ -409,6 +409,20 @@ interface RemoteLogItem {
   truncated: boolean;
 }
 
+interface AgentUpgradeInfo {
+  sourceUrl: string;
+  agentBinary: string;
+  backupPath: string;
+  previousVersion: string;
+  newVersion: string;
+  checksumSha256: string;
+  syntaxChecked: boolean;
+  installed: boolean;
+  restartScheduled: boolean;
+  reportedAt?: number;
+  parseError?: string;
+}
+
 const NANO_MEMORY_MB = 256;
 const NANO_CRITICAL_MEMORY_MB = 200;
 
@@ -683,6 +697,25 @@ const taskRemoteLogs = (task: DeployTask): RemoteLogItem[] => {
         truncated: Boolean((item as any).truncated)
       };
     });
+};
+
+const taskAgentUpgrade = (task: DeployTask): AgentUpgradeInfo | null => {
+  const payload = deployTaskResultPayload(task);
+  const upgrade = (payload as any)?.maintenance?.upgrade;
+  if (!upgrade || typeof upgrade !== "object" || Array.isArray(upgrade)) return null;
+  return {
+    sourceUrl: String((upgrade as any).sourceUrl || ""),
+    agentBinary: String((upgrade as any).agentBinary || ""),
+    backupPath: String((upgrade as any).backupPath || ""),
+    previousVersion: String((upgrade as any).previousVersion || ""),
+    newVersion: String((upgrade as any).newVersion || ""),
+    checksumSha256: String((upgrade as any).checksumSha256 || ""),
+    syntaxChecked: Boolean((upgrade as any).syntaxChecked),
+    installed: Boolean((upgrade as any).installed),
+    restartScheduled: Boolean((upgrade as any).restartScheduled),
+    reportedAt: Number((upgrade as any).reportedAt) || undefined,
+    parseError: (upgrade as any).parseError ? String((upgrade as any).parseError) : undefined
+  };
 };
 
 const summarizeDiagnostics = (items: DiagnosticItem[]): DiagnosticSummary => ({
@@ -977,6 +1010,55 @@ const RemoteLogsPanel = ({ task, onShowResult }: { task: DeployTask; onShowResul
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] text-gray-500">{t("仅展示最近 {count} 份日志摘要。", { count: visibleLogs.length })}</p>
         <Button size="sm" variant="light" onPress={() => onShowResult(task)}>{t("查看完整日志")}</Button>
+      </div>
+    </div>
+  );
+};
+
+const AgentUpgradePanel = ({ task, onShowResult }: { task: DeployTask; onShowResult: (task: DeployTask) => void }) => {
+  const { t } = useLanguage();
+  const upgrade = taskAgentUpgrade(task);
+  if (!upgrade) return null;
+
+  const checksumPreview = upgrade.checksumSha256
+    ? `${upgrade.checksumSha256.slice(0, 12)}...${upgrade.checksumSha256.slice(-8)}`
+    : "-";
+
+  return (
+    <div className="rounded-small border border-default-200 bg-default-50/70 p-3 dark:bg-default-100/5">
+      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-gray-900 dark:text-white">{t("Agent 升级")}</p>
+          <p className="truncate text-xs text-gray-500">{upgrade.previousVersion || "-"} -&gt; {upgrade.newVersion || "-"}</p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <Chip size="sm" variant="flat" color={upgrade.syntaxChecked ? "success" : "danger"}>{upgrade.syntaxChecked ? t("语法已校验") : t("语法未校验")}</Chip>
+          <Chip size="sm" variant="flat" color={upgrade.installed ? "success" : "danger"}>{upgrade.installed ? t("已安装") : t("未安装")}</Chip>
+          <Chip size="sm" variant="flat" color={upgrade.restartScheduled ? "primary" : "warning"}>{upgrade.restartScheduled ? t("重启已计划") : t("需手动重启")}</Chip>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+        <div className="rounded-small border border-default-200 bg-white px-2.5 py-2 dark:bg-default-50/5">
+          <p className="text-xs text-gray-500">{t("Agent 文件")}</p>
+          <p className="truncate text-xs font-medium text-gray-900 dark:text-white">{upgrade.agentBinary || "-"}</p>
+        </div>
+        <div className="rounded-small border border-default-200 bg-white px-2.5 py-2 dark:bg-default-50/5">
+          <p className="text-xs text-gray-500">{t("备份")}</p>
+          <p className="truncate text-xs font-medium text-gray-900 dark:text-white">{upgrade.backupPath || "-"}</p>
+        </div>
+        <div className="rounded-small border border-default-200 bg-white px-2.5 py-2 dark:bg-default-50/5">
+          <p className="text-xs text-gray-500">SHA256</p>
+          <p className="truncate font-mono text-xs text-gray-900 dark:text-white">{checksumPreview}</p>
+        </div>
+        <div className="rounded-small border border-default-200 bg-white px-2.5 py-2 dark:bg-default-50/5">
+          <p className="text-xs text-gray-500">{t("来源")}</p>
+          <p className="truncate text-xs font-medium text-gray-900 dark:text-white">{upgrade.sourceUrl || "-"}</p>
+        </div>
+      </div>
+      {upgrade.parseError && <p className="mt-2 text-xs text-danger">{upgrade.parseError}</p>}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] text-gray-500">{t("升级结果会保留版本、校验、备份和重启计划。")}</p>
+        <Button size="sm" variant="light" onPress={() => onShowResult(task)}>{t("查看原始结果")}</Button>
       </div>
     </div>
   );
@@ -3216,6 +3298,7 @@ export default function OrchestratorPage() {
                   <p className="text-xs text-gray-500">{t("创建：{time}", { time: formatTime(task.createdTime) })}</p>
                   <RuntimeStatePanel task={task} />
                   <DiagnosticSummaryPanel task={task} onShowResult={showTaskResult} />
+                  <AgentUpgradePanel task={task} onShowResult={showTaskResult} />
                   <RemoteLogsPanel task={task} onShowResult={showTaskResult} />
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="flat" onPress={() => showTaskScript(task)}>{t("脚本")}</Button>

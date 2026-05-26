@@ -53,9 +53,12 @@
 - 已提交并推送 `f9691f4 Add real 3x-ui E2E contract gate` 到 `origin/main` 和 `origin/future`。
 - 已确认 `f9691f4` 的 GitHub Actions：main CI、future CI、main Docker Images、future Docker Images、main Pages 均成功。
 - 已确认 GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 更新到 index digest `sha256:e7519039788a6ba54ec31fb4cc3b46864c9b774412894566be582d46533e15a3`，linux/amd64 digest `sha256:29fea0bd5ffa8c67ed505bdc13d9c01a782c6f72168a7db96e159ff58ea2ea69`。
+- 本轮已补强 Agent 安全自动升级闭环：`flux-agent.sh --version`、升级前下载/非空/语法校验、SHA-256、旧二进制备份、staged install、重启计划和结构化 `maintenance.upgrade` 回报。
+- 本轮已在主控任务卡增加 Agent 升级摘要面板，展示版本变化、语法校验、安装状态、重启计划、备份路径、SHA-256 和来源 URL。
+- 本轮已同步 README、中文 README、Operations、Release Notes、GitHub Pages 和 PROJECT_CONTEXT，说明 Agent 安全升级生命周期。
 
 下一步：
-- 提交并推送本轮远端验证记录，让 GitHub 上保留 Actions/GHCR 结果。
+- 提交并推送本轮 Agent 安全升级闭环，让 GitHub 上保留 Actions/GHCR 结果。
 - 后续在 repo secrets 配置真实 `THREE_XUI_E2E_URL` / `THREE_XUI_E2E_TOKEN` 后，手动运行 `Real 3x-ui E2E` workflow 取得真实 3x-ui 容器或 VPS 证明。
 
 关键文件：
@@ -118,6 +121,12 @@
 - 本轮真实 3x-ui E2E harness 已通过 `bash scripts/test-three-xui-fixture.sh`，其中 fixture 反打新脚本完成状态、入站、Xray config、临时 inbound 创建/切换/删除。
 - 本轮真实 3x-ui E2E harness 已通过 `bash scripts/release-check.sh`，覆盖 shell、agent mock、3x-ui fixture + E2E fixture 反打、可选真实 E2E skip、compose config、master port contract、Docker Node 22 前端 build、compose dry-run 和 `git diff --check`。
 - 本轮真实 3x-ui E2E harness 已通过远端 GitHub Actions / GHCR 验证：`f9691f4` 的 main/future CI 和 Docker Images 成功，main Pages 成功；GHCR latest index digest 为 `sha256:e7519039788a6ba54ec31fb4cc3b46864c9b774412894566be582d46533e15a3`。
+- 本轮 Agent 安全升级已通过 `bash -lc 'bash -n scripts/*.sh'` 和 `bash -lc 'sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'`。
+- 本轮 Agent 安全升级已通过 `bash scripts/test-flux-agent-mock.sh`，覆盖默认/覆盖版本输出、Agent doctor、成功任务和超时任务。
+- 本轮 Agent 安全升级已通过 `npm run build`，仅有既有 Vite dynamic/static import chunk 提示。
+- 本轮 Agent 安全升级已通过 Docker Maven：`RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 17 个测试成功。
+- 本轮 Agent 安全升级已通过 `git diff --check`，仅有 Windows LF/CRLF 提示。
+- 本轮 Agent 安全升级已通过 `bash scripts/release-check.sh`，覆盖 shell、agent mock、3x-ui fixture + E2E fixture 反打、可选真实 E2E skip、compose config、master port contract、Docker Node 22 前端 build、compose dry-run 和 `git diff --check`。
 
 风险/待确认：
 - Runtime Provider 已是融合架构关键层；真实 3x-ui E2E harness 已具备，但还需要配置真实 endpoint/token 并跑出实际容器或 VPS 记录，不能把 skip 当真机证明。
@@ -140,7 +149,7 @@
 - 本轮远端验证只使用 `gh` 和 Docker imagetools 读取/触发 GitHub Actions 与 GHCR；未启动本地服务、未占用端口、未创建持久容器。
 - 本轮保留 Docker Desktop 和 Codex/Cursor/MCP 常驻进程；未关闭归属不明进程。
 
-最后更新：2026-05-25 19:32:13 -07:00
+最后更新：2026-05-25 20:30:36 -07:00
 
 ## Active Tasks
 
@@ -165,6 +174,8 @@
 - [x] **Goal:** 推送并确认真实 3x-ui E2E harness 的 GitHub Actions / Pages / GHCR 镜像成果。
 - [ ] **Goal:** 提交推送并确认真实 3x-ui E2E 远端验证记录的 GitHub Actions / GHCR 成果。
 - [ ] **Goal:** 继续推进正式版缺口：真实 VPS 矩阵、真实 3x-ui endpoint 记录、UI polish、安全治理和 agent 自动升级。
+- [x] **Goal:** 补强 Agent 安全自动升级闭环：版本探测、下载校验、备份、安装、重启计划和结构化结果回报。
+- [ ] **Goal:** 提交推送并确认 Agent 安全升级闭环的 GitHub Actions / Pages / GHCR 镜像成果。
 
 ## Notes For Next Agent
 

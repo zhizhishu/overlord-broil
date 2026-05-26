@@ -1083,6 +1083,8 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 : > "$DIAG_FILE" 2>/dev/null || true
                 LOG_FILE="${TMPDIR:-/tmp}/flux-maintenance-logs-$$.jsonl"
                 : > "$LOG_FILE" 2>/dev/null || true
+                UPGRADE_FILE="${TMPDIR:-/tmp}/flux-maintenance-upgrade-$$.json"
+                : > "$UPGRADE_FILE" 2>/dev/null || true
                 case "$LOG_LINES" in
                   ''|*[!0-9]*)
                     LOG_LINES=160
@@ -1448,16 +1450,126 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   echo "agent uninstall scheduled via ${manager}; current task can report before the service is removed"
                 }
 
+                file_sha256() {
+                  local file="$1"
+                  if command -v sha256sum >/dev/null 2>&1; then
+                    sha256sum "$file" | awk '{print $1}'
+                    return
+                  fi
+                  if command -v shasum >/dev/null 2>&1; then
+                    shasum -a 256 "$file" | awk '{print $1}'
+                    return
+                  fi
+                  if command -v openssl >/dev/null 2>&1; then
+                    openssl dgst -sha256 "$file" | awk '{print $NF}'
+                    return
+                  fi
+                  echo ""
+                }
+
+                agent_script_version() {
+                  local script="$1"
+                  [ -f "$script" ] || return 0
+                  FLUX_AGENT_VERSION= bash "$script" --version 2>/dev/null | head -n 1 || true
+                }
+
+                write_upgrade_metadata() {
+                  local previous_version="$1"
+                  local new_version="$2"
+                  local backup_path="$3"
+                  local checksum="$4"
+                  local restart_scheduled="$5"
+                  local python_bin
+                  python_bin="$(first_available_python 2>/dev/null || true)"
+                  [ -n "$python_bin" ] || return 0
+                  UPGRADE_SOURCE_URL="$SOURCE_URL" \
+                  UPGRADE_AGENT_BIN="$AGENT_BIN" \
+                  UPGRADE_BACKUP_PATH="$backup_path" \
+                  UPGRADE_PREVIOUS_VERSION="$previous_version" \
+                  UPGRADE_NEW_VERSION="$new_version" \
+                  UPGRADE_CHECKSUM_SHA256="$checksum" \
+                  UPGRADE_RESTART_SCHEDULED="$restart_scheduled" \
+                  UPGRADE_FILE="$UPGRADE_FILE" \
+                    "$python_bin" <<'PY'
+                import json
+                import os
+                import time
+
+                def boolean_env(name):
+                    return (os.environ.get(name) or "").strip().lower() in ("1", "true", "yes", "ok")
+
+                payload = {
+                    "sourceUrl": os.environ.get("UPGRADE_SOURCE_URL") or "",
+                    "agentBinary": os.environ.get("UPGRADE_AGENT_BIN") or "",
+                    "backupPath": os.environ.get("UPGRADE_BACKUP_PATH") or "",
+                    "previousVersion": os.environ.get("UPGRADE_PREVIOUS_VERSION") or "",
+                    "newVersion": os.environ.get("UPGRADE_NEW_VERSION") or "",
+                    "checksumSha256": os.environ.get("UPGRADE_CHECKSUM_SHA256") or "",
+                    "syntaxChecked": True,
+                    "installed": True,
+                    "restartScheduled": boolean_env("UPGRADE_RESTART_SCHEDULED"),
+                    "reportedAt": int(time.time() * 1000),
+                }
+                with open(os.environ["UPGRADE_FILE"], "w", encoding="utf-8") as handle:
+                    json.dump(payload, handle, ensure_ascii=False, separators=(",", ":"))
+                PY
+                }
+
                 upgrade_agent() {
-                  local tmp
+                  local tmp install_dir staged backup previous_version new_version checksum restart_scheduled
                   command -v curl >/dev/null 2>&1 || { echo 'curl is required for agent upgrade.' >&2; return 1; }
-                  tmp="$(mktemp)"
-                  curl -fsSL --retry 3 "$SOURCE_URL" -o "$tmp"
-                  bash -n "$tmp"
-                  install -m 0755 "$tmp" "$AGENT_BIN"
+                  command -v bash >/dev/null 2>&1 || { echo 'bash is required for agent upgrade validation.' >&2; return 1; }
+
+                  tmp="$(mktemp "${TMPDIR:-/tmp}/flux-agent-upgrade-XXXXXX")"
+                  if ! curl -fsSL --retry 3 --connect-timeout 10 --max-time 120 "$SOURCE_URL" -o "$tmp"; then
+                    rm -f "$tmp"
+                    echo "failed to download agent from ${SOURCE_URL}" >&2
+                    return 1
+                  fi
+                  if [ ! -s "$tmp" ]; then
+                    rm -f "$tmp"
+                    echo "downloaded agent is empty: ${SOURCE_URL}" >&2
+                    return 1
+                  fi
+                  if ! bash -n "$tmp"; then
+                    rm -f "$tmp"
+                    echo "downloaded agent failed bash syntax validation; current binary was not changed." >&2
+                    return 1
+                  fi
+
+                  previous_version="$(agent_script_version "$AGENT_BIN")"
+                  new_version="$(agent_script_version "$tmp")"
+                  checksum="$(file_sha256 "$tmp")"
+                  install_dir="$(dirname "$AGENT_BIN")"
+                  mkdir -p "$install_dir"
+                  staged="${install_dir}/.$(basename "$AGENT_BIN").new.$$"
+                  backup=""
+                  if [ -e "$AGENT_BIN" ]; then
+                    backup="${AGENT_BIN}.bak.$(date -u +%Y%m%d%H%M%S)"
+                    cp -p "$AGENT_BIN" "$backup"
+                  fi
+
+                  if command -v install >/dev/null 2>&1; then
+                    install -m 0755 "$tmp" "$staged"
+                  else
+                    cp "$tmp" "$staged"
+                    chmod 0755 "$staged"
+                  fi
+                  mv "$staged" "$AGENT_BIN"
                   rm -f "$tmp"
                   echo "agent binary updated from ${SOURCE_URL}"
-                  schedule_agent_restart
+                  echo "previous version: ${previous_version:-unknown}"
+                  echo "new version: ${new_version:-unknown}"
+                  [ -z "$backup" ] || echo "backup: ${backup}"
+                  [ -z "$checksum" ] || echo "sha256: ${checksum}"
+
+                  restart_scheduled=false
+                  if schedule_agent_restart; then
+                    restart_scheduled=true
+                  else
+                    echo "agent binary was upgraded, but service restart could not be scheduled automatically." >&2
+                  fi
+                  write_upgrade_metadata "$previous_version" "$new_version" "$backup" "$checksum" "$restart_scheduled"
                 }
 
                 repair_xui() {
@@ -1754,7 +1866,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     echo "python3 or python is unavailable; skipping structured maintenance metadata." >&2
                     return 0
                   fi
-                  "$python_bin" - "$action" "$status" "$manager" "$(flux_agent_status)" "$(service_status x-ui.service)" "$(service_status snell.service)" "$AGENT_BIN" "$DIAG_FILE" "$LOG_FILE" <<'PY' || true
+                  "$python_bin" - "$action" "$status" "$manager" "$(flux_agent_status)" "$(service_status x-ui.service)" "$(service_status snell.service)" "$AGENT_BIN" "$DIAG_FILE" "$LOG_FILE" "$UPGRADE_FILE" <<'PY' || true
                 import json
                 import os
                 import sys
@@ -1850,8 +1962,23 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                         })
                     return items
 
+                def load_upgrade(path):
+                    if not path or not os.path.exists(path) or os.path.getsize(path) <= 0:
+                        return None
+                    try:
+                        with open(path, "r", encoding="utf-8", errors="replace") as handle:
+                            payload = json.load(handle)
+                        return payload if isinstance(payload, dict) else None
+                    except Exception as exc:
+                        return {
+                            "parseError": str(exc),
+                            "syntaxChecked": False,
+                            "installed": False,
+                        }
+
                 items = load_diagnostics(sys.argv[8] if len(sys.argv) > 8 else "")
                 log_items = load_logs(sys.argv[9] if len(sys.argv) > 9 else "")
+                upgrade = load_upgrade(sys.argv[10] if len(sys.argv) > 10 else "")
                 summary = {
                     "ok": sum(1 for item in items if item.get("state") == "ok"),
                     "warning": sum(1 for item in items if item.get("state") == "warning"),
@@ -1870,6 +1997,8 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                         "reportedAt": int(time.time() * 1000),
                     }
                 }
+                if upgrade:
+                    payload["maintenance"]["upgrade"] = upgrade
                 if items:
                     payload["diagnostics"] = {
                         "items": items,
@@ -1892,6 +2021,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 PY
                   rm -f "$DIAG_FILE" 2>/dev/null || true
                   rm -f "$LOG_FILE" 2>/dev/null || true
+                  rm -f "$UPGRADE_FILE" 2>/dev/null || true
                 }
 
                 case "$ACTION" in

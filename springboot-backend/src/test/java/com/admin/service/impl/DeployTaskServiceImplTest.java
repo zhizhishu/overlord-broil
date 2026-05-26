@@ -170,6 +170,34 @@ class DeployTaskServiceImplTest {
     }
 
     @Test
+    void agentMaintenanceUpgradeScriptIncludesSafeUpgradeLifecycle() {
+        DeployTaskDto dto = new DeployTaskDto();
+        dto.setServerId(7L);
+        dto.setProtocol("agent-maintenance");
+        dto.setAction("upgrade-agent");
+
+        ControlServer server = new ControlServer();
+        server.setId(7L);
+        server.setName("edge-upgrade");
+        server.setHost("203.0.113.7");
+
+        String script = ReflectionTestUtils.invokeMethod(service, "buildAgentMaintenanceScript", dto, server);
+
+        assertNotNull(script);
+        assertTrue(script.contains("UPGRADE_FILE=\"${TMPDIR:-/tmp}/flux-maintenance-upgrade-$$.json\""));
+        assertTrue(script.contains("file_sha256()"));
+        assertTrue(script.contains("agent_script_version()"));
+        assertTrue(script.contains("write_upgrade_metadata()"));
+        assertTrue(script.contains("curl -fsSL --retry 3 --connect-timeout 10 --max-time 120"));
+        assertTrue(script.contains("bash -n \"$tmp\""));
+        assertTrue(script.contains("cp -p \"$AGENT_BIN\" \"$backup\""));
+        assertTrue(script.contains("staged=\"${install_dir}/.$(basename \"$AGENT_BIN\").new.$$\""));
+        assertTrue(script.contains("checksumSha256"));
+        assertTrue(script.contains("payload[\"maintenance\"][\"upgrade\"] = upgrade"));
+        assertTrue(script.contains("rm -f \"$UPGRADE_FILE\""));
+    }
+
+    @Test
     void validatesAgentMaintenanceActionsFromRuntimeProviderCatalog() {
         DeployTaskDto dto = new DeployTaskDto();
         dto.setProtocol("agent-maintenance");

@@ -214,3 +214,23 @@
   - GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 可读取，index digest 为 `sha256:e7519039788a6ba54ec31fb4cc3b46864c9b774412894566be582d46533e15a3`，linux/amd64 digest 为 `sha256:29fea0bd5ffa8c67ed505bdc13d9c01a782c6f72168a7db96e159ff58ea2ea69`。
 - 清理：本阶段只使用 `gh` 和 Docker imagetools 读取远端状态并触发镜像 workflow，未启动本地服务、未占用端口、未创建持久容器。
 - 后续：提交并推送这份远端验证记录，再触发/确认最终 GitHub Actions 与 GHCR 镜像成果。
+
+### Agent Safe Upgrade Lifecycle
+
+- 完成：补强 `agent-maintenance upgrade-agent`，让被控 Agent 升级进入可审计、可回滚的主控任务闭环。
+- 修改：
+  - `flux-agent.sh` 新增 `--version`，默认版本提升为 `flux-agent/0.3`。
+  - 主控生成的升级脚本先下载到临时文件，执行非空检查和 `bash -n`，再计算 SHA-256、备份旧二进制、staged install、计划重启 agent 服务。
+  - 升级结果写入结构化 `maintenance.upgrade`，包含 source URL、agent binary、backup path、previous/new version、checksum、syntax/install/restart 状态。
+  - 主控任务卡新增 Agent 升级摘要面板，并补齐中英文文案。
+  - README、中文 README、Operations、Release Notes、GitHub Pages 和 PROJECT_CONTEXT 已同步说明安全升级生命周期。
+- 验证：
+  - `bash -lc 'bash -n scripts/*.sh'` 通过。
+  - `bash -lc 'sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
+  - `bash scripts/test-flux-agent-mock.sh` 通过。
+  - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
+  - Docker Maven `RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 17 个测试成功。
+  - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
+  - `bash scripts/release-check.sh` 通过。
+- 清理：Agent mock 临时目录已清理；3x-ui fixture 临时 inbound 已删除；Docker Maven 和 Docker Node 验证容器均使用 `--rm`，未保留容器或端口监听。
+- 后续：提交推送到 `origin/main` 和 `origin/future`，确认 GitHub Actions、Pages 和 GHCR 镜像成果。

@@ -236,6 +236,19 @@ PY
 }
 
 detect_python
+
+version_output="$(bash "${PROJECT_ROOT}/scripts/flux-agent.sh" --version)"
+if [ "$version_output" != "flux-agent/0.3" ]; then
+  echo "expected default agent version flux-agent/0.3, got ${version_output}" >&2
+  exit 1
+fi
+
+custom_version_output="$(FLUX_AGENT_VERSION="flux-agent/test-custom" bash "${PROJECT_ROOT}/scripts/flux-agent.sh" --version)"
+if [ "$custom_version_output" != "flux-agent/test-custom" ]; then
+  echo "expected overridden agent version flux-agent/test-custom, got ${custom_version_output}" >&2
+  exit 1
+fi
+
 TMP_DIR="$(mktemp -d)"
 trap cleanup_tmp_dir EXIT
 

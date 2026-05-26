@@ -163,6 +163,8 @@ Install, certificate and firewall diagnostics write structured `diagnostics.item
 
 `agent-maintenance` log collection writes structured `logs.items` into the task result. Each item carries `runtime`, `source`, `title`, bounded `content`, line count and truncation state. The intended coverage is Flux agent runtime logs, x-ui/Xray service logs, Snell node service logs, remote forwarding service logs and task/work-directory logs. The master task card should use these items for a short remote-log summary first, then leave raw stdout/stderr available for deeper investigation.
 
+`agent-maintenance upgrade-agent` uses a guarded upgrade path. The generated script downloads the new `flux-agent.sh` to a temporary file, rejects empty or syntactically invalid downloads before touching the current binary, records the current and new `--version` values, calculates SHA-256 when a local checksum tool is available, backs up the previous binary as `flux-agent.sh.bak.<timestamp>`, installs through a staged file, schedules a service restart, and reports the result under `maintenance.upgrade`.
+
 ## First-Run Operator Path
 
 1. Register the master and controlled servers in the asset list.

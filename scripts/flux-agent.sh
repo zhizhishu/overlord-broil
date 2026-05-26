@@ -7,7 +7,7 @@ AGENT_TOKEN="${FLUX_AGENT_TOKEN:-}"
 WORK_DIR="${FLUX_WORK_DIR:-/var/lib/flux-agent}"
 LOCK_FILE="${FLUX_AGENT_LOCK_FILE:-${WORK_DIR}/flux-agent.lock}"
 POLL_INTERVAL="${FLUX_POLL_INTERVAL:-20}"
-AGENT_VERSION="${FLUX_AGENT_VERSION:-flux-agent/0.2}"
+AGENT_VERSION="${FLUX_AGENT_VERSION:-flux-agent/0.3}"
 HTTP_RETRIES="${FLUX_HTTP_RETRIES:-4}"
 HTTP_BACKOFF_BASE="${FLUX_HTTP_BACKOFF_BASE:-2}"
 HTTP_BACKOFF_MAX="${FLUX_HTTP_BACKOFF_MAX:-30}"
@@ -23,11 +23,12 @@ FALLBACK_LOCK_DIR=""
 usage() {
   cat <<'EOF'
 Usage:
-  flux-agent.sh [--once|--doctor]
+  flux-agent.sh [--once|--doctor|--version]
 
 Commands:
   --once       Send one heartbeat, claim at most one task, then exit.
   --doctor     Run local, non-destructive agent diagnostics and exit.
+  --version    Print agent version and exit.
 
 Required environment:
   FLUX_PANEL_URL
@@ -257,7 +258,7 @@ require_positive_int() {
 }
 
 case "$AGENT_COMMAND" in
-  ""|--once|--doctor)
+  ""|--once|--doctor|--version)
     ;;
   -h|--help)
     usage
@@ -273,6 +274,11 @@ esac
 if [ "$AGENT_COMMAND" = "--doctor" ]; then
   run_agent_doctor
   exit $?
+fi
+
+if [ "$AGENT_COMMAND" = "--version" ]; then
+  printf '%s\n' "$AGENT_VERSION"
+  exit 0
 fi
 
 if [ -z "$PANEL_URL" ] || [ -z "$SERVER_ID" ] || [ -z "$AGENT_TOKEN" ]; then
