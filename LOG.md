@@ -2,6 +2,19 @@
 
 ## 2026-05-26
 
+### Operation Audit Remote Image Verification
+
+- 完成：确认 Operation Audit Log 已推送到 `origin/main` 和 `origin/future`，两条分支均指向 `f6381606c7410e1d8b89c6b93aaecbfbf210697f`。
+- 镜像：手动确认并补齐 GHCR 镜像标签，`master`、`backend`、`frontend` 均已有 `latest`、`main`、`sha-f638160`。
+- 验证：
+  - `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest/main/sha-f638160` index digest 为 `sha256:4ebde7a773d5521ac5d262f5ae7b1ca7360bbec96ebd0d843cf20214f92e28b5`。
+  - `ghcr.io/zhizhishu/flux-3xui-orchestrator-backend:latest/main/sha-f638160` index digest 为 `sha256:0623605b60acbfaacd35c3e60beff16c2d686d141afed6a1d03d988a2b45af41`。
+  - `ghcr.io/zhizhishu/flux-3xui-orchestrator-frontend:latest/main/sha-f638160` index digest 为 `sha256:b7ea04d1081d21f6e00287087543eb65de89d67fcd7f6d21abd647291febdbbd`。
+  - 前端 Docker build 内部 `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
+- 注意：`gh run list --commit f6381606c7410e1d8b89c6b93aaecbfbf210697f` 未返回 Actions run，因此本次以手动 Docker buildx push 和 `imagetools inspect` 作为镜像成果证明。
+- 清理：未启动本地 dev server，未占用 `5166/5168/6365/8066` 等项目端口；保留 Docker buildx builder 容器 `buildx_buildkit_halowebui-multi0`。
+- 后续：继续推进真实 VPS 矩阵、真实 3x-ui E2E 记录、UI polish、安全治理和镜像发布自动化稳定性。
+
 ### Operation Audit Log
 
 - 完成：新增主控操作审计日志能力，覆盖 deploy task 创建、编排、拒绝、状态更新、重试、删除、agent claim 和 agent report。
