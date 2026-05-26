@@ -18,7 +18,7 @@ This release moves the project from the first public production milestone into a
 - Future branch update: added `scripts/build-release-bundle.sh` and a `Release` workflow that validates `VERSION`, runs `scripts/release-check.sh --full`, builds a tarball plus sha256 checksum and uploads both to GitHub Releases for `v*` tags or manual runs.
 - Future branch update: added a first-run setup guide to the master control center, covering server registration, controlled-agent install, 3x-ui/Snell orchestration, rule/traffic sync and pre-release firewall checks.
 - Future branch update: tightened the master compose layout to a single public entry port: `5166/tcp` serves both browser users and controlled-agent callbacks, while backend `6365`, MySQL and phpMyAdmin stay internal unless explicitly exposed for debugging or maintenance.
-- Future branch update: added the default `flux-master` single image. The Vite UI is built into the Spring Boot jar, so the default compose stack is now `mysql + flux-master`; split backend/frontend compose files remain as legacy debug/rollback files.
+- Future branch update: removed the legacy split backend/frontend runtime surface. The Vite UI is built into the Spring Boot jar, so supported deployments use `mysql + flux-master` or the optional SQLite `flux-master` stack.
 - Future branch update: refined protocol-node creation with structured form checks for target server, port reuse, credentials, Reality fields, Snell PSK/version and outbound tags; the generated inbound JSON is now an advanced preview instead of the default editing surface.
 - Future branch update: install, certificate and firewall diagnostics now emit structured `diagnostics.items`; the master task card summarizes DNS, port `80`, certificate-file, ACME-tooling, local-firewall and cloud-firewall findings before users open raw logs.
 - Future branch update: connected the legacy Flux forwarding page to the shared `zh-CN` / `en-US` dictionary for its main flows, including toasts, form validation, empty states, import/export, delete confirmation, address copy and diagnostics modals.
@@ -45,7 +45,7 @@ This release moves the project from the first public production milestone into a
 | Area | 0.6.0 stance |
 | --- | --- |
 | Master install | Same one-command installer as 0.5.0, now with a pre-install doctor for ports, Docker/Compose and `.env` checks. |
-| Master runtime | Default Docker Compose uses MySQL plus the `flux-master` single image on port `5166`; optional SQLite mode removes the MySQL sidecar for small labs; legacy split backend/frontend compose files are retained for rollback/debug only. |
+| Master runtime | Default Docker Compose uses MySQL plus the `flux-master` single image on port `5166`; optional SQLite mode removes the MySQL sidecar for small labs; legacy split backend/frontend compose files are no longer shipped. |
 | Agent install | systemd/OpenRC installer plus preflight doctor and local runtime doctor. |
 | Agent maintenance | Remote diagnostics, log collection, restart and upgrade tasks generated from the master panel. |
 | Release packaging | Future branch includes a clean-tree release bundle builder and GitHub Release workflow; release assets include the tarball and `.sha256`. |
@@ -139,7 +139,7 @@ This is the first public-facing productization milestone for Flux 3x-ui Orchestr
 | --- | --- |
 | Master install | `scripts/install-master.sh` via GitHub raw URL; installs into `/opt/flux-3xui-orchestrator`. |
 | Master runtime | Docker Compose with MySQL 5.7, backend, frontend and optional phpMyAdmin. |
-| GHCR images | `ghcr.io/zhizhishu/flux-3xui-orchestrator-backend:latest` and `...-frontend:latest`. |
+| GHCR image | `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest`. |
 | Source fallback | Installer can download the public source archive and build images locally when GHCR pull fails. |
 | Agent install | `scripts/install-flux-agent.sh` creates `/etc/flux-agent.env`, `/usr/local/bin/flux-agent.sh` and `flux-agent.service`. |
 | Agent execution | Polls task claim/report APIs, stores work under `/var/lib/flux-agent`, supports retries and task timeouts. |

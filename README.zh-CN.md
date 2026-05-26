@@ -240,12 +240,7 @@ Agent 心跳会上报总内存。主控会自动识别低内存档位：
 ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest
 ```
 
-遗留前后端分离镜像保留用于回滚和调试：
-
-```text
-ghcr.io/zhizhishu/flux-3xui-orchestrator-backend:latest
-ghcr.io/zhizhishu/flux-3xui-orchestrator-frontend:latest
-```
+旧的前后端分离运行镜像已从正式产品面移除。仓库仍保留后端和前端源码模块用于单体构建与本地验证，但部署和发布只使用 `flux-master` 单体镜像。
 
 `main` 和 `v*` tag 会推送 GHCR 镜像。`future` 分支用于验证未来能力，默认只构建检查，不覆盖正式镜像。
 

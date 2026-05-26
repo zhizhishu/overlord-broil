@@ -14,8 +14,6 @@ on:
       - "docker-compose-v4.yml"
       - "docker-compose-v6.yml"
       - "docker-compose.sqlite.yml"
-      - "docker-compose.legacy-v4.yml"
-      - "docker-compose.legacy-v6.yml"
   pull_request:
     branches: ["main"]
     paths:
@@ -28,8 +26,6 @@ on:
       - "docker-compose-v4.yml"
       - "docker-compose-v6.yml"
       - "docker-compose.sqlite.yml"
-      - "docker-compose.legacy-v4.yml"
-      - "docker-compose.legacy-v6.yml"
   workflow_dispatch:
 
 permissions:
@@ -49,12 +45,6 @@ jobs:
           - name: master
             context: .
             image: ghcr.io/zhizhishu/flux-3xui-orchestrator-master
-          - name: backend
-            context: ./springboot-backend
-            image: ghcr.io/zhizhishu/flux-3xui-orchestrator-backend
-          - name: frontend
-            context: ./vite-frontend
-            image: ghcr.io/zhizhishu/flux-3xui-orchestrator-frontend
 
     steps:
       - uses: actions/checkout@v5

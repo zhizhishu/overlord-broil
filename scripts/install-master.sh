@@ -581,8 +581,6 @@ download_runtime_files() {
   download_file "${RAW_BASE}/docker-compose-v4.yml" "docker-compose-v4.yml"
   download_file "${RAW_BASE}/docker-compose-v6.yml" "docker-compose-v6.yml"
   download_file "${RAW_BASE}/docker-compose.sqlite.yml" "docker-compose.sqlite.yml"
-  download_file "${RAW_BASE}/docker-compose.legacy-v4.yml" "docker-compose.legacy-v4.yml"
-  download_file "${RAW_BASE}/docker-compose.legacy-v6.yml" "docker-compose.legacy-v6.yml"
   download_file "${RAW_BASE}/${COMPOSE_FILE}" "$COMPOSE_FILE"
   download_file "${RAW_BASE}/gost.sql" "gost.sql"
   download_file "${RAW_BASE}/scripts/install-master.sh" "install-master.sh"
@@ -1115,7 +1113,7 @@ create_backup() {
   archive="${BACKUP_DIR}/flux-master-backup-${stamp}.tar.gz"
 
   mkdir -p "${workdir}/files"
-  for file in "$ENV_FILE" "docker-compose.yml" "docker-compose-v4.yml" "docker-compose-v6.yml" "docker-compose.sqlite.yml" "docker-compose.legacy-v4.yml" "docker-compose.legacy-v6.yml" "$BACKEND_OVERRIDE_FILE" "$PHPMYADMIN_OVERRIDE_FILE" "gost.sql"; do
+  for file in "$ENV_FILE" "docker-compose.yml" "docker-compose-v4.yml" "docker-compose-v6.yml" "docker-compose.sqlite.yml" "$BACKEND_OVERRIDE_FILE" "$PHPMYADMIN_OVERRIDE_FILE" "gost.sql"; do
     if [ -f "$file" ]; then
       cp -p "$file" "${workdir}/files/${file}"
       file_count=$((file_count + 1))

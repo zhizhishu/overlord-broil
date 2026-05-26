@@ -46,9 +46,9 @@ interface ConfigItem {
 const CONFIG_ITEMS: ConfigItem[] = [
   {
     key: 'ip',
-    label: '面板后端地址',
-    placeholder: '请输入面板后端IP:PORT',
-    description: '格式“ip:port”,用于对接节点时使用,ip是你安装面板服务器的公网ip,端口是安装脚本内输入的后端端口。不要套CDN,不支持https,通讯数据有加密',
+    label: '主控访问地址',
+    placeholder: '例如 http://1.2.3.4:5166',
+    description: '浏览器和被控 agent 共用的主控入口，例如 http://1.2.3.4:5166 或你的域名；用于生成被控安装命令。',
     type: 'input'
   },
   {

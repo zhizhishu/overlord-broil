@@ -216,7 +216,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
 
                 setup_self_signed_cert() {
                   local cert_dir cn
-                  cert_dir="/root/cert/flux-panel"
+                  cert_dir="/root/cert/flux-3xui-orchestrator"
                   cn="${CERTIFICATE_DOMAIN:-$PUBLIC_HOST}"
                   mkdir -p "$cert_dir"
                   CERT_FILE="${cert_dir}/fullchain.pem"

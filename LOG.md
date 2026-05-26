@@ -2,14 +2,21 @@
 
 ## 2026-05-26
 
+### Legacy Split Runtime Removal
+
+- 完成：删除旧分体 runtime 产品面，默认发布和安装路径只保留 `flux-master` 单体主控镜像与当前 `flux-agent` 被控安装方式。
+- 修改：移除 legacy compose、旧根级安装脚本、旧分体 Dockerfile、旧 VitePress 文档站和 standalone frontend Nginx 配置；GitHub Docker Images workflow 只构建/推送 `flux-3xui-orchestrator-master`；CI/release gate 不再验证 legacy compose。
+- 修正：`NodeServiceImpl` 生成当前项目 `install-flux-agent-bootstrap.sh` 命令；配置页改为主控访问地址 `5166` 语义；浏览器标题/meta 和前端包名改为 Flux 3x-ui Orchestrator；新生成证书目录改为 `/root/cert/flux-3xui-orchestrator`，agent 保留旧证书路径读取兜底。
+- 验证：`bash -n scripts/*.sh`、bootstrap `sh -n`、master port contract、MySQL/SQLite compose dry-run、agent mock、3x-ui fixture、前端 `npm run build`、Docker Maven package build、`git diff --check` 均通过。
+- 清理：Docker Maven 使用 `--rm`，测试容器已退出；未启动本地 dev server，未占用 `5166/5168/6365/8066` 等项目端口。
+- 后续：提交并推送 `origin/main` 与 `origin/future`，再确认 GitHub Actions 和 GHCR `flux-master` 镜像。
+
 ### Operation Audit Remote Image Verification
 
 - 完成：确认 Operation Audit Log 已推送到 `origin/main` 和 `origin/future`，两条分支均指向 `f6381606c7410e1d8b89c6b93aaecbfbf210697f`。
-- 镜像：手动确认并补齐 GHCR 镜像标签，`master`、`backend`、`frontend` 均已有 `latest`、`main`、`sha-f638160`。
+- 镜像：手动确认并补齐 GHCR 镜像标签；随后产品面已收口为只发布 `flux-master` 单体镜像。
 - 验证：
   - `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest/main/sha-f638160` index digest 为 `sha256:4ebde7a773d5521ac5d262f5ae7b1ca7360bbec96ebd0d843cf20214f92e28b5`。
-  - `ghcr.io/zhizhishu/flux-3xui-orchestrator-backend:latest/main/sha-f638160` index digest 为 `sha256:0623605b60acbfaacd35c3e60beff16c2d686d141afed6a1d03d988a2b45af41`。
-  - `ghcr.io/zhizhishu/flux-3xui-orchestrator-frontend:latest/main/sha-f638160` index digest 为 `sha256:b7ea04d1081d21f6e00287087543eb65de89d67fcd7f6d21abd647291febdbbd`。
   - 前端 Docker build 内部 `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
 - 注意：`gh run list --commit f6381606c7410e1d8b89c6b93aaecbfbf210697f` 未返回 Actions run，因此本次以手动 Docker buildx push 和 `imagetools inspect` 作为镜像成果证明。
 - Actions：远端验证记录提交 `1fc801068ec3df0d8b329f4560bc40f140bd9182` 已推送到 `main` 和 `future`；`main CI` run `26448892387` 成功，`future CI` run `26448900654` 初次受 GitHub checkout/action 下载 403 影响失败，重跑失败项后成功，Pages run `26448891539` 初次下载官方 action 失败，重跑后成功。

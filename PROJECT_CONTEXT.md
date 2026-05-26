@@ -13,7 +13,7 @@ The project is currently a `0.6.0` public-trial reliability candidate, not a bro
 - `master`: `flux-master` single image. The Dockerfile builds the Vite UI, embeds it into the Spring Boot jar, and serves both Web UI and API on container port `5166`.
 - Optional SQLite mode uses `docker-compose.sqlite.yml`, `SPRING_PROFILES_ACTIVE=sqlite`, the embedded `schema-sqlite.sql`, and `/app/data/flux-master.sqlite` mounted from the install directory. It is meant for small labs or single-node trials, not as a forced replacement for MySQL.
 - `phpmyadmin`: optional maintenance override only. It is not part of the default compose stack and is created by the installer only when `PHPMYADMIN_PORT` is set.
-- Legacy split `backend`/`frontend` compose files are retained as `docker-compose.legacy-v4.yml` and `docker-compose.legacy-v6.yml` for rollback/debug only.
+- Legacy split `backend`/`frontend` compose files and standalone backend/frontend runtime images are no longer part of the supported product surface.
 - During install or upgrade, the installer removes old split-stack containers named `vite-frontend`, `springboot-backend`, and `gost-phpmyadmin` before starting the single-image master stack.
 
 Default public master exposure:
@@ -122,7 +122,7 @@ CI currently covers:
 - Backend Runtime Provider / Runtime State tests for task-result audit metadata.
 - 3x-ui fixture tests.
 - Optional real 3x-ui E2E contract smoke through `scripts/test-three-xui-e2e.sh`; it skips unless endpoint/token are configured and only performs write checks when explicitly enabled.
-- Default, v4/v6 and legacy compose config.
+- Default, v4/v6 and SQLite compose config.
 - Optional SQLite compose config and schema smoke.
 - Disposable compose smoke stack with the `flux-master` single image.
 - Debian, Ubuntu, Alpine, Rocky Linux, and Oracle Linux installer diagnostics.

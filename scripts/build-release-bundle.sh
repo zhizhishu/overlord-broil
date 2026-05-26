@@ -119,8 +119,6 @@ Primary entrypoints:
 - docker-compose-v4.yml
 - docker-compose-v6.yml
 - docker-compose.sqlite.yml
-- docker-compose.legacy-v4.yml
-- docker-compose.legacy-v6.yml
 - gost.sql
 - README.md
 - README.zh-CN.md
@@ -137,8 +135,7 @@ Default ports:
 - ACME HTTP validation, only when selected: 80
 
 Runtime images:
-- default: ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest
-- legacy/debug only: ghcr.io/zhizhishu/flux-3xui-orchestrator-backend:latest and ...-frontend:latest
+- ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest
 EOF
 
 tar -czf "$ARCHIVE_PATH" -C "$WORK_DIR" "$BUNDLE_BASENAME"

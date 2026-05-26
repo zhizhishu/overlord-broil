@@ -237,12 +237,7 @@ Default master image:
 ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest
 ```
 
-Legacy split images remain for rollback/debug:
-
-```text
-ghcr.io/zhizhishu/flux-3xui-orchestrator-backend:latest
-ghcr.io/zhizhishu/flux-3xui-orchestrator-frontend:latest
-```
+The old split backend/frontend runtime images have been removed from the supported product surface. Backend and frontend source modules remain in the repository, but deployment and releases use the single `flux-master` image.
 
 `main` and `v*` tags publish GHCR images. The `future` branch builds images for validation, but does not overwrite release images.
 

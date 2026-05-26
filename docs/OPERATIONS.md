@@ -33,6 +33,8 @@ This checklist is for running Flux 3x-ui Orchestrator as a small authorized mast
 
 The installer removes legacy split-stack containers named `vite-frontend`, `springboot-backend` and `gost-phpmyadmin` during install/upgrade. This prevents old Flux-derived deployments from leaving public `80/6365/8066` ports active after the default runtime has moved to the single `flux-master` entry.
 
+Standalone backend/frontend runtime images and legacy split compose files are intentionally removed from the supported install path. Use the single `flux-master` image for master deployments.
+
 Controlled hosts do not need an inbound agent port. Agents call the same master entry URL that users open in the browser, for example `http://master:5166`.
 
 Controlled-host business ports are created by your orchestration choices: optional 3x-ui panel port `5168`, Xray/Snell node ports, remote-forward listen ports and ACME HTTP `80/tcp` when selected.

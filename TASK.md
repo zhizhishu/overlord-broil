@@ -3,6 +3,7 @@
 ## Handoff Summary
 
 当前目标：
+- 本轮已按用户要求删除旧分体 compose、旧 backend/frontend 镜像发布面和旧 Flux 安装脚本链路，只保留 `flux-master` 单体主控镜像与当前 `flux-agent` 被控安装方式。
 - 继续朝 `flux-master` 单体主控架构推进：内置 Web UI、API、任务引擎、状态同步、Runtime Provider 层、MySQL/可选 SQLite，以及由 `flux-agent` 执行和回报的被控端闭环。
 - 本轮已完成“操作审计日志”的本地实现、验证、提交、推送和 GHCR 镜像补推。
 
@@ -16,13 +17,15 @@
 - 主控任务创建、编排、拒绝、状态更新、重试、删除、agent claim、agent report 已进入统一审计记录。
 - agent report 审计只记录 stdout/stderr/resultJson 长度，不保存原始输出内容。
 - `origin/main` 和 `origin/future` 均已推送到 `f6381606c7410e1d8b89c6b93aaecbfbf210697f`。
-- GHCR 已确认：
-  - `flux-3xui-orchestrator-master:latest/main/sha-f638160` -> `sha256:4ebde7a773d5521ac5d262f5ae7b1ca7360bbec96ebd0d843cf20214f92e28b5`
-  - `flux-3xui-orchestrator-backend:latest/main/sha-f638160` -> `sha256:0623605b60acbfaacd35c3e60beff16c2d686d141afed6a1d03d988a2b45af41`
-  - `flux-3xui-orchestrator-frontend:latest/main/sha-f638160` -> `sha256:b7ea04d1081d21f6e00287087543eb65de89d67fcd7f6d21abd647291febdbbd`
+- GHCR 上一轮曾确认 `flux-master` 镜像；本轮产品面改为只发布 `flux-master`，旧分体运行镜像不再作为支持目标。
+- 已删除旧 `install.sh`、`panel_install.sh`、`proxy.sh`、legacy compose、分体 Dockerfile、旧 VitePress 文档站和旧 standalone frontend Nginx 配置。
+- GitHub Docker Images workflow 已收口为只构建/推送 `ghcr.io/zhizhishu/flux-3xui-orchestrator-master`。
+- 后端节点安装命令已改为当前项目 `install-flux-agent-bootstrap.sh`，前端配置页改为主控访问地址 `http://MASTER_IP:5166` 语义。
+- 浏览器标题、OG/meta 和前端包名已改为 `Flux 3x-ui Orchestrator` / `flux-3xui-orchestrator-ui`。
 
 下一步：
-- 继续推进真实 VPS 矩阵、真实 3x-ui E2E 记录、UI polish 和安全治理。
+- 提交并推送 `origin/main` 与 `origin/main:future`。
+- 推送后检查 GitHub Actions Docker Images/CI，以及 GHCR `flux-master` 镜像。
 
 关键文件：
 - `springboot-backend/src/main/java/com/admin/entity/OperationAuditLog.java`
@@ -47,11 +50,18 @@
 - `PROJECT_CONTEXT.md`
 
 验证状态：
-- 已通过 `bash -n scripts/*.sh`。
+- 本轮本地验证已通过；待远端 Actions/GHCR 确认。
+- 已通过 `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'`。
 - 已通过 `bash scripts/test-sqlite-schema.sh`。
 - 已通过 `git diff --check`，仅有仓库既有 LF/CRLF 提示。
 - 已通过 `npm run build`，仅有既有 Vite dynamic/static import chunk 提示。
 - 已通过 Docker Maven targeted test：`RuntimeProviderServiceTest,DeployTaskServiceImplTest`，25 tests，0 failures。
+- 已通过 Docker Maven package build：`docker run --rm -v "$PWD/springboot-backend:/workspace" -v flux-3xui-m2:/root/.m2 -w /workspace maven:3.9-eclipse-temurin-21 mvn -B -DskipTests package`。
+- 已通过 `bash scripts/test-master-port-contract.sh`。
+- 已通过 `bash scripts/test-compose-smoke.sh --build-local --dry-run`。
+- 已通过 `bash scripts/test-compose-smoke.sh --compose-file docker-compose.sqlite.yml --build-local --dry-run`。
+- 已通过 `bash scripts/test-flux-agent-mock.sh`。
+- 已通过 `bash scripts/test-three-xui-fixture.sh`。
 - 本轮未跑完整 `bash scripts/release-check.sh`，避免继续长时间空转；最终以 GitHub Actions/Docker Images 远端门禁为准。
 - `gh run list --commit f6381606c7410e1d8b89c6b93aaecbfbf210697f` 未返回 Actions run；已用本地 Docker buildx 手动补推并用 `docker buildx imagetools inspect` 验证 GHCR 三镜像。
 - 前端镜像重建时 `npm run build` 在 Docker 内通过，仅有既有 Vite dynamic/static import chunk 提示。
@@ -76,6 +86,7 @@
 - [x] **Goal:** 建立 Runtime Provider 层和 agent claim/report 执行闭环。
 - [x] **Goal:** 完成 SQLite 可选主控模式和任务安全硬化。
 - [x] **Goal:** Operation Audit Log 已完成本地验证、提交推送和 GHCR 镜像成果确认。
+- [x] **Goal:** 删除旧分体 runtime 面、修正 agent 安装命令、更新 GitHub Actions 只发布 `flux-master`。
 - [ ] **Goal:** 后续继续推进真实 VPS 矩阵、真实 3x-ui E2E 记录、UI polish 和安全治理。
 
 ## Notes For Next Agent

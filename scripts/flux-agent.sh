@@ -582,7 +582,7 @@ xray_status() {
 
 certificate_json() {
   local cert_file=""
-  for candidate in /root/cert/flux-panel/fullchain.pem /root/cert/*/fullchain.pem /etc/letsencrypt/live/*/fullchain.pem; do
+  for candidate in /root/cert/flux-3xui-orchestrator/fullchain.pem /root/cert/flux-panel/fullchain.pem /root/cert/*/fullchain.pem /etc/letsencrypt/live/*/fullchain.pem; do
     if [ -f "$candidate" ]; then
       cert_file="$candidate"
       break

@@ -22,7 +22,6 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
 
 /**
  * <p>
@@ -61,6 +60,7 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
     private static final String ERROR_PORT_END_REQUIRED = "结束端口不能为空";
     private static final String ERROR_PORT_RANGE_INVALID = "端口必须在1-65535范围内";
     private static final String ERROR_PORT_ORDER_INVALID = "结束端口不能小于起始端口";
+    private static final String AGENT_BOOTSTRAP_URL = "https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent-bootstrap.sh";
 
     // ========== 依赖注入 ==========
     
@@ -335,23 +335,38 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
      */
     private R buildInstallCommand(Node node) {
         ViteConfig viteConfig = viteConfigService.getOne(new QueryWrapper<ViteConfig>().eq("name", "ip"));
-        if (viteConfig == null) return R.err("请先前往网站配置中设置ip");
+        if (viteConfig == null) return R.err("请先前往网站配置中设置主控地址");
 
+        String panelUrl = normalizePanelUrl(processServerAddress(viteConfig.getValue()));
         StringBuilder command = new StringBuilder();
-        
-        // 第一部分：下载安装脚本  
-        command.append("curl -L https://raw.githubusercontent.com/BrunuhVille/flux-panel/refs/heads/main/install.sh")
-               .append(" -o ./install.sh && chmod +x ./install.sh && ");
-        
-        // 处理服务器地址，如果是IPv6需要添加方括号
-        String processedServerAddr = processServerAddress(viteConfig.getValue());
-        
-        // 第二部分：执行安装脚本（去掉-u参数）
-        command.append("./install.sh")
-               .append(" -a ").append(processedServerAddr)  // 服务器地址
-               .append(" -s ").append(node.getSecret());    // 节点密钥
-        
+        command.append("curl -fsSL ")
+                .append(shellQuote(AGENT_BOOTSTRAP_URL))
+                .append(" | env FLUX_PANEL_URL=")
+                .append(shellQuote(panelUrl))
+                .append(" FLUX_SERVER_ID=")
+                .append(shellQuote(String.valueOf(node.getId())))
+                .append(" FLUX_AGENT_TOKEN=")
+                .append(shellQuote(node.getSecret()))
+                .append(" sh");
+
         return R.ok(command.toString());
+    }
+
+    private String normalizePanelUrl(String serverAddr) {
+        if (StrUtil.isBlank(serverAddr)) {
+            return serverAddr;
+        }
+        if (serverAddr.startsWith("http://") || serverAddr.startsWith("https://")) {
+            return serverAddr;
+        }
+        return "http://" + serverAddr;
+    }
+
+    private String shellQuote(String value) {
+        if (value == null) {
+            return "''";
+        }
+        return "'" + value.replace("'", "'\"'\"'") + "'";
     }
 
     /**

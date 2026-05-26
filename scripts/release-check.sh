@@ -17,7 +17,7 @@ Default checks:
   - SQLite schema smoke test
   - tokenized 3x-ui fixture test
   - optional real 3x-ui E2E contract when THREE_XUI_E2E_URL/TOKEN are set
-  - default/legacy compose config validation
+  - single-image compose config validation
   - frontend install and production build in Docker Node 22
   - git whitespace check
 
@@ -108,8 +108,6 @@ docker compose -f docker-compose.yml config --quiet
 docker compose -f docker-compose-v4.yml config --quiet
 docker compose -f docker-compose-v6.yml config --quiet
 docker compose -f docker-compose.sqlite.yml config --quiet
-docker compose -f docker-compose.legacy-v4.yml config --quiet
-docker compose -f docker-compose.legacy-v6.yml config --quiet
 
 step "Validate master port contract"
 bash scripts/test-master-port-contract.sh
