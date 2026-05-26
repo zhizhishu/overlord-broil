@@ -34,6 +34,7 @@ import {
   getRuntimeStateOverview,
   getRuntimeProviderList,
   listMonitorAlerts,
+  listOperationAuditLogs,
   getProtocolNodeList,
   getProtocolProfileList,
   getServerForwardRuleList,
@@ -58,7 +59,7 @@ import {
   updateProtocolProfile,
   updateServerForwardRule
 } from "@/api";
-import type { ControlServer, DeployTask, MonitorAlert, ProtocolNode, ProtocolProfile, RuntimeProviderAction, RuntimeProviderDescriptor, RuntimeState, RuntimeStateOverview, RuntimeStateOverviewItem, ServerForwardRule, ThreeXuiTrafficSnapshot } from "@/types";
+import type { ControlServer, DeployTask, MonitorAlert, OperationAuditLog, ProtocolNode, ProtocolProfile, RuntimeProviderAction, RuntimeProviderDescriptor, RuntimeState, RuntimeStateOverview, RuntimeStateOverviewItem, ServerForwardRule, ThreeXuiTrafficSnapshot } from "@/types";
 
 interface ServerForm {
   id?: number;
@@ -1290,6 +1291,7 @@ export default function OrchestratorPage() {
   const [runtimeStateOverview, setRuntimeStateOverview] = useState<RuntimeStateOverview | null>(null);
   const [trafficSnapshots, setTrafficSnapshots] = useState<ThreeXuiTrafficSnapshot[]>([]);
   const [monitorAlerts, setMonitorAlerts] = useState<MonitorAlert[]>([]);
+  const [operationAuditLogs, setOperationAuditLogs] = useState<OperationAuditLog[]>([]);
   const [serverModalOpen, setServerModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [protocolNodeModalOpen, setProtocolNodeModalOpen] = useState(false);
@@ -1356,6 +1358,8 @@ export default function OrchestratorPage() {
   }, [monitorAlerts]);
 
   const recentAlerts = useMemo(() => monitorAlerts.slice(0, 5), [monitorAlerts]);
+
+  const recentAuditLogs = useMemo(() => operationAuditLogs.slice(0, 6), [operationAuditLogs]);
 
   const agentMaintenanceActions = useMemo(() => mergeProviderActions(runtimeProviders), [runtimeProviders]);
 
@@ -1677,13 +1681,14 @@ export default function OrchestratorPage() {
     setLoading(true);
     try {
       await ensureDefaultProtocolProfiles();
-      const [serverRes, profileRes, taskRes, nodeRes, forwardRes, alertRes, providerRes, runtimeStateRes] = await Promise.all([
+      const [serverRes, profileRes, taskRes, nodeRes, forwardRes, alertRes, auditRes, providerRes, runtimeStateRes] = await Promise.all([
         getControlServerList(),
         getProtocolProfileList(),
         getDeployTaskList(),
         getProtocolNodeList({ limit: 300 }),
         getServerForwardRuleList({ limit: 300 }),
         listMonitorAlerts({ acknowledged: 0, limit: 100 }),
+        listOperationAuditLogs({ limit: 100 }),
         getRuntimeProviderList(),
         getRuntimeStateOverview()
       ]);
@@ -1694,9 +1699,10 @@ export default function OrchestratorPage() {
       if (nodeRes.code === 0) setProtocolNodes(nodeRes.data || []);
       if (forwardRes.code === 0) setForwardRules(forwardRes.data || []);
       if (alertRes.code === 0) setMonitorAlerts(alertRes.data || []);
+      if (auditRes.code === 0) setOperationAuditLogs(auditRes.data || []);
       if (providerRes.code === 0) setRuntimeProviders(providerRes.data || []);
       if (runtimeStateRes.code === 0) setRuntimeStateOverview(runtimeStateRes.data || null);
-      if (serverRes.code !== 0 || profileRes.code !== 0 || taskRes.code !== 0 || nodeRes.code !== 0 || forwardRes.code !== 0 || alertRes.code !== 0 || providerRes.code !== 0 || runtimeStateRes.code !== 0) {
+      if (serverRes.code !== 0 || profileRes.code !== 0 || taskRes.code !== 0 || nodeRes.code !== 0 || forwardRes.code !== 0 || alertRes.code !== 0 || auditRes.code !== 0 || providerRes.code !== 0 || runtimeStateRes.code !== 0) {
         toast.error(t("主控数据加载不完整"));
       }
     } catch (error) {
@@ -2525,6 +2531,24 @@ export default function OrchestratorPage() {
     return "default";
   };
 
+  const auditOutcomeColor = (outcome?: string) => {
+    if (!outcome) return "default";
+    if (["succeeded", "requested", "claimed"].includes(outcome)) return "success";
+    if (["failed", "timeout", "rejected"].includes(outcome)) return "danger";
+    if (outcome === "running") return "primary";
+    return "default";
+  };
+
+  const auditOutcomeLabel = (outcome?: string) => {
+    if (outcome === "requested") return t("已请求");
+    if (outcome === "claimed") return t("已领取");
+    if (outcome === "succeeded") return t("已成功");
+    if (outcome === "failed") return t("已失败");
+    if (outcome === "timeout") return t("已超时");
+    if (outcome === "rejected") return t("已拒绝");
+    return outcome || "-";
+  };
+
   const certificateText = (server: ControlServer) => {
     if (!server.certificateStatus) return t("证书 -");
     const domain = server.certificateDomain ? ` ${server.certificateDomain}` : "";
@@ -2888,6 +2912,68 @@ export default function OrchestratorPage() {
               ))}
               {monitorAlerts.length > recentAlerts.length && (
                 <p className="text-xs text-gray-500">{t("仅显示最近 {shown} 条，后端已保留 {total} 条待确认告警。", { shown: recentAlerts.length, total: monitorAlerts.length })}</p>
+              )}
+            </CardBody>
+          </Card>
+        </section>
+
+        <section>
+          <Card radius="sm">
+            <CardHeader className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("操作审计")}</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  {t("记录主控创建/拒绝/改状态/重试/删除任务、agent 领取任务和执行回报，方便追踪多服务器运维链路。")}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Chip size="sm" variant="flat">{t("{count} 条记录", { count: operationAuditLogs.length })}</Chip>
+                <Button size="sm" variant="light" onPress={loadData}>{t("刷新")}</Button>
+              </div>
+            </CardHeader>
+            <CardBody className="space-y-3">
+              {operationAuditLogs.length === 0 && (
+                <div className="rounded-small border border-dashed border-default-300 p-5 text-center">
+                  <p className="font-medium text-gray-900 dark:text-white">{t("暂无操作审计")}</p>
+                  <p className="text-sm text-gray-500 mt-1">{t("创建部署任务或 agent 回报结果后，这里会显示最近审计事件。")}</p>
+                </div>
+              )}
+              {recentAuditLogs.map(log => (
+                <div key={log.id} className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1.2fr)_minmax(220px,1fr)_minmax(260px,1.3fr)_auto] lg:items-center">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Chip size="sm" variant="flat" color={auditOutcomeColor(log.outcome) as any}>{auditOutcomeLabel(log.outcome)}</Chip>
+                        <Chip size="sm" variant="flat">{log.eventType}</Chip>
+                        {log.danger === 1 && <Chip size="sm" variant="flat" color="danger">{t("危险动作")}</Chip>}
+                      </div>
+                      <p className="mt-2 truncate font-semibold text-gray-900 dark:text-white">{log.summary || log.eventType}</p>
+                      <p className="truncate text-xs text-gray-500">{formatTime(log.createdTime)}</p>
+                    </div>
+                    <div className="text-sm">
+                      <p className="text-xs text-gray-500">{t("执行者")}</p>
+                      <p className="truncate text-gray-900 dark:text-white">{log.actorName || log.actorId || log.actorType}</p>
+                      <p className="truncate text-xs text-gray-500">{log.actorType}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-gray-500">{t("资源")}</p>
+                      <p className="truncate text-sm text-gray-900 dark:text-white">
+                        {[log.serverName || (log.serverId ? `#${log.serverId}` : null), log.providerKey, log.action].filter(Boolean).join(" · ") || "-"}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {log.resourceType && <Chip size="sm" variant="flat">{log.resourceType}</Chip>}
+                        {log.resourceId && <Chip size="sm" variant="flat">#{log.resourceId}</Chip>}
+                        {log.providerKey && <Chip size="sm" variant="flat" color={runtimeProviderColor(log.providerKey) as any}>{log.providerKey}</Chip>}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
+                      {log.detailJson && <Button size="sm" variant="flat" onPress={() => showThreeXuiResult(t("审计详情"), log.detailJson || "")}>{t("详情")}</Button>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {operationAuditLogs.length > recentAuditLogs.length && (
+                <p className="text-xs text-gray-500">{t("仅显示最近 {shown} 条，后端已保留 {total} 条审计记录。", { shown: recentAuditLogs.length, total: operationAuditLogs.length })}</p>
               )}
             </CardBody>
           </Card>

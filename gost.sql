@@ -225,6 +225,29 @@ CREATE TABLE `monitor_alert` (
 
 -- --------------------------------------------------------
 
+CREATE TABLE `operation_audit_log` (
+  `id` int(10) NOT NULL,
+  `actor_type` varchar(50) NOT NULL,
+  `actor_id` varchar(100) DEFAULT NULL,
+  `actor_name` varchar(100) DEFAULT NULL,
+  `event_type` varchar(80) NOT NULL,
+  `resource_type` varchar(80) DEFAULT NULL,
+  `resource_id` varchar(100) DEFAULT NULL,
+  `server_id` int(10) DEFAULT NULL,
+  `server_name` varchar(100) DEFAULT NULL,
+  `provider_key` varchar(50) DEFAULT NULL,
+  `action` varchar(80) DEFAULT NULL,
+  `danger` int(1) NOT NULL DEFAULT '0',
+  `outcome` varchar(50) NOT NULL,
+  `summary` varchar(255) DEFAULT NULL,
+  `detail_json` longtext,
+  `created_time` bigint(20) NOT NULL,
+  `updated_time` bigint(20) DEFAULT NULL,
+  `status` int(10) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
 CREATE TABLE `three_xui_traffic_snapshot` (
   `id` int(10) NOT NULL,
   `server_id` int(10) NOT NULL,
@@ -420,6 +443,14 @@ ALTER TABLE `monitor_alert`
   ADD KEY `acknowledged` (`acknowledged`),
   ADD KEY `last_seen_at` (`last_seen_at`);
 
+ALTER TABLE `operation_audit_log`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `server_id` (`server_id`),
+  ADD KEY `event_type` (`event_type`),
+  ADD KEY `provider_key` (`provider_key`),
+  ADD KEY `outcome` (`outcome`),
+  ADD KEY `created_time` (`created_time`);
+
 ALTER TABLE `three_xui_traffic_snapshot`
   ADD PRIMARY KEY (`id`),
   ADD KEY `server_id` (`server_id`),
@@ -486,6 +517,9 @@ ALTER TABLE `deploy_task`
   MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
 
 ALTER TABLE `monitor_alert`
+  MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+
+ALTER TABLE `operation_audit_log`
   MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
 
 ALTER TABLE `three_xui_traffic_snapshot`

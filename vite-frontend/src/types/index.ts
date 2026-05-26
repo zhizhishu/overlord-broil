@@ -354,6 +354,27 @@ export interface MonitorAlert {
   status: number;
 }
 
+export interface OperationAuditLog {
+  id: number;
+  actorType: "master-user" | "agent" | string;
+  actorId?: string;
+  actorName?: string;
+  eventType: string;
+  resourceType?: string;
+  resourceId?: string;
+  serverId?: number;
+  serverName?: string;
+  providerKey?: string;
+  action?: string;
+  danger?: number;
+  outcome: "requested" | "claimed" | "succeeded" | "failed" | "timeout" | "rejected" | string;
+  summary?: string;
+  detailJson?: string;
+  createdTime?: number;
+  updatedTime?: number;
+  status: number;
+}
+
 export interface Pagination {
   current: number;
   size: number;

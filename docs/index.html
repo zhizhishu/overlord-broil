@@ -101,7 +101,7 @@ sudo -E /usr/local/bin/flux-agent.sh --doctor</code></pre>
       <section id="workspace" class="section">
         <div class="section-header">
           <h2>主控一键编排闭环已经打通</h2>
-          <p>当前版本能多选服务器生成编排任务，由副控 agent 自动领取执行；完成后把 3x-ui 连接信息、Xray inbound/outbound、Snell 节点、远端端口转发、证书、服务状态和流量快照回写到主控。Xray/3x-ui 节点任务已经可以由 agent 调用 inbound API 执行，防火墙运行时端口也能通过 agent 尝试放行或关闭。完整 3x-ui 安装编排要求 systemd 主机；Alpine/OpenRC 用于 agent、Snell 和转发任务。</p>
+          <p>当前版本能多选服务器生成编排任务，由副控 agent 自动领取执行；完成后把 3x-ui 连接信息、Xray inbound/outbound、Snell 节点、远端端口转发、证书、服务状态和流量快照回写到主控。Xray/3x-ui 节点任务已经可以由 agent 调用 inbound API 执行，防火墙运行时端口也能通过 agent 尝试放行或关闭。主控还会记录任务创建、agent 领取和执行回报审计。完整 3x-ui 安装编排要求 systemd 主机；Alpine/OpenRC 用于 agent、Snell 和转发任务。</p>
         </div>
         <div class="metric-row" aria-label="Current release metrics">
           <div class="metric">
@@ -163,6 +163,7 @@ POST /api/v1/control-server/heartbeat
 POST /api/v1/agent-task/claim
 POST /api/v1/agent-task/report
 POST /api/v1/deploy-task/create
+POST /api/v1/operation-audit/list
 POST /api/v1/protocol-node/create
 POST /api/v1/protocol-node/list
 POST /api/v1/protocol-node/sync
@@ -206,6 +207,10 @@ POST /api/v1/three-xui/restart-xray</code></pre>
             </div>
             <div class="status-item">
               <span>Agent 诊断/日志/安全升级</span>
+              <span class="tag green">ready</span>
+            </div>
+            <div class="status-item">
+              <span>操作审计日志</span>
               <span class="tag green">ready</span>
             </div>
             <div class="status-item">

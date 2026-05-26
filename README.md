@@ -57,6 +57,8 @@ Runtime Provider descriptors now include an Action Catalog for `agent-maintenanc
 
 Dangerous maintenance actions, such as agent uninstall or runtime-port closure, require an explicit confirmation contract. The UI asks for confirmation and the backend rejects the task unless `requestJson` carries `dangerConfirmed=true` and `confirmAction=<action>`.
 
+Operation audit logs now cover the same control path. The master writes `operation_audit_log` rows when operators create, reject, manually update, retry or delete deploy/orchestration tasks, when agents claim tasks, and when agents report success, failure or timeout. The control-center audit panel shows recent actor, server, provider, action, outcome and dangerous-action markers.
+
 Xray/3x-ui orchestration tasks now generate agent-executable scripts instead of placeholder payloads. The controlled agent resolves the local or saved 3x-ui endpoint/token, calls the 3x-ui inbound API to add/delete protocol nodes, can restart Xray, and reports inbound metadata back through `FLUX_AGENT_RESULT_JSON`.
 
 Agent task history redacts 3x-ui secrets before storage. Installation/orchestration reports can still update encrypted server credentials, but stored `resultJson` keeps only configured flags instead of raw API tokens, passwords or 2FA codes.
@@ -83,6 +85,7 @@ Current UI coverage includes:
 - Runtime Provider Action Catalog-driven maintenance buttons
 - State Sync runtime overview by server and provider
 - State Sync runtime diagnostics and repair task shortcuts
+- operation audit timeline for task creation, rejection, manual state changes, retry/delete, agent claim and agent report events
 - agent diagnostics, logs, restart, upgrade, uninstall and repair tasks
 - remote log summaries on agent-maintenance task cards
 - monitor alerts and a unified rule center
@@ -341,7 +344,7 @@ THREE_XUI_E2E_WRITE=1 THREE_XUI_E2E_PORT=42123 bash scripts/test-three-xui-e2e.s
 - Real VPS matrix: Debian, Ubuntu, Rocky Linux, Oracle Linux and Alpine.
 - Run and record real 3x-ui container or VPS end-to-end smoke results through `scripts/test-three-xui-e2e.sh`.
 - Better certificate, firewall and cloud-security-group diagnostics.
-- RBAC, audit logs, agent token expiry/revocation and key-rotation migration.
+- RBAC, audit retention/export, agent token expiry/revocation and key-rotation migration.
 - Mobile layout, loading/error states and task-detail polish.
 
 ## References And Acknowledgements

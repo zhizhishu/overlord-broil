@@ -83,6 +83,9 @@ export const resolveRuntimeProvider = (data: { protocol?: string; action?: strin
 export const listMonitorAlerts = (data: any = {}) => Network.post("/monitor-alert/list", data);
 export const acknowledgeMonitorAlert = (id: number) => Network.post("/monitor-alert/ack", { id });
 
+// 主控操作审计
+export const listOperationAuditLogs = (data: any = {}) => Network.post("/operation-audit/list", data);
+
 // 3x-ui 远端面板出入站管理
 export const testThreeXuiConnection = (serverId: number) => Network.post("/three-xui/test", { serverId });
 export const listThreeXuiInbounds = (serverId: number) => Network.post("/three-xui/inbounds/list", { serverId });

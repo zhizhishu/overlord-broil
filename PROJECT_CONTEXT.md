@@ -70,6 +70,7 @@ Controlled hosts may expose business ports depending on orchestration choices:
 - Runtime Provider metadata travels through task claim/report and is stored in task result JSON for audit.
 - Agent task claim uses an atomic `generated -> claimed` transition so competing agent loops cannot execute the same generated task twice.
 - Dangerous `agent-maintenance` actions require both UI confirmation and backend `dangerConfirmed=true` / `confirmAction=<action>` validation before entering the controlled-agent queue.
+- Operation audit logs are persisted in `operation_audit_log` for deploy/orchestration task creation, rejected task requests, manual state updates, retries, deletes, agent task claims and agent task reports; the control center displays recent actor/server/provider/action/outcome events.
 - Runtime State is stored in `resultJson.runtimeState` and rendered on task cards, normalizing provider, protocol/action, source task, server, resource type/id, danger flag, task state, resolved status/source, services, nodes, forwarding, certificates and diagnostics.
 - Xray/3x-ui deployment scripts are executable by the controlled agent: they resolve saved/local 3x-ui API metadata, call inbound add/delete or restart-Xray APIs, and return inbound metadata through `FLUX_AGENT_RESULT_JSON`.
 - Agent task results are sanitized before storage: the master can use raw reports to update encrypted 3x-ui credentials, but stored task history removes API tokens, passwords, 2FA codes and `serverSecrets`.
@@ -138,7 +139,7 @@ bash scripts/release-check.sh --full
 - Snell is product-layer unified but runtime-independent; do not describe it as a native 3x-ui/Xray protocol.
 - Alpine/OpenRC supports the agent, Snell tasks, and remote forwarding, but full 3x-ui install/configure orchestration is intended for systemd hosts.
 - Certificate automation depends on DNS, port `80`, local firewall, and cloud security groups.
-- Security governance still needs RBAC, audit logs, token expiry/revocation, key rotation, and stronger destructive-action confirmation.
+- Security governance still needs RBAC, audit retention/export, token expiry/revocation, key rotation, and broader destructive-action policy.
 - UI still needs more mobile, loading, error, and task-detail polish.
 
 ## Reference Projects

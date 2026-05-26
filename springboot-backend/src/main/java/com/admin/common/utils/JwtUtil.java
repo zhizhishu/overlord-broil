@@ -151,6 +151,18 @@ public class JwtUtil {
         return payload.get("name").toString();
     }
 
+    public static String getNameFromToken(String token) {
+        String[] parts = token.split("\\.");
+        String encodedPayload = parts[1];
+        String decodedPayload = new String(Base64.getUrlDecoder().decode(encodedPayload), StandardCharsets.UTF_8);
+        Map<String, Object> payload = JSON.parseObject(decodedPayload, Map.class);
+        Object name = payload.get("name");
+        if (name == null) {
+            name = payload.get("user");
+        }
+        return name == null ? null : name.toString();
+    }
+
     /**
      * 从JWT Token中获取用户角色ID
      *
@@ -191,4 +203,4 @@ public class JwtUtil {
         byte[] signatureBytes = hmac.doFinal(content.getBytes(StandardCharsets.UTF_8));
         return Base64.getUrlEncoder().withoutPadding().encodeToString(signatureBytes);
     }
-} 
+}

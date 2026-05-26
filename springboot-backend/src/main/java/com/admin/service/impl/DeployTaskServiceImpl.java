@@ -13,6 +13,7 @@ import com.admin.common.utils.LowMemoryPolicyUtils;
 import com.admin.common.utils.MasterSelfProtectionUtils;
 import com.admin.common.utils.ProtocolValidationUtils;
 import com.admin.common.utils.SecretCryptoUtils;
+import com.admin.common.utils.JwtUtil;
 import com.admin.entity.ControlServer;
 import com.admin.entity.DeployTask;
 import com.admin.entity.ProtocolProfile;
@@ -20,6 +21,7 @@ import com.admin.mapper.DeployTaskMapper;
 import com.admin.service.ControlServerService;
 import com.admin.service.DeployTaskService;
 import com.admin.service.MonitorAlertService;
+import com.admin.service.OperationAuditLogService;
 import com.admin.service.ProtocolNodeService;
 import com.admin.service.ProtocolProfileService;
 import com.admin.service.ServerForwardRuleService;
@@ -33,8 +35,11 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -82,6 +87,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
     @Resource
     private RuntimeProviderService runtimeProviderService;
 
+    @Resource
+    private OperationAuditLogService operationAuditLogService;
+
     @Override
     public R createTask(DeployTaskDto dto) {
         ControlServer server = controlServerService.getById(dto.getServerId());
@@ -93,6 +101,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         if (dto.getProfileId() != null) {
             profile = protocolProfileService.getById(dto.getProfileId());
             if (profile == null) {
+                auditRejectedTask(server, safeProtocol(dto.getProtocol()), dto.getAction(), "protocol profile not found");
                 return R.err("protocol profile not found");
             }
         }
@@ -100,15 +109,19 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         String protocol = dto.getProtocol().trim().toLowerCase();
         String validationError = validateDeployTask(dto, profile, protocol);
         if (validationError != null) {
+            auditRejectedTask(server, protocol, dto.getAction(), validationError);
             return R.err(validationError);
         }
         if (isNanoCritical(server) && requiresXrayTask(protocol)) {
+            String reason = "server memory is below 200 MB; Nano nodes should use Snell or remote port forwarding instead of Xray/3x-ui deployment tasks";
+            auditRejectedTask(server, protocol, dto.getAction(), reason);
             return R.err("server memory is below 200 MB; Nano nodes should use Snell or remote port forwarding instead of Xray/3x-ui deployment tasks");
         }
         Integer listenPort = dto.getListenPort() != null ? dto.getListenPort() : profile == null ? null : profile.getListenPort();
         String masterGuardError = MasterSelfProtectionUtils.validateListenPortAndAction(
                 server, listenPort, dto.getAction(), "部署任务", "协议监听端口");
         if (masterGuardError != null) {
+            auditRejectedTask(server, protocol, dto.getAction(), masterGuardError);
             return R.err(masterGuardError);
         }
         String script;
@@ -137,6 +150,8 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             return R.err("deploy task create failed");
         }
         runtimeProviderService.applyToTask(task);
+        auditMasterTaskEvent("deploy_task.created", task,
+                "requested", "Created deploy task #" + task.getId(), taskDetail(task, "created"));
         return R.ok(task);
     }
 
@@ -148,6 +163,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         }
         String validationError = validateOrchestration(dto, server);
         if (validationError != null) {
+            auditRejectedTask(server, "xui-orchestrator", "orchestrate", validationError);
             return R.err(validationError);
         }
 
@@ -169,6 +185,8 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             return R.err("orchestration task create failed");
         }
         runtimeProviderService.applyToTask(task);
+        auditMasterTaskEvent("deploy_task.orchestrated", task,
+                "requested", "Created orchestration task #" + task.getId(), taskDetail(task, "orchestrated"));
         return R.ok(task);
     }
 
@@ -579,6 +597,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         }
 
         long now = System.currentTimeMillis();
+        String previousState = exists.getState();
         DeployTask task = new DeployTask();
         task.setId(dto.getId());
         task.setState(state);
@@ -595,6 +614,14 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         if (updated) {
             monitorAlertService.handleTaskFailed(exists.getServerId(), exists.getServerName(), exists.getId(),
                     state, dto.getResultJson(), now);
+            exists.setState(state);
+            exists.setResultJson(dto.getResultJson());
+            runtimeProviderService.applyToTask(exists);
+            Map<String, Object> detail = taskDetail(exists, "state-updated");
+            detail.put("previousState", previousState);
+            detail.put("requestedState", state);
+            auditMasterTaskEvent("deploy_task.state_updated", exists,
+                    "updated", "Updated deploy task #" + exists.getId() + " state to " + state, detail);
         }
         return updated ? R.ok("deploy task state updated") : R.err("deploy task state update failed");
     }
@@ -633,6 +660,11 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             return R.err("deploy task retry failed");
         }
         runtimeProviderService.applyToTask(retry);
+        Map<String, Object> detail = taskDetail(retry, "retried");
+        detail.put("retryFromTaskId", exists.getId());
+        detail.put("retryFromState", exists.getState());
+        auditMasterTaskEvent("deploy_task.retried", retry,
+                "requested", "Retried deploy task #" + exists.getId() + " as #" + retry.getId(), detail);
         return R.ok(retry);
     }
 
@@ -656,6 +688,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
 
             long now = System.currentTimeMillis();
             if (markTaskClaimed(task.getId(), server.getId(), now)) {
+                runtimeProviderService.applyToTask(task);
+                auditTaskEvent("agent_task.claimed", "agent", String.valueOf(server.getId()), server.getName(), task,
+                        "claimed", "Agent claimed task #" + task.getId(), taskDetail(task, "claimed"));
                 return R.ok(claimedTaskPayload(task, now));
             }
         }
@@ -726,16 +761,158 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             monitorAlertService.handleTaskFailed(exists.getServerId(), exists.getServerName(), exists.getId(),
                     state, task.getResultJson(), now);
             applyAgentResultMetadata(exists, agentResultJson, state);
+            auditTaskEvent("agent_task.reported", "agent", String.valueOf(server.getId()), server.getName(), exists,
+                    state, "Agent reported task #" + exists.getId() + " as " + state,
+                    agentReportDetail(exists, dto, state, task.getResultJson()));
         }
         return updated ? R.ok("agent task report accepted") : R.err("agent task report failed");
     }
 
+    private void auditRejectedTask(ControlServer server, String protocol, String action, String reason) {
+        if (server == null) {
+            return;
+        }
+        DeployTask draft = new DeployTask();
+        draft.setServerId(server.getId());
+        draft.setServerName(server.getName());
+        draft.setProtocol(protocol);
+        draft.setAction(normalizeTaskAction(protocol, action));
+
+        Map<String, Object> detail = taskDetail(draft, "rejected");
+        detail.put("reason", reason);
+        auditMasterTaskEvent("deploy_task.rejected", draft,
+                "rejected", "Rejected " + protocol + " task: " + reason, detail);
+    }
+
+    private void auditMasterTaskEvent(String eventType,
+                                      DeployTask task,
+                                      String outcome,
+                                      String summary,
+                                      Map<String, Object> detail) {
+        AuditActor actor = currentMasterActor();
+        auditTaskEvent(eventType, actor.type, actor.id, actor.name, task, outcome, summary, detail);
+    }
+
+    private void auditTaskEvent(String eventType,
+                                String actorType,
+                                String actorId,
+                                String actorName,
+                                DeployTask task,
+                                String outcome,
+                                String summary,
+                                Map<String, Object> detail) {
+        if (operationAuditLogService == null || task == null) {
+            return;
+        }
+        RuntimeProviderAssignment provider = task.getRuntimeProvider();
+        if (provider == null && runtimeProviderService != null) {
+            provider = runtimeProviderService.assign(task.getProtocol(), task.getAction());
+        }
+        boolean danger = isDangerAuditTask(task);
+        operationAuditLogService.recordTaskEvent(eventType, actorType, actorId, actorName, task, provider,
+                danger, outcome, summary, detail);
+    }
+
+    private AuditActor currentMasterActor() {
+        try {
+            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attributes == null) {
+                return AuditActor.unknownMaster();
+            }
+            HttpServletRequest request = attributes.getRequest();
+            String token = normalizeAuthorizationToken(request.getHeader("Authorization"));
+            if (token == null || token.isEmpty()) {
+                return AuditActor.unknownMaster();
+            }
+            Long userId = JwtUtil.getUserIdFromToken(token);
+            String name = JwtUtil.getNameFromToken(token);
+            String id = userId == null ? "unknown" : String.valueOf(userId);
+            if (name == null || name.trim().isEmpty()) {
+                name = "user#" + id;
+            }
+            return new AuditActor("master-user", id, name);
+        } catch (Exception ex) {
+            return AuditActor.unknownMaster();
+        }
+    }
+
+    private String normalizeAuthorizationToken(String token) {
+        if (token == null) {
+            return null;
+        }
+        String trimmed = token.trim();
+        if (trimmed.toLowerCase().startsWith("bearer ")) {
+            return trimmed.substring(7).trim();
+        }
+        return trimmed;
+    }
+
+    private boolean isDangerAuditTask(DeployTask task) {
+        return task != null
+                && runtimeProviderService != null
+                && "agent-maintenance".equals(task.getProtocol())
+                && runtimeProviderService.isDangerAgentMaintenanceAction(task.getAction());
+    }
+
+    private Map<String, Object> taskDetail(DeployTask task, String phase) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        if (task == null) {
+            return detail;
+        }
+        detail.put("phase", phase);
+        detail.put("taskId", task.getId());
+        detail.put("serverId", task.getServerId());
+        detail.put("serverName", task.getServerName());
+        detail.put("protocol", task.getProtocol());
+        detail.put("action", task.getAction());
+        detail.put("state", task.getState());
+        detail.put("danger", isDangerAuditTask(task));
+        return detail;
+    }
+
+    private String safeProtocol(String protocol) {
+        return protocol == null || protocol.trim().isEmpty() ? "unknown" : protocol.trim().toLowerCase();
+    }
+
+    private static class AuditActor {
+        private final String type;
+        private final String id;
+        private final String name;
+
+        private AuditActor(String type, String id, String name) {
+            this.type = type;
+            this.id = id;
+            this.name = name;
+        }
+
+        private static AuditActor unknownMaster() {
+            return new AuditActor("master-unknown", "unknown", "Unknown master user");
+        }
+    }
+
+    private Map<String, Object> agentReportDetail(DeployTask task, AgentTaskReportDto dto, String state, String resultJson) {
+        Map<String, Object> detail = taskDetail(task, "reported");
+        detail.put("reportedState", state);
+        detail.put("exitCode", dto.getExitCode());
+        detail.put("stdoutLength", dto.getStdout() == null ? 0 : dto.getStdout().length());
+        detail.put("stderrLength", dto.getStderr() == null ? 0 : dto.getStderr().length());
+        detail.put("resultJsonLength", resultJson == null ? 0 : resultJson.length());
+        return detail;
+    }
+
     @Override
     public R deleteTask(Long id) {
-        if (this.getById(id) == null) {
+        DeployTask exists = this.getById(id);
+        if (exists == null) {
             return R.err("deploy task not found");
         }
-        return this.removeById(id) ? R.ok("deploy task deleted") : R.err("deploy task delete failed");
+        runtimeProviderService.applyToTask(exists);
+        boolean deleted = this.removeById(id);
+        if (deleted) {
+            auditMasterTaskEvent("deploy_task.deleted", exists,
+                    "deleted", "Deleted deploy task #" + exists.getId(), taskDetail(exists, "deleted"));
+        }
+        return deleted ? R.ok("deploy task deleted") : R.err("deploy task delete failed");
     }
 
     private ControlServer validateAgent(Long serverId, String token) {

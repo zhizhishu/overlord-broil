@@ -38,6 +38,7 @@ This release moves the project from the first public production milestone into a
 - Future branch update: firewall Runtime Provider actions now include executable `open-runtime-ports` and `close-runtime-ports` tasks, parsing task ports and applying local `ufw`, `firewalld` or `iptables` rules before returning diagnostics.
 - Future branch update: added optional SQLite master mode through `FLUX_DB_MODE=sqlite`, `application-sqlite.yml`, an embedded SQLite schema, `docker-compose.sqlite.yml`, installer backup/restore awareness and CI/release smoke coverage. MySQL remains the default production path.
 - Future branch update: hardened the task engine with atomic agent task claiming, dangerous `agent-maintenance` confirmation checks and richer Runtime State trace fields (`sourceTaskId`, `serverId`, `resourceType`, `resourceId`, `danger`).
+- Future branch update: added `operation_audit_log` plus a control-center Operation Audit panel. Deploy/orchestration task creation, rejection, manual state update, retry/delete, agent task claim and agent task report events now record actor, server, provider, action, outcome and dangerous-action markers.
 
 ### 0.6.0 Capability Matrix
 
@@ -54,6 +55,7 @@ This release moves the project from the first public production milestone into a
 | Legacy forwarding UI | Future branch translates the main forwarding workflows through the shared `zh-CN` / `en-US` dictionary and unifies empty/failure/status wording. |
 | Nano controlled hosts | Agent heartbeat reports total memory; the master badges low-memory servers and keeps sub-200 MB hosts on Snell or remote-forwarding paths. |
 | Runtime Provider / Runtime State audit | Task claim/report results carry provider metadata and normalized runtime state for `xui`, `snell`, `forward`, `certificate` and `firewall`, giving the master a stable audit trail across agent versions. |
+| Operation audit log | Master task creation, orchestration task creation, rejection, manual state updates, retries, deletes, agent claims and agent reports are persisted in `operation_audit_log` and shown in the control center. |
 | State Sync overview | `/api/v1/deploy-task/runtime-state/overview` aggregates latest runtime states plus heartbeat fields into a server-by-provider operations panel. |
 | State Sync actions | Runtime rows can generate provider-aware diagnostics and XUI/Snell repairs as normal `agent-maintenance` tasks for the controlled agent. |
 | Runtime Provider Action Catalog | Provider descriptors register maintenance action labels, categories, danger flags and State Sync visibility; backend validation and master UI buttons reuse that catalog. |
@@ -71,7 +73,7 @@ This release moves the project from the first public production milestone into a
 - The included 3x-ui fixture is API-level. A real 3x-ui E2E harness now exists, but a `1.0` claim still needs recorded runs against real container/VPS targets with endpoint secrets configured.
 - Snell is unified at the product/control-plane layer. It remains a separate runtime service managed by the Flux agent rather than a native Xray protocol inside 3x-ui.
 - Nano detection is a protection layer, not a promise that 3x-ui/Xray will run well on tiny hardware. Sub-200 MB hosts should be treated as Snell or forwarding nodes unless swap and real-host testing prove otherwise.
-- Enterprise-grade governance is still future work: RBAC, full audit log views, key-rotation migration, agent token expiry/revocation and dangerous-operation confirmation.
+- Enterprise-grade governance is still future work: RBAC, audit retention/export, key-rotation migration, agent token expiry/revocation and broader dangerous-operation policy.
 
 ## 0.5.0 - production-ready public milestone
 

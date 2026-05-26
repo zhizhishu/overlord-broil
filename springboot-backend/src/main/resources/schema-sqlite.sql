@@ -190,6 +190,33 @@ CREATE INDEX IF NOT EXISTS idx_monitor_alert_alert_type ON monitor_alert (alert_
 CREATE INDEX IF NOT EXISTS idx_monitor_alert_acknowledged ON monitor_alert (acknowledged);
 CREATE INDEX IF NOT EXISTS idx_monitor_alert_last_seen_at ON monitor_alert (last_seen_at);
 
+CREATE TABLE IF NOT EXISTS operation_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor_type TEXT NOT NULL,
+  actor_id TEXT,
+  actor_name TEXT,
+  event_type TEXT NOT NULL,
+  resource_type TEXT,
+  resource_id TEXT,
+  server_id INTEGER,
+  server_name TEXT,
+  provider_key TEXT,
+  action TEXT,
+  danger INTEGER NOT NULL DEFAULT 0,
+  outcome TEXT NOT NULL,
+  summary TEXT,
+  detail_json TEXT,
+  created_time INTEGER NOT NULL,
+  updated_time INTEGER,
+  status INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_operation_audit_server_id ON operation_audit_log (server_id);
+CREATE INDEX IF NOT EXISTS idx_operation_audit_event_type ON operation_audit_log (event_type);
+CREATE INDEX IF NOT EXISTS idx_operation_audit_provider_key ON operation_audit_log (provider_key);
+CREATE INDEX IF NOT EXISTS idx_operation_audit_outcome ON operation_audit_log (outcome);
+CREATE INDEX IF NOT EXISTS idx_operation_audit_created_time ON operation_audit_log (created_time);
+
 CREATE TABLE IF NOT EXISTS three_xui_traffic_snapshot (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   server_id INTEGER NOT NULL,

@@ -4,10 +4,13 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.admin.common.dto.DeployTaskDto;
+import com.admin.common.dto.AgentTaskReportDto;
 import com.admin.entity.ControlServer;
 import com.admin.entity.DeployTask;
 import com.admin.entity.ProtocolProfile;
+import com.admin.runtime.RuntimeProviderAssignment;
 import com.admin.runtime.RuntimeProviderService;
+import com.admin.service.OperationAuditLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -23,6 +26,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class DeployTaskServiceImplTest {
 
@@ -401,6 +409,86 @@ class DeployTaskServiceImplTest {
         dto.setRequestJson("{\"dangerConfirmed\":true,\"confirmAction\":\"close-runtime-ports\",\"ports\":[{\"port\":443,\"protocol\":\"tcp\"}]}");
 
         assertNull(ReflectionTestUtils.invokeMethod(service, "validateDeployTask", dto, null, "agent-maintenance"));
+    }
+
+    @Test
+    void auditTaskEventUsesRuntimeProviderAndDangerFlag() {
+        OperationAuditLogService auditLogService = mock(OperationAuditLogService.class);
+        ReflectionTestUtils.setField(service, "operationAuditLogService", auditLogService);
+
+        DeployTask task = new DeployTask();
+        task.setId(99L);
+        task.setServerId(7L);
+        task.setServerName("edge-firewall");
+        task.setProtocol("agent-maintenance");
+        task.setAction("close-runtime-ports");
+
+        ReflectionTestUtils.invokeMethod(service, "auditTaskEvent",
+                "agent_task.claimed", "agent", "7", "edge-firewall", task,
+                "claimed", "Agent claimed task #99", new LinkedHashMap<>());
+
+        verify(auditLogService).recordTaskEvent(
+                eq("agent_task.claimed"),
+                eq("agent"),
+                eq("7"),
+                eq("edge-firewall"),
+                eq(task),
+                any(RuntimeProviderAssignment.class),
+                eq(true),
+                eq("claimed"),
+                eq("Agent claimed task #99"),
+                anyMap());
+    }
+
+    @Test
+    void masterAuditFallsBackToUnknownActorWithoutRequestContext() {
+        OperationAuditLogService auditLogService = mock(OperationAuditLogService.class);
+        ReflectionTestUtils.setField(service, "operationAuditLogService", auditLogService);
+
+        DeployTask task = new DeployTask();
+        task.setId(99L);
+        task.setServerId(7L);
+        task.setServerName("edge-snell");
+        task.setProtocol("snell");
+        task.setAction("present");
+
+        ReflectionTestUtils.invokeMethod(service, "auditMasterTaskEvent",
+                "deploy_task.created", task, "requested", "Created deploy task #99", new LinkedHashMap<>());
+
+        verify(auditLogService).recordTaskEvent(
+                eq("deploy_task.created"),
+                eq("master-unknown"),
+                eq("unknown"),
+                eq("Unknown master user"),
+                eq(task),
+                any(RuntimeProviderAssignment.class),
+                eq(false),
+                eq("requested"),
+                eq("Created deploy task #99"),
+                anyMap());
+    }
+
+    @Test
+    void agentReportAuditDetailStoresLengthsInsteadOfRawLogs() {
+        DeployTask task = new DeployTask();
+        task.setId(99L);
+        task.setProtocol("snell");
+        task.setAction("present");
+
+        AgentTaskReportDto dto = new AgentTaskReportDto();
+        dto.setExitCode(1);
+        dto.setStdout("stdout-secret");
+        dto.setStderr("stderr-secret");
+
+        Map<String, Object> detail = ReflectionTestUtils.invokeMethod(service,
+                "agentReportDetail", task, dto, "failed", "{\"ok\":false}");
+
+        assertNotNull(detail);
+        assertEquals(13, detail.get("stdoutLength"));
+        assertEquals(13, detail.get("stderrLength"));
+        assertEquals(12, detail.get("resultJsonLength"));
+        assertTrue(!detail.containsValue("stdout-secret"));
+        assertTrue(!detail.containsValue("stderr-secret"));
     }
 
     @Test

@@ -173,6 +173,8 @@ Dangerous Action Catalog entries require explicit confirmation before they enter
 
 Task claiming is guarded by an atomic state transition: the agent can only move a task from `generated` to `claimed` when the row still belongs to the same server and still has `state=generated`. If another agent loop wins the race, the loser receives no task and polls again instead of executing the same script twice.
 
+Operation audit is written beside the task history. The master records `deploy_task.created`, `deploy_task.orchestrated`, `deploy_task.rejected`, `deploy_task.state_updated`, `deploy_task.retried`, `deploy_task.deleted`, `agent_task.claimed` and `agent_task.reported` events into `operation_audit_log`; the UI reads them from `/api/v1/operation-audit/list`. Master-side events use the current JWT user when a request context exists, and report events store state, exit code and log lengths, not raw stdout/stderr content.
+
 Xray/3x-ui deployment scripts are now executable by the controlled agent. They resolve `XUI_ENDPOINT`, `XUI_BASE_PATH` and `XUI_API_TOKEN` from saved server metadata or local agent environment, call `/panel/api/inbounds/add`, `/panel/api/inbounds/del/{id}` or `/panel/api/server/restartXrayService`, and report inbound metadata through `FLUX_AGENT_RESULT_JSON`. A missing API token should be treated as an operator configuration error unless the target host can read it from `/usr/local/x-ui/x-ui`.
 
 Agent reports are sanitized before task-history storage. Raw installation/orchestration reports may contain new 3x-ui credentials long enough for the master to update encrypted server fields, but stored `resultJson` removes `xuiApiToken`, `xuiPassword`, `xuiTwoFactorCode` and any `serverSecrets` block, replacing them with configured flags where useful.
@@ -211,6 +213,7 @@ Install, certificate and firewall diagnostics write structured `diagnostics.item
 - For ACME HTTP certificate mode, run certificate and firewall diagnostics before retrying. The task card should distinguish DNS, local port `80`, certificate-file state, local firewall rules and cloud security-group exposure.
 - Verify duplicate protocol and forwarding ports before deploying to a shared host.
 - Review task stdout/stderr before retrying failed deployment tasks.
+- Review the Operation Audit panel after orchestration batches to confirm who created tasks, which agent claimed them and whether the final outcome was accepted, failed, timed out or rejected.
 - Review monitor alerts after every orchestration batch; acknowledge only after the remote condition has been checked.
 - Keep GHCR package visibility and tag policy aligned with the public README commands.
 

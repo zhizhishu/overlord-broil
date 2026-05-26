@@ -47,6 +47,7 @@ try:
         "server_forward_rule",
         "deploy_task",
         "monitor_alert",
+        "operation_audit_log",
         "three_xui_traffic_snapshot",
         "speed_limit",
         "statistics_flow",

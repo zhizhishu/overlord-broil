@@ -1,5 +1,16 @@
 # LOG.md
 
+## 2026-05-26
+
+### Operation Audit Log
+
+- 完成：新增主控操作审计日志能力，覆盖 deploy task 创建、编排、拒绝、状态更新、重试、删除、agent claim 和 agent report。
+- 修改：新增 `operation_audit_log` MySQL/SQLite schema、启动自动建表、后端实体/Mapper/Service/Controller、主控任务审计写入、前端 Operation Audit 面板、中英文 README/Operations/Pages/Release Notes 说明。
+- 安全：agent report 审计只记录 stdout/stderr/resultJson 长度，不写入原始日志；master 侧 actor 从 JWT 请求上下文解析，无请求上下文时明确记录为 `master-unknown`。
+- 验证：`bash -n scripts/*.sh`、`bash scripts/test-sqlite-schema.sh`、`git diff --check`、`npm run build` 通过；Docker Maven targeted test `RuntimeProviderServiceTest,DeployTaskServiceImplTest` 通过，25 tests、0 failures。
+- 清理：本轮未启动长期 dev server；Docker Maven 使用 `--rm`，测试容器已退出；保留 Maven 缓存卷 `flux-3xui-m2` 加速后续验证。
+- 后续：提交推送到 `origin/main` 和 `origin/future`，再确认 GitHub Actions、Pages 和 GHCR 镜像成果。
+
 ## 2026-05-25
 
 ### Project Agent Context Bootstrap
