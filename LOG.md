@@ -2,6 +2,29 @@
 
 ## 2026-05-26
 
+### isrco-hk Real Host Migration Smoke
+
+- Completed: verified the public GitHub install path on the real `isrco-hk` host with SQLite master mode and the controlled agent installed on the same server.
+- Fixed: `install-master.sh` now removes the obsolete legacy `gost-mysql` container during SQLite migration while keeping old Docker volumes and install files for manual recovery.
+- Fixed: `overlord-agent.sh` treats empty task claims (`data:null`) as normal idle polls, so the agent no longer logs `claim response did not include a task id` after restart.
+- Cleaned product docs: rewrote `README.zh-CN.md` and `docs/index.html` as valid UTF-8, documented default `5166/tcp` exposure, legacy split-container cleanup and SQLite migration behavior.
+- UI copy: release-readiness text now says to expose `5166` and business ports by default; `6365` is debug-only and must be explicitly exposed.
+- Local validation passed:
+  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh'`
+  - `bash scripts/test-master-port-contract.sh`
+  - `bash scripts/test-agent-mock.sh`
+  - `npm run build`
+  - `git diff --check` with only Windows LF/CRLF warnings.
+- Real-host validation passed:
+  - `overlord-master` is healthy and publishes only `0.0.0.0:5166->5166/tcp` plus IPv6.
+  - `vite-frontend`, `springboot-backend`, `gost-phpmyadmin` and `gost-mysql` are absent.
+  - Local `/flow/test` returns `test`; external `http://82.158.91.116:5166/flow/test` returns `test`; external root returns HTTP `200`.
+  - Listening ports relevant to the product are `5166/tcp` and SSH `22/tcp`; no `80/6365/8066` listener remains.
+  - `overlord-agent.service` is active, the installed agent binary contains `claim_state()`, and journal after the restart has `idle_warning_after_restart=absent`.
+- Pushed: `8c20d3d Tighten real-host install migration` to `origin/main`.
+
+## 2026-05-26
+
 ### Legacy Split Runtime Removal
 
 - 完成：删除旧分体 runtime 产品面，默认发布和安装路径只保留 `overlord-master` 单体主控镜像与当前 `overlord-agent` 被控安装方式。
