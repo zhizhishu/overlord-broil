@@ -67,12 +67,17 @@ Push the project toward the pre-1.0 goals requested by the user:
   - `docs/assets/actual-orchestrator-top.png`
   - `docs/assets/actual-orchestrator-full.png`
 - README, Chinese README, GitHub Pages and release notes now reference the live UI screenshots.
+- Real 3x-ui write validation is complete on `isrco-hk`:
+  - started a temporary `ghcr.io/mhsanaei/3x-ui:latest` (`3x-ui 3.1.0`) container on the `overlord-network`.
+  - direct `scripts/test-three-xui-e2e.sh` created, toggled and deleted temporary inbound port `42123`.
+  - Overlord master API created, toggled and deleted temporary inbound port `42124`.
+  - temporary 3x-ui container, API token file and test data were removed after validation.
 
 ## Remaining
 
-1. Commit and push the screenshot/docs follow-up to `origin/main` and `origin/future`.
+1. Commit and push the real 3x-ui E2E compatibility fix plus validation notes to `origin/main` and `origin/future`.
 2. Confirm GitHub Actions and Pages after push.
-3. Real 3x-ui write E2E still needs a safe real endpoint/token. Fixture E2E remains the current local proof.
+3. Broaden real VPS matrix beyond the current `isrco-hk` host before any `1.0` claim.
 
 ## Risks
 

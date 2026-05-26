@@ -175,6 +175,8 @@ bash scripts/test-compose-smoke.sh --compose-file docker-compose.sqlite.yml --bu
 
 真实 3x-ui 合同烟测是可选项; 没有配置真实地址和 API token 时会自动跳过.
 
+真实验证记录: `isrco-hk` 上的 `ghcr.io/mhsanaei/3x-ui:latest` (`3x-ui 3.1.0`) 已通过直连 3x-ui E2E 写入合同, 也通过 Overlord 主控 API 的 inbound 新增 / 启停 / 删除链路. 临时端口 `42123` 和 `42124` 已清理.
+
 Snell 真机 smoke 会登录主控, 创建临时 Snell 协议节点, 触发被控 Agent 执行, 验证服务和端口, 然后默认删除测试节点. 删除阶段也会确认服务已停止, 监听端口已关闭, 协议节点不再处于 active 状态:
 
 ```bash
@@ -184,7 +186,7 @@ OB_MASTER_URL="http://127.0.0.1:5166" OB_SNELL_PORT=18390 bash scripts/test-snel
 ## 仍未到 1.0 的部分
 
 - 还需要真实 VPS 矩阵: Debian, Ubuntu, Rocky, Oracle Linux, Alpine.
-- 还需要记录真实 3x-ui 容器或 VPS 的端到端测试结果.
+- 还需要把当前 `isrco-hk` 真实 3x-ui 容器验证扩展到更多 VPS / 云厂商目标.
 - 证书, 防火墙和云安全组诊断还可以继续加强.
 - RBAC, 审计导出, Agent token 过期 / 吊销, 密钥轮换迁移仍是后续工作.
 - 移动端, 加载态, 失败态和任务详情还可以继续打磨.

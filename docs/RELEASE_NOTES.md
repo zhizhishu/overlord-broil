@@ -44,6 +44,7 @@ This release moves the project from the first public production milestone into a
 - Future branch update: hardened Snell cleanup and failure feedback. Snell delete tasks now verify service shutdown and closed listen ports before reporting success, failed/timeout Snell tasks update protocol-node state and `lastError`, and the live Snell smoke script verifies cleanup after temporary-node deletion.
 - Future branch update: aligned the source default server port with the single master entry (`5166`) and extended in-app confirmation to destructive/restart/save flows outside the agent-maintenance catalog.
 - Future branch update: captured live `isrco-hk` screenshots for the login page and master control center after redeploying the latest single-container SQLite master.
+- Future branch update: real 3x-ui E2E now accepts newer 3x-ui status responses with `obj: null`; `isrco-hk` passed direct `3x-ui 3.1.0` inbound add/toggle/delete and Overlord master API add/toggle/delete against a temporary 3x-ui container.
 
 ### 0.6.0 Capability Matrix
 
@@ -68,14 +69,14 @@ This release moves the project from the first public production milestone into a
 | Remote runtime logs | `agent-maintenance logs` reports structured `logs.items` for Overlord agent, x-ui/Xray, Snell, forwarding and task logs, with task-card summaries in the master UI. |
 | Master port contract | Default compose files publish only one host port for `overlord-master`; installer upgrades remove legacy split containers so old `80/6365/8066` mappings do not remain, and SQLite migration stops obsolete `gost-mysql` without deleting its volumes. |
 | Linux coverage | Docker/CI diagnostics cover Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux userspaces. |
-| 3x-ui | API fixture remains API-level; optional real 3x-ui contract smoke can run from local env or manual GitHub workflow; full install/configure still targets systemd hosts. |
+| 3x-ui | API fixture remains in CI, and `isrco-hk` has a recorded real `3x-ui 3.1.0` container write smoke for direct API plus Overlord master API inbound add/toggle/delete; full install/configure still targets systemd hosts. |
 | Snell | Product-level protocol node with separate systemd/OpenRC runtime, not a native Xray/3x-ui core protocol; live smoke script is available for authorized hosts. |
 | Verification | Shell syntax, agent mock, SQLite schema smoke, 3x-ui fixture, optional real 3x-ui E2E gate, master port contract, frontend build, backend Maven build, install matrix and MySQL/SQLite single-image compose smoke. |
 
 ### Honest Boundaries
 
 - The Linux matrix in this release is Docker/CI preflight coverage. It is not yet the full real-VPS matrix with public DNS, cloud firewall, ACME HTTP validation and real service managers.
-- The included 3x-ui fixture is API-level. A real 3x-ui E2E harness now exists, but a `1.0` claim still needs recorded runs against real container/VPS targets with endpoint secrets configured.
+- The included 3x-ui fixture is API-level. One real `isrco-hk` container write smoke is now recorded, but a `1.0` claim still needs a broader VPS/provider matrix with endpoint secrets configured.
 - Snell is unified at the product/control-plane layer. It remains a separate runtime service managed by the Overlord agent rather than a native Xray protocol inside 3x-ui.
 - Nano detection is a protection layer, not a promise that 3x-ui/Xray will run well on tiny hardware. Sub-200 MB hosts should be treated as Snell or forwarding nodes unless swap and real-host testing prove otherwise.
 - Enterprise-grade governance is still future work: RBAC, audit retention/export, key-rotation migration, agent token expiry/revocation and broader dangerous-operation policy.

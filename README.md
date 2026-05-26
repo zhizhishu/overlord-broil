@@ -339,6 +339,8 @@ To create, toggle and delete a temporary VLESS inbound on the real 3x-ui host, o
 THREE_XUI_E2E_WRITE=1 THREE_XUI_E2E_PORT=42123 bash scripts/test-three-xui-e2e.sh
 ```
 
+Live validation note: on `isrco-hk`, `ghcr.io/mhsanaei/3x-ui:latest` (`3x-ui 3.1.0`) passed the direct real 3x-ui E2E write contract and the Overlord master API inbound add/toggle/delete path. The temporary ports `42123` and `42124` were cleaned after the run.
+
 Real Snell smoke runs against a live master/agent host. It logs in to the master, creates a temporary Snell protocol node, lets the controlled agent claim the task, checks the service and listen port, then deletes the temporary node by default. The delete phase also verifies that the service is inactive, the listen port is closed and the protocol-node state is no longer active:
 
 ```bash
@@ -348,7 +350,7 @@ OB_MASTER_URL="http://127.0.0.1:5166" OB_SNELL_PORT=18390 bash scripts/test-snel
 ## Remaining Work Before 1.0
 
 - Real VPS matrix: Debian, Ubuntu, Rocky Linux, Oracle Linux and Alpine.
-- Run and record real 3x-ui container or VPS end-to-end smoke results through `scripts/test-three-xui-e2e.sh`.
+- Extend the recorded real 3x-ui E2E beyond the current `isrco-hk` container run to more VPS/provider targets.
 - Better certificate, firewall and cloud-security-group diagnostics.
 - RBAC, audit retention/export, agent token expiry/revocation and key-rotation migration.
 - Mobile layout, loading/error states and task-detail polish.

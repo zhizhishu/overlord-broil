@@ -2,6 +2,16 @@
 
 ## 2026-05-26
 
+### Real 3x-ui Container And Master API E2E
+
+- Found: official `ghcr.io/mhsanaei/3x-ui:latest` (`3x-ui 3.1.0`) can return `success=true` with `obj=null` from `/panel/api/server/status`, while the existing real E2E script required `obj` to be a JSON object.
+- Fixed: `scripts/test-three-xui-e2e.sh` now accepts newer 3x-ui status envelopes as long as the `obj` key is present.
+- Completed: on `isrco-hk`, started a temporary 3x-ui container on `overlord-network`, generated a temporary API token, and ran direct real 3x-ui E2E write mode.
+- Completed: direct E2E created, toggled and deleted a temporary VLESS inbound on port `42123`; DB verification confirmed `inbound_port_42123_count=0`.
+- Completed: Overlord master API used the same temporary real 3x-ui instance to test `/api/v1/three-xui/test`, inbound list, add, set-enable false/true and delete on temporary port `42124`.
+- Cleanup: restored the server's original 3x-ui fields, removed the temporary 3x-ui container, deleted `/tmp/ob-3xui-e2e`, and verified only SSH plus master `5166/tcp` remained listening.
+- Validation: `bash -n scripts/test-three-xui-e2e.sh` and `bash scripts/test-three-xui-fixture.sh` passed after the compatibility fix.
+
 ### Live UI Evidence And Screenshot Capture
 
 - Completed: verified the live `isrco-hk` master UI after redeploying `ghcr.io/zhizhishu/overlord-broil:latest` in SQLite single-container mode.

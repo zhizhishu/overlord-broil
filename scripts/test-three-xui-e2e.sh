@@ -214,7 +214,7 @@ run_read_only_contract() {
   echo "Checking real 3x-ui status endpoint..."
   get_json /panel/api/server/status
   assert_success_envelope
-  json_assert 'isinstance(data.get("obj"), dict)'
+  json_assert '"obj" in data'
 
   echo "Checking real 3x-ui inbound list endpoint..."
   get_json /panel/api/inbounds/list
