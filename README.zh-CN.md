@@ -54,6 +54,12 @@ State Sync 面板现在也可以直接发起 Runtime Provider 运维任务。运
 
 Runtime Provider 描述现在包含 `agent-maintenance` Action Catalog。后端从这份 catalog 校验维护动作，主控 UI 的 State Sync 行动作和服务器卡片 Agent 按钮也从同一份元数据派生，不再各自维护硬编码按钮列表。
 
+Xray / 3x-ui 编排任务现在生成的是 Agent 可执行脚本，而不是占位 payload。被控 Agent 会解析本机或服务器卡片里保存的 3x-ui endpoint/token，调用 3x-ui inbound API 创建 / 删除协议节点，也可以重启 Xray，并通过 `FLUX_AGENT_RESULT_JSON` 把 inbound 元数据回报给主控。
+
+Agent 任务历史会在落库前脱敏 3x-ui 密钥。安装 / 编排回报仍然可以更新服务器卡片里的加密凭据，但保存到 `resultJson` 的只会是 configured 标记，不会保留 API token、密码或 2FA 明文。
+
+防火墙维护也进入同一份 provider 契约。`open-runtime-ports` 和 `close-runtime-ports` 会从任务 `requestJson` 里解析运行时端口，在目标机器上尽量应用 `ufw`、`firewalld` 或 `iptables` 规则，然后回传结构化诊断结果。云厂商安全组仍然需要运维人员确认。
+
 远端日志采集也复用同一条 `agent-maintenance` 链路。`logs` 动作会结构化返回 `logs.items`，覆盖 Flux agent 运行器、x-ui/Xray 服务、Snell 节点服务、转发/任务日志和相关服务管理器；主控任务卡会先展示一段远端日志摘要，运维人员再按需打开原始输出。
 
 Agent 升级也走同一条被控任务闭环：Agent 支持 `--version`，升级任务会先下载到临时文件、校验 Bash 语法、计算 SHA-256、备份旧二进制、安装新文件、计划重启服务，并把版本、校验、备份和重启状态写入结构化 `maintenance.upgrade`，主控任务卡可以直接查看。

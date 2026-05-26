@@ -234,3 +234,24 @@
   - `bash scripts/release-check.sh` 通过。
 - 清理：Agent mock 临时目录已清理；3x-ui fixture 临时 inbound 已删除；Docker Maven 和 Docker Node 验证容器均使用 `--rm`，未保留容器或端口监听。
 - 后续：提交推送到 `origin/main` 和 `origin/future`，确认 GitHub Actions、Pages 和 GHCR 镜像成果。
+
+### Xray Agent Execution And Firewall Runtime Ports
+
+- 完成：把 Runtime Provider 继续从“可见/可审计”推进到“可执行”，补齐 Xray/3x-ui inbound 编排和 firewall runtime port open/close 的 Agent 执行闭环。
+- 修改：
+  - `DeployTaskServiceImpl.buildXrayAgentPayload` 不再只输出占位 payload，而是生成 Agent 可执行脚本，解析 3x-ui endpoint/base path/token，调用 inbound add/delete 或 restart Xray API，并通过 `FLUX_AGENT_RESULT_JSON` 回传 inbound metadata。
+  - Xray agent 结果已做 token 脱敏：执行脚本可以使用 3x-ui API token，但回报 JSON 只包含 `tokenConfigured`，不保存 token 明文。
+  - `RuntimeProviderService` 将 `open-runtime-ports` 和 `close-runtime-ports` 注册为 firewall provider action，并让 runtime-port 类维护动作解析到 `firewall`。
+  - `agent-maintenance` 脚本新增 runtime port 解析和本机 firewall 执行逻辑，支持 `ufw`、active `firewalld` 和 `iptables`，执行后继续输出结构化诊断。
+  - 后端测试新增生成脚本 `bash -n` 校验，避免 Java text block / shell 拼接错误。
+  - README、中文 README、Operations、Release Notes、GitHub Pages 和 PROJECT_CONTEXT 已同步说明这两条执行能力。
+- 验证：
+  - Docker Maven clean test：`RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 19 个测试成功。
+  - `bash -n scripts/*.sh` 通过。
+  - `sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh` 通过。
+  - `bash scripts/test-flux-agent-mock.sh` 通过。
+  - `bash scripts/test-three-xui-fixture.sh` 通过，完成 3x-ui fixture 状态、入站、Xray config、临时 inbound 创建/切换/删除。
+  - `bash scripts/release-check.sh` 通过，覆盖 shell、agent mock、3x-ui fixture + E2E fixture 反打、可选真实 E2E skip、compose config、master port contract、Docker Node 22 前端 build、compose dry-run 和 `git diff --check`。
+  - Agent 任务结果脱敏修正后，Docker Maven targeted test：`RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 20 个测试成功。
+- 清理：Docker Maven 容器 `flux-runtime-provider-clean-test`、`flux-runtime-provider-ret-test` 和 `flux-runtime-provider-sanitize-test` 均使用 `--rm` 并已退出；release-check 使用的 Docker Node 22 容器、agent mock 和 3x-ui fixture 的临时目录、临时服务和临时 inbound 已清理；未保留本轮端口监听。
+- 后续：提交推送到 `origin/main` 和 `origin/future`，确认 GitHub Actions、Pages 和 GHCR 镜像成果。

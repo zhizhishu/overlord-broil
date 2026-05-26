@@ -35,6 +35,14 @@ class RuntimeProviderServiceTest {
                 "repair-snell".equals(action.getKey())
                         && "repair".equals(action.getCategory())
                         && "agent-maintenance".equals(action.getProtocol())));
+        RuntimeProviderDescriptor firewall = service.getProvider("firewall");
+        assertTrue(firewall.getActionCatalog().stream().anyMatch(action ->
+                "open-runtime-ports".equals(action.getKey())
+                        && "repair".equals(action.getCategory())
+                        && action.isStateSync()));
+        assertTrue(firewall.getActionCatalog().stream().anyMatch(action ->
+                "close-runtime-ports".equals(action.getKey())
+                        && action.isDanger()));
     }
 
     @Test
@@ -42,8 +50,10 @@ class RuntimeProviderServiceTest {
         assertTrue(service.isAllowedAgentMaintenanceAction("doctor"));
         assertTrue(service.isAllowedAgentMaintenanceAction("repair-snell"));
         assertTrue(service.isAllowedAgentMaintenanceAction("firewall-diagnose"));
+        assertTrue(service.isAllowedAgentMaintenanceAction("open-runtime-ports"));
+        assertTrue(service.isAllowedAgentMaintenanceAction("close-runtime-ports"));
         assertTrue(service.isAllowedAgentMaintenanceAction(null));
-        assertEquals(13, service.listAgentMaintenanceActions().size());
+        assertEquals(15, service.listAgentMaintenanceActions().size());
     }
 
     @Test
@@ -53,6 +63,7 @@ class RuntimeProviderServiceTest {
         assertEquals("forward", service.assign("server-forward", "restart").getKey());
         assertEquals("certificate", service.assign("agent-maintenance", "cert-diagnose").getKey());
         assertEquals("firewall", service.assign("agent-maintenance", "firewall-diagnose").getKey());
+        assertEquals("firewall", service.assign("agent-maintenance", "open-runtime-ports").getKey());
         assertEquals("snell", service.assign("agent-maintenance", "repair-snell").getKey());
         assertEquals("xui", service.assign("agent-maintenance", "repair-xray").getKey());
     }

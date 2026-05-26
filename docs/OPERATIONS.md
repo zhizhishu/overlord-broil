@@ -143,11 +143,11 @@ Deployment tasks carry Runtime Provider metadata so operators can see which runt
 
 | Provider | Runtime boundary | Operational note |
 | --- | --- | --- |
-| `xui` | 3x-ui, Xray, Reality, inbounds, outbounds and traffic | Uses master-side 3x-ui API calls plus agent tasks for install/orchestration; avoid full orchestration on sub-200 MB hosts. |
+| `xui` | 3x-ui, Xray, Reality, inbounds, outbounds and traffic | Uses master-side 3x-ui API calls plus agent-executed inbound add/delete/restart tasks; avoid full orchestration on sub-200 MB hosts. |
 | `snell` | Snell node services | Runs through agent-created systemd/OpenRC services and is the preferred proxy runtime for Nano hosts. |
 | `forward` | Remote TCP/UDP forwarding | Runs through agent-created `socat` services and stays visible in the unified rule center. |
 | `certificate` | Self-signed, ACME and certificate diagnostics | ACME HTTP mode needs DNS and `80/tcp`; diagnose before retrying failed issuance. |
-| `firewall` | Runtime port diagnostics and opening | Reports local firewall state; cloud security groups still need manual confirmation. |
+| `firewall` | Runtime port diagnostics, opening and closing | Applies local `ufw`, `firewalld` or `iptables` runtime-port changes when requested; cloud security groups still need manual confirmation. |
 
 Failed or timed-out deployment tasks should be retried from the task card rather than edited in place. The retry endpoint creates a new `generated` task with the same script, stores `retryFromTaskId` in `request_json`, and reattaches Runtime Provider metadata so the original stdout/stderr remains auditable.
 
@@ -158,6 +158,12 @@ The State Sync overview endpoint, `/api/v1/deploy-task/runtime-state/overview`, 
 State Sync row actions reuse the existing `agent-maintenance` task path instead of introducing a second executor. The runtime doctor button maps the provider to the most relevant diagnostic action (`install-diagnose`, `cert-diagnose`, `firewall-diagnose` or `doctor`), while XUI/Snell repair buttons generate `repair-xui`, `repair-xray` or `repair-snell` tasks with the source runtime metadata preserved in `request_json`.
 
 Runtime Provider descriptors expose an Action Catalog for these `agent-maintenance` operations. Treat that catalog as the supported action contract: backend validation, State Sync row shortcuts and server-card Agent buttons should all derive from it so new provider actions have a single auditable registration point.
+
+Xray/3x-ui deployment scripts are now executable by the controlled agent. They resolve `XUI_ENDPOINT`, `XUI_BASE_PATH` and `XUI_API_TOKEN` from saved server metadata or local agent environment, call `/panel/api/inbounds/add`, `/panel/api/inbounds/del/{id}` or `/panel/api/server/restartXrayService`, and report inbound metadata through `FLUX_AGENT_RESULT_JSON`. A missing API token should be treated as an operator configuration error unless the target host can read it from `/usr/local/x-ui/x-ui`.
+
+Agent reports are sanitized before task-history storage. Raw installation/orchestration reports may contain new 3x-ui credentials long enough for the master to update encrypted server fields, but stored `resultJson` removes `xuiApiToken`, `xuiPassword`, `xuiTwoFactorCode` and any `serverSecrets` block, replacing them with configured flags where useful.
+
+Firewall actions `open-runtime-ports` and `close-runtime-ports` parse `ports`, `runtimePorts`, `listenPort`, `panelPort`, protocol-specific ports and `acme-http` mode from `request_json`. The generated agent script applies local firewall rules through `ufw`, active `firewalld`, or `iptables`, then runs firewall diagnostics again. Local success still does not prove that the cloud security group permits the port.
 
 Install, certificate and firewall diagnostics write structured `diagnostics.items` into the task result. The master task card summarizes high-risk findings first: unresolved DNS, local port `80` occupancy, missing certificate files, missing ACME tooling, local firewall command availability and the cloud-security-group boundary.
 

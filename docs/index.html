@@ -98,7 +98,7 @@ sudo -E /usr/local/bin/flux-agent.sh --doctor</code></pre>
       <section id="workspace" class="section">
         <div class="section-header">
           <h2>主控一键编排闭环已经打通</h2>
-          <p>当前版本能多选服务器生成编排任务，由副控 agent 自动领取执行；完成后把 3x-ui 连接信息、Xray inbound/outbound、Snell 节点、远端端口转发、证书、服务状态和流量快照回写到主控。主控中心新增首次配置向导，把登记服务器、安装 agent、编排 3x-ui/Snell、同步规则和发布前防火墙检查串成一条路径。完整 3x-ui 安装编排要求 systemd 主机；Alpine/OpenRC 用于 agent、Snell 和转发任务。</p>
+          <p>当前版本能多选服务器生成编排任务，由副控 agent 自动领取执行；完成后把 3x-ui 连接信息、Xray inbound/outbound、Snell 节点、远端端口转发、证书、服务状态和流量快照回写到主控。Xray/3x-ui 节点任务已经可以由 agent 调用 inbound API 执行，防火墙运行时端口也能通过 agent 尝试放行或关闭。完整 3x-ui 安装编排要求 systemd 主机；Alpine/OpenRC 用于 agent、Snell 和转发任务。</p>
         </div>
         <div class="metric-row" aria-label="Current release metrics">
           <div class="metric">
@@ -136,7 +136,7 @@ sudo -E /usr/local/bin/flux-agent.sh --doctor</code></pre>
           </article>
           <article class="card">
             <h3>3x-ui Proxy</h3>
-            <p>通过 Bearer token 操作 `/panel/api/inbounds/*`，读取 Xray config/outbounds，并可请求远端 Xray 重启。</p>
+            <p>通过 Bearer token 操作 `/panel/api/inbounds/*`，读取 Xray config/outbounds；agent 任务也能创建、删除 inbound 或请求远端 Xray 重启。</p>
           </article>
           <article class="card">
             <h3>Server Forward</h3>

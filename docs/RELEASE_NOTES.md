@@ -33,6 +33,9 @@ This release moves the project from the first public production milestone into a
 - Future branch update: hardened `agent-maintenance upgrade-agent`; agent binaries expose `--version`, upgrades validate downloads before install, keep timestamped backups, calculate SHA-256 and report `maintenance.upgrade` metadata back to the master UI.
 - Future branch update: tightened the master single-port contract. The installer now removes legacy split-stack containers (`vite-frontend`, `springboot-backend`, `gost-phpmyadmin`) during install/upgrade, and CI/release checks validate that default compose files publish only the `flux-master` entry.
 - Future branch update: added `scripts/test-three-xui-e2e.sh` plus a manual `Real 3x-ui E2E` GitHub workflow. The gate checks real 3x-ui status, inbound list and Xray config when endpoint/token secrets exist, and can explicitly create/toggle/delete a temporary inbound when write mode is enabled.
+- Future branch update: Xray/3x-ui deployment tasks now produce agent-executable scripts that call the 3x-ui inbound add/delete/restart APIs and report inbound metadata back to the master.
+- Future branch update: agent task results now redact 3x-ui API tokens, passwords, 2FA codes and `serverSecrets` before storing task history, while still allowing encrypted server metadata updates.
+- Future branch update: firewall Runtime Provider actions now include executable `open-runtime-ports` and `close-runtime-ports` tasks, parsing task ports and applying local `ufw`, `firewalld` or `iptables` rules before returning diagnostics.
 
 ### 0.6.0 Capability Matrix
 

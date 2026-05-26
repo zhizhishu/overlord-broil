@@ -6,11 +6,15 @@ import com.alibaba.fastjson2.JSONObject;
 import com.admin.common.dto.DeployTaskDto;
 import com.admin.entity.ControlServer;
 import com.admin.entity.DeployTask;
+import com.admin.entity.ProtocolProfile;
 import com.admin.runtime.RuntimeProviderService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +78,35 @@ class DeployTaskServiceImplTest {
         assertEquals("forward", result.getJSONObject("runtimeProvider").getString("key"));
         assertEquals("forward", result.getJSONObject("runtimeState").getString("providerKey"));
         assertEquals("succeeded", result.getJSONObject("runtimeState").getString("status"));
+    }
+
+    @Test
+    void sanitizesAgentResultSecretsBeforeTaskHistory() {
+        String sanitized = ReflectionTestUtils.invokeMethod(service, "sanitizeAgentResultJson", """
+                {
+                  "server": {
+                    "xuiEndpoint": "http://127.0.0.1:5168",
+                    "xuiApiToken": "token-123",
+                    "xuiPassword": "password-123",
+                    "xuiTwoFactorCode": "654321"
+                  },
+                  "serverSecrets": {
+                    "xuiApiToken": "token-456"
+                  }
+                }
+                """);
+
+        JSONObject result = JSON.parseObject(sanitized);
+        JSONObject server = result.getJSONObject("server");
+
+        assertEquals("http://127.0.0.1:5168", server.getString("xuiEndpoint"));
+        assertNull(server.getString("xuiApiToken"));
+        assertNull(server.getString("xuiPassword"));
+        assertNull(server.getString("xuiTwoFactorCode"));
+        assertTrue(server.getBooleanValue("xuiApiTokenConfigured"));
+        assertTrue(server.getBooleanValue("xuiPasswordConfigured"));
+        assertTrue(server.getBooleanValue("xuiTwoFactorConfigured"));
+        assertNull(result.getJSONObject("serverSecrets"));
     }
 
     @Test
@@ -198,11 +231,96 @@ class DeployTaskServiceImplTest {
     }
 
     @Test
+    void xrayDeployScriptExecutesThroughAgentAndReportsInboundMetadata() throws Exception {
+        DeployTaskDto dto = new DeployTaskDto();
+        dto.setServerId(7L);
+        dto.setProtocol("vmess");
+        dto.setAction("present");
+        dto.setListenPort(2086);
+        dto.setRequestJson("{\"transport\":\"ws\",\"wsPath\":\"/flux\",\"email\":\"client@flux.local\"}");
+
+        ProtocolProfile profile = new ProtocolProfile();
+        profile.setProtocol("vmess");
+        profile.setVersionFamily("xray");
+        profile.setListenPort(2086);
+        profile.setTransport("ws");
+        profile.setConfigJson("{\"network\":\"ws\",\"security\":\"none\"}");
+
+        ControlServer server = new ControlServer();
+        server.setId(7L);
+        server.setName("edge-xray");
+        server.setHost("203.0.113.7");
+        server.setXuiEndpoint("http://127.0.0.1:5168");
+        server.setXuiBasePath("/flux");
+        server.setXuiApiToken("token-123");
+
+        String script = ReflectionTestUtils.invokeMethod(service, "buildXrayAgentPayload", dto, profile, server);
+
+        assertNotNull(script);
+        assertTrue(script.contains("FLUX_XRAY_TASK="));
+        assertTrue(script.contains("XUI_API_TOKEN='token-123'"));
+        assertTrue(script.contains("/panel/api/inbounds/add"));
+        assertTrue(script.contains("FLUX_AGENT_RESULT_JSON="));
+        assertTrue(script.contains("\"inbounds\": []"));
+        assertTrue(script.contains("runtimeState") || script.contains("services"));
+        assertTrue(script.contains("\"tokenConfigured\": bool(token)"));
+        assertTrue(!script.contains("\"xuiApiToken\": token"));
+        assertTrue(!script.contains("next integration step"));
+        assertBashSyntaxValid(script);
+    }
+
+    @Test
+    void agentMaintenanceFirewallScriptIncludesRuntimePortOpenCloseActions() throws Exception {
+        DeployTaskDto dto = new DeployTaskDto();
+        dto.setServerId(7L);
+        dto.setProtocol("agent-maintenance");
+        dto.setAction("open-runtime-ports");
+        dto.setRequestJson("{\"ports\":[{\"port\":443,\"protocol\":\"tcp\"},{\"port\":8390,\"protocol\":\"udp\"}]}");
+
+        ControlServer server = new ControlServer();
+        server.setId(7L);
+        server.setName("edge-firewall");
+        server.setHost("203.0.113.7");
+
+        String script = ReflectionTestUtils.invokeMethod(service, "buildAgentMaintenanceScript", dto, server);
+
+        assertNotNull(script);
+        assertTrue(script.contains("firewall_requested_ports()"));
+        assertTrue(script.contains("manage_firewall_ports open"));
+        assertTrue(script.contains("manage_firewall_ports close"));
+        assertTrue(script.contains("ufw allow"));
+        assertTrue(script.contains("firewall-cmd --permanent --add-port"));
+        assertTrue(script.contains("iptables -I INPUT"));
+        assertTrue(script.contains("firewall_ports_missing"));
+        assertTrue(script.contains("FLUX_AGENT_RESULT_JSON="));
+        assertTrue(script.contains("done <<< \"$ports\""));
+        assertBashSyntaxValid(script);
+    }
+
+    private static void assertBashSyntaxValid(String script) throws Exception {
+        Path scriptFile = Files.createTempFile("flux-generated-", ".sh");
+        try {
+            Files.writeString(scriptFile, script, StandardCharsets.UTF_8);
+            Process process = new ProcessBuilder("bash", "-n", scriptFile.toString())
+                    .redirectErrorStream(true)
+                    .start();
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            int exitCode = process.waitFor();
+            assertEquals(0, exitCode, output);
+        } finally {
+            Files.deleteIfExists(scriptFile);
+        }
+    }
+
+    @Test
     void validatesAgentMaintenanceActionsFromRuntimeProviderCatalog() {
         DeployTaskDto dto = new DeployTaskDto();
         dto.setProtocol("agent-maintenance");
 
         dto.setAction("repair-snell");
+        assertNull(ReflectionTestUtils.invokeMethod(service, "validateDeployTask", dto, null, "agent-maintenance"));
+
+        dto.setAction("open-runtime-ports");
         assertNull(ReflectionTestUtils.invokeMethod(service, "validateDeployTask", dto, null, "agent-maintenance"));
 
         dto.setAction("");

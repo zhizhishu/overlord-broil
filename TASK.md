@@ -56,9 +56,17 @@
 - 本轮已补强 Agent 安全自动升级闭环：`flux-agent.sh --version`、升级前下载/非空/语法校验、SHA-256、旧二进制备份、staged install、重启计划和结构化 `maintenance.upgrade` 回报。
 - 本轮已在主控任务卡增加 Agent 升级摘要面板，展示版本变化、语法校验、安装状态、重启计划、备份路径、SHA-256 和来源 URL。
 - 本轮已同步 README、中文 README、Operations、Release Notes、GitHub Pages 和 PROJECT_CONTEXT，说明 Agent 安全升级生命周期。
+- 已提交并推送 `e3c2eb9 Harden agent upgrade lifecycle` 到 `origin/main` 和 `origin/future`。
+- 已确认 `e3c2eb9` 的 GitHub Actions：main CI、main Docker Images、main Pages、future CI、future Docker Images 均成功。
+- 已确认 GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 更新到 index digest `sha256:ada576e9e50190ede7e7c7c69688a044f28b28dd5cfe805d2f4a114b15aca18e`，linux/amd64 digest `sha256:13919ec75caa05f4e77d3a5651de8a5788b769d37739820fa50b984842f737c3`。
+- 本轮已把 Xray/3x-ui 编排从占位 payload 推进为 Agent 可执行脚本：被控端解析 3x-ui endpoint/base path/token，调用 inbound add/delete 或 restart Xray API，并通过 `FLUX_AGENT_RESULT_JSON` 回传 inbound 元数据。
+- 本轮已修正 Xray agent 回报脱敏：脚本执行仍使用 3x-ui API token，但任务结果只回传 `tokenConfigured`，不把 token 写入 `resultJson`。
+- 本轮已补齐 Firewall Runtime Provider 的执行动作：`open-runtime-ports` / `close-runtime-ports` 可从 `requestJson` 解析运行时端口，尝试应用本机 `ufw`、`firewalld` 或 `iptables` 规则，并回传结构化诊断。
+- 本轮已增强后端测试：生成的 Xray 和 firewall agent 脚本会被写入临时文件并执行 `bash -n`，防止 Java text block / shell 拼接错误。
+- 本轮已同步 README、中文 README、Operations、Release Notes、GitHub Pages 和 PROJECT_CONTEXT，说明 Xray agent 执行和 firewall runtime port open/close 能力。
 
 下一步：
-- 提交并推送本轮 Agent 安全升级闭环，让 GitHub 上保留 Actions/GHCR 结果。
+- 提交并推送本轮 Xray agent 执行和 firewall runtime port 动作，让 GitHub 上保留 Actions/GHCR 结果。
 - 后续在 repo secrets 配置真实 `THREE_XUI_E2E_URL` / `THREE_XUI_E2E_TOKEN` 后，手动运行 `Real 3x-ui E2E` workflow 取得真实 3x-ui 容器或 VPS 证明。
 
 关键文件：
@@ -127,6 +135,13 @@
 - 本轮 Agent 安全升级已通过 Docker Maven：`RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 17 个测试成功。
 - 本轮 Agent 安全升级已通过 `git diff --check`，仅有 Windows LF/CRLF 提示。
 - 本轮 Agent 安全升级已通过 `bash scripts/release-check.sh`，覆盖 shell、agent mock、3x-ui fixture + E2E fixture 反打、可选真实 E2E skip、compose config、master port contract、Docker Node 22 前端 build、compose dry-run 和 `git diff --check`。
+- 本轮 Xray/firewall runtime 执行已通过 Docker Maven clean test：`RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 19 个测试成功。
+- 本轮 Agent 任务结果脱敏修正后已重新通过 Docker Maven targeted test：`RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 20 个测试成功。
+- 本轮 Xray/firewall runtime 执行已通过 `bash -n scripts/*.sh`。
+- 本轮 Xray/firewall runtime 执行已通过 `sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh`。
+- 本轮 Xray/firewall runtime 执行已通过 `bash scripts/test-flux-agent-mock.sh`。
+- 本轮 Xray/firewall runtime 执行已通过 `bash scripts/test-three-xui-fixture.sh`，fixture 完成 3x-ui 状态、入站、Xray config、临时 inbound 创建/切换/删除。
+- 本轮 Xray/firewall runtime 执行已通过 `bash scripts/release-check.sh`，覆盖 shell、agent mock、3x-ui fixture + E2E fixture 反打、可选真实 E2E skip、compose config、master port contract、Docker Node 22 前端 build、compose dry-run 和 `git diff --check`。
 
 风险/待确认：
 - Runtime Provider 已是融合架构关键层；真实 3x-ui E2E harness 已具备，但还需要配置真实 endpoint/token 并跑出实际容器或 VPS 记录，不能把 skip 当真机证明。
@@ -147,9 +162,10 @@
 - 本轮真实 3x-ui E2E fixture 反打启动的本地 Python fixture 随脚本退出清理；临时 inbound 已删除。
 - 本轮 `release-check.sh` 使用 Docker Node 22 容器 `--rm` 运行，未保留容器；复查 `4173/5166/6365/12101` 无本轮端口监听。
 - 本轮远端验证只使用 `gh` 和 Docker imagetools 读取/触发 GitHub Actions 与 GHCR；未启动本地服务、未占用端口、未创建持久容器。
+- 本轮 Xray/firewall runtime 执行使用 Docker Maven 容器 `flux-runtime-provider-clean-test`、`flux-runtime-provider-ret-test` 和 `flux-runtime-provider-sanitize-test`，容器均使用 `--rm` 并已随测试成功退出；release-check 使用的 Docker Node 22 容器、agent mock 和 3x-ui fixture 脚本也已结束并清理临时资源。
 - 本轮保留 Docker Desktop 和 Codex/Cursor/MCP 常驻进程；未关闭归属不明进程。
 
-最后更新：2026-05-25 20:30:36 -07:00
+最后更新：2026-05-25 22:23:36 -07:00
 
 ## Active Tasks
 
@@ -175,7 +191,10 @@
 - [ ] **Goal:** 提交推送并确认真实 3x-ui E2E 远端验证记录的 GitHub Actions / GHCR 成果。
 - [ ] **Goal:** 继续推进正式版缺口：真实 VPS 矩阵、真实 3x-ui endpoint 记录、UI polish、安全治理和 agent 自动升级。
 - [x] **Goal:** 补强 Agent 安全自动升级闭环：版本探测、下载校验、备份、安装、重启计划和结构化结果回报。
-- [ ] **Goal:** 提交推送并确认 Agent 安全升级闭环的 GitHub Actions / Pages / GHCR 镜像成果。
+- [x] **Goal:** 提交推送并确认 Agent 安全升级闭环的 GitHub Actions / Pages / GHCR 镜像成果。
+- [x] **Goal:** Xray/3x-ui 编排任务从占位 payload 推进为 Agent 可执行 inbound add/delete/restart 脚本。
+- [x] **Goal:** Firewall Runtime Provider 增加 `open-runtime-ports` / `close-runtime-ports` 真执行动作和测试覆盖。
+- [ ] **Goal:** 提交推送并确认 Xray agent 执行与 firewall runtime port 动作的 GitHub Actions / Pages / GHCR 镜像成果。
 
 ## Notes For Next Agent
 

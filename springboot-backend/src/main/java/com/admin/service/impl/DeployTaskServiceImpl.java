@@ -666,7 +666,8 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         DeployTask task = new DeployTask();
         task.setId(exists.getId());
         task.setState(state);
-        task.setResultJson(buildAgentResultJson(dto, exists, state));
+        String agentResultJson = buildAgentResultJson(dto, exists, state);
+        task.setResultJson(sanitizeAgentResultJson(agentResultJson));
         task.setUpdatedTime(now);
         if (STATE_RUNNING.equals(state) && exists.getStartedTime() == null) {
             task.setStartedTime(now);
@@ -679,7 +680,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         if (updated) {
             monitorAlertService.handleTaskFailed(exists.getServerId(), exists.getServerName(), exists.getId(),
                     state, task.getResultJson(), now);
-            applyAgentResultMetadata(exists, task.getResultJson(), state);
+            applyAgentResultMetadata(exists, agentResultJson, state);
         }
         return updated ? R.ok("agent task report accepted") : R.err("agent task report failed");
     }
@@ -728,6 +729,32 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             resultJson = JSON.toJSONString(result);
         }
         return attachRuntimeMetadata(resultJson, task, state);
+    }
+
+    private String sanitizeAgentResultJson(String resultJson) {
+        if (resultJson == null || resultJson.trim().isEmpty()) {
+            return resultJson;
+        }
+        try {
+            JSONObject root = JSON.parseObject(resultJson);
+            redactServerSecret(root.getJSONObject("server"), "xuiApiToken", "xuiApiTokenConfigured");
+            redactServerSecret(root.getJSONObject("server"), "xuiPassword", "xuiPasswordConfigured");
+            redactServerSecret(root.getJSONObject("server"), "xuiTwoFactorCode", "xuiTwoFactorConfigured");
+            root.remove("serverSecrets");
+            return JSON.toJSONString(root);
+        } catch (Exception ignored) {
+            return resultJson;
+        }
+    }
+
+    private void redactServerSecret(JSONObject serverMeta, String secretKey, String configuredKey) {
+        if (serverMeta == null || !serverMeta.containsKey(secretKey)) {
+            return;
+        }
+        if (notBlank(serverMeta.getString(secretKey))) {
+            serverMeta.put(configuredKey, true);
+        }
+        serverMeta.remove(secretKey);
     }
 
     private String attachRuntimeMetadata(String resultJson, DeployTask task, String taskState) {
@@ -1035,10 +1062,286 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         String json = JSON.toJSONString(payload);
         return "#!/usr/bin/env bash\n"
                 + "set -euo pipefail\n"
-                + "cat <<'FLUX_XRAY_PAYLOAD'\n"
-                + json + "\n"
-                + "FLUX_XRAY_PAYLOAD\n"
-                + "echo 'Xray/3x-ui agent payload generated. Send it to the flux agent in the next integration step.'\n";
+                + "FLUX_XRAY_TASK='" + escapeShell(json) + "'\n"
+                + "XUI_ENDPOINT='" + escapeShell(server.getXuiEndpoint()) + "'\n"
+                + "XUI_BASE_PATH='" + escapeShell(server.getXuiBasePath()) + "'\n"
+                + "XUI_API_TOKEN='" + escapeShell(decryptSecret(server.getXuiApiToken())) + "'\n"
+                + "XUI_SERVICE_STATUS='unknown'\n\n"
+                + xrayAgentTaskBody();
+    }
+
+    private String decryptSecret(String value) {
+        return secretCryptoUtils == null ? value : secretCryptoUtils.decryptIfNeeded(value);
+    }
+
+    private String xrayAgentTaskBody() {
+        return """
+
+                XUI_ENDPOINT="${FLUX_XUI_ENDPOINT:-$XUI_ENDPOINT}"
+                XUI_BASE_PATH="${FLUX_XUI_BASE_PATH:-$XUI_BASE_PATH}"
+                XUI_API_TOKEN="${FLUX_XUI_API_TOKEN:-$XUI_API_TOKEN}"
+                XUI_PANEL_PORT="${FLUX_XUI_PANEL_PORT:-5168}"
+
+                if [ -z "$XUI_ENDPOINT" ]; then
+                  XUI_ENDPOINT="http://127.0.0.1:${XUI_PANEL_PORT}"
+                fi
+
+                if [ -z "$XUI_API_TOKEN" ] && [ -x /usr/local/x-ui/x-ui ]; then
+                  XUI_API_TOKEN="$(/usr/local/x-ui/x-ui setting -getApiToken true 2>/dev/null | awk '/apiToken:/ {print $2; exit}' || true)"
+                fi
+
+                if [ -z "$XUI_API_TOKEN" ]; then
+                  echo '3x-ui API token is required. Save it on the server card or run this task on a host with /usr/local/x-ui/x-ui.' >&2
+                  exit 1
+                fi
+
+                if command -v systemctl >/dev/null 2>&1; then
+                  XUI_SERVICE_STATUS="$(systemctl is-active x-ui 2>/dev/null || echo unknown)"
+                fi
+
+                export FLUX_XRAY_TASK XUI_ENDPOINT XUI_BASE_PATH XUI_API_TOKEN XUI_SERVICE_STATUS
+                python3 <<'PY'
+                import json
+                import os
+                import ssl
+                import subprocess
+                import time
+                import urllib.parse
+                import urllib.request
+                import uuid
+
+                task = json.loads(os.environ["FLUX_XRAY_TASK"])
+                endpoint = os.environ["XUI_ENDPOINT"].rstrip("/")
+                base_path = (os.environ.get("XUI_BASE_PATH") or "").strip()
+                if base_path and not base_path.startswith("/"):
+                    base_path = "/" + base_path
+                base_path = base_path.rstrip("/")
+                base = endpoint + base_path
+                token = os.environ["XUI_API_TOKEN"]
+                protocol = (task.get("protocol") or "vless").lower()
+                action = (task.get("action") or "present").lower()
+                listen_port = task.get("listenPort")
+                profile = task.get("profile") or {}
+                request = task.get("request") or {}
+
+                def parse_json(value, fallback):
+                    if value is None:
+                        return fallback
+                    if isinstance(value, (dict, list)):
+                        return value
+                    if isinstance(value, str) and value.strip():
+                        try:
+                            return json.loads(value)
+                        except json.JSONDecodeError:
+                            return fallback
+                    return fallback
+
+                request_meta = parse_json(request.get("requestJson"), {})
+                profile_config = parse_json(profile.get("configJson"), {})
+
+                def first(*values):
+                    for value in values:
+                        if value is not None and str(value).strip() != "":
+                            return value
+                    return None
+
+                def as_int(value, fallback):
+                    try:
+                        return int(value)
+                    except (TypeError, ValueError):
+                        return fallback
+
+                def url(path):
+                    return base + path
+
+                def post_form(path, payload):
+                    data = urllib.parse.urlencode(payload).encode()
+                    req = urllib.request.Request(
+                        url(path),
+                        data=data,
+                        headers={
+                            "Authorization": "Bearer " + token,
+                            "Content-Type": "application/x-www-form-urlencoded",
+                        },
+                        method="POST",
+                    )
+                    ctx = ssl._create_unverified_context()
+                    with urllib.request.urlopen(req, context=ctx, timeout=30) as resp:
+                        return resp.read().decode()
+
+                def post_empty(path):
+                    return post_form(path, {})
+
+                def find_xray_private_key():
+                    candidates = [
+                        "/usr/local/x-ui/bin/xray",
+                        "/usr/local/x-ui/bin/xray-linux-amd64",
+                        "/usr/local/x-ui/bin/xray-linux-arm64",
+                    ]
+                    for candidate in candidates:
+                        if not os.path.exists(candidate):
+                            continue
+                        try:
+                            output = subprocess.check_output([candidate, "x25519"], text=True, stderr=subprocess.DEVNULL, timeout=10)
+                        except Exception:
+                            continue
+                        for line in output.splitlines():
+                            if "Private key:" in line:
+                                return line.split("Private key:", 1)[1].strip()
+                    return ""
+
+                def inbound_payload():
+                    direct = request_meta.get("payload") or request_meta.get("inbound") or request_meta.get("inboundPayload")
+                    if isinstance(direct, dict):
+                        return direct
+                    if all(key in request_meta for key in ("port", "protocol", "settings")):
+                        return request_meta
+
+                    port = as_int(first(request.get("listenPort"), request_meta.get("listenPort"), request_meta.get("port"), listen_port, profile.get("listenPort")), 443)
+                    transport = str(first(request_meta.get("transport"), profile_config.get("network"), profile.get("transport"), "tcp")).lower()
+                    security = str(first(request_meta.get("security"), profile_config.get("security"), "reality" if protocol == "vless" else "none")).lower()
+                    sniffing = json.dumps({"enabled": True, "destOverride": ["http", "tls", "quic", "fakedns"]}, separators=(",", ":"))
+                    now = int(time.time())
+
+                    if protocol == "vless":
+                        client_id = str(first(request_meta.get("clientId"), request_meta.get("uuid"), uuid.uuid4()))
+                        flow = str(first(request_meta.get("flow"), "xtls-rprx-vision" if security == "reality" else ""))
+                        settings = {
+                            "clients": [{
+                                "id": client_id,
+                                "flow": flow,
+                                "email": str(first(request_meta.get("email"), "vless-%s@flux.local" % now)),
+                                "limitIp": 0,
+                                "totalGB": as_int(request_meta.get("totalGB"), 0),
+                                "expiryTime": as_int(request_meta.get("expiryTime"), 0),
+                                "enable": True,
+                            }],
+                            "decryption": "none",
+                            "fallbacks": [],
+                        }
+                        stream = {"network": transport, "security": security}
+                        if security == "reality":
+                            private_key = str(first(request_meta.get("privateKey"), request_meta.get("realityPrivateKey"), find_xray_private_key()))
+                            if not private_key:
+                                raise SystemExit("Reality private key is required; install 3x-ui/Xray first or provide realityPrivateKey in requestJson.")
+                            stream["realitySettings"] = {
+                                "show": False,
+                                "dest": str(first(request_meta.get("dest"), request_meta.get("realityDest"), profile_config.get("dest"), "www.cloudflare.com:443")),
+                                "xver": 0,
+                                "serverNames": [str(first(request_meta.get("serverName"), request_meta.get("sni"), "www.cloudflare.com"))],
+                                "privateKey": private_key,
+                                "shortIds": [str(first(request_meta.get("shortId"), request_meta.get("realityShortId"), uuid.uuid4().hex[:8]))],
+                            }
+                    elif protocol == "vmess":
+                        settings = {
+                            "clients": [{
+                                "id": str(first(request_meta.get("clientId"), request_meta.get("uuid"), uuid.uuid4())),
+                                "alterId": 0,
+                                "email": str(first(request_meta.get("email"), "vmess-%s@flux.local" % now)),
+                                "limitIp": 0,
+                                "totalGB": as_int(request_meta.get("totalGB"), 0),
+                                "expiryTime": as_int(request_meta.get("expiryTime"), 0),
+                                "enable": True,
+                            }],
+                            "disableInsecureEncryption": False,
+                        }
+                        stream = {"network": transport, "security": security}
+                        if transport == "ws":
+                            stream["wsSettings"] = {"path": str(first(request_meta.get("path"), request_meta.get("wsPath"), "/ws")), "headers": {}}
+                    elif protocol == "trojan":
+                        settings = {
+                            "clients": [{
+                                "password": str(first(request_meta.get("password"), uuid.uuid4().hex)),
+                                "email": str(first(request_meta.get("email"), "trojan-%s@flux.local" % now)),
+                                "limitIp": 0,
+                                "totalGB": as_int(request_meta.get("totalGB"), 0),
+                                "expiryTime": as_int(request_meta.get("expiryTime"), 0),
+                                "enable": True,
+                            }],
+                            "fallbacks": [],
+                        }
+                        stream = {"network": transport, "security": "tls" if security == "none" else security}
+                    elif protocol == "shadowsocks":
+                        settings = {
+                            "method": str(first(request_meta.get("method"), profile_config.get("method"), "2022-blake3-aes-128-gcm")),
+                            "password": str(first(request_meta.get("password"), uuid.uuid4().hex)),
+                            "network": "tcp,udp",
+                        }
+                        stream = {"network": transport, "security": "none"}
+                    else:
+                        raise SystemExit("Unsupported Xray/3x-ui protocol: %s" % protocol)
+
+                    return {
+                        "up": 0,
+                        "down": 0,
+                        "total": 0,
+                        "remark": str(first(request_meta.get("remark"), request_meta.get("name"), "flux-%s" % protocol)),
+                        "enable": "true",
+                        "expiryTime": 0,
+                        "listen": str(first(request_meta.get("listen"), "")),
+                        "port": port,
+                        "protocol": protocol,
+                        "settings": json.dumps(settings, separators=(",", ":")),
+                        "streamSettings": json.dumps(stream, separators=(",", ":")),
+                        "sniffing": sniffing,
+                    }
+
+                result = {
+                    "server": {
+                        "xuiEndpoint": endpoint,
+                        "xuiBasePath": base_path,
+                        "tokenConfigured": bool(token),
+                    },
+                    "services": {
+                        "xui": os.environ.get("XUI_SERVICE_STATUS") or "unknown",
+                    },
+                    "inbounds": [],
+                }
+
+                if action in ("restart", "restarted", "restart-xray"):
+                    response = post_empty("/panel/api/server/restartXrayService")
+                    result["action"] = action
+                    result["response"] = response[:1200]
+                elif action in ("absent", "delete", "deleted"):
+                    remote_id = first(request_meta.get("remoteId"), request_meta.get("inboundId"), request.get("remoteId"))
+                    if not remote_id:
+                        raise SystemExit("remoteId or inboundId is required for Xray inbound deletion.")
+                    response = post_empty("/panel/api/inbounds/del/%s" % urllib.parse.quote(str(remote_id)))
+                    result["inbounds"].append({
+                        "name": str(first(request_meta.get("name"), "flux-%s" % protocol)),
+                        "engine": "xray",
+                        "direction": "inbound",
+                        "protocol": protocol,
+                        "remoteId": str(remote_id),
+                        "state": "deleted",
+                        "response": response[:1200],
+                    })
+                else:
+                    payload = inbound_payload()
+                    response = post_form("/panel/api/inbounds/add", payload)
+                    parsed = parse_json(response, {})
+                    obj = parsed.get("obj") if isinstance(parsed, dict) else {}
+                    remote_id = obj.get("id") if isinstance(obj, dict) else None
+                    try:
+                        stream = json.loads(payload.get("streamSettings") or "{}")
+                    except json.JSONDecodeError:
+                        stream = {}
+                    result["inbounds"].append({
+                        "name": payload.get("remark"),
+                        "engine": "xray",
+                        "direction": "inbound",
+                        "port": payload.get("port"),
+                        "protocol": payload.get("protocol"),
+                        "transport": stream.get("network"),
+                        "security": stream.get("security"),
+                        "remoteId": str(remote_id or ""),
+                        "response": response[:1200],
+                        "state": "active",
+                    })
+
+                print("FLUX_AGENT_RESULT_JSON=" + json.dumps(result, ensure_ascii=False, separators=(",", ":")))
+                PY
+                """;
     }
 
     private String buildAgentMaintenanceScript(DeployTaskDto dto, ControlServer server) {
@@ -1808,6 +2111,200 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   fi
                 }
 
+                firewall_requested_ports() {
+                  local python_bin
+                  python_bin="$(first_available_python 2>/dev/null || true)"
+                  [ -n "$python_bin" ] || return 1
+                  REQUEST_JSON="$REQUEST_JSON" "$python_bin" - <<'PY'
+                import json
+                import os
+                import sys
+
+                raw = os.environ.get("REQUEST_JSON") or "{}"
+
+                def parse(value):
+                    if not value:
+                        return {}
+                    if isinstance(value, dict):
+                        return value
+                    if isinstance(value, str):
+                        try:
+                            parsed = json.loads(value)
+                            return parsed if isinstance(parsed, dict) else {}
+                        except Exception:
+                            return {}
+                    return {}
+
+                root = parse(raw)
+                nested = parse(root.get("requestJson"))
+                request = root.get("request") if isinstance(root.get("request"), dict) else {}
+                original = root.get("originalRequest") if isinstance(root.get("originalRequest"), dict) else {}
+                candidates = [root, nested, request, original]
+                seen = set()
+
+                def add(port, proto="tcp"):
+                    try:
+                        port = int(port)
+                    except Exception:
+                        return
+                    proto = str(proto or "tcp").lower()
+                    if proto not in ("tcp", "udp"):
+                        proto = "tcp"
+                    if port < 1 or port > 65535:
+                        return
+                    key = (proto, port)
+                    if key not in seen:
+                        seen.add(key)
+                        print("%s %s" % key)
+
+                def add_value(value, proto="tcp"):
+                    if value is None:
+                        return
+                    if isinstance(value, dict):
+                        add(value.get("port") or value.get("listenPort") or value.get("targetPort"), value.get("protocol") or value.get("transport") or proto)
+                    elif isinstance(value, list):
+                        for item in value:
+                            add_value(item, proto)
+                    elif isinstance(value, str) and "," in value:
+                        for part in value.split(","):
+                            add_value(part.strip(), proto)
+                    else:
+                        add(value, proto)
+
+                list_keys = ("ports", "runtimePorts", "listenPorts", "exposedPorts", "firewallPorts")
+                scalar_keys = (
+                    "port", "listenPort", "panelPort", "vlessPort", "vmessPort", "trojanPort",
+                    "shadowsocksPort", "snellPort", "forwardListenPort", "remotePort", "acmePort"
+                )
+                for source in candidates:
+                    if not isinstance(source, dict):
+                        continue
+                    proto = source.get("protocol") or source.get("transport") or "tcp"
+                    for key in list_keys:
+                        add_value(source.get(key), proto)
+                    for key in scalar_keys:
+                        add_value(source.get(key), proto)
+                    if str(source.get("certificateMode") or "").lower() == "acme-http":
+                        add(80, "tcp")
+
+                if not seen:
+                    sys.exit(1)
+                PY
+                }
+
+                manage_firewall_port() {
+                  local mode="$1"
+                  local proto="$2"
+                  local port="$3"
+                  local applied=0
+                  local changed=0
+                  local action_word="open"
+                  [ "$mode" = "close" ] && action_word="close"
+
+                  section "Firewall ${action_word} ${proto}/${port}"
+
+                  if [ "$(id -u)" -ne 0 ]; then
+                    echo "[fail] firewall ${action_word} requires root."
+                    diag_item fail "firewall_root_required" "Firewall task requires root" "${proto}/${port}" "Run the Flux agent service as root for firewall changes."
+                    return 1
+                  fi
+
+                  if command -v ufw >/dev/null 2>&1; then
+                    applied=1
+                    if [ "$mode" = "open" ]; then
+                      if ufw allow "${port}/${proto}"; then
+                        changed=1
+                        diag_item ok "ufw_${mode}_${proto}_${port}" "ufw rule applied" "${proto}/${port}" ""
+                      else
+                        diag_item warning "ufw_${mode}_${proto}_${port}_failed" "ufw rule failed" "${proto}/${port}" "Check ufw status and apply the rule manually if needed."
+                      fi
+                    else
+                      if ufw delete allow "${port}/${proto}"; then
+                        changed=1
+                        diag_item ok "ufw_${mode}_${proto}_${port}" "ufw rule removed" "${proto}/${port}" ""
+                      else
+                        diag_item warning "ufw_${mode}_${proto}_${port}_missing" "ufw rule was not removed" "${proto}/${port}" "The rule may not exist; check ufw status."
+                      fi
+                    fi
+                  fi
+
+                  if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+                    applied=1
+                    if [ "$mode" = "open" ]; then
+                      if firewall-cmd --permanent --add-port="${port}/${proto}" && firewall-cmd --reload; then
+                        changed=1
+                        diag_item ok "firewalld_${mode}_${proto}_${port}" "firewalld rule applied" "${proto}/${port}" ""
+                      else
+                        diag_item warning "firewalld_${mode}_${proto}_${port}_failed" "firewalld rule failed" "${proto}/${port}" "Check firewalld zone and apply the rule manually if needed."
+                      fi
+                    else
+                      if firewall-cmd --permanent --remove-port="${port}/${proto}" && firewall-cmd --reload; then
+                        changed=1
+                        diag_item ok "firewalld_${mode}_${proto}_${port}" "firewalld rule removed" "${proto}/${port}" ""
+                      else
+                        diag_item warning "firewalld_${mode}_${proto}_${port}_missing" "firewalld rule was not removed" "${proto}/${port}" "The rule may not exist in the active zone."
+                      fi
+                    fi
+                  fi
+
+                  if command -v iptables >/dev/null 2>&1; then
+                    applied=1
+                    if [ "$mode" = "open" ]; then
+                      if iptables -C INPUT -p "$proto" --dport "$port" -j ACCEPT 2>/dev/null; then
+                        diag_item ok "iptables_${mode}_${proto}_${port}_exists" "iptables rule already exists" "${proto}/${port}" ""
+                      elif iptables -I INPUT -p "$proto" --dport "$port" -j ACCEPT; then
+                        changed=1
+                        diag_item ok "iptables_${mode}_${proto}_${port}" "iptables rule inserted" "${proto}/${port}" "Persist this rule with your distro firewall tooling if required."
+                      else
+                        diag_item warning "iptables_${mode}_${proto}_${port}_failed" "iptables rule failed" "${proto}/${port}" "Check nftables/iptables backend and apply manually if needed."
+                      fi
+                    else
+                      while iptables -C INPUT -p "$proto" --dport "$port" -j ACCEPT 2>/dev/null; do
+                        if iptables -D INPUT -p "$proto" --dport "$port" -j ACCEPT; then
+                          changed=1
+                        else
+                          break
+                        fi
+                      done
+                      if [ "$changed" -eq 1 ]; then
+                        diag_item ok "iptables_${mode}_${proto}_${port}" "iptables rule removed" "${proto}/${port}" ""
+                      else
+                        diag_item warning "iptables_${mode}_${proto}_${port}_missing" "iptables rule not found" "${proto}/${port}" ""
+                      fi
+                    fi
+                  fi
+
+                  if [ "$applied" -eq 0 ]; then
+                    echo "[fail] no supported firewall command found for ${proto}/${port}."
+                    diag_item fail "firewall_tool_missing" "No supported firewall command found" "${proto}/${port}" "Install ufw, firewalld or iptables, or manage cloud security groups manually."
+                    return 1
+                  fi
+                  if [ "$changed" -eq 1 ]; then
+                    echo "[ok] firewall ${action_word} handled for ${proto}/${port}."
+                  else
+                    echo "[warn] firewall ${action_word} finished without confirmed change for ${proto}/${port}."
+                  fi
+                }
+
+                manage_firewall_ports() {
+                  local mode="$1"
+                  local ports line proto port failed
+                  failed=0
+                  ports="$(firewall_requested_ports || true)"
+                  section "Firewall ${mode} runtime ports"
+                  if [ -z "$ports" ]; then
+                    echo "[fail] no runtime ports were provided in requestJson."
+                    diag_item fail "firewall_ports_missing" "No runtime ports provided" "requestJson did not include ports/runtimePorts/listenPort/panelPort/etc." "Pass ports such as {\\\"ports\\\":[{\\\"port\\\":443,\\\"protocol\\\":\\\"tcp\\\"}]}."
+                    return 1
+                  fi
+                  while read -r proto port; do
+                    [ -n "$proto" ] && [ -n "$port" ] || continue
+                    manage_firewall_port "$mode" "$proto" "$port" || failed=1
+                  done <<< "$ports"
+                  diagnose_firewall || true
+                  return "$failed"
+                }
+
                 diagnose_certificate() {
                   local domain found_cert
                   found_cert=0
@@ -2057,6 +2554,14 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   firewall-diagnose)
                     diagnose_firewall
                     emit_result "$ACTION" "checked"
+                    ;;
+                  open-runtime-ports|firewall-open|open-firewall)
+                    manage_firewall_ports open
+                    emit_result "$ACTION" "opened"
+                    ;;
+                  close-runtime-ports|firewall-close|close-firewall)
+                    manage_firewall_ports close
+                    emit_result "$ACTION" "closed"
                     ;;
                   repair-xui)
                     repair_xui

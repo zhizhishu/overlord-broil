@@ -54,6 +54,12 @@ The same State Sync rows can also start Runtime Provider maintenance tasks. Oper
 
 Runtime Provider descriptors now include an Action Catalog for `agent-maintenance` operations. The backend validates maintenance actions from this catalog, and the master UI derives State Sync row actions plus server-card Agent buttons from the same metadata instead of keeping separate hard-coded button lists.
 
+Xray/3x-ui orchestration tasks now generate agent-executable scripts instead of placeholder payloads. The controlled agent resolves the local or saved 3x-ui endpoint/token, calls the 3x-ui inbound API to add/delete protocol nodes, can restart Xray, and reports inbound metadata back through `FLUX_AGENT_RESULT_JSON`.
+
+Agent task history redacts 3x-ui secrets before storage. Installation/orchestration reports can still update encrypted server credentials, but stored `resultJson` keeps only configured flags instead of raw API tokens, passwords or 2FA codes.
+
+Firewall maintenance is also executable from the same provider contract. `open-runtime-ports` and `close-runtime-ports` parse requested runtime ports from task `requestJson`, apply local `ufw`, `firewalld` or `iptables` rules when available, and then return structured diagnostics. Cloud security groups still need operator confirmation.
+
 Remote log collection also uses the same `agent-maintenance` path. A `logs` action returns structured `logs.items` for the Flux agent runner, x-ui/Xray services, Snell node services, forwarding/task logs and related service managers, and the control-center task card renders a compact remote-log summary before operators open raw output.
 
 Agent upgrade now uses the same controlled task loop with a safer lifecycle: the agent binary reports `--version`, the upgrade task downloads to a temporary file, verifies Bash syntax, calculates SHA-256, backs up the previous binary, installs the new file, schedules a service restart, and returns structured `maintenance.upgrade` metadata for the master task card.

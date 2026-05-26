@@ -126,7 +126,7 @@ public class RuntimeProviderService {
         if (action.contains("cert") || action.contains("acme")) {
             return providerMap.get("certificate");
         }
-        if (action.contains("firewall")) {
+        if (action.contains("firewall") || action.contains("runtime-ports")) {
             return providerMap.get("firewall");
         }
         if (action.contains("snell")) {
@@ -256,11 +256,13 @@ public class RuntimeProviderService {
                 false,
                 true,
                 list("firewall"),
-                list("open", "close", "firewall-diagnose"),
+                list("open", "close", "open-runtime-ports", "close-runtime-ports", "firewall-diagnose"),
                 list(
-                        action("firewall-diagnose", "防火墙诊断", "diagnostic", "agent-maintenance", "firewall", false, true, true)
+                        action("firewall-diagnose", "防火墙诊断", "diagnostic", "agent-maintenance", "firewall", false, true, true),
+                        action("open-runtime-ports", "Open runtime ports", "repair", "agent-maintenance", "firewall", false, false, true),
+                        action("close-runtime-ports", "Close runtime ports", "danger", "agent-maintenance", "firewall", true, false, true)
                 ),
-                list("ufw/firewalld/iptables-detect", "port-diagnose", "open-runtime-ports"),
+                list("ufw/firewalld/iptables-detect", "port-diagnose", "open-runtime-ports", "close-runtime-ports"),
                 list("runtime ports"),
                 list("runtime-dependent ports"),
                 list("xui", "snell", "forward", "certificate")
