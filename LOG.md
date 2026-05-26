@@ -2,6 +2,29 @@
 
 ## 2026-05-26
 
+### Snell Real Smoke And UI Boot Fix
+
+- Completed: added `scripts/test-snell-real-smoke.sh` for live master/agent Snell validation. It logs in to the master, creates a temporary Snell protocol node, lets the agent claim/report it, verifies service state and listen port, queries Runtime State overview and deletes the node by default.
+- Found on `isrco-hk`: the master/agent task path reached `succeeded`, but Snell services could fail because generated configs were `600 root` while systemd/OpenRC ran Snell as `nobody`.
+- Fixed: generated Snell scripts now chown config files to `nobody` when available and assert that install/restart leaves the service active before reporting success.
+- Found on the live UI: the post-build `toFile.mjs` removed `type="module"` script tags, leaving HTML with CSS but no app JavaScript, which caused the remote console to render an empty root.
+- Fixed: `toFile.mjs` now strips only unsupported attributes and preserves module scripts.
+- UI polish: added stable `data-testid` hooks for the control center, runtime panels, server cards and 3x-ui/Agent action groups, and replaced native dangerous-action confirmation with an in-app modal.
+- Local validation passed:
+  - shell syntax and bootstrap syntax
+  - `bash scripts/test-agent-mock.sh`
+  - `bash scripts/test-three-xui-fixture.sh`
+  - `bash scripts/test-master-port-contract.sh`
+  - `bash scripts/test-sqlite-schema.sh`
+  - frontend `npm run build`, with script tag verified in `dist/index.html`
+  - Docker Maven Java 21 `mvn -B -DskipTests package`
+  - Docker Maven targeted tests `RuntimeProviderServiceTest,DeployTaskServiceImplTest`: 25 tests, 0 failures
+  - `git diff --check` with only Windows LF/CRLF warnings.
+- Real-host cleanup: temporary Snell smoke nodes/services created during diagnosis on `isrco-hk` were removed.
+- Next: push this fix, let GHCR build the patched master image, redeploy `isrco-hk`, rerun the Snell real smoke against the updated master and capture final UI screenshots.
+
+## 2026-05-26
+
 ### isrco-hk Real Host Migration Smoke
 
 - Completed: verified the public GitHub install path on the real `isrco-hk` host with SQLite master mode and the controlled agent installed on the same server.

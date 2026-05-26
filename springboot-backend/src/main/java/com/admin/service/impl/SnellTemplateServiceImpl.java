@@ -183,7 +183,28 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
                 psk = ${PSK}
                 ipv6 = true
                 SNELL_CONFIG
+                  if id -u nobody >/dev/null 2>&1; then
+                    chown nobody "$MAIN_CONFIG_PATH"
+                  fi
                   chmod 600 "$MAIN_CONFIG_PATH"
+                }
+
+                assert_service_active() {
+                  local manager="$1"
+                  if [ "$manager" = "systemd" ]; then
+                    sleep 1
+                    if ! systemctl is-active --quiet "$SERVICE_NAME"; then
+                      systemctl --no-pager --full status "$SERVICE_NAME" || true
+                      echo "Snell service ${SERVICE_NAME} is not active after ${ACTION}." >&2
+                      exit 1
+                    fi
+                  else
+                    if ! rc-service "$SERVICE_BASE" status >/dev/null 2>&1; then
+                      rc-service "$SERVICE_BASE" status || true
+                      echo "Snell service ${SERVICE_BASE} is not active after ${ACTION}." >&2
+                      exit 1
+                    fi
+                  fi
                 }
 
                 write_systemd_service() {
@@ -238,13 +259,12 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
                     write_systemd_service
                     systemctl enable "$SERVICE_NAME"
                     systemctl restart "$SERVICE_NAME"
-                    systemctl --no-pager --full status "$SERVICE_NAME" || true
                   else
                     write_openrc_service
                     rc-update add "$SERVICE_BASE" default
                     rc-service "$SERVICE_BASE" restart
-                    rc-service "$SERVICE_BASE" status || true
                   fi
+                  assert_service_active "$manager"
                 }
 
                 uninstall_snell() {
@@ -271,11 +291,10 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
                   manager="$(detect_service_manager)"
                   if [ "$manager" = "systemd" ]; then
                     systemctl restart "$SERVICE_NAME"
-                    systemctl --no-pager status "$SERVICE_NAME" || true
                   else
                     rc-service "$SERVICE_BASE" restart
-                    rc-service "$SERVICE_BASE" status || true
                   fi
+                  assert_service_active "$manager"
                 }
 
                 show_snell_status() {

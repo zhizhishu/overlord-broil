@@ -163,12 +163,19 @@ ghcr.io/zhizhishu/overlord-broil:latest
 ```bash
 bash scripts/test-agent-mock.sh
 bash scripts/test-three-xui-fixture.sh
+bash scripts/test-snell-real-smoke.sh
 bash scripts/test-three-xui-e2e.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
 bash scripts/test-compose-smoke.sh --compose-file docker-compose.sqlite.yml --build-local --dry-run
 ```
 
 真实 3x-ui 合同烟测是可选项; 没有配置真实地址和 API token 时会自动跳过.
+
+Snell 真机 smoke 会登录主控, 创建临时 Snell 协议节点, 触发被控 Agent 执行, 验证服务和端口, 然后默认删除测试节点:
+
+```bash
+OB_MASTER_URL="http://127.0.0.1:5166" OB_SNELL_PORT=18390 bash scripts/test-snell-real-smoke.sh
+```
 
 ## 仍未到 1.0 的部分
 

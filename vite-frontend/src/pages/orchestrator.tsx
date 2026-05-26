@@ -207,6 +207,14 @@ type DiagnosticState = "ok" | "warning" | "fail";
 type StatusColor = "default" | "primary" | "secondary" | "success" | "warning" | "danger";
 type AgentMaintenanceAction = RuntimeProviderAction | string;
 
+interface PendingAgentMaintenance {
+  server: ControlServer;
+  actionKey: string;
+  actionText: string;
+  actionMeta?: RuntimeProviderAction;
+  meta: Record<string, unknown>;
+}
+
 const fallbackAction = (
   key: string,
   label: string,
@@ -811,11 +819,11 @@ const MasterRiskNotice = ({ context }: { context: string }) => {
   );
 };
 
-const ServerActionGroup = ({ title, children }: { title: string; children: ReactNode }) => {
+const ServerActionGroup = ({ title, children, testId }: { title: string; children: ReactNode; testId?: string }) => {
   const { t } = useLanguage();
 
   return (
-    <div className="rounded-small border border-default-200 bg-white/60 p-2.5 dark:bg-default-50/5">
+    <div className="rounded-small border border-default-200 bg-white/60 p-2.5 dark:bg-default-50/5" data-testid={testId}>
       <p className="mb-2 text-[11px] font-semibold uppercase tracking-normal text-gray-500">{t(title)}</p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3">
         {children}
@@ -1303,6 +1311,7 @@ export default function OrchestratorPage() {
   const [xraySettingModalOpen, setXraySettingModalOpen] = useState(false);
   const [scriptTitle, setScriptTitle] = useState("");
   const [scriptText, setScriptText] = useState("");
+  const [pendingAgentMaintenance, setPendingAgentMaintenance] = useState<PendingAgentMaintenance | null>(null);
   const [xraySettingServerId, setXraySettingServerId] = useState<number | null>(null);
   const [xraySettingText, setXraySettingText] = useState("");
   const [outboundTestUrl, setOutboundTestUrl] = useState("https://www.google.com/generate_204");
@@ -2074,14 +2083,16 @@ export default function OrchestratorPage() {
       ? agentMaintenanceActions.find(item => item.key === actionKey)
       : action;
     const actionText = actionLabel(actionMeta || action, agentMaintenanceActions);
-    const dangerConfirmed = actionMeta?.danger
-      ? window.confirm(t("确认执行危险操作：{action}？", { action: t(actionText) }))
-      : true;
 
-    if (!dangerConfirmed) {
+    if (actionMeta?.danger) {
+      setPendingAgentMaintenance({ server, actionKey, actionText, actionMeta, meta });
       return;
     }
 
+    await executeAgentMaintenance({ server, actionKey, actionText, actionMeta, meta });
+  };
+
+  const executeAgentMaintenance = async ({ server, actionKey, actionText, actionMeta, meta }: PendingAgentMaintenance) => {
     setSubmitting(true);
     const res = await createDeployTask({
       serverId: server.id,
@@ -2111,6 +2122,15 @@ export default function OrchestratorPage() {
     } else {
       toast.error(res.msg || t("{action}任务生成失败", { action: t(actionText) }));
     }
+  };
+
+  const confirmPendingAgentMaintenance = async () => {
+    if (!pendingAgentMaintenance) {
+      return;
+    }
+    const pending = pendingAgentMaintenance;
+    setPendingAgentMaintenance(null);
+    await executeAgentMaintenance(pending);
   };
 
   const saveOrchestrationTask = async () => {
@@ -2620,19 +2640,19 @@ export default function OrchestratorPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-100 dark:bg-black">
+    <div className="h-full overflow-y-auto bg-slate-100 dark:bg-black" data-testid="control-center">
       <div className="p-4 md:p-6 space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between" data-testid="control-center-header">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("主控中心")}</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("服务器编排、统一协议节点、Snell / Xray 运维")}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button color="primary" onPress={() => openOrchestrationModal()}>{t("一键编排")}</Button>
-            <Button color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
-            <Button color="primary" onPress={() => openDeployModal()}>{t("新建部署")}</Button>
-            <Button variant="flat" onPress={() => openServerModal()}>{t("添加服务器")}</Button>
-            <Button variant="flat" onPress={() => openProfileModal()}>{t("添加模板")}</Button>
+            <Button color="primary" data-testid="open-orchestration" onPress={() => openOrchestrationModal()}>{t("一键编排")}</Button>
+            <Button color="primary" variant="flat" data-testid="open-protocol-node" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
+            <Button color="primary" data-testid="open-deploy-task" onPress={() => openDeployModal()}>{t("新建部署")}</Button>
+            <Button variant="flat" data-testid="open-server-modal" onPress={() => openServerModal()}>{t("添加服务器")}</Button>
+            <Button variant="flat" data-testid="open-profile-modal" onPress={() => openProfileModal()}>{t("添加模板")}</Button>
           </div>
         </div>
 
@@ -2669,7 +2689,7 @@ export default function OrchestratorPage() {
           </Card>
         </div>
 
-        <section>
+        <section data-testid="state-sync">
           <Card radius="sm">
             <CardHeader className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
@@ -2818,7 +2838,7 @@ export default function OrchestratorPage() {
           </Card>
         </section>
 
-        <section>
+        <section data-testid="runtime-provider">
           <Card radius="sm">
             <CardHeader className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
@@ -2873,7 +2893,7 @@ export default function OrchestratorPage() {
           </Card>
         </section>
 
-        <section>
+        <section data-testid="monitor-alerts">
           <Card radius="sm">
             <CardHeader className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -2917,7 +2937,7 @@ export default function OrchestratorPage() {
           </Card>
         </section>
 
-        <section>
+        <section data-testid="operation-audit">
           <Card radius="sm">
             <CardHeader className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -2979,7 +2999,7 @@ export default function OrchestratorPage() {
           </Card>
         </section>
 
-        <section>
+        <section data-testid="unified-rule-center">
           <Card radius="sm">
             <CardHeader className="flex flex-col items-stretch gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
@@ -3090,14 +3110,14 @@ export default function OrchestratorPage() {
           </Card>
         </section>
 
-        <section>
+        <section data-testid="server-list">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("服务器")}</h2>
             <Button size="sm" variant="light" onPress={loadData}>{t("刷新")}</Button>
           </div>
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             {servers.map(server => (
-              <Card key={server.id} radius="sm">
+              <Card key={server.id} radius="sm" data-testid={`server-card-${server.id}`}>
                 <CardHeader className="flex justify-between gap-3">
                   <div>
                     <p className="font-semibold text-gray-900 dark:text-white">{server.name}</p>
@@ -3191,7 +3211,7 @@ export default function OrchestratorPage() {
                       <Button size="sm" variant="flat" onPress={() => syncXuiTraffic(server)}>{t("同步流量")}</Button>
                       <Button size="sm" variant="flat" onPress={() => showTrafficSnapshots(server)}>{t("流量快照")}</Button>
                     </ServerActionGroup>
-                    <ServerActionGroup title="3x-ui">
+                    <ServerActionGroup title="3x-ui" testId={`three-xui-actions-${server.id}`}>
                       <Button size="sm" variant="flat" onPress={() => testXui(server)}>{t("测 3x-ui")}</Button>
                       <Button size="sm" variant="flat" onPress={() => showThreeXuiInbounds(server)}>{t("入站")}</Button>
                       <Button size="sm" variant="flat" onPress={() => openThreeXuiInboundModal(server)}>{t("入站操作")}</Button>
@@ -3201,7 +3221,7 @@ export default function OrchestratorPage() {
                       <Button size="sm" variant="flat" onPress={() => openXraySettingModal(server)}>{t("保存出站")}</Button>
                       <Button size="sm" variant="flat" onPress={() => restartXray(server)}>{t("重启 Xray")}</Button>
                     </ServerActionGroup>
-                    <ServerActionGroup title="Agent">
+                    <ServerActionGroup title="Agent" testId={`agent-actions-${server.id}`}>
                       {serverAgentActions.map(action => (
                         <Button
                           key={action.key}
@@ -3919,6 +3939,28 @@ export default function OrchestratorPage() {
           <ModalFooter>
             <Button variant="light" onPress={() => setXraySettingModalOpen(false)}>{t("取消")}</Button>
             <Button color="primary" isLoading={submitting} onPress={saveXraySetting}>{t("保存到 3x-ui")}</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={Boolean(pendingAgentMaintenance)} onOpenChange={open => !open && setPendingAgentMaintenance(null)} size="lg">
+        <ModalContent data-testid="danger-action-confirm">
+          <ModalHeader>{t("确认危险操作")}</ModalHeader>
+          <ModalBody>
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                {t("该操作会通过被控 Agent 在远端服务器执行，请确认目标和动作无误。")}
+              </p>
+              <div className="rounded-small border border-danger-200 bg-danger-50 p-3 text-sm dark:border-danger-500/30 dark:bg-danger-500/10">
+                <p className="font-semibold text-danger">{pendingAgentMaintenance?.actionText}</p>
+                <p className="mt-1 text-gray-600 dark:text-gray-300">{pendingAgentMaintenance?.server.name}</p>
+                <p className="text-xs text-gray-500">{pendingAgentMaintenance?.server.host}:{pendingAgentMaintenance?.server.sshPort || 22}</p>
+              </div>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={() => setPendingAgentMaintenance(null)}>{t("取消")}</Button>
+            <Button color="danger" isLoading={submitting} onPress={confirmPendingAgentMaintenance}>{t("确认执行")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

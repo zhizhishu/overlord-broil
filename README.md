@@ -315,6 +315,7 @@ Common smoke checks:
 ```bash
 bash scripts/test-agent-mock.sh
 bash scripts/test-three-xui-fixture.sh
+bash scripts/test-snell-real-smoke.sh
 bash scripts/test-three-xui-e2e.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
 bash scripts/test-compose-smoke.sh --build-local
@@ -332,6 +333,12 @@ To create, toggle and delete a temporary VLESS inbound on the real 3x-ui host, o
 
 ```bash
 THREE_XUI_E2E_WRITE=1 THREE_XUI_E2E_PORT=42123 bash scripts/test-three-xui-e2e.sh
+```
+
+Real Snell smoke runs against a live master/agent host. It logs in to the master, creates a temporary Snell protocol node, lets the controlled agent claim the task, checks the service and listen port, then deletes the temporary node by default:
+
+```bash
+OB_MASTER_URL="http://127.0.0.1:5166" OB_SNELL_PORT=18390 bash scripts/test-snell-real-smoke.sh
 ```
 
 ## Remaining Work Before 1.0

@@ -39,6 +39,8 @@ This release moves the project from the first public production milestone into a
 - Future branch update: added optional SQLite master mode through `OB_DB_MODE=sqlite`, `application-sqlite.yml`, an embedded SQLite schema, `docker-compose.sqlite.yml`, installer backup/restore awareness and CI/release smoke coverage. MySQL remains the default production path.
 - Future branch update: hardened the task engine with atomic agent task claiming, dangerous `agent-maintenance` confirmation checks and richer Runtime State trace fields (`sourceTaskId`, `serverId`, `resourceType`, `resourceId`, `danger`).
 - Future branch update: added `operation_audit_log` plus a control-center Operation Audit panel. Deploy/orchestration task creation, rejection, manual state update, retry/delete, agent task claim and agent task report events now record actor, server, provider, action, outcome and dangerous-action markers.
+- Future branch update: added `scripts/test-snell-real-smoke.sh` for live master/agent Snell validation, and hardened generated Snell services so configs are readable by the `nobody` runtime user and install/restart tasks fail unless the service becomes active.
+- Future branch update: improved control-center testability and operator safety with stable `data-testid` hooks on key orchestration panels and an in-app dangerous-action confirmation modal.
 
 ### 0.6.0 Capability Matrix
 
@@ -64,7 +66,7 @@ This release moves the project from the first public production milestone into a
 | Master port contract | Default compose files publish only one host port for `overlord-master`; installer upgrades remove legacy split containers so old `80/6365/8066` mappings do not remain, and SQLite migration stops obsolete `gost-mysql` without deleting its volumes. |
 | Linux coverage | Docker/CI diagnostics cover Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux userspaces. |
 | 3x-ui | API fixture remains API-level; optional real 3x-ui contract smoke can run from local env or manual GitHub workflow; full install/configure still targets systemd hosts. |
-| Snell | Product-level protocol node with separate systemd/OpenRC runtime, not a native Xray/3x-ui core protocol. |
+| Snell | Product-level protocol node with separate systemd/OpenRC runtime, not a native Xray/3x-ui core protocol; live smoke script is available for authorized hosts. |
 | Verification | Shell syntax, agent mock, SQLite schema smoke, 3x-ui fixture, optional real 3x-ui E2E gate, master port contract, frontend build, backend Maven build, install matrix and MySQL/SQLite single-image compose smoke. |
 
 ### Honest Boundaries

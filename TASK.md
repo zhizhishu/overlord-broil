@@ -1,52 +1,76 @@
 # TASK.md
 
-## 当前目标
+## Current Goal
 
-在真机 `isrco-hk` 上验证 Overlord Broil 主控和被控 Agent 的真实安装 / 迁移流程, 并把发现的问题修复后推送 GitHub.
+Push the project toward the pre-1.0 goals requested by the user:
 
-## 本轮已完成
+1. Strengthen real-host and system-matrix validation.
+2. Validate real 3x-ui write E2E behavior.
+3. Validate Snell as a real master-managed protocol node through the agent.
+4. Capture and polish the control-console UI in the Flux-inspired Overlord Broil direction.
 
-- 已确认项目根目录: `C:\Users\echo\Downloads\claude\overlord-broil`.
-- 已使用 Termius 控制真机 `isrco-hk`; 远端为 Debian 12, 约 `1.9 GiB` 内存, Docker `29.5.2`, Docker Compose `v5.1.4`.
-- 真机旧分离栈已迁移为 SQLite 单体主控:
-  - `overlord-master` 暴露 `5166/tcp`.
-  - `vite-frontend` 已清理.
-  - `springboot-backend` 已清理.
-  - `gost-phpmyadmin` 已清理.
-  - SQLite 模式下旧 `gost-mysql` 容器已清理, 未删除旧 volume 和安装文件.
-- 已修复 installer: SQLite 迁移时会移除旧 `gost-mysql` 容器, 并在文档和测试中说明只移除容器, 不删除旧数据.
-- 已修复 agent idle 行为: 主控返回 `data:null` 时视为正常空任务, 不再输出 `claim response did not include a task id`, 也不生成 task report.
-- 已重写乱码的 `README.zh-CN.md` 和 `docs/index.html`, 并统一端口口径为默认只公开 `5166/tcp`.
-- 已更新 UI/i18n 发布前检查文案: 默认只开放 `5166` 和业务端口, `6365` 仅调试时显式开放.
-- 已提交并推送 `origin/main`: `8c20d3d Tighten real-host install migration`.
+## Authorization
 
-## 已通过验证
+- Termius access to `isrco-hk` is allowed for this task.
+- Browser MCP is allowed for real console UI operation and screenshots.
+- Serena Pool, ACE and subagents are allowed for parallel audit.
+- Local Docker and GitHub Actions may be used for validation.
+- Do not expose tokens, cookies, private keys, 3x-ui secrets, Snell PSK values or generated agent tokens in logs, docs or final replies.
 
-- 本地:
-  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh'`
-  - `bash scripts/test-master-port-contract.sh`
-  - `bash scripts/test-agent-mock.sh`
-  - `npm run build`
-  - `git diff --check` (仅 Windows LF/CRLF 提示)
-- 真机 `isrco-hk`:
-  - `docker ps` 仅显示 `overlord-master` 相关产品容器.
-  - 旧容器检查: `vite-frontend=absent`, `springboot-backend=absent`, `gost-phpmyadmin=absent`, `gost-mysql=absent`.
-  - 主控健康: `http://127.0.0.1:5166/flow/test -> test`.
-  - 公网健康: `http://82.158.91.116:5166/flow/test -> test`, 首页 HTTP `200`.
-  - 监听端口: 只有 `5166/tcp` 和 SSH `22/tcp`; 未见 `80/6365/8066`.
-  - Agent service active, `/usr/local/bin/overlord-agent.sh` 已包含 `claim_state()`.
-  - Agent 重启后的 journal 中 `idle_warning_after_restart=absent`.
-  - 主控登录 API 返回 `code=0` 且 token 存在.
+## Current Baseline
 
-## 下一步
+- Repository: `https://github.com/zhizhishu/overlord-broil`
+- Local root: `C:\Users\echo\Downloads\claude\overlord-broil`
+- Previous pushed baseline: `4f00f18` on `main` and `future`.
+- `isrco-hk` baseline before this round:
+  - `overlord-master` was healthy.
+  - Public entry: `http://82.158.91.116:5166`.
+  - `/flow/test` returned `test`.
+  - Default public listeners were only `5166/tcp` and SSH `22/tcp`.
+  - `overlord-agent.service` was active.
+  - Legacy split containers were absent.
 
-1. 更新 `LOG.md` 记录本次真机烟测结果.
-2. 提交日志更新并推送 `origin/main`.
-3. 检查 GitHub Actions / Docker Images / Pages 是否开始或完成最新提交.
+## Completed This Round
 
-## 风险/待确认
+- Parallel audits completed for CI/Docker gates, UI routes/screenshots and 3x-ui/Snell/VPS runtime paths.
+- Local validation passed:
+  - shell syntax for `scripts/*.sh`
+  - bootstrap syntax
+  - `scripts/test-agent-mock.sh`
+  - `scripts/test-three-xui-fixture.sh`
+  - `scripts/test-master-port-contract.sh`
+  - `scripts/test-sqlite-schema.sh`
+  - frontend `npm run build`
+  - `git diff --check`
+- Added `scripts/test-snell-real-smoke.sh` for master API -> protocol node -> agent -> Snell service -> runtime overview smoke testing.
+- Found a real Snell runtime bug on `isrco-hk`: generated Snell configs were `600 root` while services ran as `nobody`, and the task could still be reported as succeeded.
+- Fixed Snell generated scripts:
+  - config files are chowned to `nobody` when available.
+  - install/restart now assert the service is active before reporting success.
+- Cleaned temporary failed Snell smoke artifacts on `isrco-hk`.
+- Found and fixed the live blank-console root cause: `vite-frontend/toFile.mjs` removed `type="module"` script tags after build, so the served HTML loaded CSS but no app JavaScript.
+- UI polish:
+  - added stable `data-testid` hooks for the control center, key panels, server cards and 3x-ui/Agent action groups.
+  - replaced native `window.confirm` dangerous-action prompts with an in-app confirmation modal.
 
-- 这轮是真机单台 Debian 验证, 还不是完整 VPS 矩阵.
-- 真实 3x-ui endpoint/token 端到端写入仍需要专门真机目标.
-- 默认账号 `admin_user/admin_user` 仅用于测试, 正式使用必须修改.
-- 不在日志、提交或回复中暴露 token、密码、Cookie、私钥.
+## In Progress
+
+- Docker Maven Java 21 backend package validation passed.
+- Docker Maven targeted tests `RuntimeProviderServiceTest,DeployTaskServiceImplTest` passed: 25 tests, 0 failures.
+- After push, rebuild/redeploy the master image, then rerun `scripts/test-snell-real-smoke.sh` against `isrco-hk` on the updated master.
+- Use Browser MCP to capture real console screenshots into `docs/assets/`.
+
+## Remaining
+
+1. Rerun Snell real smoke after the patched master is deployed.
+2. Run or record real 3x-ui write E2E against a real endpoint if a safe endpoint/token is available; otherwise keep fixture write E2E as the current local proof.
+3. Capture UI screenshots from the actual `http://82.158.91.116:5166/#/orchestrator` console.
+4. Update README, Operations, Release Notes, Pages and LOG.
+5. Commit and push to `origin/main` and `origin/future`.
+6. Confirm GitHub Actions and GHCR image result after push.
+
+## Risks
+
+- `isrco-hk` is a real server. Any temporary Snell/3x-ui node must use high test ports and be cleaned after validation.
+- Snell and 3x-ui real tests may download upstream binaries or mutate service state.
+- Screenshots must not include secrets, tokens or PSK values.

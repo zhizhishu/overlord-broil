@@ -243,6 +243,7 @@ bash scripts/release-check.sh
 bash scripts/release-check.sh --full
 bash scripts/test-agent-mock.sh
 bash scripts/test-three-xui-fixture.sh
+bash scripts/test-snell-real-smoke.sh
 bash scripts/test-three-xui-e2e.sh
 bash scripts/test-install-matrix.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
@@ -253,6 +254,14 @@ bash scripts/test-compose-smoke.sh --compose-file docker-compose.sqlite.yml --bu
 ```
 
 The 3x-ui fixture test uses a short-lived local Python HTTP server and exits without leaving ports open. The real 3x-ui E2E script is a gated contract smoke: it exits as skipped unless `THREE_XUI_E2E_URL` and `THREE_XUI_E2E_TOKEN` are set, and write checks require `THREE_XUI_E2E_WRITE=1` plus `THREE_XUI_E2E_PORT`. The install matrix is useful shell portability coverage, but it is not a substitute for a real VPS matrix with systemd/OpenRC, cloud firewall and public DNS. The full compose smoke test should remove its disposable containers, network and volumes when it exits.
+
+The Snell real smoke script is intentionally not part of the default CI gate because it mutates a live controlled host. Run it only on a disposable or authorized host:
+
+```bash
+OB_MASTER_URL="http://127.0.0.1:5166" OB_SNELL_PORT=18390 bash scripts/test-snell-real-smoke.sh
+```
+
+By default it creates a temporary Snell protocol node, waits for the agent path, verifies service state and the listen port, queries Runtime State overview, then deletes the node. Set `OB_SNELL_KEEP=1` only when you intentionally want to keep the test node.
 
 Manual real 3x-ui read-only check:
 
