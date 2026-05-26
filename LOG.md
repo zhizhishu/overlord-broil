@@ -203,3 +203,14 @@
   - `bash scripts/release-check.sh` 通过，覆盖 agent mock、3x-ui fixture、可选真实 E2E skip、compose、master port contract、Docker Node 22 前端 build、compose dry-run 和 `git diff --check`。
 - 清理：本地 3x-ui fixture 随脚本退出清理；临时 inbound 已删除；Docker Node 22 验证容器使用 `--rm`；未保留本轮端口监听。
 - 后续：提交推送到 `origin/main` 和 `origin/future`，确认 GitHub Actions、Pages 和 GHCR 镜像成果；配置真实 3x-ui secrets 后再跑手动 workflow。
+
+### Real 3x-ui E2E Remote Verification
+
+- 完成：确认 `f9691f4 Add real 3x-ui E2E contract gate` 已同步到 `origin/main` 和 `origin/future`，并完成远端 CI、Pages、Docker Images 与 GHCR 镜像验证。
+- 验证：
+  - `origin/main` 和 `origin/future` 均指向 `f9691f4f28063f09391687c087519f4a0ff17cc6`。
+  - main CI run `26428766161` 成功，future CI run `26428766915` 成功，main Pages deployment run `26428765778` 成功。
+  - 手动触发 main Docker Images run `26428778888` 成功，手动触发 future Docker Images run `26428778873` 成功。
+  - GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 可读取，index digest 为 `sha256:e7519039788a6ba54ec31fb4cc3b46864c9b774412894566be582d46533e15a3`，linux/amd64 digest 为 `sha256:29fea0bd5ffa8c67ed505bdc13d9c01a782c6f72168a7db96e159ff58ea2ea69`。
+- 清理：本阶段只使用 `gh` 和 Docker imagetools 读取远端状态并触发镜像 workflow，未启动本地服务、未占用端口、未创建持久容器。
+- 后续：提交并推送这份远端验证记录，再触发/确认最终 GitHub Actions 与 GHCR 镜像成果。
