@@ -44,7 +44,7 @@ jobs:
         include:
           - name: master
             context: .
-            image: ghcr.io/zhizhishu/flux-3xui-orchestrator-master
+            image: ghcr.io/zhizhishu/overlord-broil
 
     steps:
       - uses: actions/checkout@v5

@@ -1,39 +1,39 @@
 # Operations
 
-This checklist is for running Flux 3x-ui Orchestrator as a small authorized master/agent deployment.
+This checklist is for running Overlord Broil as a small authorized master/agent deployment.
 
 ## Install Paths
 
 | Component | Path |
 | --- | --- |
-| Master install root | `/opt/flux-3xui-orchestrator` |
-| Master environment | `/opt/flux-3xui-orchestrator/.env` |
-| Master compose files | `/opt/flux-3xui-orchestrator/docker-compose.yml`, `docker-compose-v4.yml`, `docker-compose-v6.yml` or `docker-compose.sqlite.yml` |
-| Database seed | `/opt/flux-3xui-orchestrator/gost.sql` |
-| SQLite data directory | `/opt/flux-3xui-orchestrator/data`, only when `FLUX_DB_MODE=sqlite` |
-| Master backups | `/opt/flux-3xui-orchestrator/backups` |
-| Master logs volume | Docker volume `master_logs`, mounted at `/app/logs` |
-| MySQL data volume | Docker volume `mysql_data` |
-| Agent environment | `/etc/flux-agent.env` |
-| Agent runner | `/usr/local/bin/flux-agent.sh` |
-| Agent work directory | `/var/lib/flux-agent` |
+| Master install root | `/opt/overlord-broil` |
+| Master environment | `/opt/overlord-broil/.env` |
+| Master compose files | `/opt/overlord-broil/docker-compose.yml`, `docker-compose-v4.yml`, `docker-compose-v6.yml` or `docker-compose.sqlite.yml` |
+| Database seed | `/opt/overlord-broil/overlord.sql` |
+| SQLite data directory | `/opt/overlord-broil/data`, only when `OB_DB_MODE=sqlite` |
+| Master backups | `/opt/overlord-broil/backups` |
+| Master logs volume | Docker volume `overlord_master_logs`, mounted at `/app/logs` |
+| MySQL data volume | Docker volume `overlord_mysql_data` |
+| Agent environment | `/etc/overlord-agent.env` |
+| Agent runner | `/usr/local/bin/overlord-agent.sh` |
+| Agent work directory | `/var/lib/overlord-agent` |
 | Snell node configs | `/etc/snell/users/node-<id>.conf` |
 | Snell services | `snell-node-<id>.service` on systemd, `/etc/init.d/snell-node-<id>` on OpenRC |
-| Forwarding services | `flux-forward-<id>.service` on systemd, `/etc/init.d/flux-forward-<id>` on OpenRC |
+| Forwarding services | `overlord-forward-<id>.service` on systemd, `/etc/init.d/overlord-forward-<id>` on OpenRC |
 
 ## Ports
 
 | Port | Component | Production note |
 | --- | --- | --- |
-| `5166/tcp` | Master panel, API and controlled-agent callback | Default public entry. Change with `FLUX_FRONTEND_PORT`. |
-| `6365/tcp` | Backend debug alias | Not exposed by default. Publish only with `FLUX_EXPOSE_BACKEND=1`. |
+| `5166/tcp` | Master panel, API and controlled-agent callback | Default public entry. Change with `OB_FRONTEND_PORT`. |
+| `6365/tcp` | Backend debug alias | Not exposed by default. Publish only with `OB_EXPOSE_BACKEND=1`. |
 | `3306/tcp` | MySQL | Docker internal only in shipped compose files. |
 | SQLite | Local DB file | Optional mode only; no network port. |
-| phpMyAdmin | Maintenance UI | Disabled by default. Expose temporarily with `FLUX_PHPMYADMIN_PORT`. |
+| phpMyAdmin | Maintenance UI | Disabled by default. Expose temporarily with `OB_PHPMYADMIN_PORT`. |
 
-The installer removes legacy split-stack containers named `vite-frontend`, `springboot-backend` and `gost-phpmyadmin` during install/upgrade. This prevents old Flux-derived deployments from leaving public `80/6365/8066` ports active after the default runtime has moved to the single `flux-master` entry.
+The installer removes legacy split-stack containers and optional phpMyAdmin helpers during install/upgrade. This prevents older deployments from leaving public `80/6365/8066` ports active after the default runtime has moved to the single `overlord-master` entry.
 
-Standalone backend/frontend runtime images and legacy split compose files are intentionally removed from the supported install path. Use the single `flux-master` image for master deployments.
+Standalone backend/frontend runtime images and legacy split compose files are intentionally removed from the supported install path. Use the single `overlord-master` image for master deployments.
 
 Controlled hosts do not need an inbound agent port. Agents call the same master entry URL that users open in the browser, for example `http://master:5166`.
 
@@ -54,51 +54,51 @@ Controlled-host business ports are created by your orchestration choices: option
 Install:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh | sudo bash
 ```
 
 Bootstrap form for Alpine or minimal images without `bash`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master-bootstrap.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master-bootstrap.sh | sudo sh
 ```
 
 Preflight:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh \
   | sudo bash -s -- doctor
 ```
 
 Common overrides:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo env FLUX_FRONTEND_PORT="5166" FLUX_NETWORK_STACK="v4" bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh \
+  | sudo env OB_FRONTEND_PORT="5166" OB_NETWORK_STACK="v4" bash
 
 # optional SQLite mode for small labs or single-node trials
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo env FLUX_DB_MODE="sqlite" FLUX_FRONTEND_PORT="5166" bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh \
+  | sudo env OB_DB_MODE="sqlite" OB_FRONTEND_PORT="5166" bash
 ```
 
-`FLUX_DB_MODE=mysql` is still the default and keeps the MySQL sidecar plus optional phpMyAdmin maintenance path. `FLUX_DB_MODE=sqlite` switches the master to `docker-compose.sqlite.yml`, disables phpMyAdmin, mounts `/opt/flux-3xui-orchestrator/data` into the `flux-master` container, and initializes the schema from the embedded SQLite schema on boot.
+`OB_DB_MODE=mysql` is still the default and keeps the MySQL sidecar plus optional phpMyAdmin maintenance path. `OB_DB_MODE=sqlite` switches the master to `docker-compose.sqlite.yml`, disables phpMyAdmin, mounts `/opt/overlord-broil/data` into the `overlord-master` container, and initializes the schema from the embedded SQLite schema on boot.
 
 Day-2 actions:
 
 ```bash
-sudo bash /opt/flux-3xui-orchestrator/install-master.sh upgrade
-sudo bash /opt/flux-3xui-orchestrator/install-master.sh backup
-sudo bash /opt/flux-3xui-orchestrator/install-master.sh restore --backup-file /opt/flux-3xui-orchestrator/backups/flux-master-backup-YYYYMMDD-HHMMSS.tar.gz
-sudo bash /opt/flux-3xui-orchestrator/install-master.sh uninstall --yes
+sudo bash /opt/overlord-broil/install-master.sh upgrade
+sudo bash /opt/overlord-broil/install-master.sh backup
+sudo bash /opt/overlord-broil/install-master.sh restore --backup-file /opt/overlord-broil/backups/overlord-master-backup-YYYYMMDD-HHMMSS.tar.gz
+sudo bash /opt/overlord-broil/install-master.sh uninstall --yes
 ```
 
-In SQLite mode, `backup` stores the resolved data directory as a separate `sqlite-data/` payload and `restore` writes it back to the `SQLITE_DATA_DIR` recorded in `.env`. If `flux-master` is running, the backup command briefly stops the master container before copying SQLite files, then starts it again for a consistent file-level backup.
+In SQLite mode, `backup` stores the resolved data directory as a separate `sqlite-data/` payload and `restore` writes it back to the `SQLITE_DATA_DIR` recorded in `.env`. If `overlord-master` is running, the backup command briefly stops the master container before copying SQLite files, then starts it again for a consistent file-level backup.
 
 Expose direct backend or phpMyAdmin only during maintenance:
 
 ```bash
-sudo env FLUX_EXPOSE_BACKEND="1" FLUX_BACKEND_PORT="6365" bash /opt/flux-3xui-orchestrator/install-master.sh upgrade
-sudo env FLUX_PHPMYADMIN_PORT="18066" bash /opt/flux-3xui-orchestrator/install-master.sh upgrade
+sudo env OB_EXPOSE_BACKEND="1" OB_BACKEND_PORT="6365" bash /opt/overlord-broil/install-master.sh upgrade
+sudo env OB_PHPMYADMIN_PORT="18066" bash /opt/overlord-broil/install-master.sh upgrade
 ```
 
 Verify the single-entry contract from a checkout:
@@ -112,41 +112,41 @@ bash scripts/test-master-port-contract.sh
 Install an agent on each controlled server:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
-  | sudo env FLUX_PANEL_URL="http://MASTER_IP:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent.sh \
+  | sudo env OB_PANEL_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash
 ```
 
 Bootstrap form:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent-bootstrap.sh \
-  | sudo env FLUX_PANEL_URL="http://MASTER_IP:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" sh
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent-bootstrap.sh \
+  | sudo env OB_PANEL_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" sh
 ```
 
 Useful checks:
 
 ```bash
-systemctl status flux-agent.service
-journalctl -u flux-agent.service -n 100 --no-pager
-sudo -E /usr/local/bin/flux-agent.sh --doctor
-sudo -E /usr/local/bin/flux-agent.sh --once
+systemctl status overlord-agent.service
+journalctl -u overlord-agent.service -n 100 --no-pager
+sudo -E /usr/local/bin/overlord-agent.sh --doctor
+sudo -E /usr/local/bin/overlord-agent.sh --once
 
 # Alpine / OpenRC
-rc-service flux-agent status
-tail -n 100 /var/log/flux-agent.log
-tail -n 100 /var/log/flux-agent.err
+rc-service overlord-agent status
+tail -n 100 /var/log/overlord-agent.log
+tail -n 100 /var/log/overlord-agent.err
 ```
 
-Reliability knobs in `/etc/flux-agent.env`:
+Reliability knobs in `/etc/overlord-agent.env`:
 
 ```bash
-FLUX_HTTP_RETRIES=4
-FLUX_HTTP_BACKOFF_BASE=2
-FLUX_HTTP_BACKOFF_MAX=30
-FLUX_HTTP_CONNECT_TIMEOUT=10
-FLUX_HTTP_MAX_TIME=60
-FLUX_TASK_TIMEOUT_SECONDS=7200
-FLUX_TASK_TIMEOUT_KILL_SECONDS=30
+OB_HTTP_RETRIES=4
+OB_HTTP_BACKOFF_BASE=2
+OB_HTTP_BACKOFF_MAX=30
+OB_HTTP_CONNECT_TIMEOUT=10
+OB_HTTP_MAX_TIME=60
+OB_TASK_TIMEOUT_SECONDS=7200
+OB_TASK_TIMEOUT_KILL_SECONDS=30
 ```
 
 ## Runtime Provider Operations
@@ -177,7 +177,7 @@ Task claiming is guarded by an atomic state transition: the agent can only move 
 
 Operation audit is written beside the task history. The master records `deploy_task.created`, `deploy_task.orchestrated`, `deploy_task.rejected`, `deploy_task.state_updated`, `deploy_task.retried`, `deploy_task.deleted`, `agent_task.claimed` and `agent_task.reported` events into `operation_audit_log`; the UI reads them from `/api/v1/operation-audit/list`. Master-side events use the current JWT user when a request context exists, and report events store state, exit code and log lengths, not raw stdout/stderr content.
 
-Xray/3x-ui deployment scripts are now executable by the controlled agent. They resolve `XUI_ENDPOINT`, `XUI_BASE_PATH` and `XUI_API_TOKEN` from saved server metadata or local agent environment, call `/panel/api/inbounds/add`, `/panel/api/inbounds/del/{id}` or `/panel/api/server/restartXrayService`, and report inbound metadata through `FLUX_AGENT_RESULT_JSON`. A missing API token should be treated as an operator configuration error unless the target host can read it from `/usr/local/x-ui/x-ui`.
+Xray/3x-ui deployment scripts are now executable by the controlled agent. They resolve `XUI_ENDPOINT`, `XUI_BASE_PATH` and `XUI_API_TOKEN` from saved server metadata or local agent environment, call `/panel/api/inbounds/add`, `/panel/api/inbounds/del/{id}` or `/panel/api/server/restartXrayService`, and report inbound metadata through `OB_AGENT_RESULT_JSON`. A missing API token should be treated as an operator configuration error unless the target host can read it from `/usr/local/x-ui/x-ui`.
 
 Agent reports are sanitized before task-history storage. Raw installation/orchestration reports may contain new 3x-ui credentials long enough for the master to update encrypted server fields, but stored `resultJson` removes `xuiApiToken`, `xuiPassword`, `xuiTwoFactorCode` and any `serverSecrets` block, replacing them with configured flags where useful.
 
@@ -185,9 +185,9 @@ Firewall actions `open-runtime-ports` and `close-runtime-ports` parse `ports`, `
 
 Install, certificate and firewall diagnostics write structured `diagnostics.items` into the task result. The master task card summarizes high-risk findings first: unresolved DNS, local port `80` occupancy, missing certificate files, missing ACME tooling, local firewall command availability and the cloud-security-group boundary.
 
-`agent-maintenance` log collection writes structured `logs.items` into the task result. Each item carries `runtime`, `source`, `title`, bounded `content`, line count and truncation state. The intended coverage is Flux agent runtime logs, x-ui/Xray service logs, Snell node service logs, remote forwarding service logs and task/work-directory logs. The master task card should use these items for a short remote-log summary first, then leave raw stdout/stderr available for deeper investigation.
+`agent-maintenance` log collection writes structured `logs.items` into the task result. Each item carries `runtime`, `source`, `title`, bounded `content`, line count and truncation state. The intended coverage is Overlord agent runtime logs, x-ui/Xray service logs, Snell node service logs, remote forwarding service logs and task/work-directory logs. The master task card should use these items for a short remote-log summary first, then leave raw stdout/stderr available for deeper investigation.
 
-`agent-maintenance upgrade-agent` uses a guarded upgrade path. The generated script downloads the new `flux-agent.sh` to a temporary file, rejects empty or syntactically invalid downloads before touching the current binary, records the current and new `--version` values, calculates SHA-256 when a local checksum tool is available, backs up the previous binary as `flux-agent.sh.bak.<timestamp>`, installs through a staged file, schedules a service restart, and reports the result under `maintenance.upgrade`.
+`agent-maintenance upgrade-agent` uses a guarded upgrade path. The generated script downloads the new `overlord-agent.sh` to a temporary file, rejects empty or syntactically invalid downloads before touching the current binary, records the current and new `--version` values, calculates SHA-256 when a local checksum tool is available, backs up the previous binary as `overlord-agent.sh.bak.<timestamp>`, installs through a staged file, schedules a service restart, and reports the result under `maintenance.upgrade`.
 
 ## First-Run Operator Path
 
@@ -204,7 +204,7 @@ Install, certificate and firewall diagnostics write structured `diagnostics.item
 - Back up `SECRET_ENCRYPTION_KEY` with `.env`; encrypted 3x-ui credentials and API tokens cannot be restored safely if the key is lost or rotated without planning.
 - Keep controlled-server agents off the master host unless you are deliberately testing self-control behavior. A `role=master` server can self-manage safe tasks, while destructive actions and protected listen ports such as frontend/backend/MySQL/SSH are blocked.
 - Confirm only `5166/tcp` is publicly reachable for the master unless you intentionally exposed debug or maintenance ports.
-- Confirm `docker compose ps` shows healthy `mysql` and `master` services in MySQL mode, or a healthy `master` service plus `/opt/flux-3xui-orchestrator/data` in SQLite mode.
+- Confirm `docker compose ps` shows healthy `mysql` and `master` services in MySQL mode, or a healthy `master` service plus `/opt/overlord-broil/data` in SQLite mode.
 - Check `GET /flow/test` through the master entry after every upgrade.
 - Create a backup before upgrades and before schema-affecting changes.
 - Store 3x-ui API tokens only in the panel fields intended for that purpose; do not paste tokens into issue reports or logs.
@@ -225,10 +225,10 @@ Release readiness means:
 
 - `VERSION`, `README.md`, release notes and the public docs site name the same release.
 - CI is green on `main`.
-- Docker Images workflow is green on `main` and GHCR has a fresh `flux-master` image.
-- GHCR package visibility is public or otherwise intentionally scoped, and `docker pull ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` works from the intended install environment.
+- Docker Images workflow is green on `main` and GHCR has a fresh `overlord-master` image.
+- GHCR package visibility is public or otherwise intentionally scoped, and `docker pull ghcr.io/zhizhishu/overlord-broil:latest` works from the intended install environment.
 - `scripts/install-master.sh` succeeds on a clean Linux host or falls back to local source builds when GHCR pulls are unavailable.
-- `scripts/install-master-bootstrap.sh` and `scripts/install-flux-agent-bootstrap.sh` are syntax-checked.
+- `scripts/install-master-bootstrap.sh` and `scripts/install-agent-bootstrap.sh` are syntax-checked.
 - `scripts/test-install-matrix.sh` passes on Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux container images.
 - `.env` and backup handling are understood before the first live install.
 - Public firewall rules intentionally expose only the ports needed for your environment.
@@ -238,10 +238,10 @@ Release readiness means:
 
 ```bash
 docker run --rm -v "$PWD/springboot-backend:/workspace" -w /workspace maven:3.9-eclipse-temurin-21 mvn -B -DskipTests package
-docker run --rm -v "$PWD:/workspace" -v flux_3xui_frontend_node_modules:/workspace/vite-frontend/node_modules -w /workspace/vite-frontend node:22-bookworm bash -lc "npm install --legacy-peer-deps --no-audit --no-fund && npm run build"
+docker run --rm -v "$PWD:/workspace" -v ob_3xui_frontend_node_modules:/workspace/vite-frontend/node_modules -w /workspace/vite-frontend node:22-bookworm bash -lc "npm install --legacy-peer-deps --no-audit --no-fund && npm run build"
 bash scripts/release-check.sh
 bash scripts/release-check.sh --full
-bash scripts/test-flux-agent-mock.sh
+bash scripts/test-agent-mock.sh
 bash scripts/test-three-xui-fixture.sh
 bash scripts/test-three-xui-e2e.sh
 bash scripts/test-install-matrix.sh

@@ -26,7 +26,7 @@ import sqlite3
 from pathlib import Path
 
 schema = Path("/schema-sqlite.sql").read_text(encoding="utf-8")
-db_path = Path("/work/flux-master.sqlite")
+db_path = Path("/work/overlord-master.sqlite")
 
 conn = sqlite3.connect(db_path)
 try:

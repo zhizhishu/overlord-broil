@@ -11,7 +11,7 @@ interface LanguageContextValue {
   t: (message: string, params?: Params) => string;
 }
 
-const STORAGE_KEY = "flux_locale";
+const STORAGE_KEY = "ob_locale";
 
 const en: Record<string, string> = {
   "语言": "Language",

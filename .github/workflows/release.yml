@@ -66,9 +66,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: Flux 3x-ui Orchestrator ${{ steps.version.outputs.version }}
+          name: Overlord Broil ${{ steps.version.outputs.version }}
           body_path: docs/RELEASE_NOTES.md
           prerelease: ${{ !startsWith(steps.version.outputs.version, '1.') }}
           files: |
-            dist/release/flux-3xui-orchestrator-${{ steps.version.outputs.version }}.tar.gz
-            dist/release/flux-3xui-orchestrator-${{ steps.version.outputs.version }}.tar.gz.sha256
+            dist/release/overlord-broil-${{ steps.version.outputs.version }}.tar.gz
+            dist/release/overlord-broil-${{ steps.version.outputs.version }}.tar.gz.sha256

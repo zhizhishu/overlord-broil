@@ -4,29 +4,29 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-COMPOSE_FILE="${FLUX_COMPOSE_FILE:-docker-compose-v4.yml}"
-DB_MODE="${FLUX_DB_MODE:-mysql}"
+COMPOSE_FILE="${OB_COMPOSE_FILE:-docker-compose-v4.yml}"
+DB_MODE="${OB_DB_MODE:-mysql}"
 BACKEND_PORT="${BACKEND_PORT:-16365}"
 FRONTEND_PORT="${FRONTEND_PORT:-18080}"
 MASTER_INTERNAL_URL="${MASTER_INTERNAL_URL:-http://localhost:5166/flow/test}"
 FRONTEND_URL="${FRONTEND_URL:-http://127.0.0.1:${FRONTEND_PORT}/}"
-DB_NAME="${DB_NAME:-gost_smoke}"
-DB_USER="${DB_USER:-gost_smoke}"
+DB_NAME="${DB_NAME:-overlord_smoke}"
+DB_USER="${DB_USER:-overlord_smoke}"
 DB_PASSWORD="${DB_PASSWORD:-test-password}"
-SQLITE_DB_PATH="${FLUX_SQLITE_DB_PATH:-/app/data/flux-master.sqlite}"
+SQLITE_DB_PATH="${OB_SQLITE_DB_PATH:-/app/data/overlord-master.sqlite}"
 SQLITE_DATA_OWNED="false"
-if [ "${FLUX_SQLITE_DATA_DIR+x}" = "x" ]; then
-  SQLITE_DATA_DIR="$FLUX_SQLITE_DATA_DIR"
+if [ "${OB_SQLITE_DATA_DIR+x}" = "x" ]; then
+  SQLITE_DATA_DIR="$OB_SQLITE_DATA_DIR"
 else
   SQLITE_DATA_DIR="${PROJECT_ROOT}/.tmp/compose-smoke-sqlite-data"
   SQLITE_DATA_OWNED="true"
 fi
 JWT_SECRET="${JWT_SECRET:-test-jwt-secret}"
 SECRET_ENCRYPTION_KEY="${SECRET_ENCRYPTION_KEY:-test-secret-encryption-key}"
-TIMEOUT_SECONDS="${FLUX_COMPOSE_SMOKE_TIMEOUT_SECONDS:-240}"
-POLL_SECONDS="${FLUX_COMPOSE_SMOKE_POLL_SECONDS:-5}"
-ALLOW_EXISTING="${FLUX_COMPOSE_SMOKE_ALLOW_EXISTING:-false}"
-BUILD_LOCAL="${FLUX_COMPOSE_SMOKE_BUILD_LOCAL:-false}"
+TIMEOUT_SECONDS="${OB_COMPOSE_SMOKE_TIMEOUT_SECONDS:-240}"
+POLL_SECONDS="${OB_COMPOSE_SMOKE_POLL_SECONDS:-5}"
+ALLOW_EXISTING="${OB_COMPOSE_SMOKE_ALLOW_EXISTING:-false}"
+BUILD_LOCAL="${OB_COMPOSE_SMOKE_BUILD_LOCAL:-false}"
 DRY_RUN="false"
 
 usage() {
@@ -34,7 +34,7 @@ usage() {
 Usage: scripts/test-compose-smoke.sh [--compose-file FILE] [--backend-port PORT] [--frontend-port PORT] [--timeout SECONDS] [--build-local] [--dry-run]
 
 Starts the compose smoke stack with test environment values, checks:
-  - flux-master: GET /flow/test from inside the single-image master container
+  - overlord-master: GET /flow/test from inside the single-image master container
   - host:        GET / through the public master entry
 
 The script always runs docker compose down --volumes --remove-orphans before exit
@@ -42,10 +42,10 @@ after a stack start attempt.
 
 Because the compose files use fixed container, volume, and network names, the
 script fails before startup if those resources already exist. Set
-FLUX_COMPOSE_SMOKE_ALLOW_EXISTING=true to override this guard in disposable
+OB_COMPOSE_SMOKE_ALLOW_EXISTING=true to override this guard in disposable
 environments.
 
-Use --build-local to build the flux-master image from the current checkout
+Use --build-local to build the overlord-master image from the current checkout
 before startup. This avoids depending on GHCR pull permissions and makes CI
 smoke tests validate the current commit.
 EOF
@@ -211,27 +211,27 @@ assert_no_existing_resource() {
 }
 
 assert_clean_compose_resources() {
-  assert_no_existing_resource container flux-master
-  assert_no_existing_resource container gost-phpmyadmin
+  assert_no_existing_resource container overlord-master
+  assert_no_existing_resource container overlord-phpmyadmin
   assert_no_existing_resource container springboot-backend
   assert_no_existing_resource container vite-frontend
-  assert_no_existing_resource volume master_logs
-  assert_no_existing_resource volume backend_logs
-  assert_no_existing_resource network gost-network
+  assert_no_existing_resource volume overlord_master_logs
+  assert_no_existing_resource volume overlord_backend_logs
+  assert_no_existing_resource network overlord-network
   if [ "$DB_MODE" = "sqlite" ]; then
     if [ "$ALLOW_EXISTING" != "true" ] && [ -e "$SQLITE_DATA_DIR" ]; then
       echo "Refusing to run: existing SQLite data dir '${SQLITE_DATA_DIR}' would be affected by cleanup." >&2
       exit 1
     fi
   else
-    assert_no_existing_resource container gost-mysql
-    assert_no_existing_resource volume mysql_data
+    assert_no_existing_resource container overlord-mysql
+    assert_no_existing_resource volume overlord_mysql_data
   fi
 }
 
 build_local_images() {
-  echo "Building local flux-master compose smoke image..."
-  docker build -t ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest "${PROJECT_ROOT}"
+  echo "Building local overlord-master compose smoke image..."
+  docker build -t ghcr.io/zhizhishu/overlord-broil:latest "${PROJECT_ROOT}"
 }
 
 cleanup() {
@@ -265,9 +265,9 @@ compose config --quiet
 if [ "$DRY_RUN" = "true" ]; then
   if [ "$BUILD_LOCAL" = "true" ]; then
     if [ "$DB_MODE" = "sqlite" ]; then
-      echo "Dry run passed. Would build local flux-master image, then run: docker compose -f ${COMPOSE_PATH} up -d master"
+      echo "Dry run passed. Would build local overlord-master image, then run: docker compose -f ${COMPOSE_PATH} up -d master"
     else
-      echo "Dry run passed. Would build local flux-master image, then run: docker compose -f ${COMPOSE_PATH} up -d mysql master"
+      echo "Dry run passed. Would build local overlord-master image, then run: docker compose -f ${COMPOSE_PATH} up -d mysql master"
     fi
   else
     if [ "$DB_MODE" = "sqlite" ]; then
@@ -292,7 +292,7 @@ if [ "$DB_MODE" = "sqlite" ]; then
 else
   compose up -d mysql master
 fi
-wait_for_container_http "flux-master" flux-master "$MASTER_INTERNAL_URL"
+wait_for_container_http "overlord-master" overlord-master "$MASTER_INTERNAL_URL"
 wait_for_http "public master" "$FRONTEND_URL"
 
 echo "compose smoke test passed"

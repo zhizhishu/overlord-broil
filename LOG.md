@@ -4,19 +4,19 @@
 
 ### Legacy Split Runtime Removal
 
-- 完成：删除旧分体 runtime 产品面，默认发布和安装路径只保留 `flux-master` 单体主控镜像与当前 `flux-agent` 被控安装方式。
-- 修改：移除 legacy compose、旧根级安装脚本、旧分体 Dockerfile、旧 VitePress 文档站和 standalone frontend Nginx 配置；GitHub Docker Images workflow 只构建/推送 `flux-3xui-orchestrator-master`；CI/release gate 不再验证 legacy compose。
-- 修正：`NodeServiceImpl` 生成当前项目 `install-flux-agent-bootstrap.sh` 命令；配置页改为主控访问地址 `5166` 语义；浏览器标题/meta 和前端包名改为 Flux 3x-ui Orchestrator；新生成证书目录改为 `/root/cert/flux-3xui-orchestrator`，agent 保留旧证书路径读取兜底。
+- 完成：删除旧分体 runtime 产品面，默认发布和安装路径只保留 `overlord-master` 单体主控镜像与当前 `overlord-agent` 被控安装方式。
+- 修改：移除 legacy compose、旧根级安装脚本、旧分体 Dockerfile、旧 VitePress 文档站和 standalone frontend Nginx 配置；GitHub Docker Images workflow 只构建/推送 `overlord-broil`；CI/release gate 不再验证 legacy compose。
+- 修正：`NodeServiceImpl` 生成当前项目 `install-agent-bootstrap.sh` 命令；配置页改为主控访问地址 `5166` 语义；浏览器标题/meta 和前端包名改为 Overlord Broil；新生成证书目录改为 `/root/cert/overlord-broil`，agent 保留旧证书路径读取兜底。
 - 验证：`bash -n scripts/*.sh`、bootstrap `sh -n`、master port contract、MySQL/SQLite compose dry-run、agent mock、3x-ui fixture、前端 `npm run build`、Docker Maven package build、`git diff --check` 均通过。
 - 清理：Docker Maven 使用 `--rm`，测试容器已退出；未启动本地 dev server，未占用 `5166/5168/6365/8066` 等项目端口。
-- 后续：提交并推送 `origin/main` 与 `origin/future`，再确认 GitHub Actions 和 GHCR `flux-master` 镜像。
+- 后续：提交并推送 `origin/main` 与 `origin/future`，再确认 GitHub Actions 和 GHCR `overlord-master` 镜像。
 
 ### Operation Audit Remote Image Verification
 
 - 完成：确认 Operation Audit Log 已推送到 `origin/main` 和 `origin/future`，两条分支均指向 `f6381606c7410e1d8b89c6b93aaecbfbf210697f`。
-- 镜像：手动确认并补齐 GHCR 镜像标签；随后产品面已收口为只发布 `flux-master` 单体镜像。
+- 镜像：手动确认并补齐 GHCR 镜像标签；随后产品面已收口为只发布 `overlord-master` 单体镜像。
 - 验证：
-  - `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest/main/sha-f638160` index digest 为 `sha256:4ebde7a773d5521ac5d262f5ae7b1ca7360bbec96ebd0d843cf20214f92e28b5`。
+  - `ghcr.io/zhizhishu/overlord-broil:latest/main/sha-f638160` index digest 为 `sha256:4ebde7a773d5521ac5d262f5ae7b1ca7360bbec96ebd0d843cf20214f92e28b5`。
   - 前端 Docker build 内部 `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
 - 注意：`gh run list --commit f6381606c7410e1d8b89c6b93aaecbfbf210697f` 未返回 Actions run，因此本次以手动 Docker buildx push 和 `imagetools inspect` 作为镜像成果证明。
 - Actions：远端验证记录提交 `1fc801068ec3df0d8b329f4560bc40f140bd9182` 已推送到 `main` 和 `future`；`main CI` run `26448892387` 成功，`future CI` run `26448900654` 初次受 GitHub checkout/action 下载 403 影响失败，重跑失败项后成功，Pages run `26448891539` 初次下载官方 action 失败，重跑后成功。
@@ -43,10 +43,10 @@
 
 ### Flux Master Single-Image Runtime Milestone
 
-- 完成：把默认运行形态收敛为 `mysql + flux-master`，主控 Web UI 和 API 由同一个 Spring Boot 进程在 `5166` 提供。
+- 完成：把默认运行形态收敛为 `mysql + overlord-master`，主控 Web UI 和 API 由同一个 Spring Boot 进程在 `5166` 提供。
 - 修改：更新根 `Dockerfile`、Compose、安装脚本、release 脚本、CI、Docker Images workflow、README、中文 README、Operations、Release Notes 和项目上下文。
 - 验证：通过 compose config、shell syntax、agent mock、3x-ui fixture、dry-run compose smoke 和真实 Docker smoke；真实 smoke 中 `/flow/test` 与公共入口 `http://127.0.0.1:18080/` 均通过。
-- 推送：已推送 `ad9bb2e Add flux-master single image runtime` 到 `origin/main` 和 `origin/future`。
+- 推送：已推送 `ad9bb2e Add overlord-master single image runtime` 到 `origin/main` 和 `origin/future`。
 - 清理：Docker smoke 自动删除测试容器、网络、卷；复查 `18080` 无监听。
 
 ### Runtime Provider Registry Milestone
@@ -72,15 +72,15 @@
 
 - 完成：打通 Runtime Provider 从主控 claim 到 Agent 执行报告的审计闭环。
 - 修改：
-  - `scripts/flux-agent.sh` 读取 claim payload 中的 `runtimeProvider`，执行日志标记 provider，并在 running/final report 的 `resultJson.runtimeProvider` 中回传。
+  - `scripts/overlord-agent.sh` 读取 claim payload 中的 `runtimeProvider`，执行日志标记 provider，并在 running/final report 的 `resultJson.runtimeProvider` 中回传。
   - `DeployTaskServiceImpl` 保存 Agent report 时兜底补写 Runtime Provider 元数据，旧 Agent 没上报时仍能保留审计信息。
-  - `scripts/test-flux-agent-mock.sh` 增加 provider claim payload，并断言 running/final report 都带 `runtimeProvider.key=snell`。
+  - `scripts/test-agent-mock.sh` 增加 provider claim payload，并断言 running/final report 都带 `runtimeProvider.key=snell`。
   - 新增 `DeployTaskServiceImplTest` 覆盖后端兜底、保留 Agent 上报 provider、非 JSON 结果包装三种情况。
   - README、中文 README、Release Notes、PROJECT_CONTEXT 更新 Runtime Provider claim/report 审计说明。
 - 验证：
   - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
-  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
-  - `bash scripts/test-flux-agent-mock.sh` 通过。
+  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh'` 通过。
+  - `bash scripts/test-agent-mock.sh` 通过。
   - Docker Maven `RuntimeProviderServiceTest,DeployTaskServiceImplTest` 通过，6 个测试全部成功。
   - Docker Maven `mvn -B -DskipTests package` 通过。
 - 清理：Docker 验证容器 `flux-backend-provider-audit-verify` 使用 `--rm`，无残留；agent mock 临时服务已结束；`5166/5168/6365/8066` 未发现本轮遗留监听。
@@ -97,8 +97,8 @@
 - 验证：
   - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
   - Docker Maven `RuntimeProviderServiceTest,DeployTaskServiceImplTest` 通过，8 个测试全部成功。
-  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
-  - `bash scripts/test-flux-agent-mock.sh` 通过。
+  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh'` 通过。
+  - `bash scripts/test-agent-mock.sh` 通过。
   - Docker Maven `mvn -B -DskipTests package` 通过。
   - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
 - 清理：Docker 验证容器 `flux-runtime-state-verify`、`flux-runtime-state-package` 使用 `--rm`，无残留；agent mock 临时服务已结束。
@@ -116,13 +116,13 @@
 - 验证：
   - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
   - Docker Maven `RuntimeProviderServiceTest,DeployTaskServiceImplTest` 通过，11 个测试全部成功。
-  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
-  - `bash scripts/test-flux-agent-mock.sh` 通过。
+  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh'` 通过。
+  - `bash scripts/test-agent-mock.sh` 通过。
   - Docker Maven `mvn -B -DskipTests package` 通过。
   - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
 - 清理：Docker Maven 测试容器 `flux-state-sync-test`、package 容器 `flux-state-sync-package` 均使用 `--rm`，无残留；agent mock 临时服务随脚本结束；本阶段未启动长期 dev server。
 - 推送：已推送 `f8adf8c Add runtime state sync overview` 到 `origin/main` 和 `origin/future`。
-- 远端验证：`f8adf8c` 的 main CI、main Docker Images、main Pages、future CI、future Docker Images 均成功；GHCR `flux-3xui-orchestrator-master:latest` 更新到 index digest `sha256:82f5aa31d51b964fd45d1b5644303d6bebf3653600d16163bbd71222a62e5a42`，linux/amd64 digest `sha256:92e79daad1da2f1eab1c8131fadab4690c7803fbaf82952c9072a75757cb7261`。
+- 远端验证：`f8adf8c` 的 main CI、main Docker Images、main Pages、future CI、future Docker Images 均成功；GHCR `overlord-broil:latest` 更新到 index digest `sha256:82f5aa31d51b964fd45d1b5644303d6bebf3653600d16163bbd71222a62e5a42`，linux/amd64 digest `sha256:92e79daad1da2f1eab1c8131fadab4690c7803fbaf82952c9072a75757cb7261`。
 - 后续：让 State Sync 面板可直接发起 Runtime Provider 诊断/修复任务，继续打通 `State -> Task -> Agent -> Report` 运维闭环。
 
 ### State Sync Runtime Actions
@@ -139,12 +139,12 @@
   - 临时 Vite preview `http://127.0.0.1:4173/` 返回 HTTP 200，生产包中已确认包含 `运行时诊断`、`运行时修复` 和 `trigger: "state-sync"`。
 - 清理：临时 preview 进程 PID `11232` 已停止，复查 `4173` 无监听输出；内置浏览器验证时 `node_repl` 返回 `Transport closed`，已降级为 HTTP 和生产包检查，未保留可见浏览器页签。
 - 推送：已推送 `15cf59c Add state sync runtime actions` 到 `origin/main` 和 `origin/future`。
-- 远端验证：`15cf59c` 的 main CI、main Docker Images、main Pages、future CI、future Docker Images 均成功；GHCR `flux-3xui-orchestrator-master:latest` 更新到 index digest `sha256:3daefd856e5f1b00d946ae15c75e26dc2d88a1885fca1a16f5090bfe77082e41`，linux/amd64 digest `sha256:56cec1c39a5e83aed1bd60e845beabb3284737d98fc14c3f565a11a51bb62b31`。
+- 远端验证：`15cf59c` 的 main CI、main Docker Images、main Pages、future CI、future Docker Images 均成功；GHCR `overlord-broil:latest` 更新到 index digest `sha256:3daefd856e5f1b00d946ae15c75e26dc2d88a1885fca1a16f5090bfe77082e41`，linux/amd64 digest `sha256:56cec1c39a5e83aed1bd60e845beabb3284737d98fc14c3f565a11a51bb62b31`。
 - 后续：实现 Agent 远端运行时日志结构化回传和主控展示，继续补齐 `Agent -> Execute -> Report -> Master` 运维闭环。
 
 ### Agent Remote Runtime Logs
 
-- 完成：`agent-maintenance logs` 现在会结构化回传 `logs.items`，覆盖 flux-agent、x-ui/Xray、Snell、转发服务和最近任务日志；主控任务卡新增“远端日志”摘要面板。
+- 完成：`agent-maintenance logs` 现在会结构化回传 `logs.items`，覆盖 overlord-agent、x-ui/Xray、Snell、转发服务和最近任务日志；主控任务卡新增“远端日志”摘要面板。
 - 修改：
   - `DeployTaskServiceImpl` 的维护脚本新增 `LOG_FILE`、日志行数上限、systemd/OpenRC 日志采集、最近任务日志采集和 `payload["logs"]` 输出。
   - `DeployTaskServiceImplTest` 覆盖 `logs.items` 在 runtime 元数据兜底时不丢失，并验证生成脚本包含结构化日志采集链路。
@@ -153,10 +153,10 @@
 - 验证：
   - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
   - Docker Maven `RuntimeProviderServiceTest,DeployTaskServiceImplTest` 通过，13 个测试全部成功。
-  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
-  - `bash scripts/test-flux-agent-mock.sh` 通过。
+  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh'` 通过。
+  - `bash scripts/test-agent-mock.sh` 通过。
   - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
-  - 生产包已确认包含 `远端日志` 和 `查看完整日志`；后端脚本已确认包含 `FLUX_MAINTENANCE_LOG_LINES`、`capture_journal_log` 和 `payload["logs"]`。
+  - 生产包已确认包含 `远端日志` 和 `查看完整日志`；后端脚本已确认包含 `OB_MAINTENANCE_LOG_LINES`、`capture_journal_log` 和 `payload["logs"]`。
 - 清理：Docker Maven 容器 `flux-remote-logs-test` 使用 `--rm`，已结束无残留；agent mock 临时服务随脚本结束；本阶段未启动长期 dev server。
 - 后续：提交并推送到 `origin/main` 和 `origin/future`，再检查 GitHub Actions 与 GHCR 镜像状态。
 
@@ -172,8 +172,8 @@
 - 验证：
   - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
   - Docker Maven `RuntimeProviderServiceTest,DeployTaskServiceImplTest` 通过，16 个测试全部成功。
-  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
-  - `bash scripts/test-flux-agent-mock.sh` 通过。
+  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh'` 通过。
+  - `bash scripts/test-agent-mock.sh` 通过。
   - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
 - 清理：Docker Maven 容器 `flux-action-catalog-test` 使用 `--rm`，已结束无残留；agent mock 临时服务随脚本结束；本阶段未启动长期 dev server。
 - 后续：提交并推送到 `origin/main` 和 `origin/future`，再检查 GitHub Actions 与 GHCR 镜像状态。
@@ -185,21 +185,21 @@
   - `origin/main` 和 `origin/future` 均指向 `bfff02e03dc9d3c07a352df9f2982a0ccd7655ec`。
   - main Docker Images run `26424999510` 成功，main CI run `26424999514` 成功，main Pages deployment 成功。
   - future Docker Images run `26425008996` 成功，future CI run `26425009019` 成功。
-  - GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 可读取，index digest 为 `sha256:007b640226dc97b977f15f749a47d8af4db09262290d4cfe9aa16a6d78fb5668`，linux/amd64 digest 为 `sha256:6c8055292c50e113d9eb5b47d2fb4150c49af22f973aa97f29fd8dfbaec9aafe`。
+  - GHCR `ghcr.io/zhizhishu/overlord-broil:latest` 可读取，index digest 为 `sha256:007b640226dc97b977f15f749a47d8af4db09262290d4cfe9aa16a6d78fb5668`，linux/amd64 digest 为 `sha256:6c8055292c50e113d9eb5b47d2fb4150c49af22f973aa97f29fd8dfbaec9aafe`。
 - 清理：本阶段只使用 `gh` 和 Docker manifest/imagetools 读取远端状态，未启动本地服务、未占用端口、未创建容器。
 - 后续：收口默认单端口主控契约，避免旧分离容器或可选维护端口影响正式安装体验。
 
 ### Master Single-Port Contract
 
-- 完成：补强默认单端口主控契约，确保正式安装继续朝 `mysql + flux-master` 单体主控形态收口。
+- 完成：补强默认单端口主控契约，确保正式安装继续朝 `mysql + overlord-master` 单体主控形态收口。
 - 修改：
   - `install-master.sh` 安装/升级前会移除旧分离栈容器 `vite-frontend`、`springboot-backend`、`gost-phpmyadmin`，避免旧 `80/6365/8066` 映射残留。
   - `install-master.sh doctor` 增加旧分离容器提示，并给 Docker daemon 检查加超时，避免预检卡死。
-  - 新增 `scripts/test-master-port-contract.sh`，验证默认 compose 文件只发布一个 `flux-master` 主控入口，并确认安装脚本保留端口迁移、防 phpMyAdmin 默认暴露和旧容器清理保护。
+  - 新增 `scripts/test-master-port-contract.sh`，验证默认 compose 文件只发布一个 `overlord-master` 主控入口，并确认安装脚本保留端口迁移、防 phpMyAdmin 默认暴露和旧容器清理保护。
   - GitHub Actions CI 和 `scripts/release-check.sh` 接入 master port contract 测试。
   - README、中文 README、Operations、Release Notes 和 PROJECT_CONTEXT 补充单端口主控、旧容器迁移清理和验证命令说明。
 - 验证：
-  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
+  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh'` 通过。
   - `bash scripts/test-master-port-contract.sh` 通过。
   - `bash scripts/install-master.sh doctor` 通过。
   - `bash scripts/test-compose-smoke.sh --build-local --dry-run` 通过。
@@ -216,7 +216,7 @@
   - main CI run `26425570607` 成功，main Pages deployment 成功。
   - future CI run `26425570585` 成功。
   - 手动触发 main Docker Images run `26425624672` 成功，手动触发 future Docker Images run `26425624679` 成功。
-  - GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 可读取，index digest 为 `sha256:6ac01a8f03dbf17187d2c8a3ed69514dd79e841ffea30c6b5b753abbe092ba31`，linux/amd64 digest 为 `sha256:205667901f5dd3b59c765b56fca05dc4a52c948620e442a11de3ca0bc91bf240`。
+  - GHCR `ghcr.io/zhizhishu/overlord-broil:latest` 可读取，index digest 为 `sha256:6ac01a8f03dbf17187d2c8a3ed69514dd79e841ffea30c6b5b753abbe092ba31`，linux/amd64 digest 为 `sha256:205667901f5dd3b59c765b56fca05dc4a52c948620e442a11de3ca0bc91bf240`。
 - 清理：本阶段只使用 `gh` 和 Docker imagetools 读取远端状态，未启动本地服务、未占用端口、未创建容器。
 - 后续：继续推进正式版缺口：真实 3x-ui 容器级 E2E、真实 VPS 矩阵、UI 错误/加载/空状态 polish、安全治理和 agent 自动升级。
 
@@ -229,7 +229,7 @@
   - 增强 `scripts/three-xui-fixture.py` 的 form-urlencoded 和 `/panel/api/server/getConfigJson` 覆盖，让 `scripts/test-three-xui-fixture.sh` 能反打真实 E2E 脚本。
   - README、中文 README、Operations、Release Notes、GitHub Pages 和 PROJECT_CONTEXT 补充真实 E2E 的使用方式、skip 语义和剩余真机证明边界。
 - 验证：
-  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
+  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh'` 通过。
   - `bash scripts/test-three-xui-e2e.sh` 在无 endpoint/token 时按设计 skip。
   - `bash scripts/test-three-xui-fixture.sh` 通过，并完成新 E2E 脚本对本地 fixture 的状态、入站、Xray config、临时 inbound 创建/切换/删除验证。
   - `bash scripts/release-check.sh` 通过，覆盖 agent mock、3x-ui fixture、可选真实 E2E skip、compose、master port contract、Docker Node 22 前端 build、compose dry-run 和 `git diff --check`。
@@ -243,7 +243,7 @@
   - `origin/main` 和 `origin/future` 均指向 `f9691f4f28063f09391687c087519f4a0ff17cc6`。
   - main CI run `26428766161` 成功，future CI run `26428766915` 成功，main Pages deployment run `26428765778` 成功。
   - 手动触发 main Docker Images run `26428778888` 成功，手动触发 future Docker Images run `26428778873` 成功。
-  - GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 可读取，index digest 为 `sha256:e7519039788a6ba54ec31fb4cc3b46864c9b774412894566be582d46533e15a3`，linux/amd64 digest 为 `sha256:29fea0bd5ffa8c67ed505bdc13d9c01a782c6f72168a7db96e159ff58ea2ea69`。
+  - GHCR `ghcr.io/zhizhishu/overlord-broil:latest` 可读取，index digest 为 `sha256:e7519039788a6ba54ec31fb4cc3b46864c9b774412894566be582d46533e15a3`，linux/amd64 digest 为 `sha256:29fea0bd5ffa8c67ed505bdc13d9c01a782c6f72168a7db96e159ff58ea2ea69`。
 - 清理：本阶段只使用 `gh` 和 Docker imagetools 读取远端状态并触发镜像 workflow，未启动本地服务、未占用端口、未创建持久容器。
 - 后续：提交并推送这份远端验证记录，再触发/确认最终 GitHub Actions 与 GHCR 镜像成果。
 
@@ -251,15 +251,15 @@
 
 - 完成：补强 `agent-maintenance upgrade-agent`，让被控 Agent 升级进入可审计、可回滚的主控任务闭环。
 - 修改：
-  - `flux-agent.sh` 新增 `--version`，默认版本提升为 `flux-agent/0.3`。
+  - `overlord-agent.sh` 新增 `--version`，默认版本提升为 `overlord-agent/0.3`。
   - 主控生成的升级脚本先下载到临时文件，执行非空检查和 `bash -n`，再计算 SHA-256、备份旧二进制、staged install、计划重启 agent 服务。
   - 升级结果写入结构化 `maintenance.upgrade`，包含 source URL、agent binary、backup path、previous/new version、checksum、syntax/install/restart 状态。
   - 主控任务卡新增 Agent 升级摘要面板，并补齐中英文文案。
   - README、中文 README、Operations、Release Notes、GitHub Pages 和 PROJECT_CONTEXT 已同步说明安全升级生命周期。
 - 验证：
   - `bash -lc 'bash -n scripts/*.sh'` 通过。
-  - `bash -lc 'sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
-  - `bash scripts/test-flux-agent-mock.sh` 通过。
+  - `bash -lc 'sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh'` 通过。
+  - `bash scripts/test-agent-mock.sh` 通过。
   - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
   - Docker Maven `RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 17 个测试成功。
   - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
@@ -271,7 +271,7 @@
 
 - 完成：把 Runtime Provider 继续从“可见/可审计”推进到“可执行”，补齐 Xray/3x-ui inbound 编排和 firewall runtime port open/close 的 Agent 执行闭环。
 - 修改：
-  - `DeployTaskServiceImpl.buildXrayAgentPayload` 不再只输出占位 payload，而是生成 Agent 可执行脚本，解析 3x-ui endpoint/base path/token，调用 inbound add/delete 或 restart Xray API，并通过 `FLUX_AGENT_RESULT_JSON` 回传 inbound metadata。
+  - `DeployTaskServiceImpl.buildXrayAgentPayload` 不再只输出占位 payload，而是生成 Agent 可执行脚本，解析 3x-ui endpoint/base path/token，调用 inbound add/delete 或 restart Xray API，并通过 `OB_AGENT_RESULT_JSON` 回传 inbound metadata。
   - Xray agent 结果已做 token 脱敏：执行脚本可以使用 3x-ui API token，但回报 JSON 只包含 `tokenConfigured`，不保存 token 明文。
   - `RuntimeProviderService` 将 `open-runtime-ports` 和 `close-runtime-ports` 注册为 firewall provider action，并让 runtime-port 类维护动作解析到 `firewall`。
   - `agent-maintenance` 脚本新增 runtime port 解析和本机 firewall 执行逻辑，支持 `ufw`、active `firewalld` 和 `iptables`，执行后继续输出结构化诊断。
@@ -280,8 +280,8 @@
 - 验证：
   - Docker Maven clean test：`RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 19 个测试成功。
   - `bash -n scripts/*.sh` 通过。
-  - `sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh` 通过。
-  - `bash scripts/test-flux-agent-mock.sh` 通过。
+  - `sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh` 通过。
+  - `bash scripts/test-agent-mock.sh` 通过。
   - `bash scripts/test-three-xui-fixture.sh` 通过，完成 3x-ui fixture 状态、入站、Xray config、临时 inbound 创建/切换/删除。
   - `bash scripts/release-check.sh` 通过，覆盖 shell、agent mock、3x-ui fixture + E2E fixture 反打、可选真实 E2E skip、compose config、master port contract、Docker Node 22 前端 build、compose dry-run 和 `git diff --check`。
   - Agent 任务结果脱敏修正后，Docker Maven targeted test：`RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 20 个测试成功。
@@ -295,7 +295,7 @@
   - `origin/main` 和 `origin/future` 均指向 `2e2a0e8bc262a57b78bd1b9ff5223e1d78a4af83`。
   - main CI run `26434051689` 成功，main Docker Images run `26434051681` 成功，main Pages deployment run `26434051078` 成功。
   - future CI run `26434064343` 成功，future Docker Images run `26434064354` 成功。
-  - GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 可读取，index digest 为 `sha256:4be0416f955d89153d9560fe14a2fce27d37f94be9ee460084a1507e7ab19a5e`，linux/amd64 digest 为 `sha256:4263b75e715d095a0e7af53de714bd143451b297afdd91e1a4a641edc08687d7`。
+  - GHCR `ghcr.io/zhizhishu/overlord-broil:latest` 可读取，index digest 为 `sha256:4be0416f955d89153d9560fe14a2fce27d37f94be9ee460084a1507e7ab19a5e`，linux/amd64 digest 为 `sha256:4263b75e715d095a0e7af53de714bd143451b297afdd91e1a4a641edc08687d7`。
 - 清理：本阶段只使用 `gh` 和 Docker imagetools 读取远端状态，未启动本地服务、未占用端口、未创建持久容器。
 - 后续：继续推进正式版缺口，优先评估并落地可选 SQLite 主控运行模式。
 
@@ -304,7 +304,7 @@
 - 完成：把目标架构里的 `DB: MySQL / 后续可选 SQLite` 推进为可安装的 SQLite 主控模式，同时补强 agent claim、危险维护动作确认和 Runtime State 主控审计。
 - 修改：
   - 新增 `docker-compose.sqlite.yml`、`application-sqlite.yml`、`schema-sqlite.sql` 和 `scripts/test-sqlite-schema.sh`。
-  - `install-master.sh` 支持 `FLUX_DB_MODE=mysql|sqlite` / `--db mysql|sqlite`，SQLite 模式只启动 `flux-master`，不启动 MySQL/phpMyAdmin。
+  - `install-master.sh` 支持 `OB_DB_MODE=mysql|sqlite` / `--db mysql|sqlite`，SQLite 模式只启动 `overlord-master`，不启动 MySQL/phpMyAdmin。
   - SQLite 备份保存为 `sqlite-data/`，恢复写回 `.env` 中的 `SQLITE_DATA_DIR`；旧 MySQL 备份缺少 `DB_MODE` 时按 `mysql` 兼容。
   - Agent claim 使用 `generated -> claimed` 条件更新，危险 `agent-maintenance` 动作要求 `dangerConfirmed=true` 和匹配的 `confirmAction`。
   - 保存 agent 回报时由 master 覆盖 Runtime Provider/Runtime State 审计字段，并重新计算 `status/statusSource`，避免被控端伪造 State Sync 状态。
@@ -313,9 +313,19 @@
   - `bash scripts/test-master-port-contract.sh` 通过。
   - `bash scripts/test-sqlite-schema.sh` 通过。
   - `bash -n scripts/*.sh` 通过。
-  - `bash -lc 'sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
+  - `bash -lc 'sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh'` 通过。
   - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
   - Docker Maven targeted test `RuntimeProviderServiceTest,DeployTaskServiceImplTest` 通过：22 tests, 0 failures。
   - `bash scripts/release-check.sh` 通过，覆盖 shell、agent mock、SQLite schema、3x-ui fixture、可选真实 3x-ui E2E skip、compose config、master port contract、Docker Node 22 前端 build、MySQL/SQLite compose dry-run 和 `git diff --check`。
 - 清理：Docker Maven 容器 `flux-task-safety-test` 使用 `--rm` 并已退出；release-check 使用的 Docker Node 22 容器、agent mock 和 3x-ui fixture 临时资源已清理；未保留本轮端口监听。
 - 后续：提交推送到 `origin/main` 和 `origin/future`，确认 GitHub Actions、Pages 和 GHCR 镜像成果。
+
+### Overlord Broil Identity Consolidation
+
+- Completed: unified runtime and public product surface around Overlord Broil, overlord-master, overlord-agent, overlord.sql, overlord-mysql and overlord-network.
+- Completed: removed supported split backend/frontend image publishing and kept GitHub Actions Docker workflow focused on ghcr.io/zhizhishu/overlord-broil.
+- Completed: fixed app_name defaults and legacy app_name migration so new and upgraded installs show Overlord Broil instead of the previous name.
+- Completed: updated generated 3x-ui inbound comments and forwarding service descriptions to Overlord Broil wording.
+- Completed: rewrote README.zh-CN.md and docs/index.html as valid UTF-8 after detecting a PowerShell encoding regression.
+- Validation: shell syntax, master port contract, agent mock, MySQL and SQLite compose dry-runs, SQLite schema, 3x-ui fixture, frontend build, Docker Maven package and git diff --check passed.
+- Cleanup: no long-running dev server was left open; Docker Maven used --rm and only retained the overlord-broil-m2 cache volume.

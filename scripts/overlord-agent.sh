@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PANEL_URL="${FLUX_PANEL_URL:-}"
-SERVER_ID="${FLUX_SERVER_ID:-}"
-AGENT_TOKEN="${FLUX_AGENT_TOKEN:-}"
-WORK_DIR="${FLUX_WORK_DIR:-/var/lib/flux-agent}"
-LOCK_FILE="${FLUX_AGENT_LOCK_FILE:-${WORK_DIR}/flux-agent.lock}"
-POLL_INTERVAL="${FLUX_POLL_INTERVAL:-20}"
-AGENT_VERSION="${FLUX_AGENT_VERSION:-flux-agent/0.3}"
-HTTP_RETRIES="${FLUX_HTTP_RETRIES:-4}"
-HTTP_BACKOFF_BASE="${FLUX_HTTP_BACKOFF_BASE:-2}"
-HTTP_BACKOFF_MAX="${FLUX_HTTP_BACKOFF_MAX:-30}"
-HTTP_CONNECT_TIMEOUT="${FLUX_HTTP_CONNECT_TIMEOUT:-10}"
-HTTP_MAX_TIME="${FLUX_HTTP_MAX_TIME:-60}"
-TASK_TIMEOUT_SECONDS="${FLUX_TASK_TIMEOUT_SECONDS:-7200}"
-TASK_TIMEOUT_KILL_SECONDS="${FLUX_TASK_TIMEOUT_KILL_SECONDS:-30}"
+PANEL_URL="${OB_PANEL_URL:-}"
+SERVER_ID="${OB_SERVER_ID:-}"
+AGENT_TOKEN="${OB_AGENT_TOKEN:-}"
+WORK_DIR="${OB_WORK_DIR:-/var/lib/overlord-agent}"
+LOCK_FILE="${OB_AGENT_LOCK_FILE:-${WORK_DIR}/overlord-agent.lock}"
+POLL_INTERVAL="${OB_POLL_INTERVAL:-20}"
+AGENT_VERSION="${OB_AGENT_VERSION:-overlord-agent/0.3}"
+HTTP_RETRIES="${OB_HTTP_RETRIES:-4}"
+HTTP_BACKOFF_BASE="${OB_HTTP_BACKOFF_BASE:-2}"
+HTTP_BACKOFF_MAX="${OB_HTTP_BACKOFF_MAX:-30}"
+HTTP_CONNECT_TIMEOUT="${OB_HTTP_CONNECT_TIMEOUT:-10}"
+HTTP_MAX_TIME="${OB_HTTP_MAX_TIME:-60}"
+TASK_TIMEOUT_SECONDS="${OB_TASK_TIMEOUT_SECONDS:-7200}"
+TASK_TIMEOUT_KILL_SECONDS="${OB_TASK_TIMEOUT_KILL_SECONDS:-30}"
 AGENT_COMMAND="${1:-}"
-PYTHON_BIN="${FLUX_PYTHON_BIN:-}"
-BASH_BIN="${FLUX_BASH_BIN:-}"
+PYTHON_BIN="${OB_PYTHON_BIN:-}"
+BASH_BIN="${OB_BASH_BIN:-}"
 FALLBACK_LOCK_DIR=""
 
 usage() {
   cat <<'EOF'
 Usage:
-  flux-agent.sh [--once|--doctor|--version]
+  overlord-agent.sh [--once|--doctor|--version]
 
 Commands:
   --once       Send one heartbeat, claim at most one task, then exit.
@@ -31,9 +31,9 @@ Commands:
   --version    Print agent version and exit.
 
 Required environment:
-  FLUX_PANEL_URL
-  FLUX_SERVER_ID
-  FLUX_AGENT_TOKEN
+  OB_PANEL_URL
+  OB_SERVER_ID
+  OB_AGENT_TOKEN
 EOF
 }
 
@@ -76,7 +76,7 @@ doctor_python() {
     if command -v "$PYTHON_BIN" >/dev/null 2>&1 && "$PYTHON_BIN" -c 'import json, time' >/dev/null 2>&1; then
       doctor_item ok "python" "$PYTHON_BIN"
     else
-      doctor_item fail "python" "FLUX_PYTHON_BIN is not a working Python interpreter"
+      doctor_item fail "python" "OB_PYTHON_BIN is not a working Python interpreter"
     fi
     return
   fi
@@ -95,7 +95,7 @@ doctor_python() {
 }
 
 run_agent_doctor() {
-  echo "Flux agent doctor"
+  echo "Overlord agent doctor"
   if [ -r /etc/os-release ]; then
     # shellcheck disable=SC1091
     . /etc/os-release
@@ -116,18 +116,18 @@ run_agent_doctor() {
       *) doctor_item fail "panel-url" "must start with http:// or https://" ;;
     esac
   else
-    doctor_item fail "panel-url" "FLUX_PANEL_URL is required"
+    doctor_item fail "panel-url" "OB_PANEL_URL is required"
   fi
 
   case "$SERVER_ID" in
-    ''|*[!0-9]*) doctor_item fail "server-id" "FLUX_SERVER_ID must be a numeric id" ;;
+    ''|*[!0-9]*) doctor_item fail "server-id" "OB_SERVER_ID must be a numeric id" ;;
     *) doctor_item ok "server-id" "$SERVER_ID" ;;
   esac
 
   if [ -n "$AGENT_TOKEN" ]; then
     doctor_item ok "agent-token" "provided"
   else
-    doctor_item fail "agent-token" "FLUX_AGENT_TOKEN is required"
+    doctor_item fail "agent-token" "OB_AGENT_TOKEN is required"
   fi
 
   if mkdir -p "$WORK_DIR" 2>/dev/null && [ -w "$WORK_DIR" ]; then
@@ -170,7 +170,7 @@ detect_python() {
     if command -v "$PYTHON_BIN" >/dev/null 2>&1 && "$PYTHON_BIN" -c 'import json, time' >/dev/null 2>&1; then
       return
     fi
-    error "FLUX_PYTHON_BIN must point to a working Python interpreter."
+    error "OB_PYTHON_BIN must point to a working Python interpreter."
     exit 2
   fi
 
@@ -212,7 +212,7 @@ detect_bash() {
     if validate_bash_bin "$BASH_BIN"; then
       return
     fi
-    error "FLUX_BASH_BIN must point to a working bash executable."
+    error "OB_BASH_BIN must point to a working bash executable."
     exit 2
   fi
 
@@ -282,7 +282,7 @@ if [ "$AGENT_COMMAND" = "--version" ]; then
 fi
 
 if [ -z "$PANEL_URL" ] || [ -z "$SERVER_ID" ] || [ -z "$AGENT_TOKEN" ]; then
-  error "FLUX_PANEL_URL, FLUX_SERVER_ID and FLUX_AGENT_TOKEN are required."
+  error "OB_PANEL_URL, OB_SERVER_ID and OB_AGENT_TOKEN are required."
   exit 2
 fi
 
@@ -294,14 +294,14 @@ fi
 detect_python
 detect_bash
 
-require_positive_int "FLUX_POLL_INTERVAL" "$POLL_INTERVAL"
-require_positive_int "FLUX_HTTP_RETRIES" "$HTTP_RETRIES"
-require_positive_int "FLUX_HTTP_BACKOFF_BASE" "$HTTP_BACKOFF_BASE"
-require_positive_int "FLUX_HTTP_BACKOFF_MAX" "$HTTP_BACKOFF_MAX"
-require_positive_int "FLUX_HTTP_CONNECT_TIMEOUT" "$HTTP_CONNECT_TIMEOUT"
-require_positive_int "FLUX_HTTP_MAX_TIME" "$HTTP_MAX_TIME"
-require_positive_int "FLUX_TASK_TIMEOUT_SECONDS" "$TASK_TIMEOUT_SECONDS"
-require_positive_int "FLUX_TASK_TIMEOUT_KILL_SECONDS" "$TASK_TIMEOUT_KILL_SECONDS"
+require_positive_int "OB_POLL_INTERVAL" "$POLL_INTERVAL"
+require_positive_int "OB_HTTP_RETRIES" "$HTTP_RETRIES"
+require_positive_int "OB_HTTP_BACKOFF_BASE" "$HTTP_BACKOFF_BASE"
+require_positive_int "OB_HTTP_BACKOFF_MAX" "$HTTP_BACKOFF_MAX"
+require_positive_int "OB_HTTP_CONNECT_TIMEOUT" "$HTTP_CONNECT_TIMEOUT"
+require_positive_int "OB_HTTP_MAX_TIME" "$HTTP_MAX_TIME"
+require_positive_int "OB_TASK_TIMEOUT_SECONDS" "$TASK_TIMEOUT_SECONDS"
+require_positive_int "OB_TASK_TIMEOUT_KILL_SECONDS" "$TASK_TIMEOUT_KILL_SECONDS"
 
 mkdir -p "$WORK_DIR"
 PANEL_URL="${PANEL_URL%/}"
@@ -310,7 +310,7 @@ acquire_lock() {
   if command -v flock >/dev/null 2>&1; then
     exec 9>"$LOCK_FILE"
     if ! flock -n 9; then
-      warn "another flux-agent instance is already running on this host; exiting"
+      warn "another overlord-agent instance is already running on this host; exiting"
       exit 0
     fi
     printf '%s\n' "$$" 1>&9
@@ -319,7 +319,7 @@ acquire_lock() {
 
   local lock_dir="${LOCK_FILE}.d"
   if ! mkdir "$lock_dir" 2>/dev/null; then
-    warn "another flux-agent instance is already running on this host; exiting"
+    warn "another overlord-agent instance is already running on this host; exiting"
     exit 0
   fi
   FALLBACK_LOCK_DIR="$lock_dir"
@@ -441,7 +441,7 @@ def read_limited(path):
 
 stdout_text = read_limited(stdout_path)
 stderr_text = read_limited(stderr_path)
-marker_prefix = "FLUX_AGENT_RESULT_JSON="
+marker_prefix = "OB_AGENT_RESULT_JSON="
 result = None
 clean_stdout_lines = []
 for line in stdout_text.splitlines():
@@ -582,7 +582,7 @@ xray_status() {
 
 certificate_json() {
   local cert_file=""
-  for candidate in /root/cert/flux-3xui-orchestrator/fullchain.pem /root/cert/flux-panel/fullchain.pem /root/cert/*/fullchain.pem /etc/letsencrypt/live/*/fullchain.pem; do
+  for candidate in /root/cert/overlord-broil/fullchain.pem /root/cert/*/fullchain.pem /etc/letsencrypt/live/*/fullchain.pem; do
     if [ -f "$candidate" ]; then
       cert_file="$candidate"
       break
@@ -888,7 +888,7 @@ run_task() {
 }
 
 acquire_lock
-info "flux-agent starting with work dir ${WORK_DIR}, poll interval ${POLL_INTERVAL}s, timeout ${TASK_TIMEOUT_SECONDS}s"
+info "overlord-agent starting with work dir ${WORK_DIR}, poll interval ${POLL_INTERVAL}s, timeout ${TASK_TIMEOUT_SECONDS}s"
 
 while true; do
   send_heartbeat ""

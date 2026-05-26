@@ -64,7 +64,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         copyDtoToNode(dto, node);
         node.setServerId(server.getId());
         node.setServerName(server.getName());
-        node.setName(firstNotBlank(dto.getName(), "flux-" + protocol + "-" + now));
+        node.setName(firstNotBlank(dto.getName(), "ob-" + protocol + "-" + now));
         node.setProtocol(protocol);
         node.setEngine(engine);
         node.setDirection(normalize(dto.getDirection(), DIRECTION_INBOUND));
@@ -501,7 +501,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         }
         node.setServerId(server.getId());
         node.setServerName(server.getName());
-        node.setName(firstNotBlank(inbound.getString("name"), "flux-" + inbound.getString("protocol")));
+        node.setName(firstNotBlank(inbound.getString("name"), "ob-" + inbound.getString("protocol")));
         node.setProtocol(normalize(inbound.getString("protocol"), "xray"));
         node.setEngine(ENGINE_XRAY);
         node.setDirection(DIRECTION_INBOUND);

@@ -474,7 +474,7 @@ const blankOrchestrationForm: OrchestrationForm = {
   panelPort: 5168,
   panelUsername: "",
   panelPassword: "",
-  webBasePath: "flux-control",
+  webBasePath: "ob-control",
   publicHost: "",
   listenIp: "0.0.0.0",
   certificateMode: "self-signed",
@@ -501,7 +501,7 @@ const defaultInboundPayload = {
   up: 0,
   down: 0,
   total: 0,
-  remark: "flux-vless",
+  remark: "ob-vless",
   enable: true,
   expiryTime: 0,
   listen: "",
@@ -517,7 +517,7 @@ const blankThreeXuiInboundForm: ThreeXuiInboundForm = {
   inboundId: "",
   mode: "add",
   editMode: "form",
-  remark: "flux-vless",
+  remark: "ob-vless",
   enable: 1,
   listen: "",
   port: 443,
@@ -541,7 +541,7 @@ const blankThreeXuiInboundForm: ThreeXuiInboundForm = {
 
 const blankProtocolNodeForm: ProtocolNodeForm = {
   serverId: null,
-  name: "flux-vless",
+  name: "ob-vless",
   protocol: "vless",
   engine: "xray",
   listen: "",
@@ -624,7 +624,7 @@ const safeJsonParse = (value?: string) => {
 
 const parseEmbeddedAgentResult = (stdout?: string) => {
   if (!stdout) return null;
-  const marker = "FLUX_AGENT_RESULT_JSON=";
+  const marker = "OB_AGENT_RESULT_JSON=";
   const lines = stdout.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
   for (let index = lines.length - 1; index >= 0; index -= 1) {
     if (lines[index].startsWith(marker)) {
@@ -1241,7 +1241,7 @@ const buildInboundPayloadFromForm = (form: ThreeXuiInboundForm) => {
     up: 0,
     down: 0,
     total: 0,
-    remark: form.remark.trim() || `flux-${protocol}`,
+    remark: form.remark.trim() || `ob-${protocol}`,
     enable: form.enable === 1,
     expiryTime: 0,
     listen: form.listen.trim(),
@@ -1755,7 +1755,7 @@ export default function OrchestratorPage() {
       ...blankProtocolNodeForm,
       id: node?.id,
       serverId: node?.serverId || server?.id || servers[0]?.id || null,
-      name: node?.name || (protocol === "snell" ? "flux-snell" : `flux-${protocol}`),
+      name: node?.name || (protocol === "snell" ? "ob-snell" : `ob-${protocol}`),
       protocol,
       engine,
       listen: node?.listen || (protocol === "snell" ? "::0" : ""),
@@ -1774,11 +1774,11 @@ export default function OrchestratorPage() {
 
   const updateProtocolNodeProtocol = (protocol: ProtocolNodeForm["protocol"]) => {
     const defaults: Record<ProtocolNodeForm["protocol"], Partial<ProtocolNodeForm>> = {
-      vless: { protocol, engine: "xray", name: "flux-vless", port: 443, transport: "tcp", security: "reality", flow: "xtls-rprx-vision" },
-      vmess: { protocol, engine: "xray", name: "flux-vmess", port: 2086, transport: "ws", security: "none", flow: "" },
-      trojan: { protocol, engine: "xray", name: "flux-trojan", port: 8443, transport: "tcp", security: "tls", flow: "" },
-      shadowsocks: { protocol, engine: "xray", name: "flux-shadowsocks", port: 8388, transport: "tcp", security: "none", flow: "" },
-      snell: { protocol, engine: "snell", name: "flux-snell", listen: "::0", port: 8390, transport: "tcp", security: "psk", flow: "" }
+      vless: { protocol, engine: "xray", name: "ob-vless", port: 443, transport: "tcp", security: "reality", flow: "xtls-rprx-vision" },
+      vmess: { protocol, engine: "xray", name: "ob-vmess", port: 2086, transport: "ws", security: "none", flow: "" },
+      trojan: { protocol, engine: "xray", name: "ob-trojan", port: 8443, transport: "tcp", security: "tls", flow: "" },
+      shadowsocks: { protocol, engine: "xray", name: "ob-shadowsocks", port: 8388, transport: "tcp", security: "none", flow: "" },
+      snell: { protocol, engine: "snell", name: "ob-snell", listen: "::0", port: 8390, transport: "tcp", security: "psk", flow: "" }
     };
     patchProtocolNodeForm(defaults[protocol]);
   };
@@ -1833,7 +1833,7 @@ export default function OrchestratorPage() {
       serverIds: firstServer?.id ? [firstServer.id] : [],
       publicHost: host,
       certificateDomain: host.includes(".") ? host : "",
-      webBasePath: firstServer?.id ? `flux-${firstServer.id}` : "flux-control"
+      webBasePath: firstServer?.id ? `ob-${firstServer.id}` : "ob-control"
     });
     setOrchestrationModalOpen(true);
   };
@@ -2308,10 +2308,10 @@ export default function OrchestratorPage() {
 
   const updateInboundProtocol = (protocol: ThreeXuiInboundForm["protocol"]) => {
     const defaults: Record<ThreeXuiInboundForm["protocol"], Partial<ThreeXuiInboundForm>> = {
-      vless: { protocol, remark: "flux-vless", port: 443, network: "tcp", security: "reality", flow: "xtls-rprx-vision" },
-      vmess: { protocol, remark: "flux-vmess", port: 2086, network: "ws", security: "none", flow: "" },
-      trojan: { protocol, remark: "flux-trojan", port: 443, network: "tcp", security: "tls", flow: "" },
-      shadowsocks: { protocol, remark: "flux-shadowsocks", port: 8388, network: "tcp", security: "none", flow: "" }
+      vless: { protocol, remark: "ob-vless", port: 443, network: "tcp", security: "reality", flow: "xtls-rprx-vision" },
+      vmess: { protocol, remark: "ob-vmess", port: 2086, network: "ws", security: "none", flow: "" },
+      trojan: { protocol, remark: "ob-trojan", port: 443, network: "tcp", security: "tls", flow: "" },
+      shadowsocks: { protocol, remark: "ob-shadowsocks", port: 8388, network: "tcp", security: "none", flow: "" }
     };
     patchThreeXuiInboundForm(defaults[protocol]);
   };
@@ -3708,7 +3708,7 @@ export default function OrchestratorPage() {
                       serverIds,
                       publicHost: server?.host || orchestrationForm.publicHost,
                       certificateDomain: server?.host?.includes(".") ? server.host : orchestrationForm.certificateDomain,
-                      webBasePath: serverId ? `flux-${serverId}` : orchestrationForm.webBasePath
+                      webBasePath: serverId ? `ob-${serverId}` : orchestrationForm.webBasePath
                     });
                   }}
                   variant="bordered"

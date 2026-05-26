@@ -331,4 +331,8 @@ CREATE TABLE IF NOT EXISTS vite_config (
 CREATE UNIQUE INDEX IF NOT EXISTS uq_vite_config_name ON vite_config (name);
 
 INSERT OR IGNORE INTO vite_config (id, name, value, time)
-VALUES (1, 'app_name', 'flux', 1755147963000);
+VALUES (1, 'app_name', 'Overlord Broil', 1755147963000);
+
+UPDATE vite_config
+SET value = 'Overlord Broil', time = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+WHERE name = 'app_name' AND lower(value) IN ('flux', 'flux panel', 'flux 3x-ui orchestrator');

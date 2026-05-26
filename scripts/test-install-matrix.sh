@@ -21,7 +21,7 @@ Runs non-destructive installer diagnostics in Linux containers. The matrix
 validates the current checkout on Debian, Ubuntu, Alpine, Rocky Linux and
 Oracle Linux style userspaces without starting Docker, systemd, OpenRC or 3x-ui.
 
-Set FLUX_INSTALL_MATRIX_SKIP_PULL=true to skip docker pull.
+Set OB_INSTALL_MATRIX_SKIP_PULL=true to skip docker pull.
 EOF
 }
 
@@ -89,30 +89,30 @@ install_deps() {
 install_deps
 cd /workspace
 
-bash -n scripts/install-master.sh scripts/install-flux-agent.sh scripts/flux-agent.sh
-sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh
+bash -n scripts/install-master.sh scripts/install-agent.sh scripts/overlord-agent.sh
+sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh
 
-FLUX_DOCTOR_REQUIRE_DOCKER=0 \
-FLUX_DOCTOR_SKIP_PORT_CHECK=1 \
-FLUX_FRONTEND_PORT=18080 \
-FLUX_BACKEND_PORT=16365 \
-FLUX_EXPOSE_BACKEND=0 \
+OB_DOCTOR_REQUIRE_DOCKER=0 \
+OB_DOCTOR_SKIP_PORT_CHECK=1 \
+OB_FRONTEND_PORT=18080 \
+OB_BACKEND_PORT=16365 \
+OB_EXPOSE_BACKEND=0 \
   bash scripts/install-master.sh doctor
 
-FLUX_DOCTOR_REQUIRE_SERVICE_MANAGER=0 \
-FLUX_DOCTOR_REQUIRE_AGENT_ENV=0 \
-  bash scripts/install-flux-agent.sh doctor
+OB_DOCTOR_REQUIRE_SERVICE_MANAGER=0 \
+OB_DOCTOR_REQUIRE_AGENT_ENV=0 \
+  bash scripts/install-agent.sh doctor
 
-FLUX_PANEL_URL=http://127.0.0.1:18080 \
-FLUX_SERVER_ID=1 \
-FLUX_AGENT_TOKEN=test-token \
-FLUX_WORK_DIR=/tmp/flux-agent-work \
-FLUX_AGENT_LOCK_FILE=/tmp/flux-agent.lock \
-FLUX_POLL_INTERVAL=1 \
-FLUX_HTTP_RETRIES=1 \
-FLUX_HTTP_CONNECT_TIMEOUT=1 \
-FLUX_HTTP_MAX_TIME=1 \
-  bash scripts/flux-agent.sh --doctor
+OB_PANEL_URL=http://127.0.0.1:18080 \
+OB_SERVER_ID=1 \
+OB_AGENT_TOKEN=test-token \
+OB_WORK_DIR=/tmp/overlord-agent-work \
+OB_AGENT_LOCK_FILE=/tmp/overlord-agent.lock \
+OB_POLL_INTERVAL=1 \
+OB_HTTP_RETRIES=1 \
+OB_HTTP_CONNECT_TIMEOUT=1 \
+OB_HTTP_MAX_TIME=1 \
+  bash scripts/overlord-agent.sh --doctor
 '
 
 require_command docker
@@ -120,7 +120,7 @@ require_command docker
 for image in "${IMAGES[@]}"; do
   echo
   echo "==> Install matrix: ${image}"
-  if [ "${FLUX_INSTALL_MATRIX_SKIP_PULL:-false}" != "true" ]; then
+  if [ "${OB_INSTALL_MATRIX_SKIP_PULL:-false}" != "true" ]; then
     docker pull "$image"
   fi
   docker run --rm \

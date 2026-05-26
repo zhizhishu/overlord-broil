@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-PYTHON_BIN="${FLUX_TEST_PYTHON_BIN:-}"
+PYTHON_BIN="${OB_TEST_PYTHON_BIN:-}"
 
 detect_python() {
   if [ -n "$PYTHON_BIN" ]; then
@@ -93,7 +93,7 @@ class Handler(BaseHTTPRequestHandler):
                         "name": "Snell Runtime",
                         "protocol": "snell",
                         "action": "present",
-                        "executor": "flux-agent",
+                        "executor": "overlord-agent",
                         "stateSource": "agent-report",
                         "agentRequired": True,
                         "masterApiSupported": False,
@@ -143,17 +143,17 @@ PY
   local port
   port="$(cat "$ready_file")"
 
-  FLUX_PANEL_URL="http://127.0.0.1:${port}" \
-  FLUX_SERVER_ID="1" \
-  FLUX_AGENT_TOKEN="test-agent-token" \
-  FLUX_WORK_DIR="${case_dir}/work" \
-  FLUX_AGENT_LOCK_FILE="${case_dir}/agent.lock" \
-  FLUX_HTTP_RETRIES="1" \
-  FLUX_HTTP_CONNECT_TIMEOUT="2" \
-  FLUX_HTTP_MAX_TIME="5" \
-  FLUX_TASK_TIMEOUT_SECONDS="$timeout_seconds" \
-  FLUX_TASK_TIMEOUT_KILL_SECONDS="1" \
-    bash "${PROJECT_ROOT}/scripts/flux-agent.sh" --once
+  OB_PANEL_URL="http://127.0.0.1:${port}" \
+  OB_SERVER_ID="1" \
+  OB_AGENT_TOKEN="test-agent-token" \
+  OB_WORK_DIR="${case_dir}/work" \
+  OB_AGENT_LOCK_FILE="${case_dir}/agent.lock" \
+  OB_HTTP_RETRIES="1" \
+  OB_HTTP_CONNECT_TIMEOUT="2" \
+  OB_HTTP_MAX_TIME="5" \
+  OB_TASK_TIMEOUT_SECONDS="$timeout_seconds" \
+  OB_TASK_TIMEOUT_KILL_SECONDS="1" \
+    bash "${PROJECT_ROOT}/scripts/overlord-agent.sh" --once
 
   "$PYTHON_BIN" - "$reports_file" "$expected_state" "$expected_exit_code" "$expected_timed_out" <<'PY'
 import json
@@ -237,29 +237,29 @@ PY
 
 detect_python
 
-version_output="$(bash "${PROJECT_ROOT}/scripts/flux-agent.sh" --version)"
-if [ "$version_output" != "flux-agent/0.3" ]; then
-  echo "expected default agent version flux-agent/0.3, got ${version_output}" >&2
+version_output="$(bash "${PROJECT_ROOT}/scripts/overlord-agent.sh" --version)"
+if [ "$version_output" != "overlord-agent/0.3" ]; then
+  echo "expected default agent version overlord-agent/0.3, got ${version_output}" >&2
   exit 1
 fi
 
-custom_version_output="$(FLUX_AGENT_VERSION="flux-agent/test-custom" bash "${PROJECT_ROOT}/scripts/flux-agent.sh" --version)"
-if [ "$custom_version_output" != "flux-agent/test-custom" ]; then
-  echo "expected overridden agent version flux-agent/test-custom, got ${custom_version_output}" >&2
+custom_version_output="$(OB_AGENT_VERSION="overlord-agent/test-custom" bash "${PROJECT_ROOT}/scripts/overlord-agent.sh" --version)"
+if [ "$custom_version_output" != "overlord-agent/test-custom" ]; then
+  echo "expected overridden agent version overlord-agent/test-custom, got ${custom_version_output}" >&2
   exit 1
 fi
 
 TMP_DIR="$(mktemp -d)"
 trap cleanup_tmp_dir EXIT
 
-FLUX_PANEL_URL="http://127.0.0.1:1" \
-FLUX_SERVER_ID="1" \
-FLUX_AGENT_TOKEN="test-agent-token" \
-FLUX_WORK_DIR="${TMP_DIR}/doctor-work" \
-FLUX_AGENT_LOCK_FILE="${TMP_DIR}/doctor.lock" \
-  bash "${PROJECT_ROOT}/scripts/flux-agent.sh" --doctor >/dev/null
+OB_PANEL_URL="http://127.0.0.1:1" \
+OB_SERVER_ID="1" \
+OB_AGENT_TOKEN="test-agent-token" \
+OB_WORK_DIR="${TMP_DIR}/doctor-work" \
+OB_AGENT_LOCK_FILE="${TMP_DIR}/doctor.lock" \
+  bash "${PROJECT_ROOT}/scripts/overlord-agent.sh" --doctor >/dev/null
 
-run_case "success" $'echo hello-agent\nprintf "%s\\n" '\''FLUX_AGENT_RESULT_JSON={"node":"ok"}'\''' "10" "succeeded" "0" "false"
+run_case "success" $'echo hello-agent\nprintf "%s\\n" '\''OB_AGENT_RESULT_JSON={"node":"ok"}'\''' "10" "succeeded" "0" "false"
 run_case "timeout" $'sleep 5\necho should-not-finish' "1" "failed" "124" "true"
 
-echo "flux-agent mock tests passed"
+echo "overlord-agent mock tests passed"

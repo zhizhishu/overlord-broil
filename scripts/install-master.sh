@@ -1,32 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="${FLUX_REPO:-zhizhishu/flux-3xui-orchestrator}"
-REF="${FLUX_REF:-main}"
-RAW_BASE="${FLUX_RAW_BASE:-https://raw.githubusercontent.com/${REPO}/${REF}}"
-INSTALL_DIR="${FLUX_INSTALL_DIR:-/opt/flux-3xui-orchestrator}"
-SOURCE_DIR="${FLUX_SOURCE_DIR:-${INSTALL_DIR}/source}"
-NETWORK_STACK="${FLUX_NETWORK_STACK:-v4}"
-FRONTEND_PORT="${FLUX_FRONTEND_PORT:-5166}"
-BACKEND_PORT="${FLUX_BACKEND_PORT:-6365}"
-PHPMYADMIN_PORT="${FLUX_PHPMYADMIN_PORT:-}"
-EXPOSE_BACKEND="${FLUX_EXPOSE_BACKEND:-0}"
-DB_MODE="${FLUX_DB_MODE:-mysql}"
-DB_NAME="${FLUX_DB_NAME:-gost}"
-DB_USER="${FLUX_DB_USER:-gost}"
-DB_PASSWORD="${FLUX_DB_PASSWORD:-}"
-SQLITE_DB_PATH="${FLUX_SQLITE_DB_PATH:-/app/data/flux-master.sqlite}"
-SQLITE_DATA_DIR="${FLUX_SQLITE_DATA_DIR:-./data}"
-JWT_SECRET="${FLUX_JWT_SECRET:-}"
-SECRET_ENCRYPTION_KEY="${FLUX_SECRET_ENCRYPTION_KEY:-}"
-INSTALL_DOCKER="${FLUX_INSTALL_DOCKER:-1}"
-BUILD_ON_PULL_FAILURE="${FLUX_BUILD_ON_PULL_FAILURE:-1}"
+REPO="${OB_REPO:-zhizhishu/overlord-broil}"
+REF="${OB_REF:-main}"
+RAW_BASE="${OB_RAW_BASE:-https://raw.githubusercontent.com/${REPO}/${REF}}"
+INSTALL_DIR="${OB_INSTALL_DIR:-/opt/overlord-broil}"
+SOURCE_DIR="${OB_SOURCE_DIR:-${INSTALL_DIR}/source}"
+NETWORK_STACK="${OB_NETWORK_STACK:-v4}"
+FRONTEND_PORT="${OB_FRONTEND_PORT:-5166}"
+BACKEND_PORT="${OB_BACKEND_PORT:-6365}"
+PHPMYADMIN_PORT="${OB_PHPMYADMIN_PORT:-}"
+EXPOSE_BACKEND="${OB_EXPOSE_BACKEND:-0}"
+DB_MODE="${OB_DB_MODE:-mysql}"
+DB_NAME="${OB_DB_NAME:-overlord}"
+DB_USER="${OB_DB_USER:-overlord}"
+DB_PASSWORD="${OB_DB_PASSWORD:-}"
+SQLITE_DB_PATH="${OB_SQLITE_DB_PATH:-/app/data/overlord-master.sqlite}"
+SQLITE_DATA_DIR="${OB_SQLITE_DATA_DIR:-./data}"
+JWT_SECRET="${OB_JWT_SECRET:-}"
+SECRET_ENCRYPTION_KEY="${OB_SECRET_ENCRYPTION_KEY:-}"
+INSTALL_DOCKER="${OB_INSTALL_DOCKER:-1}"
+BUILD_ON_PULL_FAILURE="${OB_BUILD_ON_PULL_FAILURE:-1}"
 GHCR_USERNAME="${GHCR_USERNAME:-}"
 GHCR_TOKEN="${GHCR_TOKEN:-}"
-GITHUB_TOKEN="${FLUX_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
+GITHUB_TOKEN="${OB_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
 ACTION="install"
-BACKUP_DIR="${FLUX_BACKUP_DIR:-}"
-BACKUP_FILE="${FLUX_BACKUP_FILE:-}"
+BACKUP_DIR="${OB_BACKUP_DIR:-}"
+BACKUP_FILE="${OB_BACKUP_FILE:-}"
 ASSUME_YES="0"
 ACTION_SET="0"
 STACK_EXPLICIT="0"
@@ -35,11 +35,11 @@ BACKEND_PORT_EXPLICIT="0"
 PHPMYADMIN_PORT_EXPLICIT="0"
 EXPOSE_BACKEND_EXPLICIT="0"
 DB_MODE_EXPLICIT="0"
-if [ "${FLUX_FRONTEND_PORT+x}" = "x" ]; then FRONTEND_PORT_EXPLICIT="1"; fi
-if [ "${FLUX_BACKEND_PORT+x}" = "x" ]; then BACKEND_PORT_EXPLICIT="1"; fi
-if [ "${FLUX_PHPMYADMIN_PORT+x}" = "x" ]; then PHPMYADMIN_PORT_EXPLICIT="1"; fi
-if [ "${FLUX_EXPOSE_BACKEND+x}" = "x" ]; then EXPOSE_BACKEND_EXPLICIT="1"; fi
-if [ "${FLUX_DB_MODE+x}" = "x" ]; then DB_MODE_EXPLICIT="1"; fi
+if [ "${OB_FRONTEND_PORT+x}" = "x" ]; then FRONTEND_PORT_EXPLICIT="1"; fi
+if [ "${OB_BACKEND_PORT+x}" = "x" ]; then BACKEND_PORT_EXPLICIT="1"; fi
+if [ "${OB_PHPMYADMIN_PORT+x}" = "x" ]; then PHPMYADMIN_PORT_EXPLICIT="1"; fi
+if [ "${OB_EXPOSE_BACKEND+x}" = "x" ]; then EXPOSE_BACKEND_EXPLICIT="1"; fi
+if [ "${OB_DB_MODE+x}" = "x" ]; then DB_MODE_EXPLICIT="1"; fi
 
 usage() {
   cat <<'EOF'
@@ -55,7 +55,7 @@ Actions:
   uninstall               Stop and remove stack containers; requires --yes and keeps data files
 
 Options:
-  --dir PATH              Install directory, default /opt/flux-3xui-orchestrator
+  --dir PATH              Install directory, default /opt/overlord-broil
   --stack v4|v6           Compose network stack, default v4
   --frontend-port PORT    Public frontend port, default 5166
   --backend-port PORT     Backend debug port when --expose-backend is enabled, default 6365
@@ -63,9 +63,9 @@ Options:
   --no-expose-backend     Keep backend API internal to Docker network
   --db mysql|sqlite       Database runtime, default mysql
   --phpmyadmin-port PORT  Expose phpMyAdmin on this host port; disabled by default
-  --backup-dir PATH       Backup output directory, default /opt/flux-3xui-orchestrator/backups
+  --backup-dir PATH       Backup output directory, default /opt/overlord-broil/backups
   --backup-file PATH      Backup archive used by restore
-  --repo OWNER/REPO       GitHub repo, default zhizhishu/flux-3xui-orchestrator
+  --repo OWNER/REPO       GitHub repo, default zhizhishu/overlord-broil
   --ref REF               Git ref to download, default main
   --no-install-docker     Fail instead of installing Docker when it is missing
   --no-build-fallback     Fail instead of building local images when GHCR pull fails
@@ -73,21 +73,21 @@ Options:
   -h, --help              Show this help
 
 Environment:
-  FLUX_GITHUB_TOKEN       Optional token for downloading files from a private repo
+  OB_GITHUB_TOKEN       Optional token for downloading files from a private repo
   GHCR_USERNAME/GHCR_TOKEN  Optional login for private GHCR packages
-  FLUX_DB_PASSWORD          Optional database password; generated when empty
-  FLUX_JWT_SECRET           Optional JWT secret; generated when empty
-  FLUX_SECRET_ENCRYPTION_KEY Optional credential encryption key; generated when empty
-  FLUX_EXPOSE_BACKEND        Optional backend public exposure flag, default 0
-  FLUX_DB_MODE               Optional database runtime: mysql or sqlite, default mysql
-  FLUX_SQLITE_DB_PATH        SQLite path inside flux-master, default /app/data/flux-master.sqlite
-  FLUX_SQLITE_DATA_DIR       SQLite data directory on the host, default ./data under install root
-  FLUX_PHPMYADMIN_PORT       Optional phpMyAdmin public port; unset disables public exposure
-  FLUX_BACKUP_DIR           Optional backup output directory
-  FLUX_BACKUP_FILE          Optional restore archive path
-  FLUX_BUILD_ON_PULL_FAILURE Build local images after GHCR pull failure, default 1
-  FLUX_DOCTOR_REQUIRE_DOCKER Require Docker daemon during doctor, default 1
-  FLUX_DOCTOR_SKIP_PORT_CHECK Skip live port-listening checks during doctor, default 0
+  OB_DB_PASSWORD          Optional database password; generated when empty
+  OB_JWT_SECRET           Optional JWT secret; generated when empty
+  OB_SECRET_ENCRYPTION_KEY Optional credential encryption key; generated when empty
+  OB_EXPOSE_BACKEND        Optional backend public exposure flag, default 0
+  OB_DB_MODE               Optional database runtime: mysql or sqlite, default mysql
+  OB_SQLITE_DB_PATH        SQLite path inside overlord-master, default /app/data/overlord-master.sqlite
+  OB_SQLITE_DATA_DIR       SQLite data directory on the host, default ./data under install root
+  OB_PHPMYADMIN_PORT       Optional phpMyAdmin public port; unset disables public exposure
+  OB_BACKUP_DIR           Optional backup output directory
+  OB_BACKUP_FILE          Optional restore archive path
+  OB_BUILD_ON_PULL_FAILURE Build local images after GHCR pull failure, default 1
+  OB_DOCTOR_REQUIRE_DOCKER Require Docker daemon during doctor, default 1
+  OB_DOCTOR_SKIP_PORT_CHECK Skip live port-listening checks during doctor, default 0
 EOF
 }
 
@@ -195,12 +195,12 @@ if [ "$NETWORK_STACK" != "v4" ] && [ "$NETWORK_STACK" != "v6" ]; then
 fi
 
 if [ "$EXPOSE_BACKEND" != "0" ] && [ "$EXPOSE_BACKEND" != "1" ]; then
-  echo "FLUX_EXPOSE_BACKEND must be 0 or 1." >&2
+  echo "OB_EXPOSE_BACKEND must be 0 or 1." >&2
   exit 2
 fi
 
 if [ "$DB_MODE" != "mysql" ] && [ "$DB_MODE" != "sqlite" ]; then
-  echo "FLUX_DB_MODE must be mysql or sqlite." >&2
+  echo "OB_DB_MODE must be mysql or sqlite." >&2
   exit 2
 fi
 
@@ -310,7 +310,7 @@ ensure_docker() {
 
 docker_daemon_reachable() {
   if command -v timeout >/dev/null 2>&1; then
-    timeout "${FLUX_DOCKER_INFO_TIMEOUT:-20}" docker info >/dev/null 2>&1
+    timeout "${OB_DOCKER_INFO_TIMEOUT:-20}" docker info >/dev/null 2>&1
   else
     docker info >/dev/null 2>&1
   fi
@@ -328,7 +328,7 @@ download_file() {
 }
 
 download_source() {
-  local archive="/tmp/flux-3xui-orchestrator-${REF}.tar.gz"
+  local archive="/tmp/overlord-broil-${REF}.tar.gz"
   rm -rf "$SOURCE_DIR"
   mkdir -p "$SOURCE_DIR"
   download_file "https://github.com/${REPO}/archive/${REF}.tar.gz" "$archive"
@@ -336,9 +336,9 @@ download_source() {
 }
 
 build_local_images() {
-  echo "Building flux-master single-image locally from ${REPO}@${REF}..."
+  echo "Building overlord-master single-image locally from ${REPO}@${REF}..."
   download_source
-  docker build -t ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest "${SOURCE_DIR}"
+  docker build -t ghcr.io/zhizhishu/overlord-broil:latest "${SOURCE_DIR}"
 }
 
 read_env_value() {
@@ -474,8 +474,8 @@ resolve_restore_compose_file() {
 }
 
 detect_host() {
-  if [ -n "${FLUX_PANEL_HOST:-}" ]; then
-    echo "$FLUX_PANEL_HOST"
+  if [ -n "${OB_PANEL_HOST:-}" ]; then
+    echo "$OB_PANEL_HOST"
     return
   fi
 
@@ -496,10 +496,10 @@ load_existing_env() {
       DB_MODE="$requested_db_mode"
     fi
     DB_MODE="${DB_MODE:-mysql}"
-    DB_NAME="${DB_NAME:-gost}"
-    DB_USER="${DB_USER:-gost}"
+    DB_NAME="${DB_NAME:-overlord}"
+    DB_USER="${DB_USER:-overlord}"
     DB_PASSWORD="${DB_PASSWORD:-}"
-    SQLITE_DB_PATH="${SQLITE_DB_PATH:-/app/data/flux-master.sqlite}"
+    SQLITE_DB_PATH="${SQLITE_DB_PATH:-/app/data/overlord-master.sqlite}"
     SQLITE_DATA_DIR="${SQLITE_DATA_DIR:-./data}"
     PHPMYADMIN_PORT="${PHPMYADMIN_PORT:-}"
     EXPOSE_BACKEND="${EXPOSE_BACKEND:-0}"
@@ -545,7 +545,7 @@ ensure_phpmyadmin_override() {
 services:
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
-    container_name: gost-phpmyadmin
+    container_name: overlord-phpmyadmin
     restart: unless-stopped
     environment:
       PMA_HOST: mysql
@@ -557,7 +557,7 @@ services:
       mysql:
         condition: service_healthy
     networks:
-      - gost-network
+      - overlord-network
 YAML
   else
     rm -f "$PHPMYADMIN_OVERRIDE_FILE"
@@ -567,7 +567,7 @@ YAML
 wait_for_mysql() {
   local i
   for i in $(seq 1 30); do
-    if docker exec gost-mysql mysqladmin ping -h 127.0.0.1 -u"${DB_USER}" -p"${DB_PASSWORD}" --silent >/dev/null 2>&1; then
+    if docker exec overlord-mysql mysqladmin ping -h 127.0.0.1 -u"${DB_USER}" -p"${DB_PASSWORD}" --silent >/dev/null 2>&1; then
       return 0
     fi
     sleep 2
@@ -582,7 +582,7 @@ download_runtime_files() {
   download_file "${RAW_BASE}/docker-compose-v6.yml" "docker-compose-v6.yml"
   download_file "${RAW_BASE}/docker-compose.sqlite.yml" "docker-compose.sqlite.yml"
   download_file "${RAW_BASE}/${COMPOSE_FILE}" "$COMPOSE_FILE"
-  download_file "${RAW_BASE}/gost.sql" "gost.sql"
+  download_file "${RAW_BASE}/overlord.sql" "overlord.sql"
   download_file "${RAW_BASE}/scripts/install-master.sh" "install-master.sh"
   chmod 0755 "install-master.sh"
 }
@@ -650,7 +650,7 @@ ENV
     write_env_value FRONTEND_PORT "$FRONTEND_PORT" "$ENV_FILE"
   elif [ "$(read_env_value FRONTEND_PORT "$ENV_FILE")" = "80" ]; then
     write_env_value FRONTEND_PORT "5166" "$ENV_FILE"
-    echo "Migrated legacy FRONTEND_PORT=80 to the single-entry default 5166. Set FLUX_FRONTEND_PORT=80 if you intentionally want port 80."
+    echo "Migrated legacy FRONTEND_PORT=80 to the single-entry default 5166. Set OB_FRONTEND_PORT=80 if you intentionally want port 80."
   fi
 
   if [ "$BACKEND_PORT_EXPLICIT" = "1" ]; then
@@ -671,9 +671,9 @@ ENV
     write_env_value PHPMYADMIN_PORT "" "$ENV_FILE"
   elif [ "$PHPMYADMIN_PORT_EXPLICIT" = "1" ]; then
     write_env_value PHPMYADMIN_PORT "$PHPMYADMIN_PORT" "$ENV_FILE"
-  elif [ "${FLUX_PRESERVE_PHPMYADMIN_PORT:-0}" != "1" ] && [ -n "$(read_env_value PHPMYADMIN_PORT "$ENV_FILE")" ]; then
+  elif [ "${OB_PRESERVE_PHPMYADMIN_PORT:-0}" != "1" ] && [ -n "$(read_env_value PHPMYADMIN_PORT "$ENV_FILE")" ]; then
     write_env_value PHPMYADMIN_PORT "" "$ENV_FILE"
-    echo "Disabled public phpMyAdmin exposure. Set FLUX_PHPMYADMIN_PORT or --phpmyadmin-port when temporary maintenance access is needed."
+    echo "Disabled public phpMyAdmin exposure. Set OB_PHPMYADMIN_PORT or --phpmyadmin-port when temporary maintenance access is needed."
   fi
 }
 
@@ -704,10 +704,10 @@ validate_port_number() {
   fi
 }
 
-port_owned_by_flux_container() {
+port_owned_by_overlord_container() {
   local port="$1"
   local container
-  for container in flux-master vite-frontend springboot-backend gost-phpmyadmin; do
+  for container in overlord-master vite-frontend springboot-backend overlord-phpmyadmin gost-phpmyadmin; do
     if docker port "$container" 2>/dev/null | grep -Eq ":${port}$"; then
       return 0
     fi
@@ -717,7 +717,7 @@ port_owned_by_flux_container() {
 
 list_legacy_split_containers() {
   local container
-  for container in vite-frontend springboot-backend gost-phpmyadmin; do
+  for container in vite-frontend springboot-backend overlord-phpmyadmin gost-phpmyadmin; do
     if docker container inspect "$container" >/dev/null 2>&1; then
       printf '%s\n' "$container"
     fi
@@ -731,7 +731,7 @@ remove_legacy_split_containers() {
     return
   fi
 
-  echo "Removing legacy split-panel container(s) before starting flux-master single-image:"
+  echo "Removing legacy split-panel container(s) before starting overlord-master single-image:"
   printf '%s\n' "$containers" | while IFS= read -r container; do
     [ -n "$container" ] || continue
     echo "  - ${container}"
@@ -781,17 +781,17 @@ preflight_ports() {
     case "$label" in
       FRONTEND_PORT) port="$final_frontend" ;;
     esac
-    if port_is_listening "$port" && ! port_owned_by_flux_container "$port"; then
-      echo "${label}=${port} is already listening on this host. Set a different FLUX_${label} or stop the conflicting service." >&2
+    if port_is_listening "$port" && ! port_owned_by_overlord_container "$port"; then
+      echo "${label}=${port} is already listening on this host. Set a different OB_${label} or stop the conflicting service." >&2
       exit 2
     fi
   done
-  if [ "$final_expose_backend" = "1" ] && port_is_listening "$final_backend" && ! port_owned_by_flux_container "$final_backend"; then
-    echo "BACKEND_PORT=${final_backend} is already listening on this host. Set a different FLUX_BACKEND_PORT or disable FLUX_EXPOSE_BACKEND." >&2
+  if [ "$final_expose_backend" = "1" ] && port_is_listening "$final_backend" && ! port_owned_by_overlord_container "$final_backend"; then
+    echo "BACKEND_PORT=${final_backend} is already listening on this host. Set a different OB_BACKEND_PORT or disable OB_EXPOSE_BACKEND." >&2
     exit 2
   fi
-  if [ -n "$final_phpmyadmin" ] && port_is_listening "$final_phpmyadmin" && ! port_owned_by_flux_container "$final_phpmyadmin"; then
-    echo "PHPMYADMIN_PORT=${final_phpmyadmin} is already listening on this host. Set a different FLUX_PHPMYADMIN_PORT or stop the conflicting service." >&2
+  if [ -n "$final_phpmyadmin" ] && port_is_listening "$final_phpmyadmin" && ! port_owned_by_overlord_container "$final_phpmyadmin"; then
+    echo "PHPMYADMIN_PORT=${final_phpmyadmin} is already listening on this host. Set a different OB_PHPMYADMIN_PORT or stop the conflicting service." >&2
     exit 2
   fi
 }
@@ -812,7 +812,7 @@ pull_or_build_images() {
       echo "Image pull failed and local build fallback is disabled." >&2
       exit 2
     fi
-    echo "Image pull failed. Falling back to a local flux-master image build from the GitHub source archive."
+    echo "Image pull failed. Falling back to a local overlord-master image build from the GitHub source archive."
     build_local_images
   fi
 }
@@ -827,14 +827,14 @@ print_success() {
 
   cat <<EOF
 
-Flux 3x-ui Orchestrator is running.
+Overlord Broil is running.
 
 Install dir: ${INSTALL_DIR}
 Panel URL:   http://${PANEL_HOST}:${FINAL_FRONTEND_PORT}
 Agent URL:   http://${PANEL_HOST}:${FINAL_FRONTEND_PORT}
-Runtime:     flux-master single-image + $(if [ "$FINAL_DB_MODE" = "sqlite" ]; then printf 'SQLite'; else printf 'MySQL'; fi)
-Backend API: $(if [ "$FINAL_EXPOSE_BACKEND" = "1" ]; then printf 'http://%s:%s  (debug alias for the same flux-master app; agents should still use the Panel URL)' "$PANEL_HOST" "$FINAL_BACKEND_PORT"; else printf 'served by the same Panel URL under /api/v1/*'; fi)
-phpMyAdmin:  $(if [ "$FINAL_DB_MODE" = "sqlite" ]; then printf 'not available in SQLite mode'; elif [ -n "$FINAL_PHPMYADMIN_PORT" ]; then printf 'http://%s:%s  (restrict by firewall in production)' "$PANEL_HOST" "$FINAL_PHPMYADMIN_PORT"; else printf 'not publicly exposed; set FLUX_PHPMYADMIN_PORT or --phpmyadmin-port to expose temporarily'; fi)
+Runtime:     overlord-master single-image + $(if [ "$FINAL_DB_MODE" = "sqlite" ]; then printf 'SQLite'; else printf 'MySQL'; fi)
+Backend API: $(if [ "$FINAL_EXPOSE_BACKEND" = "1" ]; then printf 'http://%s:%s  (debug alias for the same overlord-master app; agents should still use the Panel URL)' "$PANEL_HOST" "$FINAL_BACKEND_PORT"; else printf 'served by the same Panel URL under /api/v1/*'; fi)
+phpMyAdmin:  $(if [ "$FINAL_DB_MODE" = "sqlite" ]; then printf 'not available in SQLite mode'; elif [ -n "$FINAL_PHPMYADMIN_PORT" ]; then printf 'http://%s:%s  (restrict by firewall in production)' "$PANEL_HOST" "$FINAL_PHPMYADMIN_PORT"; else printf 'not publicly exposed; set OB_PHPMYADMIN_PORT or --phpmyadmin-port to expose temporarily'; fi)
 
 Default login:
   username: admin_user
@@ -911,15 +911,15 @@ doctor_port() {
     doctor_item fail "$label" "invalid port '${port}'"
     return
   fi
-  if [ "${FLUX_DOCTOR_SKIP_PORT_CHECK:-0}" = "1" ]; then
+  if [ "${OB_DOCTOR_SKIP_PORT_CHECK:-0}" = "1" ]; then
     doctor_item warn "$label" "${port} not checked for listeners in this doctor run"
     return
   fi
   if port_is_listening "$port"; then
-    if command -v docker >/dev/null 2>&1 && port_owned_by_flux_container "$port"; then
-      doctor_item ok "$label" "${port} is already owned by a Flux container"
+    if command -v docker >/dev/null 2>&1 && port_owned_by_overlord_container "$port"; then
+      doctor_item ok "$label" "${port} is already owned by an Overlord Broil container"
     else
-      doctor_item fail "$label" "${port} is already listening; set FLUX_${label} or stop the conflicting service"
+      doctor_item fail "$label" "${port} is already listening; set OB_${label} or stop the conflicting service"
     fi
   else
     doctor_item ok "$label" "${port} is available"
@@ -927,7 +927,7 @@ doctor_port() {
 }
 
 run_master_doctor() {
-  local require_docker="${FLUX_DOCTOR_REQUIRE_DOCKER:-1}"
+  local require_docker="${OB_DOCTOR_REQUIRE_DOCKER:-1}"
   local db_mode="${DB_MODE}"
   local frontend_port="${FRONTEND_PORT}"
   local backend_port="${BACKEND_PORT}"
@@ -935,7 +935,7 @@ run_master_doctor() {
   local expose_backend="${EXPOSE_BACKEND}"
   local docker_daemon_ok="unknown"
 
-  echo "Flux master doctor"
+  echo "Overlord master doctor"
   doctor_item ok "os" "$(detect_os_name)"
   doctor_item ok "arch" "$(uname -m)"
   doctor_item ok "package-manager" "$(detect_package_manager)"
@@ -963,7 +963,7 @@ run_master_doctor() {
         doctor_item ok "docker-daemon" "reachable"
       else
         docker_daemon_ok="0"
-        doctor_item fail "docker-daemon" "not reachable within ${FLUX_DOCKER_INFO_TIMEOUT:-20}s; start Docker before installing the master"
+        doctor_item fail "docker-daemon" "not reachable within ${OB_DOCKER_INFO_TIMEOUT:-20}s; start Docker before installing the master"
       fi
     else
       doctor_item warn "docker-daemon" "not required for this doctor run"
@@ -1010,7 +1010,7 @@ run_master_doctor() {
     local legacy_containers
     legacy_containers="$(list_legacy_split_containers | paste -sd, - || true)"
     if [ -n "$legacy_containers" ]; then
-      doctor_item warn "legacy-split-containers" "found ${legacy_containers}; install/upgrade will remove them and keep only mysql + flux-master by default"
+      doctor_item warn "legacy-split-containers" "found ${legacy_containers}; install/upgrade will remove them and keep only mysql + overlord-master by default"
     else
       doctor_item ok "legacy-split-containers" "none"
     fi
@@ -1055,8 +1055,8 @@ backup_sqlite_data() {
     return 1
   fi
 
-  if docker ps --format '{{.Names}}' | grep -qx 'flux-master'; then
-    echo "Stopping flux-master briefly for a consistent SQLite file backup..."
+  if docker ps --format '{{.Names}}' | grep -qx 'overlord-master'; then
+    echo "Stopping overlord-master briefly for a consistent SQLite file backup..."
     compose_cmd stop master
     was_running="1"
   fi
@@ -1110,10 +1110,10 @@ create_backup() {
   local file_count=0
   stamp="$(date +%Y%m%d-%H%M%S)"
   workdir="$(mktemp -d)"
-  archive="${BACKUP_DIR}/flux-master-backup-${stamp}.tar.gz"
+  archive="${BACKUP_DIR}/overlord-master-backup-${stamp}.tar.gz"
 
   mkdir -p "${workdir}/files"
-  for file in "$ENV_FILE" "docker-compose.yml" "docker-compose-v4.yml" "docker-compose-v6.yml" "docker-compose.sqlite.yml" "$BACKEND_OVERRIDE_FILE" "$PHPMYADMIN_OVERRIDE_FILE" "gost.sql"; do
+  for file in "$ENV_FILE" "docker-compose.yml" "docker-compose-v4.yml" "docker-compose-v6.yml" "docker-compose.sqlite.yml" "$BACKEND_OVERRIDE_FILE" "$PHPMYADMIN_OVERRIDE_FILE" "overlord.sql" "gost.sql"; do
     if [ -f "$file" ]; then
       cp -p "$file" "${workdir}/files/${file}"
       file_count=$((file_count + 1))
@@ -1127,9 +1127,9 @@ create_backup() {
     fi
   fi
 
-  if [ "${DB_MODE:-mysql}" != "sqlite" ] && docker ps --format '{{.Names}}' | grep -qx 'gost-mysql' && [ -n "$DB_PASSWORD" ]; then
+  if [ "${DB_MODE:-mysql}" != "sqlite" ] && docker ps --format '{{.Names}}' | grep -qx 'overlord-mysql' && [ -n "$DB_PASSWORD" ]; then
     echo "Creating MySQL logical dump..."
-    if docker exec gost-mysql mysqldump -u"${DB_USER}" -p"${DB_PASSWORD}" --single-transaction --routines --triggers "${DB_NAME}" > "${workdir}/mysql.sql"; then
+    if docker exec overlord-mysql mysqldump -u"${DB_USER}" -p"${DB_PASSWORD}" --single-transaction --routines --triggers "${DB_NAME}" > "${workdir}/mysql.sql"; then
       :
     else
       echo "MySQL dump failed; continuing with file backup only." >&2
@@ -1139,7 +1139,7 @@ create_backup() {
 
   if [ "$file_count" -eq 0 ] && [ ! -f "${workdir}/mysql.sql" ]; then
     rm -rf "$workdir"
-    echo "Nothing to back up in ${INSTALL_DIR}; expected .env, docker-compose*.yml, gost.sql or a running gost-mysql container." >&2
+    echo "Nothing to back up in ${INSTALL_DIR}; expected .env, docker-compose*.yml, overlord.sql or a running overlord-mysql container." >&2
     exit 2
   fi
 
@@ -1164,6 +1164,9 @@ restore_backup() {
 
   if [ -d "${workdir}/files" ]; then
     cp -a "${workdir}/files/." .
+    if [ ! -f "overlord.sql" ] && [ -f "gost.sql" ]; then
+      cp -p "gost.sql" "overlord.sql"
+    fi
   else
     rm -rf "$workdir"
     echo "Backup archive does not contain a files directory." >&2
@@ -1174,7 +1177,7 @@ restore_backup() {
   DB_MODE="$(read_env_value DB_MODE "$ENV_FILE")"
   DB_MODE="${DB_MODE:-mysql}"
   SQLITE_DB_PATH="$(read_env_value SQLITE_DB_PATH "$ENV_FILE")"
-  SQLITE_DB_PATH="${SQLITE_DB_PATH:-/app/data/flux-master.sqlite}"
+  SQLITE_DB_PATH="${SQLITE_DB_PATH:-/app/data/overlord-master.sqlite}"
   SQLITE_DATA_DIR="$(read_env_value SQLITE_DATA_DIR "$ENV_FILE")"
   SQLITE_DATA_DIR="${SQLITE_DATA_DIR:-./data}"
   select_compose_file
@@ -1192,7 +1195,7 @@ restore_backup() {
     load_existing_env
     wait_for_mysql
     echo "Restoring MySQL logical dump..."
-    docker exec -i gost-mysql mysql -u"${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" < "${workdir}/mysql.sql"
+    docker exec -i overlord-mysql mysql -u"${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" < "${workdir}/mysql.sql"
   fi
 
   rm -rf "$workdir"
@@ -1233,7 +1236,7 @@ uninstall_stack() {
   if [ -f "$ENV_FILE" ] && [ -f "$COMPOSE_FILE" ]; then
     create_backup
     compose_cmd down
-    echo "Flux master containers removed. Data files and Docker volumes were kept."
+    echo "Overlord master containers removed. Data files and Docker volumes were kept."
   else
     echo "No compose/env files found in ${INSTALL_DIR}; nothing to uninstall."
   fi

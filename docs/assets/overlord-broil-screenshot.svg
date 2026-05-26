@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 960" role="img" aria-labelledby="title desc">
-  <title id="title">Flux 3x-ui Orchestrator dashboard preview</title>
-  <desc id="desc">A Flux-style operations dashboard preview for multi-server 3x-ui, Snell, Xray, traffic, certificate and forwarding management.</desc>
+  <title id="title">Overlord Broil dashboard preview</title>
+  <desc id="desc">An Overlord-style operations dashboard preview for multi-server 3x-ui, Snell, Xray, traffic, certificate and forwarding management.</desc>
   <defs>
     <style>
       .bg { fill: #eef2f5; }
@@ -38,7 +38,7 @@
 
   <rect x="48" y="44" width="238" height="872" rx="18" class="sidebar"/>
   <rect x="268" y="44" width="18" height="872" fill="#101820"/>
-  <text x="84" y="102" class="inverse" font-size="27" font-weight="700">Flux</text>
+  <text x="84" y="102" class="inverse" font-size="27" font-weight="700">Overlord</text>
   <text x="150" y="102" class="thin" font-size="17">3x-ui control</text>
   <rect x="82" y="142" width="166" height="36" rx="8" class="nav-active"/>
   <text x="110" y="166" class="ink" font-size="15" font-weight="700">Orchestrator</text>

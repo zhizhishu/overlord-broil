@@ -1,13 +1,13 @@
 services:
   master:
-    image: ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest
-    container_name: flux-master
+    image: ghcr.io/zhizhishu/overlord-broil:latest
+    container_name: overlord-master
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT}:5166"
     environment:
       SPRING_PROFILES_ACTIVE: sqlite
-      SQLITE_DB_PATH: ${SQLITE_DB_PATH:-/app/data/flux-master.sqlite}
+      SQLITE_DB_PATH: ${SQLITE_DB_PATH:-/app/data/overlord-master.sqlite}
       JWT_SECRET: ${JWT_SECRET}
       SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
       SERVER_PORT: 5166
@@ -20,9 +20,9 @@ services:
       JAVA_OPTS: "-Xms128m -Xmx384m -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
     volumes:
       - ${SQLITE_DATA_DIR:-./data}:/app/data
-      - master_logs:/app/logs
+      - overlord_master_logs:/app/logs
     networks:
-      - gost-network
+      - overlord-network
     healthcheck:
       test: ["CMD", "sh", "-c", "wget --no-verbose --tries=1 --spider http://localhost:5166/flow/test || exit 1"]
       interval: 30s
@@ -31,11 +31,11 @@ services:
       start_period: 90s
 
 volumes:
-  master_logs:
-    name: master_logs
+  overlord_master_logs:
+    name: overlord_master_logs
     driver: local
 
 networks:
-  gost-network:
-    name: gost-network
+  overlord-network:
+    name: overlord-network
     driver: bridge

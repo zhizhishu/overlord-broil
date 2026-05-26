@@ -4,8 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-export DB_NAME="${DB_NAME:-gost_port_contract}"
-export DB_USER="${DB_USER:-gost_port_contract}"
+export DB_NAME="${DB_NAME:-overlord_port_contract}"
+export DB_USER="${DB_USER:-overlord_port_contract}"
 export DB_PASSWORD="${DB_PASSWORD:-port-contract-password}"
 export JWT_SECRET="${JWT_SECRET:-port-contract-jwt-secret}"
 export SECRET_ENCRYPTION_KEY="${SECRET_ENCRYPTION_KEY:-port-contract-secret-key}"
@@ -40,7 +40,7 @@ assert_single_public_entry() {
   fi
 
   printf '%s\n' "$config" | grep -q 'target: 5166' || {
-    echo "${file} must publish flux-master target port 5166." >&2
+    echo "${file} must publish overlord-master target port 5166." >&2
     exit 1
   }
 
@@ -75,8 +75,8 @@ assert_installer_migration_guard() {
     exit 1
   }
 
-  grep -q 'FLUX_SQLITE_DATA_DIR' "$installer" || {
-    echo "install-master.sh usage must document FLUX_SQLITE_DATA_DIR." >&2
+  grep -q 'OB_SQLITE_DATA_DIR' "$installer" || {
+    echo "install-master.sh usage must document OB_SQLITE_DATA_DIR." >&2
     exit 1
   }
 

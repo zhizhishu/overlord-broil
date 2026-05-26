@@ -1,27 +1,25 @@
-# Flux 3x-ui Orchestrator 中文说明
+# Overlord Broil 中文说明
 
 [English README](README.md)
 
-Flux 3x-ui Orchestrator 是一个独立的主控 / 被控运维面板。它以 Flux Panel 的 UI 方向和转发面板能力为基础，融合 3x-ui / Xray / Reality、Snell、远端端口转发、证书、防火墙、流量同步和多服务器 Agent 运维。
+Overlord Broil 是一个独立的主控 / 被控运维面板，面向多服务器节点编排。它把 3x-ui / Xray / Reality、Snell、远端端口转发、证书、防火墙、流量同步和 Agent 运维收进同一个主控工作流。
 
-当前版本：`0.6.0`，定位为公开试用 / 正式候选版本。它适合自用、小规模授权服务器和公开展示，但还不是承诺长期兼容的 `1.0` 商业级稳定版。
+当前版本：0.6.0，定位为公开试用 / 正式候选版本。它适合自用、小规模授权服务器和公开展示，但还不是承诺长期兼容的 1.0 商业级稳定版。
 
 项目站点：
 
-```text
-https://zhizhishu.github.io/flux-3xui-orchestrator/
-https://zhizhishu.github.io/
-```
+- https://zhizhishu.github.io/overlord-broil/
+- https://zhizhishu.github.io/
 
 ## 核心架构
 
-默认运行形态是 `flux-master` 单体主控镜像：
+默认运行形态是 overlord-master 单体主控镜像：
 
 ```text
 用户浏览器 / 被控 Agent
         |
         v
-flux-master :5166
+overlord-master :5166
   - 内置 Web UI
   - API
   - 任务引擎
@@ -35,298 +33,148 @@ MySQL Docker 内网
 
 Runtime Provider 层把不同运行时统一到同一套任务和 UI 模型：
 
-| Provider | 作用 | 执行方式 | Nano 主机 |
-| --- | --- | --- | --- |
-| `xui` | 3x-ui / Xray / Reality / 入站 / 出站 / 流量 | 主控 API + Agent 任务 | 不建议 |
-| `snell` | Snell 节点服务 | Agent 任务 | 支持 |
-| `forward` | TCP/UDP 远端端口转发 | Agent 任务 | 支持 |
-| `certificate` | 自签 / ACME / 证书诊断 | Agent 任务 | 视任务而定 |
-| `firewall` | 防火墙诊断和运行时端口放行 | Agent 任务 | 支持 |
+| Provider | 管理内容 |
+| --- | --- |
+| xui | 3x-ui、Xray、Reality、inbound/outbound、流量同步、Xray restart |
+| snell | Snell 服务、PSK、端口、systemd/OpenRC 生命周期 |
+| forward | 远端端口转发、socat、服务状态、规则流量 |
+| certificate | ACME / 自签证书、证书文件、过期时间、诊断 |
+| firewall | 本机防火墙端口放行 / 关闭、诊断结果 |
 
-Snell 已统一到产品层的“协议节点”管理里，但它不是 Xray 或 3x-ui 的原生协议。底层仍然由 Agent 在被控服务器上部署独立 Snell 服务，这样更符合 Snell 的实际运行方式。
+Snell 已统一到产品层的“协议节点”管理里，但它不是 Xray 或 3x-ui 的原生协议。底层仍由 Agent 在被控服务器上部署独立 Snell 服务，这样更符合 Snell 的真实运行方式。
 
-Runtime Provider 元数据现在会从主控领取任务一路跟到 Agent 回报结果。Agent 会记录正在执行的 provider，并把它写入 `resultJson.runtimeProvider`；如果旧 Agent 没带这段信息，主控保存任务结果时也会兜底补上审计元数据。
+## UI Preview
 
-任务结果还会写入统一的 `resultJson.runtimeState`。它包含 `providerKey`、`providerName`、`protocol`、`action`、`taskState`、`sourceTaskId`、`serverId`、`resourceType`、解析后的 `status`、`statusSource`、`updatedAt`，以及服务状态、协议节点、转发规则、证书和诊断摘要。主控任务卡会直接展示这段状态，因此 XUI、Snell、转发、证书和防火墙任务可以用同一种方式查看执行结果。
+![Overlord Broil control plane preview](docs/assets/overlord-broil-screenshot.svg)
 
-State Sync 已把这些任务级运行时状态提升为“服务器 × Runtime Provider”的聚合视图。主控新增 `/api/v1/deploy-task/runtime-state/overview` 接口，把最新任务结果和服务器心跳里的 XUI/Xray、Snell、证书状态合并展示，主控中心也新增了 Flux 风格的状态同步面板。
-
-State Sync 面板现在也可以直接发起 Runtime Provider 运维任务。运维人员可以从状态行里启动对应运行时的诊断；XUI 和 Snell 行还会提供修复入口，实际生成普通的 `agent-maintenance` 部署任务，由被控 Agent 领取、执行并回报结果。
-
-Runtime Provider 描述现在包含 `agent-maintenance` Action Catalog。后端从这份 catalog 校验维护动作，主控 UI 的 State Sync 行动作和服务器卡片 Agent 按钮也从同一份元数据派生，不再各自维护硬编码按钮列表。
-
-危险维护动作现在有后端确认契约。比如卸载 agent 或关闭运行时端口这类动作，主控 UI 会先要求确认；后端也会拒绝没有 `dangerConfirmed=true` 和 `confirmAction=<action>` 的任务，避免误点直接进入被控执行链路。
-
-操作审计日志也接入了同一条控制链路。主控在创建、拒绝、手动改状态、重试或删除部署/编排任务，以及 Agent 领取任务、Agent 回报成功/失败/超时时写入 `operation_audit_log`；主控中心的“操作审计”面板会展示最近事件的执行者、服务器、provider、动作、结果和危险动作标记。
-
-Xray / 3x-ui 编排任务现在生成的是 Agent 可执行脚本，而不是占位 payload。被控 Agent 会解析本机或服务器卡片里保存的 3x-ui endpoint/token，调用 3x-ui inbound API 创建 / 删除协议节点，也可以重启 Xray，并通过 `FLUX_AGENT_RESULT_JSON` 把 inbound 元数据回报给主控。
-
-Agent 任务历史会在落库前脱敏 3x-ui 密钥。安装 / 编排回报仍然可以更新服务器卡片里的加密凭据，但保存到 `resultJson` 的只会是 configured 标记，不会保留 API token、密码或 2FA 明文。
-
-防火墙维护也进入同一份 provider 契约。`open-runtime-ports` 和 `close-runtime-ports` 会从任务 `requestJson` 里解析运行时端口，在目标机器上尽量应用 `ufw`、`firewalld` 或 `iptables` 规则，然后回传结构化诊断结果。云厂商安全组仍然需要运维人员确认。
-
-远端日志采集也复用同一条 `agent-maintenance` 链路。`logs` 动作会结构化返回 `logs.items`，覆盖 Flux agent 运行器、x-ui/Xray 服务、Snell 节点服务、转发/任务日志和相关服务管理器；主控任务卡会先展示一段远端日志摘要，运维人员再按需打开原始输出。
-
-Agent 升级也走同一条被控任务闭环：Agent 支持 `--version`，升级任务会先下载到临时文件、校验 Bash 语法、计算 SHA-256、备份旧二进制、安装新文件、计划重启服务，并把版本、校验、备份和重启状态写入结构化 `maintenance.upgrade`，主控任务卡可以直接查看。
-
-## UI 方向
-
-UI 继续靠近 Flux Panel：高信息密度、服务器卡片、操作分组、状态 chip、统一规则视图。它不是营销落地页，而是运维控制台。
-
-![Flux 3x-ui Orchestrator 主控预览](docs/assets/flux-orchestrator-screenshot.svg)
-
-当前主控 UI 包含：
-
-- 服务器注册、Token、心跳、状态卡片
-- 3x-ui / Xray 入站、出站、配置、流量和重启
-- Snell 节点创建、重启和卸载
-- 远端端口转发规则
-- Runtime Provider 可视化入口
-- Runtime Provider Action Catalog 驱动的维护按钮
-- State Sync 服务器 / 运行时聚合状态
-- State Sync 运行时诊断和修复任务快捷入口
-- 任务创建、拒绝、手动状态变更、重试/删除、Agent 领取和执行回报的操作审计时间线
-- Agent 诊断、日志、重启、升级、卸载和一键修复
-- `agent-maintenance` 任务卡上的远端日志摘要
-- 监控告警和统一规则中心
-- `zh-CN` / `en-US` 语言切换
+UI 方向是高信息密度的运维控制台：服务器卡片、操作分组、状态 chip、统一规则视图、Runtime State、任务审计和中英文切换。
 
 ## 默认端口
 
-主控默认只暴露一个公网入口：
-
-| 端口 | 用途 | 默认是否暴露 |
+| 角色 | 默认端口 | 说明 |
 | --- | --- | --- |
-| `5166/tcp` | 主控 Web UI、API、Agent 回调 | 是 |
-| `6365/tcp` | 后端调试别名 | 否，仅 `FLUX_EXPOSE_BACKEND=1` 时暴露 |
-| `3306/tcp` | MySQL | 否，仅 Docker 内网 |
-| SQLite | 可选本地主控数据库文件 | 不占用网络端口 |
-| phpMyAdmin | 临时维护 | 否，仅设置 `FLUX_PHPMYADMIN_PORT` 时暴露 |
+| 主控 Web / API | 5166/tcp | 浏览器和被控 Agent 都访问这个入口 |
+| 主控后端调试别名 | 默认不暴露 | 只有设置 OB_EXPOSE_BACKEND=1 才临时暴露 |
+| phpMyAdmin | 默认不暴露 | 只有设置 OB_PHPMYADMIN_PORT 才临时暴露 |
+| MySQL | 不暴露宿主机端口 | 只在 Docker 内网使用 |
+| 被控 Agent | 不暴露管理端口 | Agent 主动轮询主控 |
 
-安装或升级时，脚本会自动移除旧版分离栈留下的 `vite-frontend`、`springboot-backend`、`gost-phpmyadmin` 容器，避免它们继续占用 `80/6365/8066` 等旧端口。CI 和 release gate 会运行 `scripts/test-master-port-contract.sh`，确保默认 compose 只公开 `5166` 对应的主控入口。
+被控服务器只需要根据你创建的业务节点开放实际协议端口，例如 3x-ui 面板建议 5168、Xray inbound 端口、Snell 端口和远端转发端口。
 
-MySQL 仍然是默认生产路径。如果只是小规模自用、实验或想少跑一个数据库容器，可以显式选择 SQLite：
+## 安装主控
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo env FLUX_DB_MODE="sqlite" FLUX_FRONTEND_PORT="5166" bash
-```
-
-SQLite 模式同样只暴露 `5166/tcp`，数据库文件在 `/opt/flux-3xui-orchestrator/data`，并且会关闭 phpMyAdmin，因为没有 MySQL 服务。
-
-被控服务器不需要暴露 Agent 管理端口。Agent 主动连接主控，例如：
-
-```text
-http://MASTER_IP:5166
-```
-
-被控服务器只会根据你创建的业务节点暴露端口，例如：
-
-- 3x-ui 面板端口，默认建议 `5168`
-- Xray / Reality 入站端口
-- Snell 监听端口
-- 远端转发监听端口
-- ACME HTTP 模式需要的 `80/tcp`
-
-## 一键安装主控
+默认 MySQL 模式：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh | sudo bash
 ```
 
-Alpine 或极简系统没有 `bash` 时：
+轻量 SQLite 模式，不启动 MySQL sidecar：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master-bootstrap.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh \
+  | sudo env OB_DB_MODE="sqlite" OB_FRONTEND_PORT="5166" bash
 ```
 
 安装前预检：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh \
   | sudo bash -s -- doctor
 ```
 
-常用参数：
+升级：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo env FLUX_FRONTEND_PORT="5166" FLUX_NETWORK_STACK="v4" bash
-
-# 可选轻量数据库模式，不启动 MySQL sidecar
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo env FLUX_DB_MODE="sqlite" FLUX_FRONTEND_PORT="5166" bash
+sudo /opt/overlord-broil/install-master.sh upgrade
 ```
 
-升级、备份、恢复、卸载：
+默认登录：
 
-```bash
-sudo bash /opt/flux-3xui-orchestrator/install-master.sh upgrade
-sudo bash /opt/flux-3xui-orchestrator/install-master.sh backup
-sudo bash /opt/flux-3xui-orchestrator/install-master.sh restore --backup-file /opt/flux-3xui-orchestrator/backups/flux-master-backup-YYYYMMDD-HHMMSS.tar.gz
-sudo bash /opt/flux-3xui-orchestrator/install-master.sh uninstall --yes
+```text
+username: admin_user
+password: admin_user
 ```
 
-SQLite 模式备份会把实际数据目录单独保存为 `sqlite-data/`，恢复时再写回 `.env` 里记录的 `SQLITE_DATA_DIR`。如果备份时 `flux-master` 正在运行，脚本会短暂停止主控容器再复制数据库文件，保证文件级备份一致。
+首次登录后请立即修改默认密码，并备份 /opt/overlord-broil/.env。
 
 ## 安装被控 Agent
 
-先在主控的“主控中心”创建服务器，点击服务器卡片上的 `Token` 获取 `FLUX_SERVER_ID` 和 `FLUX_AGENT_TOKEN`。
-
-然后在被控服务器执行：
+先在主控的“主控中心”创建服务器，获取 OB_SERVER_ID 和 OB_AGENT_TOKEN，然后在被控服务器执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
-  | sudo env FLUX_PANEL_URL="http://MASTER_IP:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent.sh \
+  | sudo env OB_PANEL_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash
 ```
 
-Alpine 或极简系统：
+Alpine 或极简系统可用 bootstrap：
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent-bootstrap.sh \
-  | sudo env FLUX_PANEL_URL="http://MASTER_IP:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" sh
-```
-
-被控端预检：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
-  | sudo env FLUX_PANEL_URL="http://MASTER_IP:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
+```sh
+wget -O- https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent-bootstrap.sh \
+  | env OB_PANEL_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" sh
 ```
 
 Agent 安装后会通过 systemd 或 OpenRC 常驻运行，主动向主控拉取任务、在本机执行、再回报结果。
-领取到的任务会携带 Runtime Provider 分配结果，后续任务历史可以按 `xui`、`snell`、`forward`、`certificate`、`firewall` 审计。
 
-## 怎么用
+## 使用流程
 
-1. 安装主控，打开 `http://MASTER_IP:5166`。
+1. 安装主控，打开 http://MASTER_IP:5166。
 2. 登录后台，进入“主控中心”。
-3. 创建服务器，获取 Agent 安装命令。
+3. 创建服务器，复制 Agent 安装命令。
 4. 在被控服务器安装 Agent，等待心跳在线。
-5. 选择一台或多台服务器，执行一键编排：
-   - 安装或复用 3x-ui
-   - 创建 VLESS Reality、VMess WebSocket、Trojan TLS、Shadowsocks 节点
-   - 部署 Snell 节点
-   - 申请或配置证书
-   - 同步规则和流量
-6. 后续在服务器卡片中管理入站、出站、Snell、转发、证书、防火墙和 Agent 运维任务。
+5. 多选服务器，执行一键编排：安装或复用 3x-ui、创建 Xray/Reality 节点、部署 Snell、配置转发、同步状态。
+6. 在统一节点、转发规则、Runtime State、任务审计和流量面板里查看结果。
 
 ## 低内存服务器
 
-Agent 心跳会上报总内存。主控会自动识别低内存档位：
-
 | 档位 | 内存 | 策略 |
 | --- | --- | --- |
-| `nano-critical` | `< 200 MB` | 阻止完整 3x-ui / Xray 编排，建议 Snell 或端口转发 |
-| `nano` | `< 256 MB` | 显示 Nano 提醒，谨慎创建重运行时任务 |
-| `small` | `< 512 MB` | 建议开启 swap 后再跑复杂节点 |
-| `standard` | `>= 512 MB` | 正常路径 |
+| nano-critical | < 200 MB | 阻止完整 3x-ui / Xray 编排，建议只跑 Snell 或端口转发 |
+| nano | < 256 MB | 显示 Nano 提醒，谨慎创建重运行时任务 |
+| small | < 512 MB | 显示小内存提醒 |
+| standard | >= 512 MB | 正常路径 |
 
-## 支持系统
+这只是保护层，不保证 3x-ui/Xray 能在超小机器长期稳定运行。
+
+## Linux 支持
 
 | 目标 | Debian / Ubuntu | Rocky / Oracle Linux | Alpine / OpenRC |
 | --- | --- | --- | --- |
-| 主控 Docker 栈 | 支持 | 支持 | 支持 bootstrap |
+| 主控 Docker stack | 支持 | 支持 | bootstrap 支持 |
 | Agent 服务 | systemd | systemd | OpenRC |
-| Snell 节点 | systemd | systemd | OpenRC |
-| 远端转发 | systemd + `socat` | systemd + `socat` | OpenRC + `socat` |
-| 完整 3x-ui 安装配置 | 支持 | 支持 | `0.6.0` 暂不支持 |
+| Snell 节点任务 | systemd | systemd | OpenRC |
+| 远端转发任务 | systemd + socat | systemd + socat | OpenRC + socat |
+| 完整 3x-ui 安装配置 | 支持 | 支持 | 0.6.0 暂不支持 |
 
-## Docker / GHCR 镜像
+## Docker 和 GHCR
 
 默认主控镜像：
 
 ```text
-ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest
+ghcr.io/zhizhishu/overlord-broil:latest
 ```
 
-旧的前后端分离运行镜像已从正式产品面移除。仓库仍保留后端和前端源码模块用于单体构建与本地验证，但部署和发布只使用 `flux-master` 单体镜像。
-
-`main` 和 `v*` tag 会推送 GHCR 镜像。`future` 分支用于验证未来能力，默认只构建检查，不覆盖正式镜像。
-
-## API 摘要
-
-Runtime Provider：
-
-```text
-POST /api/v1/runtime-provider/list
-POST /api/v1/runtime-provider/resolve
-```
-
-核心任务链路：
-
-```text
-POST /api/v1/control-server/create
-POST /api/v1/control-server/list
-POST /api/v1/control-server/token
-POST /api/v1/control-server/heartbeat
-POST /api/v1/deploy-task/create
-POST /api/v1/deploy-task/orchestrate
-POST /api/v1/deploy-task/list
-POST /api/v1/deploy-task/retry
-POST /api/v1/agent-task/claim
-POST /api/v1/agent-task/report
-```
-
-Agent 回报结果会同时保存 `resultJson.runtimeProvider` 和 `resultJson.runtimeState`，任务历史既能按运行时归属、来源任务、目标服务器和资源类型审计，也能按服务、节点、证书或诊断状态排查。
-`agent-maintenance` 日志回报还会保存结构化 `logs.items`，覆盖 Flux agent、x-ui/Xray、Snell、转发和任务日志来源，供任务卡生成摘要。
-
-节点、转发和 3x-ui：
-
-```text
-POST /api/v1/protocol-node/create
-POST /api/v1/protocol-node/list
-POST /api/v1/protocol-node/sync
-POST /api/v1/server-forward/create
-POST /api/v1/server-forward/list
-POST /api/v1/server-rule/overview
-POST /api/v1/three-xui/inbounds/list
-POST /api/v1/three-xui/outbounds
-POST /api/v1/three-xui/traffic/sync
-POST /api/v1/three-xui/restart-xray
-```
+旧的前后端分离运行镜像已从正式产品面移除。仓库仍保留后端和前端源码模块用于单体构建与本地验证，但部署和发布只使用 overlord-master 单体镜像。
 
 ## 本地验证
 
 ```bash
-bash scripts/release-check.sh --full
-```
-
-没有本机 Maven 时可以用 Docker：
-
-```bash
-docker run --rm -v "$PWD/springboot-backend:/workspace" -w /workspace maven:3.9-eclipse-temurin-21 mvn -B -DskipTests package
-```
-
-前端：
-
-```bash
-cd vite-frontend
-npm install --legacy-peer-deps
-npm run build
-```
-
-真实 3x-ui 合同烟测是可选项；没有配置真实地址和 API token 时会自动跳过：
-
-```bash
-export THREE_XUI_E2E_URL="https://xui.example.com:5168"
-export THREE_XUI_E2E_TOKEN="YOUR_3XUI_API_TOKEN"
+bash scripts/test-agent-mock.sh
+bash scripts/test-three-xui-fixture.sh
 bash scripts/test-three-xui-e2e.sh
+bash scripts/test-compose-smoke.sh --build-local --dry-run
+bash scripts/test-compose-smoke.sh --compose-file docker-compose.sqlite.yml --build-local --dry-run
 ```
 
-如果要在真实 3x-ui 上创建、切换并删除一个临时 VLESS inbound，需要显式开启写入并指定一个未占用端口：
+真实 3x-ui 合同烟测是可选项；没有配置真实地址和 API token 时会自动跳过。
 
-```bash
-THREE_XUI_E2E_WRITE=1 THREE_XUI_E2E_PORT=42123 bash scripts/test-three-xui-e2e.sh
-```
+## 仍未到 1.0 的部分
 
-## 离 1.0 还差什么
-
-- 真实 VPS 矩阵：Debian、Ubuntu、Rocky、Oracle Linux、Alpine。
-- 通过 `scripts/test-three-xui-e2e.sh` 跑通并记录真实 3x-ui 容器或 VPS 端到端烟测结果。
-- 更完整的证书、防火墙和云安全组诊断。
-- RBAC、审计保留 / 导出、Agent token 过期 / 吊销、密钥轮换。
-- 移动端、加载态、失败态和任务详情继续打磨。
+- 还需要真实 VPS 矩阵：Debian、Ubuntu、Rocky、Oracle Linux、Alpine。
+- 还需要记录真实 3x-ui 容器或 VPS 的端到端测试结果。
+- 证书、防火墙和云安全组诊断还可以继续加强。
+- RBAC、审计导出、Agent token 过期 / 吊销、密钥轮换迁移仍是后续工作。
+- 移动端、加载态、失败态和任务详情还可以继续打磨。
 
 ## 致谢
 
@@ -339,4 +187,4 @@ THREE_XUI_E2E_WRITE=1 THREE_XUI_E2E_PORT=42123 bash scripts/test-three-xui-e2e.s
 
 ## 安全说明
 
-本项目仅用于你拥有或被授权管理的服务器。请不要用于未授权访问、滥用、规避监管、违法用途或违反服务条款的行为。
+只在你拥有授权的服务器上使用本项目。请修改默认密码，保管好 /opt/overlord-broil/.env，不要把 SECRET_ENCRYPTION_KEY、Agent token、3x-ui API token 或 Cookie 公开到日志、Issue、截图或聊天记录里。

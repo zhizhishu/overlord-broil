@@ -18,7 +18,7 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- 数据库： `gost`
+-- 数据库： `overlord`
 --
 
 -- --------------------------------------------------------
@@ -391,7 +391,7 @@ CREATE TABLE `vite_config` (
 --
 
 INSERT INTO `vite_config` (`id`, `name`, `value`, `time`) VALUES
-(1, 'app_name', 'flux', 1755147963000);
+(1, 'app_name', 'Overlord Broil', 1755147963000);
 
 --
 -- 转储表的索引

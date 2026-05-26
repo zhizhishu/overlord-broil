@@ -1392,7 +1392,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         String json = JSON.toJSONString(payload);
         return "#!/usr/bin/env bash\n"
                 + "set -euo pipefail\n"
-                + "FLUX_XRAY_TASK='" + escapeShell(json) + "'\n"
+                + "OB_XRAY_TASK='" + escapeShell(json) + "'\n"
                 + "XUI_ENDPOINT='" + escapeShell(server.getXuiEndpoint()) + "'\n"
                 + "XUI_BASE_PATH='" + escapeShell(server.getXuiBasePath()) + "'\n"
                 + "XUI_API_TOKEN='" + escapeShell(decryptSecret(server.getXuiApiToken())) + "'\n"
@@ -1407,10 +1407,10 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
     private String xrayAgentTaskBody() {
         return """
 
-                XUI_ENDPOINT="${FLUX_XUI_ENDPOINT:-$XUI_ENDPOINT}"
-                XUI_BASE_PATH="${FLUX_XUI_BASE_PATH:-$XUI_BASE_PATH}"
-                XUI_API_TOKEN="${FLUX_XUI_API_TOKEN:-$XUI_API_TOKEN}"
-                XUI_PANEL_PORT="${FLUX_XUI_PANEL_PORT:-5168}"
+                XUI_ENDPOINT="${OB_XUI_ENDPOINT:-$XUI_ENDPOINT}"
+                XUI_BASE_PATH="${OB_XUI_BASE_PATH:-$XUI_BASE_PATH}"
+                XUI_API_TOKEN="${OB_XUI_API_TOKEN:-$XUI_API_TOKEN}"
+                XUI_PANEL_PORT="${OB_XUI_PANEL_PORT:-5168}"
 
                 if [ -z "$XUI_ENDPOINT" ]; then
                   XUI_ENDPOINT="http://127.0.0.1:${XUI_PANEL_PORT}"
@@ -1429,7 +1429,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   XUI_SERVICE_STATUS="$(systemctl is-active x-ui 2>/dev/null || echo unknown)"
                 fi
 
-                export FLUX_XRAY_TASK XUI_ENDPOINT XUI_BASE_PATH XUI_API_TOKEN XUI_SERVICE_STATUS
+                export OB_XRAY_TASK XUI_ENDPOINT XUI_BASE_PATH XUI_API_TOKEN XUI_SERVICE_STATUS
                 python3 <<'PY'
                 import json
                 import os
@@ -1440,7 +1440,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 import urllib.request
                 import uuid
 
-                task = json.loads(os.environ["FLUX_XRAY_TASK"])
+                task = json.loads(os.environ["OB_XRAY_TASK"])
                 endpoint = os.environ["XUI_ENDPOINT"].rstrip("/")
                 base_path = (os.environ.get("XUI_BASE_PATH") or "").strip()
                 if base_path and not base_path.startswith("/"):
@@ -1540,7 +1540,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                             "clients": [{
                                 "id": client_id,
                                 "flow": flow,
-                                "email": str(first(request_meta.get("email"), "vless-%s@flux.local" % now)),
+                                "email": str(first(request_meta.get("email"), "vless-%s@overlord.local" % now)),
                                 "limitIp": 0,
                                 "totalGB": as_int(request_meta.get("totalGB"), 0),
                                 "expiryTime": as_int(request_meta.get("expiryTime"), 0),
@@ -1567,7 +1567,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                             "clients": [{
                                 "id": str(first(request_meta.get("clientId"), request_meta.get("uuid"), uuid.uuid4())),
                                 "alterId": 0,
-                                "email": str(first(request_meta.get("email"), "vmess-%s@flux.local" % now)),
+                                "email": str(first(request_meta.get("email"), "vmess-%s@overlord.local" % now)),
                                 "limitIp": 0,
                                 "totalGB": as_int(request_meta.get("totalGB"), 0),
                                 "expiryTime": as_int(request_meta.get("expiryTime"), 0),
@@ -1582,7 +1582,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                         settings = {
                             "clients": [{
                                 "password": str(first(request_meta.get("password"), uuid.uuid4().hex)),
-                                "email": str(first(request_meta.get("email"), "trojan-%s@flux.local" % now)),
+                                "email": str(first(request_meta.get("email"), "trojan-%s@overlord.local" % now)),
                                 "limitIp": 0,
                                 "totalGB": as_int(request_meta.get("totalGB"), 0),
                                 "expiryTime": as_int(request_meta.get("expiryTime"), 0),
@@ -1605,7 +1605,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                         "up": 0,
                         "down": 0,
                         "total": 0,
-                        "remark": str(first(request_meta.get("remark"), request_meta.get("name"), "flux-%s" % protocol)),
+                        "remark": str(first(request_meta.get("remark"), request_meta.get("name"), "ob-%s" % protocol)),
                         "enable": "true",
                         "expiryTime": 0,
                         "listen": str(first(request_meta.get("listen"), "")),
@@ -1638,7 +1638,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                         raise SystemExit("remoteId or inboundId is required for Xray inbound deletion.")
                     response = post_empty("/panel/api/inbounds/del/%s" % urllib.parse.quote(str(remote_id)))
                     result["inbounds"].append({
-                        "name": str(first(request_meta.get("name"), "flux-%s" % protocol)),
+                        "name": str(first(request_meta.get("name"), "ob-%s" % protocol)),
                         "engine": "xray",
                         "direction": "inbound",
                         "protocol": protocol,
@@ -1669,7 +1669,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                         "state": "active",
                     })
 
-                print("FLUX_AGENT_RESULT_JSON=" + json.dumps(result, ensure_ascii=False, separators=(",", ":")))
+                print("OB_AGENT_RESULT_JSON=" + json.dumps(result, ensure_ascii=False, separators=(",", ":")))
                 PY
                 """;
     }
@@ -1690,11 +1690,11 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 + "set -euo pipefail\n\n"
                 + "ACTION='" + escapeShell(action) + "'\n"
                 + "REQUEST_JSON='" + escapeShell(requestJson) + "'\n"
-                + "AGENT_BIN='${FLUX_AGENT_BIN:-/usr/local/bin/flux-agent.sh}'\n"
-                + "AGENT_ENV='${FLUX_AGENT_ENV:-/etc/flux-agent.env}'\n"
-                + "REPO_RAW_URL='${FLUX_REPO_RAW_URL:-https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main}'\n"
-                + "SOURCE_URL='${FLUX_AGENT_SOURCE_URL:-${REPO_RAW_URL}/scripts/flux-agent.sh}'\n"
-                + "LOG_LINES=\"${FLUX_MAINTENANCE_LOG_LINES:-160}\"\n\n"
+                + "AGENT_BIN='${OB_AGENT_BIN:-/usr/local/bin/overlord-agent.sh}'\n"
+                + "AGENT_ENV='${OB_AGENT_ENV:-/etc/overlord-agent.env}'\n"
+                + "REPO_RAW_URL='${OB_REPO_RAW_URL:-https://raw.githubusercontent.com/zhizhishu/overlord-broil/main}'\n"
+                + "SOURCE_URL='${OB_AGENT_SOURCE_URL:-${REPO_RAW_URL}/scripts/overlord-agent.sh}'\n"
+                + "LOG_LINES=\"${OB_MAINTENANCE_LOG_LINES:-160}\"\n\n"
                 + "SERVER_HOST='" + escapeShell(server.getHost()) + "'\n"
                 + "XUI_ENDPOINT='" + escapeShell(server.getXuiEndpoint()) + "'\n"
                 + "CERTIFICATE_DOMAIN='" + escapeShell(server.getCertificateDomain()) + "'\n"
@@ -1705,18 +1705,18 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
     private String agentMaintenanceBody() {
         return """
                 log() {
-                  printf '[flux-maintenance] %s\\n' "$*"
+                  printf '[overlord-maintenance] %s\\n' "$*"
                 }
 
                 section() {
                   printf '\\n== %s ==\\n' "$*"
                 }
 
-                DIAG_FILE="${TMPDIR:-/tmp}/flux-maintenance-diagnostics-$$.jsonl"
+                DIAG_FILE="${TMPDIR:-/tmp}/overlord-maintenance-diagnostics-$$.jsonl"
                 : > "$DIAG_FILE" 2>/dev/null || true
-                LOG_FILE="${TMPDIR:-/tmp}/flux-maintenance-logs-$$.jsonl"
+                LOG_FILE="${TMPDIR:-/tmp}/overlord-maintenance-logs-$$.jsonl"
                 : > "$LOG_FILE" 2>/dev/null || true
-                UPGRADE_FILE="${TMPDIR:-/tmp}/flux-maintenance-upgrade-$$.json"
+                UPGRADE_FILE="${TMPDIR:-/tmp}/overlord-maintenance-upgrade-$$.json"
                 : > "$UPGRADE_FILE" 2>/dev/null || true
                 case "$LOG_LINES" in
                   ''|*[!0-9]*)
@@ -1797,16 +1797,16 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     printf '%s\\t%s\\t%s\\t%s\\t%s\\n' "$state" "$code" "$title" "$detail" "$hint" >> "$DIAG_FILE" 2>/dev/null || true
                     return 0
                   fi
-                  FLUX_DIAG_STATE="$state" FLUX_DIAG_CODE="$code" FLUX_DIAG_TITLE="$title" FLUX_DIAG_DETAIL="$detail" FLUX_DIAG_HINT="$hint" "$python_bin" - <<'PY' >> "$DIAG_FILE" 2>/dev/null || true
+                  OB_DIAG_STATE="$state" OB_DIAG_CODE="$code" OB_DIAG_TITLE="$title" OB_DIAG_DETAIL="$detail" OB_DIAG_HINT="$hint" "$python_bin" - <<'PY' >> "$DIAG_FILE" 2>/dev/null || true
                 import json
                 import os
 
                 print(json.dumps({
-                    "state": os.environ.get("FLUX_DIAG_STATE", "warning"),
-                    "code": os.environ.get("FLUX_DIAG_CODE", "unknown"),
-                    "title": os.environ.get("FLUX_DIAG_TITLE", ""),
-                    "detail": os.environ.get("FLUX_DIAG_DETAIL", ""),
-                    "hint": os.environ.get("FLUX_DIAG_HINT", ""),
+                    "state": os.environ.get("OB_DIAG_STATE", "warning"),
+                    "code": os.environ.get("OB_DIAG_CODE", "unknown"),
+                    "title": os.environ.get("OB_DIAG_TITLE", ""),
+                    "detail": os.environ.get("OB_DIAG_DETAIL", ""),
+                    "hint": os.environ.get("OB_DIAG_HINT", ""),
                 }, ensure_ascii=False, separators=(",", ":")))
                 PY
                 }
@@ -1823,12 +1823,12 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     printf '%s\\t%s\\t%s\\t%s\\n' "$runtime" "$source" "$title" "$file" >> "$LOG_FILE" 2>/dev/null || true
                     return 0
                   fi
-                  FLUX_LOG_RUNTIME="$runtime" FLUX_LOG_SOURCE="$source" FLUX_LOG_TITLE="$title" FLUX_LOG_PATH="$file" "$python_bin" - <<'PY' >> "$LOG_FILE" 2>/dev/null || true
+                  OB_LOG_RUNTIME="$runtime" OB_LOG_SOURCE="$source" OB_LOG_TITLE="$title" OB_LOG_PATH="$file" "$python_bin" - <<'PY' >> "$LOG_FILE" 2>/dev/null || true
                 import json
                 import os
 
                 max_len = 12000
-                path = os.environ.get("FLUX_LOG_PATH", "")
+                path = os.environ.get("OB_LOG_PATH", "")
                 content = ""
                 truncated = False
                 try:
@@ -1840,9 +1840,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 except Exception as exc:
                     content = "unable to read log: " + str(exc)
                 print(json.dumps({
-                    "runtime": os.environ.get("FLUX_LOG_RUNTIME", "agent"),
-                    "source": os.environ.get("FLUX_LOG_SOURCE", ""),
-                    "title": os.environ.get("FLUX_LOG_TITLE", ""),
+                    "runtime": os.environ.get("OB_LOG_RUNTIME", "agent"),
+                    "source": os.environ.get("OB_LOG_SOURCE", ""),
+                    "title": os.environ.get("OB_LOG_TITLE", ""),
                     "content": content,
                     "lines": len(content.splitlines()),
                     "truncated": truncated,
@@ -1855,7 +1855,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   local unit="$2"
                   local title="$3"
                   local tmp
-                  tmp="$(mktemp "${TMPDIR:-/tmp}/flux-log-${runtime}-XXXXXX" 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/flux-log-$$-${runtime}")"
+                  tmp="$(mktemp "${TMPDIR:-/tmp}/overlord-log-${runtime}-XXXXXX" 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/overlord-log-$$-${runtime}")"
                   journalctl -u "$unit" -n "$LOG_LINES" --no-pager > "$tmp" 2>&1 || true
                   cat "$tmp" 2>/dev/null || true
                   log_file_item "$runtime" "journalctl:${unit}" "$title" "$tmp"
@@ -1870,7 +1870,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   local lines="${5:-80}"
                   local tmp
                   [ -f "$file" ] || return 0
-                  tmp="$(mktemp "${TMPDIR:-/tmp}/flux-log-${runtime}-XXXXXX" 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/flux-log-$$-${runtime}")"
+                  tmp="$(mktemp "${TMPDIR:-/tmp}/overlord-log-${runtime}-XXXXXX" 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/overlord-log-$$-${runtime}")"
                   tail -n "$lines" "$file" > "$tmp" 2>&1 || true
                   cat "$tmp" 2>/dev/null || true
                   log_file_item "$runtime" "$source" "$title" "$tmp"
@@ -1936,15 +1936,15 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   return 1
                 }
 
-                flux_agent_status() {
+                overlord_agent_status() {
                   local manager
                   manager="$(detect_service_manager)"
                   case "$manager" in
                     systemd)
-                      systemctl is-active flux-agent 2>/dev/null || true
+                      systemctl is-active overlord-agent 2>/dev/null || true
                       ;;
                     openrc)
-                      if rc-service flux-agent status >/dev/null 2>&1; then
+                      if rc-service overlord-agent status >/dev/null 2>&1; then
                         echo active
                       else
                         echo inactive
@@ -1983,7 +1983,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   echo "== service manager: ${manager}"
                   case "$manager" in
                     systemd)
-                      capture_journal_log "agent" "flux-agent.service" "flux-agent service log"
+                      capture_journal_log "agent" "overlord-agent.service" "overlord-agent service log"
                       for unit in x-ui.service xray.service; do
                         if systemctl status "$unit" >/dev/null 2>&1; then
                           capture_journal_log "xui" "$unit" "${unit} log"
@@ -1993,7 +1993,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                       for unit in $units; do
                         capture_journal_log "snell" "$unit" "${unit} log"
                       done
-                      for pattern in 'flux-forward*.service' 'server-forward*.service' 'socat*.service'; do
+                      for pattern in 'overlord-forward*.service' 'server-forward*.service' 'socat*.service'; do
                         units="$(systemctl list-unit-files "$pattern" --no-legend 2>/dev/null | awk '{print $1}' || true)"
                         for unit in $units; do
                           capture_journal_log "forward" "$unit" "${unit} log"
@@ -2001,15 +2001,15 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                       done
                       ;;
                     openrc)
-                      capture_file_log "agent" "file:/var/log/flux-agent.log" "flux-agent log" "/var/log/flux-agent.log" "$LOG_LINES"
-                      capture_file_log "agent" "file:/var/log/flux-agent.err" "flux-agent error log" "/var/log/flux-agent.err" "$LOG_LINES"
+                      capture_file_log "agent" "file:/var/log/overlord-agent.log" "overlord-agent log" "/var/log/overlord-agent.log" "$LOG_LINES"
+                      capture_file_log "agent" "file:/var/log/overlord-agent.err" "overlord-agent error log" "/var/log/overlord-agent.err" "$LOG_LINES"
                       for file in /var/log/x-ui*.log /var/log/xray*.log; do
                         capture_file_log "xui" "file:${file}" "$(basename "$file")" "$file" "$LOG_LINES"
                       done
                       for file in /var/log/snell*.log; do
                         capture_file_log "snell" "file:${file}" "$(basename "$file")" "$file" "$LOG_LINES"
                       done
-                      for file in /var/log/flux-forward*.log /var/log/server-forward*.log /var/log/socat*.log; do
+                      for file in /var/log/overlord-forward*.log /var/log/server-forward*.log /var/log/socat*.log; do
                         capture_file_log "forward" "file:${file}" "$(basename "$file")" "$file" "$LOG_LINES"
                       done
                       ;;
@@ -2023,11 +2023,11 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   for file in /var/log/snell*.log; do
                     capture_file_log "snell" "file:${file}" "$(basename "$file")" "$file" "$LOG_LINES"
                   done
-                  for file in /var/log/flux-forward*.log /var/log/server-forward*.log /var/log/socat*.log; do
+                  for file in /var/log/overlord-forward*.log /var/log/server-forward*.log /var/log/socat*.log; do
                     capture_file_log "forward" "file:${file}" "$(basename "$file")" "$file" "$LOG_LINES"
                   done
                   echo "== recent task logs"
-                  task_files="$(ls -t /var/lib/flux-agent/task-*.out /var/lib/flux-agent/task-*.err 2>/dev/null || true)"
+                  task_files="$(ls -t /var/lib/overlord-agent/task-*.out /var/lib/overlord-agent/task-*.err 2>/dev/null || true)"
                   if [ -z "$task_files" ]; then
                     echo "no recent task logs"
                     return
@@ -2045,10 +2045,10 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   manager="$(detect_service_manager)"
                   case "$manager" in
                     systemd)
-                      nohup sh -c 'sleep 3; systemctl restart flux-agent.service' >/tmp/flux-agent-restart.log 2>&1 &
+                      nohup sh -c 'sleep 3; systemctl restart overlord-agent.service' >/tmp/overlord-agent-restart.log 2>&1 &
                       ;;
                     openrc)
-                      nohup sh -c 'sleep 3; rc-service flux-agent restart' >/tmp/flux-agent-restart.log 2>&1 &
+                      nohup sh -c 'sleep 3; rc-service overlord-agent restart' >/tmp/overlord-agent-restart.log 2>&1 &
                       ;;
                     *)
                       echo 'systemd or OpenRC is required to restart the long-running agent service.' >&2
@@ -2061,25 +2061,25 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 schedule_agent_uninstall() {
                   local manager script
                   manager="$(detect_service_manager)"
-                  script="/tmp/flux-agent-uninstall-$$.sh"
+                  script="/tmp/overlord-agent-uninstall-$$.sh"
                   cat > "$script" <<'UNINSTALL'
                 #!/usr/bin/env sh
                 sleep 5
                 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
-                  systemctl stop flux-agent.service 2>/dev/null || true
-                  systemctl disable flux-agent.service 2>/dev/null || true
-                  rm -f /etc/systemd/system/flux-agent.service
+                  systemctl stop overlord-agent.service 2>/dev/null || true
+                  systemctl disable overlord-agent.service 2>/dev/null || true
+                  rm -f /etc/systemd/system/overlord-agent.service
                   systemctl daemon-reload 2>/dev/null || true
                 elif command -v rc-service >/dev/null 2>&1 && command -v rc-update >/dev/null 2>&1; then
-                  rc-service flux-agent stop 2>/dev/null || true
-                  rc-update del flux-agent default 2>/dev/null || true
-                  rm -f /etc/init.d/flux-agent /usr/local/bin/flux-agent-openrc-wrapper.sh
+                  rc-service overlord-agent stop 2>/dev/null || true
+                  rc-update del overlord-agent default 2>/dev/null || true
+                  rm -f /etc/init.d/overlord-agent /usr/local/bin/overlord-agent-openrc-wrapper.sh
                 fi
-                rm -f /usr/local/bin/flux-agent.sh /etc/flux-agent.env
+                rm -f /usr/local/bin/overlord-agent.sh /etc/overlord-agent.env
                 rm -f "$0"
                 UNINSTALL
                   chmod 0700 "$script"
-                  nohup sh "$script" >/tmp/flux-agent-uninstall.log 2>&1 &
+                  nohup sh "$script" >/tmp/overlord-agent-uninstall.log 2>&1 &
                   echo "agent uninstall scheduled via ${manager}; current task can report before the service is removed"
                 }
 
@@ -2103,7 +2103,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 agent_script_version() {
                   local script="$1"
                   [ -f "$script" ] || return 0
-                  FLUX_AGENT_VERSION= bash "$script" --version 2>/dev/null | head -n 1 || true
+                  OB_AGENT_VERSION= bash "$script" --version 2>/dev/null | head -n 1 || true
                 }
 
                 write_upgrade_metadata() {
@@ -2153,7 +2153,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   command -v curl >/dev/null 2>&1 || { echo 'curl is required for agent upgrade.' >&2; return 1; }
                   command -v bash >/dev/null 2>&1 || { echo 'bash is required for agent upgrade validation.' >&2; return 1; }
 
-                  tmp="$(mktemp "${TMPDIR:-/tmp}/flux-agent-upgrade-XXXXXX")"
+                  tmp="$(mktemp "${TMPDIR:-/tmp}/overlord-agent-upgrade-XXXXXX")"
                   if ! curl -fsSL --retry 3 --connect-timeout 10 --max-time 120 "$SOURCE_URL" -o "$tmp"; then
                     rm -f "$tmp"
                     echo "failed to download agent from ${SOURCE_URL}" >&2
@@ -2280,18 +2280,18 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     diag_item ok "agent_env" "agent 环境文件存在" "$AGENT_ENV" ""
                   else
                     echo "[fail] agent env missing: ${AGENT_ENV}"
-                    diag_item fail "agent_env_missing" "agent 环境文件缺失" "$AGENT_ENV" "重新安装 agent，并确认 FLUX_PANEL_URL、FLUX_SERVER_ID、FLUX_AGENT_TOKEN 已写入。"
+                    diag_item fail "agent_env_missing" "agent 环境文件缺失" "$AGENT_ENV" "重新安装 agent，并确认 OB_PANEL_URL、OB_SERVER_ID、OB_AGENT_TOKEN 已写入。"
                   fi
-                  if [ -d /var/lib/flux-agent ]; then
-                    echo "[ok] work dir: /var/lib/flux-agent"
-                    diag_item ok "agent_work_dir" "agent 工作目录存在" "/var/lib/flux-agent" ""
+                  if [ -d /var/lib/overlord-agent ]; then
+                    echo "[ok] work dir: /var/lib/overlord-agent"
+                    diag_item ok "agent_work_dir" "agent 工作目录存在" "/var/lib/overlord-agent" ""
                   else
-                    echo "[warn] work dir missing: /var/lib/flux-agent"
-                    diag_item warning "agent_work_dir_missing" "agent 工作目录缺失" "/var/lib/flux-agent" "agent 首次运行会创建目录；若任务无法写日志，请检查目录权限。"
+                    echo "[warn] work dir missing: /var/lib/overlord-agent"
+                    diag_item warning "agent_work_dir_missing" "agent 工作目录缺失" "/var/lib/overlord-agent" "agent 首次运行会创建目录；若任务无法写日志，请检查目录权限。"
                   fi
                   if [ -r "$AGENT_ENV" ]; then
-                    grep -E '^(FLUX_PANEL_URL|FLUX_SERVER_ID|FLUX_POLL_INTERVAL)=' "$AGENT_ENV" || true
-                    if grep -q '^FLUX_AGENT_TOKEN=' "$AGENT_ENV"; then
+                    grep -E '^(OB_PANEL_URL|OB_SERVER_ID|OB_POLL_INTERVAL)=' "$AGENT_ENV" || true
+                    if grep -q '^OB_AGENT_TOKEN=' "$AGENT_ENV"; then
                       echo "[ok] agent token: configured"
                       diag_item ok "agent_token" "agent token 已配置" "$AGENT_ENV" ""
                     else
@@ -2303,10 +2303,10 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   section "Agent service status"
                   case "$manager" in
                     systemd)
-                      systemctl --no-pager --full status flux-agent.service || true
+                      systemctl --no-pager --full status overlord-agent.service || true
                       ;;
                     openrc)
-                      rc-service flux-agent status || true
+                      rc-service overlord-agent status || true
                       ;;
                     *)
                       echo "[fail] no running systemd/OpenRC service manager detected"
@@ -2535,7 +2535,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
 
                   if [ "$(id -u)" -ne 0 ]; then
                     echo "[fail] firewall ${action_word} requires root."
-                    diag_item fail "firewall_root_required" "Firewall task requires root" "${proto}/${port}" "Run the Flux agent service as root for firewall changes."
+                    diag_item fail "firewall_root_required" "Firewall task requires root" "${proto}/${port}" "Run the Overlord agent service as root for firewall changes."
                     return 1
                   fi
 
@@ -2693,7 +2693,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     echo "python3 or python is unavailable; skipping structured maintenance metadata." >&2
                     return 0
                   fi
-                  "$python_bin" - "$action" "$status" "$manager" "$(flux_agent_status)" "$(service_status x-ui.service)" "$(service_status snell.service)" "$AGENT_BIN" "$DIAG_FILE" "$LOG_FILE" "$UPGRADE_FILE" <<'PY' || true
+                  "$python_bin" - "$action" "$status" "$manager" "$(overlord_agent_status)" "$(service_status x-ui.service)" "$(service_status snell.service)" "$AGENT_BIN" "$DIAG_FILE" "$LOG_FILE" "$UPGRADE_FILE" <<'PY' || true
                 import json
                 import os
                 import sys
@@ -2844,7 +2844,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                         },
                     }
 
-                print("FLUX_AGENT_RESULT_JSON=" + json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+                print("OB_AGENT_RESULT_JSON=" + json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
                 PY
                   rm -f "$DIAG_FILE" 2>/dev/null || true
                   rm -f "$LOG_FILE" 2>/dev/null || true

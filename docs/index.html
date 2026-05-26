@@ -3,263 +3,60 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Flux 3x-ui Orchestrator</title>
-    <meta name="description" content="基于 Flux Panel 的 3x-ui、Snell、多服务器主控副控编排面板。">
-    <meta property="og:title" content="Flux 3x-ui Orchestrator">
-    <meta property="og:description" content="一个面向多服务器协议节点部署的主控编排面板。">
+    <title>Overlord Broil</title>
+    <meta name="description" content="Overlord Broil，统一管理 3x-ui、Xray/Reality、Snell、端口转发、证书、流量和多服务器 Agent 的主控面板。">
+    <meta property="og:title" content="Overlord Broil">
+    <meta property="og:description" content="一个面向多服务器协议节点部署的主控 / 被控运维产品。">
     <meta property="og:type" content="website">
     <meta name="theme-color" content="#0b0f10">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
     <header class="site-header">
-      <a class="brand" href="#top" aria-label="Flux 3x-ui Orchestrator">
-        <span class="brand-mark" aria-hidden="true"></span>
-        <span>Flux 3x-ui Orchestrator</span>
-      </a>
-      <nav class="nav" aria-label="Primary navigation">
-        <a href="#architecture">架构</a>
-        <a href="#install">安装</a>
-        <a href="#workspace">工作台</a>
-        <a href="#roadmap">路线</a>
-        <a class="repo-link" href="https://github.com/zhizhishu/flux-3xui-orchestrator">GitHub</a>
-      </nav>
+      <a class="brand" href="#top"><span class="brand-mark">OB</span><span>Overlord Broil</span></a>
+      <nav><a href="#install">安装</a><a href="#runtime">能力</a><a href="#ports">端口</a><a href="https://github.com/zhizhishu/overlord-broil">GitHub</a></nav>
     </header>
-
-    <section id="top" class="hero">
-      <div class="hero-inner">
-        <p class="eyebrow">MASTER / AGENT / XRAY / SNELL</p>
-        <h1>Flux 3x-ui Orchestrator</h1>
-        <p class="hero-copy">
-          一个基于 Flux Panel 的新主控项目：在一个工作台里选择多台服务器，自动安装/配置 3x-ui，把 VLESS Reality、VMess WS、Trojan TLS、Shadowsocks、Snell 和远端端口转发放进统一规则视图，并统一回看 Xray、证书、流量与服务状态。
-        </p>
-        <div class="hero-actions">
-          <a class="button primary" href="https://github.com/zhizhishu/flux-3xui-orchestrator">查看仓库</a>
-          <a class="button secondary" href="#install">一键安装</a>
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">0.6.0 release candidate</p>
+          <h1>Overlord Broil</h1>
+          <p class="lead">一个统一的多服务器主控产品：在同一个工作台里选择多台服务器，自动安装 / 配置 3x-ui，创建 Xray/Reality、Snell 和端口转发节点，并统一查看证书、流量、服务状态和任务审计。</p>
+          <div class="hero-actions"><a class="button primary" href="https://github.com/zhizhishu/overlord-broil">Open Repository</a><a class="button" href="#install">Quick Install</a></div>
         </div>
-      </div>
-    </section>
-
-    <main class="main">
+        <div class="hero-panel"><img src="assets/overlord-broil-screenshot.svg" alt="Overlord Broil control plane preview"></div>
+      </section>
       <section id="install" class="section">
-        <div class="section-header">
-          <h2>0.6.0 reliability gate，公开试用前先预检</h2>
-          <p>主控优先拉取 GitHub Actions 发布到 GHCR 的镜像；如果 GHCR 暂未公开，安装脚本会回退到下载公开源码并本地构建镜像。默认只公开一个主控入口 5166，浏览器和被控 agent 都走这个入口；后端 6365、MySQL 和 phpMyAdmin 默认只在 Docker 内网。小规模试用可以显式选择 SQLite 模式，不启动 MySQL sidecar，也不额外占用数据库端口。</p>
-        </div>
+        <div class="section-header"><h2>一键安装</h2><p>默认主控只公开一个入口：<code>5166/tcp</code>。浏览器和被控 Agent 都访问这个端口，MySQL、后端调试别名和 phpMyAdmin 默认不暴露到宿主机公网。</p></div>
         <div class="grid two">
-          <article class="card">
-            <h3>主控面板</h3>
-            <pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash</code></pre>
-            <p>安装脚本会创建 `/opt/flux-3xui-orchestrator/.env`，下载 compose 和 `gost.sql`，然后拉取或构建 `flux-master` 单体镜像。默认启动 MySQL + master；设置 `FLUX_DB_MODE=sqlite` 时改用本地 SQLite 文件。</p>
-            <pre class="runbook"><code># 可选 SQLite 模式，不启动 MySQL sidecar
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh \
-  | sudo env FLUX_DB_MODE="sqlite" FLUX_FRONTEND_PORT="5166" bash</code></pre>
-            <pre class="runbook"><code># Alpine / 极简系统没有 bash 时
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master-bootstrap.sh | sudo sh</code></pre>
-            <pre class="runbook"><code># 显式运维动作
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- doctor
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- upgrade
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- backup
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- restore --backup-file /opt/flux-3xui-orchestrator/backups/flux-master-backup-YYYYMMDD-HHMMSS.tar.gz
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-master.sh | sudo bash -s -- uninstall --yes</code></pre>
-            <p>`doctor` 会先检查 Docker/Compose、端口占用和 `.env`；`upgrade` 会先备份再刷新 compose/sql 并重启；`uninstall` 只移除容器，保留安装目录和 Docker volumes。</p>
-          </article>
-          <article class="card">
-            <h3>被控服务器 Agent</h3>
-            <pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
-  | sudo env FLUX_PANEL_URL="http://your-master-panel:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash</code></pre>
-            <p>agent 会注册为 systemd 或 OpenRC 服务，自动领取 Snell、3x-ui、Xray 和远端端口转发任务；内置单机任务锁、HTTP 重试退避和任务超时上报。</p>
-            <pre class="runbook"><code># Alpine / 极简系统没有 bash 时
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent-bootstrap.sh \
-  | sudo env FLUX_PANEL_URL="http://your-master-panel:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" sh</code></pre>
-            <pre class="runbook"><code># 被控端预检 / 已安装 agent 自检
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent.sh \
-  | sudo env FLUX_PANEL_URL="http://your-master-panel:5166" FLUX_SERVER_ID="1" FLUX_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
-sudo -E /usr/local/bin/flux-agent.sh --doctor</code></pre>
-          </article>
-        </div>
-        <div class="status-list" aria-label="Linux support">
-          <div class="status-item">
-            <span>Debian / Ubuntu / Rocky / Oracle Linux</span>
-            <span class="tag green">主控 + agent + 3x-ui</span>
-          </div>
-          <div class="status-item">
-            <span>Alpine / OpenRC</span>
-            <span class="tag">agent + Snell + 转发</span>
-          </div>
-          <div class="status-item">
-            <span>发布门禁</span>
-            <span class="tag green">release-check + MySQL/SQLite smoke</span>
-          </div>
-          <div class="status-item">
-            <span>GitHub Release</span>
-            <span class="tag green">bundle + sha256</span>
-          </div>
+          <article class="card"><h3>安装主控</h3><p>安装脚本会创建 <code>/opt/overlord-broil/.env</code>，下载 compose 和 <code>overlord.sql</code>，然后拉取或构建 <code>overlord-master</code> 单体镜像。</p><pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh | sudo bash</code></pre></article>
+          <article class="card"><h3>安装被控 Agent</h3><p>先在主控创建服务器并复制 token。Agent 无需开放管理端口，它会主动轮询主控并执行任务。</p><pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent.sh \
+  | sudo env OB_PANEL_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash</code></pre></article>
         </div>
       </section>
-
-      <section id="workspace" class="section">
-        <div class="section-header">
-          <h2>主控一键编排闭环已经打通</h2>
-          <p>当前版本能多选服务器生成编排任务，由副控 agent 自动领取执行；完成后把 3x-ui 连接信息、Xray inbound/outbound、Snell 节点、远端端口转发、证书、服务状态和流量快照回写到主控。Xray/3x-ui 节点任务已经可以由 agent 调用 inbound API 执行，防火墙运行时端口也能通过 agent 尝试放行或关闭。主控还会记录任务创建、agent 领取和执行回报审计。完整 3x-ui 安装编排要求 systemd 主机；Alpine/OpenRC 用于 agent、Snell 和转发任务。</p>
-        </div>
-        <div class="metric-row" aria-label="Current release metrics">
-          <div class="metric">
-            <strong>multi</strong>
-            <span>服务器一键选择</span>
-          </div>
-          <div class="metric">
-            <strong>6</strong>
-            <span>协议与转发规则</span>
-          </div>
-          <div class="metric">
-            <strong>5m</strong>
-            <span>自动流量同步</span>
-          </div>
-          <div class="metric">
-            <strong>5</strong>
-            <span>发行版预检矩阵</span>
-          </div>
+      <section id="runtime" class="section">
+        <div class="section-header"><h2>统一运行时</h2><p>Overlord Broil 不把 Snell 硬塞进 Xray 内核，而是在主控层把它抽象成统一协议节点，由 Agent 在被控服务器上部署独立服务。</p></div>
+        <div class="feature-grid">
+          <article class="feature-card"><span>XUI / Xray</span><p>通过 3x-ui API 管理 inbound、outbound、Reality、流量同步和 Xray restart。</p></article>
+          <article class="feature-card"><span>Snell</span><p>统一显示在协议节点列表里，底层由 systemd/OpenRC 管理 Snell 服务。</p></article>
+          <article class="feature-card"><span>Forward</span><p>把远端端口转发记录到规则中心，由 Agent 创建 socat 服务并回报状态。</p></article>
+          <article class="feature-card"><span>State Sync</span><p>汇总服务器心跳、证书、流量、服务状态、任务结果和操作审计。</p></article>
         </div>
       </section>
-
-      <section id="architecture" class="section">
-        <div class="section-header">
-          <h2>控制平面拆成清楚的四层</h2>
-          <p>保持 KISS 和 YAGNI：不把 Snell 硬塞进 Xray，而是在主控做统一节点抽象，底层分别适配 3x-ui/Xray API 和 Snell agent/systemd/OpenRC。</p>
-        </div>
-        <div class="grid four">
-          <article class="card">
-            <h3>Control Server</h3>
-            <p>登记主控/副控服务器，保存 agent token、3x-ui endpoint、API token、证书状态、服务状态、流量和心跳时间。</p>
-          </article>
-          <article class="card">
-            <h3>Protocol Node</h3>
-            <p>把 Xray inbound 和 Snell 服务记录到 `protocol_node`，同一张节点列表里管理创建、删除、重启、同步和运行状态。</p>
-          </article>
-          <article class="card">
-            <h3>3x-ui Proxy</h3>
-            <p>通过 Bearer token 操作 `/panel/api/inbounds/*`，读取 Xray config/outbounds；agent 任务也能创建、删除 inbound 或请求远端 Xray 重启。</p>
-          </article>
-          <article class="card">
-            <h3>Server Forward</h3>
-            <p>把被控机端口转发记录到 `server_forward_rule`，由 agent 创建 systemd/OpenRC + socat 服务，并在规则总览里和出入站一起查看。</p>
-          </article>
-          <article class="card">
-            <h3>Deploy Task</h3>
-            <p>主控生成一键编排脚本；授权副控 agent 拉取、执行、回传日志、升级校验和元数据，避免不可追踪的远程改动。</p>
-          </article>
+      <section id="ports" class="section">
+        <div class="section-header"><h2>端口模型</h2><p>默认设计目标是简单：主控一个端口，被控不开放 Agent 端口，业务节点按需开放。</p></div>
+        <div class="status-list">
+          <div class="status-item"><span>主控 Web / API</span><span class="tag green">5166/tcp</span></div>
+          <div class="status-item"><span>被控 Agent</span><span class="tag green">主动轮询，无入站端口</span></div>
+          <div class="status-item"><span>MySQL / phpMyAdmin</span><span class="tag">默认内网 / 不暴露</span></div>
+          <div class="status-item"><span>3x-ui / Xray / Snell / 转发</span><span class="tag">按节点任务开放</span></div>
         </div>
       </section>
-
-      <section class="section">
-        <div class="section-header">
-          <h2>入站和出站都能从主控发起</h2>
-          <p>入站走 3x-ui Bearer API，出站读取从运行配置提取，保存则使用登录态保护的 Xray 模板接口。</p>
-        </div>
-        <div class="pipeline">
-          <pre class="runbook"><code>POST /api/v1/deploy-task/orchestrate
-POST /api/v1/control-server/heartbeat
-POST /api/v1/agent-task/claim
-POST /api/v1/agent-task/report
-POST /api/v1/deploy-task/create
-POST /api/v1/operation-audit/list
-POST /api/v1/protocol-node/create
-POST /api/v1/protocol-node/list
-POST /api/v1/protocol-node/sync
-POST /api/v1/protocol-node/restart
-POST /api/v1/protocol-node/delete
-POST /api/v1/server-forward/create
-POST /api/v1/server-forward/update
-POST /api/v1/server-forward/list
-POST /api/v1/server-forward/delete
-POST /api/v1/server-forward/restart
-POST /api/v1/server-rule/overview
-POST /api/v1/three-xui/inbounds/list
-POST /api/v1/three-xui/inbounds/add
-POST /api/v1/three-xui/inbounds/update
-POST /api/v1/three-xui/inbounds/delete
-POST /api/v1/three-xui/outbounds
-POST /api/v1/three-xui/outbounds/traffic
-POST /api/v1/three-xui/traffic/sync
-POST /api/v1/three-xui/outbounds/save
-POST /api/v1/three-xui/restart-xray</code></pre>
-          <div class="status-list" aria-label="Deployment states">
-            <div class="status-item">
-              <span>主控一键编排 3x-ui</span>
-              <span class="tag green">ready</span>
-            </div>
-            <div class="status-item">
-              <span>统一协议节点层</span>
-              <span class="tag green">ready</span>
-            </div>
-            <div class="status-item">
-              <span>3x-ui 出站读取/保存</span>
-              <span class="tag green">ready</span>
-            </div>
-            <div class="status-item">
-              <span>远端端口转发与规则总览</span>
-              <span class="tag green">ready</span>
-            </div>
-            <div class="status-item">
-              <span>Snell agent 常驻执行</span>
-              <span class="tag green">ready</span>
-            </div>
-            <div class="status-item">
-              <span>Agent 诊断/日志/安全升级</span>
-              <span class="tag green">ready</span>
-            </div>
-            <div class="status-item">
-              <span>操作审计日志</span>
-              <span class="tag green">ready</span>
-            </div>
-            <div class="status-item">
-              <span>证书/服务/流量状态</span>
-              <span class="tag green">ready</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <section id="roadmap" class="section">
-        <div class="section-header">
-          <h2>0.6.0 之后继续补真实运行保障</h2>
-          <p>核心链路已经进入 0.6.0 reliability gate：Docker/CI 会跑安装矩阵、fixture、agent mock、compose smoke 和可选真实 3x-ui E2E gate。下一步重点是真实 VPS 矩阵、记录真实 3x-ui 端到端结果、密钥轮换和更完整的安全治理。</p>
-        </div>
-        <ol class="roadmap">
-          <li>
-            <div>
-              <strong>Real 3x-ui smoke</strong>
-              <span>已新增手动 GitHub workflow 和 `scripts/test-three-xui-e2e.sh`，可用真实 endpoint/token 校验状态、入站和 Xray config；写入模式会显式创建、切换并删除临时 inbound。</span>
-            </div>
-          </li>
-          <li>
-            <div>
-              <strong>Key rotation</strong>
-              <span>凭据已经加密存储；后续补计划内密钥轮换迁移，避免误换 `SECRET_ENCRYPTION_KEY` 后丢失可读性。</span>
-            </div>
-          </li>
-          <li>
-            <div>
-              <strong>VPS matrix</strong>
-              <span>Debian、Ubuntu、Rocky、Oracle Linux、Alpine 真机从安装、节点创建、证书、重启到卸载跑完整闭环。</span>
-            </div>
-          </li>
-          <li>
-            <div>
-              <strong>Docs polish</strong>
-              <span>集中清理历史 Flux Panel 遗留措辞和旧注释乱码，不影响 0.6.0 安装、编排和验证路径。</span>
-            </div>
-          </li>
-        </ol>
+        <div class="section-header"><h2>离 1.0 还差什么</h2><p>核心链路已经进入 0.6.0 reliability gate。下一步重点是真实 VPS 矩阵、真实 3x-ui 端到端记录、密钥轮换迁移和更完整的安全治理。</p></div>
+        <ol class="roadmap"><li><div><strong>Real VPS matrix</strong><span>Debian、Ubuntu、Rocky、Oracle Linux、Alpine 真机从安装到卸载跑完整闭环。</span></div></li><li><div><strong>Real 3x-ui smoke</strong><span>使用真实 endpoint/token 验证状态、入站、Xray config，并在写入模式创建和删除临时 inbound。</span></div></li><li><div><strong>Security governance</strong><span>补齐 RBAC、审计导出、Agent token 吊销、密钥轮换迁移和危险操作策略。</span></div></li></ol>
       </section>
     </main>
-
-    <footer class="footer">
-      <div class="footer-inner">
-        <strong>Flux 3x-ui Orchestrator</strong>
-        <span>Legal infrastructure orchestration only. Built from Flux Panel, 3x-ui concepts, and Snell deployment references.</span>
-      </div>
-    </footer>
+    <footer class="footer"><div class="footer-inner"><strong>Overlord Broil</strong><span>Legal infrastructure orchestration only. See README acknowledgements for upstream references.</span></div></footer>
   </body>
 </html>

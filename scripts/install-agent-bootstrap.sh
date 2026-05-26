@@ -1,11 +1,11 @@
 #!/bin/sh
 set -eu
 
-REPO="${FLUX_REPO:-zhizhishu/flux-3xui-orchestrator}"
-REF="${FLUX_REF:-main}"
-RAW_BASE="${FLUX_RAW_BASE:-https://raw.githubusercontent.com/${REPO}/${REF}}"
-GITHUB_TOKEN="${FLUX_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
-INSTALLER="/tmp/flux-install-agent.sh"
+REPO="${OB_REPO:-zhizhishu/overlord-broil}"
+REF="${OB_REF:-main}"
+RAW_BASE="${OB_RAW_BASE:-https://raw.githubusercontent.com/${REPO}/${REF}}"
+GITHUB_TOKEN="${OB_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
+INSTALLER="/tmp/overlord-install-agent.sh"
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "Please run this bootstrap as root." >&2
@@ -38,9 +38,9 @@ install_base_packages() {
 download_installer() {
   if [ -n "$GITHUB_TOKEN" ]; then
     curl -fsSL --retry 3 -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-      "${RAW_BASE}/scripts/install-flux-agent.sh" -o "$INSTALLER"
+      "${RAW_BASE}/scripts/install-agent.sh" -o "$INSTALLER"
   else
-    curl -fsSL --retry 3 "${RAW_BASE}/scripts/install-flux-agent.sh" -o "$INSTALLER"
+    curl -fsSL --retry 3 "${RAW_BASE}/scripts/install-agent.sh" -o "$INSTALLER"
   fi
   chmod 0755 "$INSTALLER"
 }

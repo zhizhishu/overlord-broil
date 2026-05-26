@@ -2,11 +2,11 @@
 
 ## Project Identity
 
-- Project: `flux-3xui-orchestrator`
-- Repository: `zhizhishu/flux-3xui-orchestrator`
-- Local root: `C:\Users\echo\Downloads\claude\flux-panel-3xui-orchestrator`
+- Project: `overlord-broil`
+- Repository: `zhizhishu/overlord-broil`
+- Local root: `C:\Users\echo\Downloads\claude\overlord-broil`
 - Parent folder `C:\Users\echo\Downloads\claude` is only a storage root. Do not create plans, logs, reports, or project files there.
-- This is an independent project based on Flux Panel UI ideas and forwarding-panel foundations. Do not submit PRs to the upstream Flux Panel author repository.
+- This is an independent Overlord Broil project. Do not submit PRs to the upstream Flux Panel author repository.
 
 ## Required Startup Order
 
@@ -30,7 +30,7 @@ Read these files in order before code changes, tests, service startup, or remote
 
 ## Development Rules
 
-- Prefer the existing Flux-style dense operations UI over landing-page or marketing layouts.
+- Prefer the existing Overlord-style dense operations UI over landing-page or marketing layouts.
 - Keep master-control behavior simple and auditable: the master creates tasks, the authorized agent pulls/executes/reports them.
 - Preserve the default single public master entry: `5166/tcp`.
 - Backend `6365`, MySQL `3306`, and phpMyAdmin are internal by default.
@@ -44,8 +44,8 @@ Use the smallest validation set that matches the change. Common commands:
 
 ```bash
 bash -n scripts/*.sh
-sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh
-bash scripts/test-flux-agent-mock.sh
+sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh
+bash scripts/test-agent-mock.sh
 bash scripts/test-three-xui-fixture.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
 bash scripts/test-sqlite-schema.sh
@@ -77,7 +77,7 @@ When starting local services or compose smoke tests, record ports/PIDs, clean up
 
 ## Git And Release
 
-- Push only to `zhizhishu/flux-3xui-orchestrator`.
+- Push only to `zhizhishu/overlord-broil`.
 - Normal development branches: `main` for current installable state, `future` for ongoing validation.
 - GHCR images are pushed from `main` and `v*` tags. `future` builds images for validation but does not push public release images.
 - Before a user-facing release tag, run `scripts/release-check.sh --full` and build the release bundle.

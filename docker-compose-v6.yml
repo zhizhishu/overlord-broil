@@ -1,7 +1,7 @@
 services:
   mysql:
     image: mysql:5.7
-    container_name: gost-mysql
+    container_name: overlord-mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
@@ -10,8 +10,8 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD}
       TZ: Asia/Shanghai
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./gost.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - overlord_mysql_data:/var/lib/mysql
+      - ./overlord.sql:/docker-entrypoint-initdb.d/init.sql:ro
     command: >
       --default-authentication-plugin=mysql_native_password
       --character-set-server=utf8mb4
@@ -19,15 +19,15 @@ services:
       --max_connections=1000
       --innodb_buffer_pool_size=256M
     networks:
-      - gost-network
+      - overlord-network
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u\"$${MYSQL_USER}\" -p\"$${MYSQL_PASSWORD}\" --silent"]
       timeout: 10s
       retries: 10
 
   master:
-    image: ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest
-    container_name: flux-master
+    image: ghcr.io/zhizhishu/overlord-broil:latest
+    container_name: overlord-master
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT}:5166"
@@ -46,12 +46,12 @@ services:
       LOG_DIR: /app/logs
       JAVA_OPTS: "-Xms256m -Xmx512m -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
     volumes:
-      - master_logs:/app/logs
+      - overlord_master_logs:/app/logs
     depends_on:
       mysql:
         condition: service_healthy
     networks:
-      - gost-network
+      - overlord-network
     healthcheck:
       test: ["CMD", "sh", "-c", "wget --no-verbose --tries=1 --spider http://localhost:5166/flow/test || exit 1"]
       interval: 30s
@@ -60,16 +60,16 @@ services:
       start_period: 90s
 
 volumes:
-  mysql_data:
-    name: mysql_data
+  overlord_mysql_data:
+    name: overlord_mysql_data
     driver: local
-  master_logs:
-    name: master_logs
+  overlord_master_logs:
+    name: overlord_master_logs
     driver: local
 
 networks:
-  gost-network:
-    name: gost-network
+  overlord-network:
+    name: overlord-network
     driver: bridge
     enable_ipv6: true
     ipam:

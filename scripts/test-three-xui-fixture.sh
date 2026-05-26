@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_BIN="${FLUX_TEST_PYTHON_BIN:-}"
+PYTHON_BIN="${OB_TEST_PYTHON_BIN:-}"
 AUTH_HEADER=()
 
 detect_python() {

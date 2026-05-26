@@ -73,7 +73,7 @@ public class SecretCryptoUtils {
 
     private byte[] deriveKey(String source) {
         try {
-            String material = isBlank(source) ? "flux-3xui-orchestrator-default-secret" : source.trim();
+            String material = isBlank(source) ? "overlord-broil-default-secret" : source.trim();
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return digest.digest(material.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {

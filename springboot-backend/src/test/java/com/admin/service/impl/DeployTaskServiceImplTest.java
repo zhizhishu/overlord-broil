@@ -256,9 +256,9 @@ class DeployTaskServiceImplTest {
         String script = ReflectionTestUtils.invokeMethod(service, "buildAgentMaintenanceScript", dto, server);
 
         assertNotNull(script);
-        assertTrue(script.contains("LOG_LINES=\"${FLUX_MAINTENANCE_LOG_LINES:-160}\""));
-        assertTrue(script.contains("LOG_FILE=\"${TMPDIR:-/tmp}/flux-maintenance-logs-$$.jsonl\""));
-        assertTrue(script.contains("capture_journal_log \"agent\" \"flux-agent.service\""));
+        assertTrue(script.contains("LOG_LINES=\"${OB_MAINTENANCE_LOG_LINES:-160}\""));
+        assertTrue(script.contains("LOG_FILE=\"${TMPDIR:-/tmp}/overlord-maintenance-logs-$$.jsonl\""));
+        assertTrue(script.contains("capture_journal_log \"agent\" \"overlord-agent.service\""));
         assertTrue(script.contains("capture_journal_log \"xui\" \"$unit\""));
         assertTrue(script.contains("capture_file_log \"snell\""));
         assertTrue(script.contains("capture_file_log \"agent-task\""));
@@ -282,7 +282,7 @@ class DeployTaskServiceImplTest {
         String script = ReflectionTestUtils.invokeMethod(service, "buildAgentMaintenanceScript", dto, server);
 
         assertNotNull(script);
-        assertTrue(script.contains("UPGRADE_FILE=\"${TMPDIR:-/tmp}/flux-maintenance-upgrade-$$.json\""));
+        assertTrue(script.contains("UPGRADE_FILE=\"${TMPDIR:-/tmp}/overlord-maintenance-upgrade-$$.json\""));
         assertTrue(script.contains("file_sha256()"));
         assertTrue(script.contains("agent_script_version()"));
         assertTrue(script.contains("write_upgrade_metadata()"));
@@ -302,7 +302,7 @@ class DeployTaskServiceImplTest {
         dto.setProtocol("vmess");
         dto.setAction("present");
         dto.setListenPort(2086);
-        dto.setRequestJson("{\"transport\":\"ws\",\"wsPath\":\"/flux\",\"email\":\"client@flux.local\"}");
+        dto.setRequestJson("{\"transport\":\"ws\",\"wsPath\":\"/ob\",\"email\":\"client@overlord.local\"}");
 
         ProtocolProfile profile = new ProtocolProfile();
         profile.setProtocol("vmess");
@@ -316,16 +316,16 @@ class DeployTaskServiceImplTest {
         server.setName("edge-xray");
         server.setHost("203.0.113.7");
         server.setXuiEndpoint("http://127.0.0.1:5168");
-        server.setXuiBasePath("/flux");
+        server.setXuiBasePath("/ob");
         server.setXuiApiToken("token-123");
 
         String script = ReflectionTestUtils.invokeMethod(service, "buildXrayAgentPayload", dto, profile, server);
 
         assertNotNull(script);
-        assertTrue(script.contains("FLUX_XRAY_TASK="));
+        assertTrue(script.contains("OB_XRAY_TASK="));
         assertTrue(script.contains("XUI_API_TOKEN='token-123'"));
         assertTrue(script.contains("/panel/api/inbounds/add"));
-        assertTrue(script.contains("FLUX_AGENT_RESULT_JSON="));
+        assertTrue(script.contains("OB_AGENT_RESULT_JSON="));
         assertTrue(script.contains("\"inbounds\": []"));
         assertTrue(script.contains("runtimeState") || script.contains("services"));
         assertTrue(script.contains("\"tokenConfigured\": bool(token)"));
@@ -357,13 +357,13 @@ class DeployTaskServiceImplTest {
         assertTrue(script.contains("firewall-cmd --permanent --add-port"));
         assertTrue(script.contains("iptables -I INPUT"));
         assertTrue(script.contains("firewall_ports_missing"));
-        assertTrue(script.contains("FLUX_AGENT_RESULT_JSON="));
+        assertTrue(script.contains("OB_AGENT_RESULT_JSON="));
         assertTrue(script.contains("done <<< \"$ports\""));
         assertBashSyntaxValid(script);
     }
 
     private static void assertBashSyntaxValid(String script) throws Exception {
-        Path scriptFile = Files.createTempFile("flux-generated-", ".sh");
+        Path scriptFile = Files.createTempFile("ob-generated-", ".sh");
         try {
             Files.writeString(scriptFile, script, StandardCharsets.UTF_8);
             Process process = new ProcessBuilder("bash", "-n", scriptFile.toString())

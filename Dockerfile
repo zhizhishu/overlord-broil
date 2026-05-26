@@ -1,4 +1,4 @@
-# flux-master single-image build.
+# overlord-master single-image build.
 # Builds the Vite UI first, then embeds the static assets into the Spring Boot jar.
 
 FROM node:22-bookworm AS frontend-build

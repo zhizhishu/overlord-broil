@@ -60,7 +60,7 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
     private static final String ERROR_PORT_END_REQUIRED = "结束端口不能为空";
     private static final String ERROR_PORT_RANGE_INVALID = "端口必须在1-65535范围内";
     private static final String ERROR_PORT_ORDER_INVALID = "结束端口不能小于起始端口";
-    private static final String AGENT_BOOTSTRAP_URL = "https://raw.githubusercontent.com/zhizhishu/flux-3xui-orchestrator/main/scripts/install-flux-agent-bootstrap.sh";
+    private static final String AGENT_BOOTSTRAP_URL = "https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent-bootstrap.sh";
 
     // ========== 依赖注入 ==========
     
@@ -341,11 +341,11 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
         StringBuilder command = new StringBuilder();
         command.append("curl -fsSL ")
                 .append(shellQuote(AGENT_BOOTSTRAP_URL))
-                .append(" | env FLUX_PANEL_URL=")
+                .append(" | env OB_PANEL_URL=")
                 .append(shellQuote(panelUrl))
-                .append(" FLUX_SERVER_ID=")
+                .append(" OB_SERVER_ID=")
                 .append(shellQuote(String.valueOf(node.getId())))
-                .append(" FLUX_AGENT_TOKEN=")
+                .append(" OB_AGENT_TOKEN=")
                 .append(shellQuote(node.getSecret()))
                 .append(" sh");
 

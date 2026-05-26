@@ -13,9 +13,9 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
     @Override
     public String buildScript(OrchestrationPlanDto dto, ControlServer server) {
         String host = firstNotBlank(dto.getPublicHost(), server.getHost(), "127.0.0.1");
-        String username = firstNotBlank(dto.getPanelUsername(), "flux_" + IdUtil.simpleUUID().substring(0, 8));
+        String username = firstNotBlank(dto.getPanelUsername(), "ob_" + IdUtil.simpleUUID().substring(0, 8));
         String password = firstNotBlank(dto.getPanelPassword(), IdUtil.simpleUUID().substring(0, 16));
-        String webBasePath = normalizeBasePath(firstNotBlank(dto.getWebBasePath(), "flux-" + IdUtil.simpleUUID().substring(0, 12)));
+        String webBasePath = normalizeBasePath(firstNotBlank(dto.getWebBasePath(), "ob-" + IdUtil.simpleUUID().substring(0, 12)));
         String certMode = normalizeCertMode(dto.getCertificateMode());
         String certDomain = firstNotBlank(dto.getCertificateDomain(), host);
         String snellPsk = firstNotBlank(dto.getSnellPsk(), IdUtil.simpleUUID().substring(0, 20));
@@ -23,7 +23,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
         StringBuilder script = new StringBuilder();
         script.append("#!/usr/bin/env bash\n");
         script.append("set -euo pipefail\n\n");
-        appendVar(script, "FLUX_AGENT_VERSION", "flux-agent/0.2-orchestrator");
+        appendVar(script, "OB_AGENT_VERSION", "overlord-agent/0.2-orchestrator");
         appendVar(script, "INSTALL_XUI", enabled(dto.getInstallXui()) ? "1" : "0");
         appendVar(script, "CONFIGURE_PANEL", enabled(dto.getConfigurePanel()) ? "1" : "0");
         appendVar(script, "XUI_VERSION", firstNotBlank(dto.getXuiVersion(), ""));
@@ -62,14 +62,14 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                 XUI_FOLDER='/usr/local/x-ui'
                 XUI_SERVICE_DIR='/etc/systemd/system'
                 XUI_CLI='/usr/bin/x-ui'
-                RESULT_FILE='/tmp/flux-xui-orchestration-result.json'
+                RESULT_FILE='/tmp/overlord-xui-orchestration-result.json'
                 CERT_FILE=''
                 KEY_FILE=''
                 LOCAL_SCHEME='http'
                 XUI_ALLOW_INSECURE=0
 
                 log() {
-                  printf '[flux-orchestrator] %s\\n' "$*"
+                  printf '[overlord-orchestrator] %s\\n' "$*"
                 }
 
                 require_root() {
@@ -81,7 +81,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
 
                 require_systemd_host() {
                   if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then
-                    echo '3x-ui orchestration requires a Linux host with running systemd. Use Debian, Ubuntu, Rocky Linux or Oracle Linux for full 3x-ui install/configure tasks; Alpine/OpenRC is supported only for the Flux agent, Snell node tasks and remote forwarding tasks.' >&2
+                    echo '3x-ui orchestration requires a Linux host with running systemd. Use Debian, Ubuntu, Rocky Linux or Oracle Linux for full 3x-ui install/configure tasks; Alpine/OpenRC is supported only for the Overlord agent, Snell node tasks and remote forwarding tasks.' >&2
                     exit 1
                   fi
                 }
@@ -216,7 +216,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
 
                 setup_self_signed_cert() {
                   local cert_dir cn
-                  cert_dir="/root/cert/flux-3xui-orchestrator"
+                  cert_dir="/root/cert/overlord-broil"
                   cn="${CERTIFICATE_DOMAIN:-$PUBLIC_HOST}"
                   mkdir -p "$cert_dir"
                   CERT_FILE="${cert_dir}/fullchain.pem"
@@ -487,14 +487,14 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                         "clients": [{
                             "id": client_id,
                             "flow": "xtls-rprx-vision",
-                            "email": "vless-%s@flux.local" % now,
+                            "email": "vless-%s@overlord.local" % now,
                             "limitIp": 0,
                             "totalGB": 0,
                             "expiryTime": 0,
                             "enable": True,
                             "tgId": "",
                             "subId": "",
-                            "comment": "created by flux orchestrator",
+                            "comment": "created by Overlord Broil",
                             "reset": 0,
                         }],
                         "decryption": "none",
@@ -516,7 +516,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                         "up": 0,
                         "down": 0,
                         "total": 0,
-                        "remark": "flux-vless-reality",
+                        "remark": "ob-vless-reality",
                         "enable": "true",
                         "expiryTime": 0,
                         "listen": "",
@@ -532,14 +532,14 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                         "clients": [{
                             "id": str(uuid.uuid4()),
                             "alterId": 0,
-                            "email": "vmess-%s@flux.local" % now,
+                            "email": "vmess-%s@overlord.local" % now,
                             "limitIp": 0,
                             "totalGB": 0,
                             "expiryTime": 0,
                             "enable": True,
                             "tgId": "",
                             "subId": "",
-                            "comment": "created by flux orchestrator",
+                            "comment": "created by Overlord Broil",
                             "reset": 0,
                         }],
                         "disableInsecureEncryption": False,
@@ -553,7 +553,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                         "up": 0,
                         "down": 0,
                         "total": 0,
-                        "remark": "flux-vmess-ws",
+                        "remark": "ob-vmess-ws",
                         "enable": "true",
                         "expiryTime": 0,
                         "listen": "",
@@ -568,14 +568,14 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                     settings = {
                         "clients": [{
                             "password": uuid.uuid4().hex,
-                            "email": "trojan-%s@flux.local" % now,
+                            "email": "trojan-%s@overlord.local" % now,
                             "limitIp": 0,
                             "totalGB": 0,
                             "expiryTime": 0,
                             "enable": True,
                             "tgId": "",
                             "subId": "",
-                            "comment": "created by flux orchestrator",
+                            "comment": "created by Overlord Broil",
                             "reset": 0,
                         }],
                         "fallbacks": [],
@@ -588,7 +588,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                         "up": 0,
                         "down": 0,
                         "total": 0,
-                        "remark": "flux-trojan-tls",
+                        "remark": "ob-trojan-tls",
                         "enable": "true",
                         "expiryTime": 0,
                         "listen": "",
@@ -610,7 +610,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                         "up": 0,
                         "down": 0,
                         "total": 0,
-                        "remark": "flux-shadowsocks",
+                        "remark": "ob-shadowsocks",
                         "enable": "true",
                         "expiryTime": 0,
                         "listen": "",
@@ -695,7 +695,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                     "xuiAllowInsecure": int(os.environ.get("XUI_ALLOW_INSECURE", "0")),
                     "xrayVersion": os.environ.get("XRAY_VERSION"),
                     "snellVersion": os.environ.get("SNELL_RUNTIME_VERSION"),
-                    "agentVersion": os.environ.get("FLUX_AGENT_VERSION"),
+                    "agentVersion": os.environ.get("OB_AGENT_VERSION"),
                 }
                 result["certificate"] = {
                     "mode": os.environ.get("CERTIFICATE_MODE"),
@@ -714,7 +714,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                 if os.environ.get("INSTALL_SNELL") == "1":
                     snell_port = int(os.environ.get("SNELL_PORT") or "8390")
                     result["protocolNodes"].append({
-                        "name": "flux-snell",
+                        "name": "ob-snell",
                         "protocol": "snell",
                         "engine": "snell",
                         "direction": "inbound",
@@ -733,7 +733,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                         "serviceName": "snell.service",
                         "state": os.environ.get("SNELL_SERVICE_STATUS"),
                     })
-                print("FLUX_AGENT_RESULT_JSON=" + json.dumps(result, ensure_ascii=False, separators=(",", ":")))
+                print("OB_AGENT_RESULT_JSON=" + json.dumps(result, ensure_ascii=False, separators=(",", ":")))
                 PY
                 }
 
@@ -751,7 +751,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                 export API_TOKEN RESULT_FILE CERTIFICATE_DOMAIN PUBLIC_HOST REALITY_DEST REALITY_SNI WS_PATH SS_METHOD
                 export CREATE_VLESS_REALITY CREATE_VMESS_WS CREATE_TROJAN_TLS CREATE_SHADOWSOCKS
                 export VLESS_PORT VMESS_PORT TROJAN_PORT SHADOWSOCKS_PORT
-                export FLUX_AGENT_VERSION CERTIFICATE_MODE SNELL_VERSION
+                export OB_AGENT_VERSION CERTIFICATE_MODE SNELL_VERSION
                 wait_for_panel
                 create_inbounds
                 if [ "$INSTALL_SNELL" = "1" ]; then
@@ -783,14 +783,14 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
     }
 
     private String normalizeBasePath(String value) {
-        String path = StrUtil.isBlank(value) ? "flux-" + IdUtil.simpleUUID().substring(0, 12) : value.trim();
+        String path = StrUtil.isBlank(value) ? "ob-" + IdUtil.simpleUUID().substring(0, 12) : value.trim();
         while (path.startsWith("/")) {
             path = path.substring(1);
         }
         while (path.endsWith("/")) {
             path = path.substring(0, path.length() - 1);
         }
-        return StrUtil.isBlank(path) ? "flux-" + IdUtil.simpleUUID().substring(0, 12) : path;
+        return StrUtil.isBlank(path) ? "ob-" + IdUtil.simpleUUID().substring(0, 12) : path;
     }
 
     private String shellQuote(String value) {

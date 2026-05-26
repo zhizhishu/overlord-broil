@@ -50,9 +50,9 @@ jobs:
       - name: Validate shell scripts
         run: |
           bash -n scripts/*.sh
-          sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh
+          sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh
       - name: Run agent mock tests
-        run: bash scripts/test-flux-agent-mock.sh
+        run: bash scripts/test-agent-mock.sh
       - name: Run SQLite schema smoke test
         run: bash scripts/test-sqlite-schema.sh
       - name: Run 3x-ui fixture tests
@@ -66,8 +66,8 @@ jobs:
         run: bash scripts/test-three-xui-e2e.sh
       - name: Validate compose files
         env:
-          DB_NAME: gost
-          DB_USER: gost
+          DB_NAME: overlord
+          DB_USER: overlord
           DB_PASSWORD: test-password
           JWT_SECRET: test-jwt-secret
           SECRET_ENCRYPTION_KEY: test-secret-encryption-key

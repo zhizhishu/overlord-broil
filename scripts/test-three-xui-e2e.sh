@@ -8,7 +8,7 @@ THREE_XUI_E2E_WRITE="${THREE_XUI_E2E_WRITE:-0}"
 THREE_XUI_E2E_PORT="${THREE_XUI_E2E_PORT:-}"
 THREE_XUI_E2E_CONNECT_TIMEOUT="${THREE_XUI_E2E_CONNECT_TIMEOUT:-10}"
 THREE_XUI_E2E_MAX_TIME="${THREE_XUI_E2E_MAX_TIME:-30}"
-PYTHON_BIN="${FLUX_TEST_PYTHON_BIN:-}"
+PYTHON_BIN="${OB_TEST_PYTHON_BIN:-}"
 
 AUTH_HEADER=()
 RESPONSE_STATUS=""
@@ -168,13 +168,13 @@ assert_success_envelope() {
 }
 
 find_created_inbound_id() {
-  FLUX_E2E_REMARK="$REMARK" FLUX_E2E_PORT="$THREE_XUI_E2E_PORT" RESPONSE_BODY="$RESPONSE_BODY" "$PYTHON_BIN" - <<'PY'
+  OB_E2E_REMARK="$REMARK" OB_E2E_PORT="$THREE_XUI_E2E_PORT" RESPONSE_BODY="$RESPONSE_BODY" "$PYTHON_BIN" - <<'PY'
 import json
 import os
 
 data = json.loads(os.environ["RESPONSE_BODY"])
-target_remark = os.environ["FLUX_E2E_REMARK"]
-target_port = int(os.environ["FLUX_E2E_PORT"])
+target_remark = os.environ["OB_E2E_REMARK"]
+target_port = int(os.environ["OB_E2E_PORT"])
 obj = data.get("obj", [])
 items = obj.get("inbounds", []) if isinstance(obj, dict) else obj
 for item in items if isinstance(items, list) else []:
@@ -249,7 +249,7 @@ run_write_contract() {
   local stream_settings
   local sniffing
 
-  REMARK="flux-e2e-$(date +%Y%m%d%H%M%S)-${RANDOM}"
+  REMARK="ob-e2e-$(date +%Y%m%d%H%M%S)-${RANDOM}"
   client_id="$("$PYTHON_BIN" -c 'import uuid; print(uuid.uuid4())')"
   client_email="${REMARK}@example.test"
   settings="{\"clients\":[{\"id\":\"${client_id}\",\"flow\":\"\",\"email\":\"${client_email}\",\"limitIp\":0,\"totalGB\":0,\"expiryTime\":0,\"enable\":true,\"tgId\":\"\",\"subId\":\"\"}],\"decryption\":\"none\",\"fallbacks\":[]}"

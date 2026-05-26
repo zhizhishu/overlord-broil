@@ -307,11 +307,11 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
                   if [ "$ACTION" = "absent" ]; then
                     node_state='deleted'
                   fi
-                  FLUX_NODE_ID="$PROTOCOL_NODE_ID" NODE_NAME="$NODE_NAME" SERVICE_NAME="$SERVICE_NAME" MAIN_CONFIG_PATH="$MAIN_CONFIG_PATH" PORT="$PORT" PSK="$PSK" SNELL_VERSION="$SNELL_VERSION" SNELL_RUNTIME_VERSION="$snell_version" SNELL_DOWNLOAD_URL="$download_url" SNELL_CHECKSUM_SHA256="$checksum_sha" NODE_STATE="$node_state" python3 <<'PY'
+                  OB_NODE_ID="$PROTOCOL_NODE_ID" NODE_NAME="$NODE_NAME" SERVICE_NAME="$SERVICE_NAME" MAIN_CONFIG_PATH="$MAIN_CONFIG_PATH" PORT="$PORT" PSK="$PSK" SNELL_VERSION="$SNELL_VERSION" SNELL_RUNTIME_VERSION="$snell_version" SNELL_DOWNLOAD_URL="$download_url" SNELL_CHECKSUM_SHA256="$checksum_sha" NODE_STATE="$node_state" python3 <<'PY'
                 import json
                 import os
 
-                node_id = os.environ.get("FLUX_NODE_ID") or None
+                node_id = os.environ.get("OB_NODE_ID") or None
                 node = {
                     "name": os.environ.get("NODE_NAME"),
                     "protocol": "snell",
@@ -339,7 +339,7 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
                     "server": {"snellVersion": os.environ.get("SNELL_RUNTIME_VERSION")},
                     "services": {"snell": os.environ.get("NODE_STATE")},
                 }
-                print("FLUX_AGENT_RESULT_JSON=" + json.dumps(result, ensure_ascii=False, separators=(",", ":")))
+                print("OB_AGENT_RESULT_JSON=" + json.dumps(result, ensure_ascii=False, separators=(",", ":")))
                 PY
                 }
 

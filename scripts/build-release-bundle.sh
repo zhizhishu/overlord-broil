@@ -12,7 +12,7 @@ usage() {
   cat <<'EOF'
 Usage: scripts/build-release-bundle.sh [--version VERSION] [--output-dir DIR] [--require-clean]
 
-Builds a source release bundle for Flux 3x-ui Orchestrator.
+Builds a source release bundle for Overlord Broil.
 
 The bundle contains tracked project files, docs, installers, compose files,
 SQL, workflow definitions and release metadata. It excludes .git, local build
@@ -88,7 +88,7 @@ fi
 
 COMMIT="$(git rev-parse --short=12 HEAD)"
 BUILD_TIME="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-BUNDLE_BASENAME="flux-3xui-orchestrator-${VERSION}"
+BUNDLE_BASENAME="overlord-broil-${VERSION}"
 WORK_DIR="$(mktemp -d)"
 STAGE_DIR="${WORK_DIR}/${BUNDLE_BASENAME}"
 ARCHIVE_NAME="${BUNDLE_BASENAME}.tar.gz"
@@ -103,7 +103,7 @@ mkdir -p "$OUTPUT_DIR"
 git archive --format=tar --prefix="${BUNDLE_BASENAME}/" HEAD | tar -x -C "$WORK_DIR"
 
 cat > "${STAGE_DIR}/RELEASE_MANIFEST.txt" <<EOF
-Flux 3x-ui Orchestrator release bundle
+Overlord Broil release bundle
 
 Version: ${VERSION}
 Git commit: ${COMMIT}
@@ -114,12 +114,12 @@ Primary entrypoints:
 - docker-compose.yml
 - scripts/install-master.sh
 - scripts/install-master-bootstrap.sh
-- scripts/install-flux-agent.sh
-- scripts/install-flux-agent-bootstrap.sh
+- scripts/install-agent.sh
+- scripts/install-agent-bootstrap.sh
 - docker-compose-v4.yml
 - docker-compose-v6.yml
 - docker-compose.sqlite.yml
-- gost.sql
+- overlord.sql
 - README.md
 - README.zh-CN.md
 - docs/OPERATIONS.md
@@ -130,12 +130,12 @@ Recommended release gate before publishing:
 
 Default ports:
 - master public entry: 5166
-- backend API / agent callback: same flux-master entry, served under /api/v1
+- backend API / agent callback: same overlord-master entry, served under /api/v1
 - controlled 3x-ui panel default: 5168
 - ACME HTTP validation, only when selected: 80
 
 Runtime images:
-- ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest
+- ghcr.io/zhizhishu/overlord-broil:latest
 EOF
 
 tar -czf "$ARCHIVE_PATH" -C "$WORK_DIR" "$BUNDLE_BASENAME"

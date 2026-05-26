@@ -223,7 +223,7 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
     }
 
     private String buildScript(ServerForwardRule rule, String action) {
-        String service = firstNotBlank(rule.getServiceName(), "flux-forward-" + rule.getId() + ".service");
+        String service = firstNotBlank(rule.getServiceName(), "overlord-forward-" + rule.getId() + ".service");
         StringBuilder script = new StringBuilder();
         script.append("#!/usr/bin/env bash\n");
         script.append("set -euo pipefail\n\n");
@@ -314,7 +314,7 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
                   socat_bin="$(command -v socat)"
                   cat > "$SYSTEMD_SERVICE_PATH" <<SERVICE
                 [Unit]
-                Description=Flux server forward ${RULE_NAME}
+                Description=Overlord server forward ${RULE_NAME}
                 After=network-online.target
                 Wants=network-online.target
 
@@ -338,8 +338,8 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
                   socat_bin="$(command -v socat)"
                   cat > "$OPENRC_SERVICE_PATH" <<SERVICE
                 #!/sbin/openrc-run
-                name="Flux server forward ${RULE_NAME}"
-                description="Flux server forward ${RULE_NAME}"
+                name="Overlord server forward ${RULE_NAME}"
+                description="Overlord server forward ${RULE_NAME}"
                 command="${socat_bin}"
                 command_args="-d -d ${listen} ${target}"
                 command_background="yes"
@@ -436,7 +436,7 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
                     "serviceName": os.environ.get("SERVICE_NAME"),
                     "state": os.environ.get("STATE"),
                 }
-                print("FLUX_AGENT_RESULT_JSON=" + json.dumps({"forwardRules": [rule]}, ensure_ascii=False, separators=(",", ":")))
+                print("OB_AGENT_RESULT_JSON=" + json.dumps({"forwardRules": [rule]}, ensure_ascii=False, separators=(",", ":")))
                 PY
                 }
 
@@ -499,7 +499,7 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
 
     private void fillService(ServerForwardRule rule) {
         if (isBlank(rule.getServiceName())) {
-            rule.setServiceName("flux-forward-" + rule.getId() + ".service");
+            rule.setServiceName("overlord-forward-" + rule.getId() + ".service");
         }
     }
 
@@ -525,7 +525,7 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
     }
 
     private String normalizeService(String service) {
-        String value = firstNotBlank(service, "flux-forward.service");
+        String value = firstNotBlank(service, "overlord-forward.service");
         return value.endsWith(".service") ? value : value + ".service";
     }
 

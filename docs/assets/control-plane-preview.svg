@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
-  <title id="title">Flux 3x-ui Orchestrator control plane preview</title>
+  <title id="title">Overlord Broil control plane preview</title>
   <desc id="desc">A stylized control plane showing one master panel connected to multiple agents, Xray protocols, Snell deployment, traffic forwarding, and status telemetry.</desc>
   <defs>
     <linearGradient id="panel" x1="0" x2="1" y1="0" y2="1">

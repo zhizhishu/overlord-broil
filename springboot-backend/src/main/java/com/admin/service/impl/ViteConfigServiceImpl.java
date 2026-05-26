@@ -24,6 +24,9 @@ import java.util.Map;
 @Service
 public class ViteConfigServiceImpl extends ServiceImpl<ViteConfigMapper, ViteConfig> implements ViteConfigService {
 
+    private static final String APP_NAME_KEY = "app_name";
+    private static final String DEFAULT_APP_NAME = "Overlord Broil";
+
     // ========== 常量定义 ==========
     
     /** 成功响应消息 */
@@ -44,6 +47,7 @@ public class ViteConfigServiceImpl extends ServiceImpl<ViteConfigMapper, ViteCon
      */
     @Override
     public R getConfigs() {
+        normalizeLegacyProductConfig();
         List<ViteConfig> configList = this.list();
         Map<String, String> configMap = new HashMap<>();
         
@@ -64,6 +68,10 @@ public class ViteConfigServiceImpl extends ServiceImpl<ViteConfigMapper, ViteCon
     public R getConfigByName(String name) {
         if (!StringUtils.hasText(name)) {
             return R.err(ERROR_CONFIG_NAME_REQUIRED);
+        }
+
+        if (APP_NAME_KEY.equals(name)) {
+            normalizeLegacyProductConfig();
         }
 
         QueryWrapper<ViteConfig> queryWrapper = new QueryWrapper<>();
@@ -154,6 +162,30 @@ public class ViteConfigServiceImpl extends ServiceImpl<ViteConfigMapper, ViteCon
             newConfig.setValue(value);
             newConfig.setTime(System.currentTimeMillis());
             this.save(newConfig);
+        }
+    }
+
+    private void normalizeLegacyProductConfig() {
+        QueryWrapper<ViteConfig> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("name", APP_NAME_KEY);
+        ViteConfig config = this.getOne(queryWrapper);
+        if (config == null) {
+            ViteConfig newConfig = new ViteConfig();
+            newConfig.setName(APP_NAME_KEY);
+            newConfig.setValue(DEFAULT_APP_NAME);
+            newConfig.setTime(System.currentTimeMillis());
+            this.save(newConfig);
+            return;
+        }
+
+        String value = config.getValue();
+        if (!StringUtils.hasText(value)
+                || "flux".equalsIgnoreCase(value.trim())
+                || "flux panel".equalsIgnoreCase(value.trim())
+                || "flux 3x-ui orchestrator".equalsIgnoreCase(value.trim())) {
+            config.setValue(DEFAULT_APP_NAME);
+            config.setTime(System.currentTimeMillis());
+            this.updateById(config);
         }
     }
 

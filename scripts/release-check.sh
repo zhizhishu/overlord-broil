@@ -9,7 +9,7 @@ usage() {
   cat <<'EOF'
 Usage: scripts/release-check.sh [--full]
 
-Runs the release gate for Flux 3x-ui Orchestrator.
+Runs the release gate for Overlord Broil.
 
 Default checks:
   - shell syntax
@@ -72,13 +72,13 @@ cleanup_release_check() {
 }
 trap cleanup_release_check EXIT
 
-if [ -z "${DOCKER_CONFIG:-}" ] && [ "${FLUX_RELEASE_CHECK_ISOLATE_DOCKER_CONFIG:-true}" = "true" ]; then
+if [ -z "${DOCKER_CONFIG:-}" ] && [ "${OB_RELEASE_CHECK_ISOLATE_DOCKER_CONFIG:-true}" = "true" ]; then
   TEMP_DOCKER_CONFIG="$(mktemp -d)"
   export DOCKER_CONFIG="$TEMP_DOCKER_CONFIG"
 fi
 
-export DB_NAME="${DB_NAME:-gost_release_check}"
-export DB_USER="${DB_USER:-gost_release_check}"
+export DB_NAME="${DB_NAME:-overlord_release_check}"
+export DB_USER="${DB_USER:-overlord_release_check}"
 export DB_PASSWORD="${DB_PASSWORD:-release-check-password}"
 export JWT_SECRET="${JWT_SECRET:-release-check-jwt-secret}"
 export SECRET_ENCRYPTION_KEY="${SECRET_ENCRYPTION_KEY:-release-check-secret-encryption-key}"
@@ -89,10 +89,10 @@ export PHPMYADMIN_PORT="${PHPMYADMIN_PORT:-}"
 
 step "Validate shell scripts"
 bash -n scripts/*.sh
-sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh
+sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh
 
 step "Run agent mock tests"
-bash scripts/test-flux-agent-mock.sh
+bash scripts/test-agent-mock.sh
 
 step "Run SQLite schema smoke test"
 bash scripts/test-sqlite-schema.sh
@@ -115,7 +115,7 @@ bash scripts/test-master-port-contract.sh
 step "Build frontend with Docker Node 22"
 docker run --rm \
   -v "${PROJECT_ROOT}:/workspace" \
-  -v flux_3xui_frontend_node_modules:/workspace/vite-frontend/node_modules \
+  -v ob_3xui_frontend_node_modules:/workspace/vite-frontend/node_modules \
   -w /workspace/vite-frontend \
   node:22-bookworm \
   bash -lc "npm install --legacy-peer-deps --no-audit --no-fund && npm run build"

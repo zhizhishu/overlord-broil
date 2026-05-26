@@ -5,7 +5,7 @@
 ### 本轮计划（创建于: 2026-05-25 05:45:38）
 1. 复核 `install-master.sh`、`docker-compose-v4.yml`、`docker-compose-v6.yml` 当前端口映射，定位为什么真机默认暴露 `80/6365/phpMyAdmin`。
 2. 将正式默认部署收口为单公网入口：主控前端 `5166` 公开，后端 `6365` 仅 Docker 内网，phpMyAdmin 默认不外露。
-3. 保留调试开关：需要直连后端时才显式启用 `FLUX_EXPOSE_BACKEND=1`，需要 phpMyAdmin 时才设置 `FLUX_PHPMYADMIN_PORT`。
+3. 保留调试开关：需要直连后端时才显式启用 `OB_EXPOSE_BACKEND=1`，需要 phpMyAdmin 时才设置 `OB_PHPMYADMIN_PORT`。
 4. 更新 README / 运维文档 / release notes，把 Docker Compose 单端口方案、升级命令和被控 agent 回调方式写清楚。
 5. 跑本地可用验证，提交并推送；如确认 `main` 安装路径仍旧，需同步发布路径让一键安装马上生效。
 
@@ -14,19 +14,19 @@
 ### 2026-05-25 06:55:50 进度记录
 
 - `docker-compose-v4.yml` / `docker-compose-v6.yml` 已移除默认 backend 宿主机端口映射；正式默认只发布 frontend/master 入口，backend `6365` 留在 Docker 内网，由 frontend Nginx 反代 `/api/v1/*`。
-- `scripts/install-master.sh` 新增 `FLUX_EXPOSE_BACKEND` / `--expose-backend` 调试开关；默认 `EXPOSE_BACKEND=0`，只有显式开启时才生成 `docker-compose-backend.yml` 并发布 `${BACKEND_PORT}:6365`。
-- 安装脚本会把老安装遗留的 `FRONTEND_PORT=80` 自动迁移为 `5166`；老 `.env` 里的 phpMyAdmin 公网端口会默认清空，除非显式传 `FLUX_PHPMYADMIN_PORT` 或 `FLUX_PRESERVE_PHPMYADMIN_PORT=1`。
+- `scripts/install-master.sh` 新增 `OB_EXPOSE_BACKEND` / `--expose-backend` 调试开关；默认 `EXPOSE_BACKEND=0`，只有显式开启时才生成 `docker-compose-backend.yml` 并发布 `${BACKEND_PORT}:6365`。
+- 安装脚本会把老安装遗留的 `FRONTEND_PORT=80` 自动迁移为 `5166`；老 `.env` 里的 phpMyAdmin 公网端口会默认清空，除非显式传 `OB_PHPMYADMIN_PORT` 或 `OB_PRESERVE_PHPMYADMIN_PORT=1`。
 - 文档已更新为单公网入口方案：主控和被控 agent 都使用 `http://master:5166`，phpMyAdmin/backend 只在调试或维护时显式外露。
-- 本地验证通过：`bash -n scripts/*.sh`、compose v4/v6 config、master doctor、`scripts/test-compose-smoke.sh --build-local --dry-run`、完整 `scripts/test-compose-smoke.sh --build-local`、`scripts/test-flux-agent-mock.sh`、`scripts/test-three-xui-fixture.sh`、Alpine install matrix、`git diff --check`。完整 Docker smoke 后已清理临时容器、卷、网络，18080/16365 未监听。
+- 本地验证通过：`bash -n scripts/*.sh`、compose v4/v6 config、master doctor、`scripts/test-compose-smoke.sh --build-local --dry-run`、完整 `scripts/test-compose-smoke.sh --build-local`、`scripts/test-agent-mock.sh`、`scripts/test-three-xui-fixture.sh`、Alpine install matrix、`git diff --check`。完整 Docker smoke 后已清理临时容器、卷、网络，18080/16365 未监听。
 
 ## 接力摘要
 
 - 当前目标：主控面板已经从“节点创建/脚本生成”推进到“按被控服务器统一管理规则”，覆盖 3x-ui 出入站查看与调整入口、统一协议节点、Snell 节点、远端端口转发和规则总览。
 - 正式可用硬化方向：优先补齐安装/升级/备份/恢复/卸载、agent 单机任务锁与重试退避、真实部署验证和 CI smoke test；随后推进敏感字段加密、Snell checksum、统一规则中心细节和监控告警。
 - 已完成：
-  - 从 `zhizhishu/flux-panel` 创建新项目 `flux-panel-3xui-orchestrator`。
+  - 从 `zhizhishu/flux-panel` 创建新项目 `overlord-broil`。
   - 将参考仓库 `MHSanaei/3x-ui` 与 `jinqians/snell.sh` 克隆到本地 `_references/`，仅作为本地参考，不推送。
-  - 新建私有主仓库 `zhizhishu/flux-3xui-orchestrator`，并将 `origin` 指向该仓库。
+  - 新建私有主仓库 `zhizhishu/overlord-broil`，并将 `origin` 指向该仓库。
   - 将原 `zhizhishu/flux-panel` 远端改名为 `upstream`，只作为来源参考；已删除误推的远端分支，没有创建 PR。
   - 后端新增主控服务器、协议模板、部署任务、Snell 非交互部署脚本生成相关实体、服务、控制器和数据库表结构。
   - 前端新增 `/orchestrator` 主控中心页面和侧边栏入口，保持 `flux-panel` 现有 UI 基调。
@@ -37,14 +37,14 @@
   - 补齐主项目 README。
   - 创建公开站点仓库 `zhizhishu/zhizhishu.github.io`，发布静态项目官网到 `https://zhizhishu.github.io/`。
   - 新增 `POST /api/v1/agent-task/claim` 与 `POST /api/v1/agent-task/report`，副控通过服务器 `apiToken` + `X-Agent-Token` 自动领取和回传部署任务。
-  - 新增 `scripts/flux-agent.sh`，副控可轮询主控、落地任务脚本、执行 Snell/Xray 部署脚本并回传 stdout/stderr/exit code。
+  - 新增 `scripts/overlord-agent.sh`，副控可轮询主控、落地任务脚本、执行 Snell/Xray 部署脚本并回传 stdout/stderr/exit code。
   - 主控中心 inbound 操作从纯 JSON 升级为结构化表单，覆盖 VLESS Reality、VMess WebSocket、Trojan TLS、Shadowsocks，并保留高级 JSON 兜底。
   - 新增 `three_xui_traffic_snapshot` 本地表及同步接口，可把 3x-ui inbound/client/outbound 流量快照写入本地数据库。
   - 前端补齐 `@heroui/theme` / `@heroui/system` 兼容版本、移除旧 legacy 插件并显式加入 Tailwind/PostCSS 所需 `jiti`。
   - 新增 GitHub Actions CI，分别验证后端 Maven package 和前端 npm build。
   - 2026-05-20 10:26:10：完成正式可用硬化第一批。分布式 worker 复核安装脚本、README、Pages、CI 与 agent 脚本后，主线程补齐主控安装脚本 `upgrade/backup/restore/uninstall` 的可靠性校验、agent 任务锁/HTTP 重试/任务超时/结果元数据上报、agent systemd env 安全写入、可复用 agent mock 测试和 CI compose 校验。
   - 2026-05-20 21:03:36：完成产品化收尾第二批。分布式 worker 分别完成 Snell 供应链 checksum/版本锁、协议级 guardrails、CI compose smoke；主线程集成复查后补齐 Xray 本地字段校验、host-only/host:port 拆分、`gost-phpmyadmin` 资源保护和 `--build-local` smoke，避免本地/CI 依赖 GHCR 拉取权限。
-  - 2026-05-20 22:26:22：完成 P1-P4 正式产品化。P1 主控中心新增统一规则中心、搜索/筛选/复制和运维入口；P2 新增 `monitor_alert` 后端模型/API、心跳/证书/服务/任务/流量告警和前端确认入口；P3 新增 3x-ui API fixture 与 CI 回归脚本；P4 补齐 `VERSION`、Release notes、Operations、README 发布与使用说明。验证通过：`bash -n scripts/*.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、`npm run build`、Docker Maven `mvn -B -DskipTests package`、`docker compose` v4/v6 config、`bash scripts/test-compose-smoke.sh --build-local --dry-run`、完整 `bash scripts/test-compose-smoke.sh --build-local`、`git diff --check`。
+  - 2026-05-20 22:26:22：完成 P1-P4 正式产品化。P1 主控中心新增统一规则中心、搜索/筛选/复制和运维入口；P2 新增 `monitor_alert` 后端模型/API、心跳/证书/服务/任务/流量告警和前端确认入口；P3 新增 3x-ui API fixture 与 CI 回归脚本；P4 补齐 `VERSION`、Release notes、Operations、README 发布与使用说明。验证通过：`bash -n scripts/*.sh`、`bash scripts/test-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、`npm run build`、Docker Maven `mvn -B -DskipTests package`、`docker compose` v4/v6 config、`bash scripts/test-compose-smoke.sh --build-local --dry-run`、完整 `bash scripts/test-compose-smoke.sh --build-local`、`git diff --check`。
 - 下一步：
   - 增加 Reality key、端口、outbound tag、Snell PSK/端口等协议级校验，降低 3x-ui/Snell payload 填错风险。
   - 为 Snell 二进制下载增加 checksum 校验和版本源锁定。
@@ -66,29 +66,29 @@
 - 验证：
   - `git diff --check` 已通过。
   - 主项目和站点仓库均已推送，当前分支干净并跟踪各自 `origin/main`。
-  - `https://zhizhishu.github.io/` 返回 `200`，页面标题为 `Flux 3x-ui Orchestrator`。
-  - `bash -n scripts/flux-agent.sh` 通过。
+  - `https://zhizhishu.github.io/` 返回 `200`，页面标题为 `Overlord Broil`。
+  - `bash -n scripts/overlord-agent.sh` 通过。
   - 本机前端已清理损坏的 `vite-frontend/node_modules`，重新执行 `npm install --legacy-peer-deps --no-audit --no-fund` 成功。
   - 本机前端 `npm run build` 通过，包含 `tsc` 与 Vite production build。
   - 前端已用 Docker Node 20 验证：`npm install --legacy-peer-deps --no-audit --no-fund && npm run build` 通过。
   - 后端已用 Docker Maven 验证：`mvn -B -DskipTests package` 通过。
   - 补齐一键编排任务：主控可多选服务器，按服务器生成 3x-ui 安装/配置、多协议节点、Snell 安装任务，副控 agent 自动领取执行。
-  - 补齐 agent systemd 安装脚本 `scripts/install-flux-agent.sh`，agent 心跳会上报 CPU/内存/网卡流量、3x-ui/Xray/Snell 服务状态、证书状态。
+  - 补齐 agent systemd 安装脚本 `scripts/install-agent.sh`，agent 心跳会上报 CPU/内存/网卡流量、3x-ui/Xray/Snell 服务状态、证书状态。
   - 补齐服务器证书与服务状态字段、编排结果回写、每 5 分钟自动同步 3x-ui 流量任务。
   - 前端主控中心新增一键编排弹窗、多服务器选择、服务/证书/流量状态 chips。
   - README 已补齐数据库升级、agent 常驻安装、一键编排使用方式、自动流量同步和 API 列表。
   - 本机仍没有原生 `java`、`mvn`、`mvnw`；后端使用 Docker Maven 作为本地可复现构建基线。
-  - 2026-05-19 06:14:15：`git diff --check` 通过；`bash -n scripts/flux-agent.sh scripts/install-flux-agent.sh` 通过；`vite-frontend npm run build` 通过；Docker Maven 后端构建容器退出码 `0`，产出 `springboot-backend/target/admin-0.0.1-SNAPSHOT.jar`。
+  - 2026-05-19 06:14:15：`git diff --check` 通过；`bash -n scripts/overlord-agent.sh scripts/install-agent.sh` 通过；`vite-frontend npm run build` 通过；Docker Maven 后端构建容器退出码 `0`，产出 `springboot-backend/target/admin-0.0.1-SNAPSHOT.jar`。
   - 2026-05-19 07:12:45：本地 Docker 烟测发现并修复 `/api/v1/agent-task/**` 被 JWT 拦截的问题；修复后通过临时 MySQL + 后端容器验证登录、创建服务器、生成一键编排任务、agent claim、agent report、heartbeat、服务器元数据回写。
-  - 2026-05-19 07:12:45：实际运行 `scripts/flux-agent.sh --once` 于 `node:20-bookworm` 临时容器，成功领取安全任务、执行脚本、解析 `FLUX_AGENT_RESULT_JSON`、回传 succeeded，并把服务器 3x-ui/证书/服务状态更新到临时数据库。
+  - 2026-05-19 07:12:45：实际运行 `scripts/overlord-agent.sh --once` 于 `node:20-bookworm` 临时容器，成功领取安全任务、执行脚本、解析 `OB_AGENT_RESULT_JSON`、回传 succeeded，并把服务器 3x-ui/证书/服务状态更新到临时数据库。
   - 2026-05-19 08:12:21：新增 `protocol_node` 统一协议节点层、后端 API、Snell 节点级 agent/systemd 任务、3x-ui inbound 同步入库、前端协议节点管理区和 README/官网说明；`npm run build` 与 Docker Maven 后端构建均通过。
   - 2026-05-19 10:17:38：新增 `server_forward_rule` 远端端口转发表、后端 API、agent systemd+socat 执行脚本、主控中心“新增转发/远端端口转发/规则总览”入口；规则总览会聚合本地协议节点、本地远端转发、实时 3x-ui inbound 和 3x-ui outbound。
   - 2026-05-19 10:17:38：修复 MySQL 8 默认认证下 JDBC 连接缺少 `allowPublicKeyRetrieval=true` 的问题。
   - 2026-05-19 10:17:38：Docker 烟测通过：临时 MySQL + 后端容器完成登录、创建被控服务器、创建远端转发、agent claim、agent report、`server_forward_rule` 状态回写为 `active`、`server-rule/overview` 返回远端转发规则；本轮临时容器和 network 已清理。
-  - 2026-05-19 23:24:41：新增 GitHub Actions 镜像构建工作流，后端和前端镜像已通过 `Docker Images` workflow 构建并推送到 GHCR；compose 镜像地址已切换到 `ghcr.io/zhizhishu/flux-3xui-orchestrator-*`。
+  - 2026-05-19 23:24:41：新增 GitHub Actions 镜像构建工作流，后端和前端镜像已通过 `Docker Images` workflow 构建并推送到 GHCR；compose 镜像地址已切换到 `ghcr.io/zhizhishu/overlord-broil-*`。
   - 2026-05-20 03:57:59：完成本地 Docker compose 全栈烟测，前端 `http://localhost:18080/` 返回 `200`，后端 `/flow/test` 返回 `test`；创建被控服务器、一键编排任务、agent claim/report、服务器状态回写均通过。烟测中修复 MySQL 首次初始化时 socket healthcheck 过早放行后端的问题，改为 TCP 账号 healthcheck；测试容器、卷、网络和端口已清理。
-  - 2026-05-20 10:26:10：本轮硬化验证通过：`bash -n scripts/*.sh`、`bash scripts/test-flux-agent-mock.sh`、`docker compose -f docker-compose-v4.yml config --quiet`、`docker compose -f docker-compose-v6.yml config --quiet`、`vite-frontend npm run build`、Docker Maven `mvn -B -DskipTests package`、`git diff --check` 均通过；agent mock 覆盖 succeeded 与 timeout 两条路径，timeout 会回传 `exitCode=124` 与 `timedOut=true`。
-  - 2026-05-20 21:03:36：产品化收尾第二批验证通过：`bash -n scripts/*.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-compose-smoke.sh --build-local --dry-run`、`bash scripts/test-compose-smoke.sh --compose-file docker-compose-v6.yml --dry-run`、`npm run build`、Docker Maven `mvn -B -DskipTests package`、`git diff --check` 和本地 Docker `bash scripts/test-compose-smoke.sh --build-local` 全栈烟测均通过。完整 smoke 从当前源码构建 backend/frontend 镜像，启动 MySQL/后端/前端，验证 `/flow/test` 与前端首页 `200`，结束后已清理容器、卷、网络、临时 Maven cache volume 和本地测试镜像。
+  - 2026-05-20 10:26:10：本轮硬化验证通过：`bash -n scripts/*.sh`、`bash scripts/test-agent-mock.sh`、`docker compose -f docker-compose-v4.yml config --quiet`、`docker compose -f docker-compose-v6.yml config --quiet`、`vite-frontend npm run build`、Docker Maven `mvn -B -DskipTests package`、`git diff --check` 均通过；agent mock 覆盖 succeeded 与 timeout 两条路径，timeout 会回传 `exitCode=124` 与 `timedOut=true`。
+  - 2026-05-20 21:03:36：产品化收尾第二批验证通过：`bash -n scripts/*.sh`、`bash scripts/test-agent-mock.sh`、`bash scripts/test-compose-smoke.sh --build-local --dry-run`、`bash scripts/test-compose-smoke.sh --compose-file docker-compose-v6.yml --dry-run`、`npm run build`、Docker Maven `mvn -B -DskipTests package`、`git diff --check` 和本地 Docker `bash scripts/test-compose-smoke.sh --build-local` 全栈烟测均通过。完整 smoke 从当前源码构建 backend/frontend 镜像，启动 MySQL/后端/前端，验证 `/flow/test` 与前端首页 `200`，结束后已清理容器、卷、网络、临时 Maven cache volume 和本地测试镜像。
 - 风险/待确认：
   - 主仓库保持私有；由于当前 GitHub plan 不支持私有仓库 Pages，官网使用独立公开仓库 `zhizhishu.github.io`。
   - Snell 现在已经可通过副控 agent 自动领取和执行任务，且已提供 systemd 常驻安装脚本；本轮已完成 Snell 下载来源、版本和 sha256 checksum 锁定，安装脚本下载后先校验再落地。
@@ -133,7 +133,7 @@
 3. 在前端新增服务器、协议、部署任务的管理入口，保持 `flux-panel` 现有 UI 风格。
 4. 提取 Snell 安装脚本中的核心参数，形成可被主控下发的部署脚本模板。
 5. 做最小静态验证，并准备 Git 分支与推送。
-6. 将项目迁移并推送到用户自己的新仓库 `zhizhishu/flux-3xui-orchestrator`。
+6. 将项目迁移并推送到用户自己的新仓库 `zhizhishu/overlord-broil`。
 7. 为项目创建公开 `github.io` 站点，并验证线上访问。
 8. 修复项目任务日志编码，补齐 GitHub Pages 发布记录。
 9. 补齐 3x-ui 真实出入站管理代理、前端使用入口、文档和验证记录。
@@ -154,7 +154,7 @@
 - [x] ~~**目标:** 新增主控服务器、协议模板、部署任务与 Snell 安装脚本生成的后端 API 骨架~~ (创建于: 2026-05-18 22:07:56 | **完成于: 2026-05-18 22:44:43**)
 - [x] ~~**目标:** 完成 Git 提交并推送到 GitHub 分支~~ (创建于: 2026-05-18 22:44:43 | **完成于: 2026-05-18 22:46:53**)
 - [x] ~~**目标:** 撤回误推的远端分支并删除 PR 提示记录~~ (创建于: 2026-05-18 23:24:30 | **完成于: 2026-05-18 23:24:30**)
-- [x] ~~**目标:** 创建自有仓库 `zhizhishu/flux-3xui-orchestrator`，补充 README，并推送当前项目~~ (创建于: 2026-05-18 23:29:20 | **完成于: 2026-05-18 23:34:10**)
+- [x] ~~**目标:** 创建自有仓库 `zhizhishu/overlord-broil`，补充 README，并推送当前项目~~ (创建于: 2026-05-18 23:29:20 | **完成于: 2026-05-18 23:34:10**)
 - [x] ~~**目标:** 新增 GitHub Pages 项目官网并发布到 `github.io`~~ (创建于: 2026-05-18 23:37:48 | **完成于: 2026-05-18 23:49:41**)
 - [x] ~~**目标:** 修复 `TASK_LOG.md` 编码并补齐 GitHub Pages 发布接力记录~~ (创建于: 2026-05-18 23:53:08 | **完成于: 2026-05-18 23:54:21**)
 - [x] ~~**目标:** 补齐 3x-ui 面板连接、inbound/outbound 管理代理和使用说明~~ (创建于: 2026-05-19 00:07:55 | **完成于: 2026-05-19 00:42:56**)
@@ -166,8 +166,8 @@
 
 - 已撤回误推的远端分支：`origin/codex/3xui-orchestrator-snell`
 - 说明：没有创建 PR；之前的链接只是 GitHub 在 `push` 后自动输出的“可创建 PR”提示。
-- 新主仓库：`https://github.com/zhizhishu/flux-3xui-orchestrator`
-- 当前主项目 `origin`：`https://github.com/zhizhishu/flux-3xui-orchestrator.git`
+- 新主仓库：`https://github.com/zhizhishu/overlord-broil`
+- 当前主项目 `origin`：`https://github.com/zhizhishu/overlord-broil.git`
 - 原 `flux-panel` 远端已改名为 `upstream`，仅作来源参考。
 - 当前主项目分支：`main`
 - 2026-05-19 04:44:59：本轮产品化提交已推送到主项目 `origin/main`，commit `2e57363168596a5bfc42108b2bdf23bc2552a771`。
@@ -184,7 +184,7 @@
 1. 后端主控自控安全模式：以 `control_server.role=master` 为主控自身标识，集中拦截会占用主控保护端口或破坏主控栈的编排、协议节点和远端转发操作。
 2. 后端凭据加密：新增兼容旧明文数据的 3x-ui/API token 加密读写能力，运行时自动解密，接口输出继续只返回掩码。
 3. 3x-ui 回归测试增强：让 fixture 更贴近真实鉴权/响应形态，并补 CI 可复用 smoke 入口。
-4. 前端运维辅助：在 Flux 风格主控页里补 Reality shortId、Snell PSK、UUID、outbound tag 等生成/选择辅助，并提示 master 服务器风险。
+4. 前端运维辅助：在 Overlord 控制台风格主控页里补 Reality shortId、Snell PSK、UUID、outbound tag 等生成/选择辅助，并提示 master 服务器风险。
 5. 验证与发布：运行脚本、前端构建、Docker Maven 构建、compose 配置/smoke、`git diff --check`，清理本轮启动资源后提交并推送 `origin/main`，观察 GitHub Actions。
 
 ## 本轮任务清单
@@ -195,7 +195,7 @@
 ## 本轮正式上架硬化计划（创建于: 2026-05-21 12:13:22）
 1. 安装兼容性：增强主控与被控脚本在 Debian/Ubuntu、Alpine、Rocky Linux、Oracle Linux 上的包管理器、Docker/Compose、systemd/OpenRC 适配与失败提示。
 2. 主控/被控可靠性：补安装前端口占用、环境变量、服务状态、日志与卸载/升级路径检查，降低一键安装失败和误操作风险。
-3. Flux 风格 UI：继续把主控中心打磨成密集、清晰、运维控制台式布局，重点优化服务器卡片操作分组、状态可读性和上架观感。
+3. Overlord 控制台风格 UI：继续把主控中心打磨成密集、清晰、运维控制台式布局，重点优化服务器卡片操作分组、状态可读性和上架观感。
 4. README/运维文档：补正式版安装矩阵、端口占用、防火墙建议、Agent 服务管理和常见排障。
 5. 验证与发布：运行脚本语法、agent mock、3x-ui fixture、前端构建、Docker Maven、compose/smoke、diff 检查，清理资源后提交推送并观察 GitHub Actions。
 
@@ -206,13 +206,13 @@
 ### 2026-05-21 13:02:34 进度记录
 
 - 已完成实现与本地验证：Debian/Ubuntu、Rocky/Oracle Linux、Alpine/OpenRC 分层支持矩阵；新增 POSIX bootstrap 安装器；agent/OpenRC、Snell/OpenRC、远端转发 OpenRC 支持；3x-ui 完整安装编排增加 systemd preflight；主控页服务器卡片操作分组已按 Flux 运维控制台方向打磨；README、Operations、Release Notes、项目 docs 官网和独立 `zhizhishu.github.io` 官网已同步正式版使用说明。
-- 本地已通过：`bash -n scripts/*.sh`、`sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、`docker compose -f docker-compose-v4.yml config --quiet`、`docker compose -f docker-compose-v6.yml config --quiet`、`vite-frontend npm run build`、`git diff --check`。
+- 本地已通过：`bash -n scripts/*.sh`、`sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh`、`bash scripts/test-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、`docker compose -f docker-compose-v4.yml config --quiet`、`docker compose -f docker-compose-v6.yml config --quiet`、`vite-frontend npm run build`、`git diff --check`。
 - 本机 Docker Desktop engine 当前对 `docker run` / `docker ps` 返回 500，导致 Docker Maven 和完整 compose smoke 无法在本机继续跑；推送后由 GitHub Actions 的 backend、scripts compose smoke 和 Docker Images workflow 做最终验证。
 
 ### 2026-05-21 13:08:00 完成记录
 
 - 主项目已推送 `origin/main`：`5a3d755`，提交信息 `Prepare 0.5.0 production release`。
-- 官网仓库已推送 `origin/main`：`f8c2fea`，提交信息 `Update Flux 3x-ui Orchestrator site for 0.5.0`。
+- 官网仓库已推送 `origin/main`：`f8c2fea`，提交信息 `Update Overlord Broil site for 0.5.0`。
 - GitHub Actions 验证通过：主项目 `CI` run `26250075134` 通过，覆盖 backend Maven、frontend build、脚本校验、agent mock、3x-ui fixture、compose config、dry-run compose smoke、完整 compose smoke；`Docker Images` run `26250075225` 通过，backend/frontend GHCR 镜像均构建并推送；主项目 Pages run `26250074383` 通过；官网 Pages run `26250155252` 通过。
 - 本轮资源清理：未保留本轮启动的 dev server、测试 watcher 或浏览器页签；本机 Docker Desktop engine 自身仍异常返回 500，但本轮启动的挂起 docker CLI 已清理，未关闭 Docker Desktop/WSL 后台服务。
 
@@ -232,16 +232,16 @@
 ### 2026-05-22 05:09:54 进度记录
 
 - 已完成 0.6.0 第一批本地实现：主控/agent/agent runtime `doctor` 预检、Debian/Ubuntu/Alpine/Rocky/Oracle Linux Docker 安装矩阵脚本、CI install-matrix job、`release-check --full` 安装矩阵接入、agent 远程维护任务（诊断/日志/重启/升级）、主控中心服务器卡片 Agent 操作组、README/Operations/Release Notes/官网 0.6.0 文档口径。
-- 已完成本地非 Docker 验证：`bash -n scripts/*.sh`、`sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、`scripts/flux-agent.sh --doctor`、`scripts/install-master.sh doctor`、`scripts/install-flux-agent.sh doctor`、`docker compose -f docker-compose-v4.yml config --quiet`、`docker compose -f docker-compose-v6.yml config --quiet`、`vite-frontend npm run build`、`git diff --check`。
+- 已完成本地非 Docker 验证：`bash -n scripts/*.sh`、`sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh`、`bash scripts/test-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、`scripts/overlord-agent.sh --doctor`、`scripts/install-master.sh doctor`、`scripts/install-agent.sh doctor`、`docker compose -f docker-compose-v4.yml config --quiet`、`docker compose -f docker-compose-v6.yml config --quiet`、`vite-frontend npm run build`、`git diff --check`。
 - 本机限制：当前 Windows Docker Desktop Linux engine 对 `docker version/docker run` 仍返回 500，导致本地 Docker Maven、Docker Node release-check、完整 compose smoke 和 `scripts/test-install-matrix.sh` 不能可靠执行；未关闭 Docker Desktop/WSL 后台进程，等待推送后用 GitHub Actions 完成 Docker/Maven/矩阵验证。
 - 下一步：提交并推送主仓库与 `zhizhishu.github.io` 官网仓库，观察 `CI`、`Docker Images`、Pages 等 GitHub Actions；若 install-matrix 或 Java 编译暴露问题，立即修复并二次推送。
 
 ### 2026-05-22 05:26:11 完成记录
 
-- 主仓库已推送 `origin/main`：`c05cd5a`，提交信息 `Fix 0.6.0 install matrix diagnostics`。该提交修复了 RHEL/Rocky 系 `curl-minimal` 与 `curl` 包冲突，并为容器化 doctor 增加 `FLUX_DOCTOR_SKIP_PORT_CHECK=1`，避免 Alpine/CI 预检误判端口占用。
+- 主仓库已推送 `origin/main`：`c05cd5a`，提交信息 `Fix 0.6.0 install matrix diagnostics`。该提交修复了 RHEL/Rocky 系 `curl-minimal` 与 `curl` 包冲突，并为容器化 doctor 增加 `OB_DOCTOR_SKIP_PORT_CHECK=1`，避免 Alpine/CI 预检误判端口占用。
 - GitHub Actions `CI` run `26253894837` 已通过：backend Maven、frontend build、scripts、agent mock、3x-ui fixture、compose config、dry-run compose smoke、完整 compose smoke、Debian/Ubuntu/Alpine/Rocky Linux/Oracle Linux install-matrix 全部成功。
 - GitHub Actions `pages-build-deployment` run `26253893769` 已通过；上一轮 `Docker Images` run `26253407666` 已通过，backend/frontend GHCR 镜像已构建并推送。
-- 本地复核通过：`bash -n scripts/*.sh`、`sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、带占位环境的 `scripts/flux-agent.sh --doctor`、`scripts/install-master.sh doctor`、`scripts/install-flux-agent.sh doctor`、v4/v6 compose config、`vite-frontend npm run build`、`git diff --check`。
+- 本地复核通过：`bash -n scripts/*.sh`、`sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh`、`bash scripts/test-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、带占位环境的 `scripts/overlord-agent.sh --doctor`、`scripts/install-master.sh doctor`、`scripts/install-agent.sh doctor`、v4/v6 compose config、`vite-frontend npm run build`、`git diff --check`。
 - 本机 Docker Desktop Linux engine 仍对 `docker version` 返回 500；本轮未关闭 Docker Desktop/WSL 后台服务，完整 Docker/Maven/compose/矩阵验证以 GitHub Actions 结果为准。
 
 ## 2026-05-23 正式版展示与 future 分支计划
@@ -259,8 +259,8 @@
 ### 2026-05-23 10:34:52 进度记录
 
 - README 已新增 `UI Preview` 截图区、`Formal Release Gap` 正式版差距说明和 `future` 分支 P0-P3 路线。
-- 新增 `docs/assets/flux-orchestrator-screenshot.svg`，展示 Flux 风格主控工作台：服务器卡片、统一规则、3x-ui/Snell/Agent 操作和一键编排。
-- 本地验证：`git diff --check` 通过；`bash -n scripts/*.sh` 通过；`bash -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh` 通过；`npm run build` 通过；SVG XML 解析通过。
+- 新增 `docs/assets/overlord-broil-screenshot.svg`，展示 Overlord 控制台风格主控工作台：服务器卡片、统一规则、3x-ui/Snell/Agent 操作和一键编排。
+- 本地验证：`git diff --check` 通过；`bash -n scripts/*.sh` 通过；`bash -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh` 通过；`npm run build` 通过；SVG XML 解析通过。
 - 环境限制：本机 Docker Desktop Linux engine 当前不可连接，本轮未跑 Docker compose/Maven 容器验证，后续以 GitHub Actions 或恢复 Docker 后再补完整 release gate。
 - 2026-05-23 10:37:30 追加：发现 GitHub Actions 只监听 `main`，已补 `future` 分支 CI 触发，并让 Docker Images workflow 支持 `future` 分支镜像构建。
 - 2026-05-23 10:46:47 追加：`future` 分支 Docker Images 前端镜像构建通过但 GHCR 推送 `frontend:future` 被拒绝；已调整为 `future` 只构建验证，只有 `main` 和 `v*` tag 推送 GHCR。
@@ -311,7 +311,7 @@
 
 1. 主控默认端口迁移：将前端公开端口从 `80` 改为 `5166`，后端 API / agent 回调继续保留 `6365`，避免破坏既有 agent 通信链路。
 2. 被控 3x-ui 默认端口迁移：将一键编排里的 3x-ui 面板默认端口从 `54321` 改为 `5168`，同步前端表单、后端 DTO 和脚本兜底默认值。
-3. phpMyAdmin 暴露策略收口：默认不暴露 phpMyAdmin 宿主机端口，只有显式设置 `FLUX_PHPMYADMIN_PORT` 或 `--phpmyadmin-port` 时才发布；安装输出和 doctor 需要明确显示状态。
+3. phpMyAdmin 暴露策略收口：默认不暴露 phpMyAdmin 宿主机端口，只有显式设置 `OB_PHPMYADMIN_PORT` 或 `--phpmyadmin-port` 时才发布；安装输出和 doctor 需要明确显示状态。
 4. 文档端口说明：README / 中文 README 清楚列出主控默认暴露端口、默认不暴露端口、被控按编排暴露端口和 ACME `80` 的边界。
 5. 验证与推送：运行脚本语法、compose config、前端构建、`git diff --check`，提交并推送 `origin/future`，观察 GitHub Actions。
 
@@ -342,7 +342,7 @@
 ### 2026-05-24 10:12:47 进度记录
 
 - 后端新增失败/超时部署任务重试接口：`POST /api/v1/deploy-task/retry` 会复用原任务脚本、协议和动作创建新的 `generated` 任务，并在 `request_json` 记录原任务来源。
-- Agent 维护动作扩展为诊断、日志、重启、升级、卸载、安装诊断、证书诊断、防火墙诊断、一键修复和分项修复 3x-ui/Xray/Snell；维护脚本会输出结构化 `FLUX_AGENT_RESULT_JSON`，便于主控回写服务状态。
+- Agent 维护动作扩展为诊断、日志、重启、升级、卸载、安装诊断、证书诊断、防火墙诊断、一键修复和分项修复 3x-ui/Xray/Snell；维护脚本会输出结构化 `OB_AGENT_RESULT_JSON`，便于主控回写服务状态。
 - 主控 UI 已补 Agent 运维按钮、失败任务重试入口和中英文文案；README、中文 README、Operations、Release Notes 已同步说明重试语义、ACME/80/DNS/防火墙诊断和修复入口。
 - 本地验证通过：Docker Maven `mvn -B -DskipTests package` 成功生成后端 jar；`vite-frontend npm run build` 通过；`git diff --check` 通过。
 - 本轮环境限制：Windows Git Bash 当前无法创建 signal pipe / CreateFileMapping，WSL 返回 `E_ACCESSDENIED`，Docker API 后续检查返回 pipe permission denied；因此本轮收尾时无法重新跑 bash 脚本语法、agent mock 和 3x-ui fixture。该三项在本批改动过程中已跑通过一次，最终仍需推送后由 GitHub Actions 再确认。
@@ -354,7 +354,7 @@
 
 1. 发布包能力：新增 release bundle 脚本，打包安装脚本、compose、SQL、文档、版本信息和校验文件，供 GitHub Release 下载与离线审计。
 2. GitHub Release 自动生成：新增 `v*` tag / 手动触发 workflow，先跑 release gate，再上传 bundle 并生成 release notes。
-3. 主控 UI 首次配置向导：在 `/orchestrator` 增加 Flux 风格的上手路径，把主控端口、被控 agent、3x-ui、Snell、证书/防火墙和发布验证串起来。
+3. 主控 UI 首次配置向导：在 `/orchestrator` 增加 Overlord 控制台风格的上手路径，把主控端口、被控 agent、3x-ui、Snell、证书/防火墙和发布验证串起来。
 4. 文档同步：README、中文 README、Operations、Release Notes 写清 release 包、tag 发布、一键升级/回滚与推荐防火墙规则。
 5. 验证与推送：运行本地可用构建/脚本检查，推送 `origin/future` 并观察 GitHub Actions。
 
@@ -362,9 +362,9 @@
 
 ### 2026-05-24 11:40:20 进度记录
 
-- 新增 `scripts/build-release-bundle.sh`，可从当前 Git commit 生成 `dist/release/flux-3xui-orchestrator-<version>.tar.gz` 和 `.sha256`，包内包含 `RELEASE_MANIFEST.txt`、安装脚本、compose、SQL、README、中文 README、Operations 和 Release Notes；`.git`、`node_modules`、`target`、`dist`、`_references` 等本地/构建产物不进入发布包。
+- 新增 `scripts/build-release-bundle.sh`，可从当前 Git commit 生成 `dist/release/overlord-broil-<version>.tar.gz` 和 `.sha256`，包内包含 `RELEASE_MANIFEST.txt`、安装脚本、compose、SQL、README、中文 README、Operations 和 Release Notes；`.git`、`node_modules`、`target`、`dist`、`_references` 等本地/构建产物不进入发布包。
 - 新增 `.github/workflows/release.yml`，支持 `v*` tag 和手动触发；workflow 会校验 `VERSION`，运行 `scripts/release-check.sh --full`，再用 clean-tree 要求构建 bundle 并上传到 GitHub Releases，`1.x` 之前自动标记 prerelease。
-- 主控 `/orchestrator` 新增 Flux 风格首次配置向导，覆盖登记服务器、安装被控 agent、编排 3x-ui/Snell、同步规则与流量、发布前检查；对应文案已接入 `zh-CN/en-US` i18n。
+- 主控 `/orchestrator` 新增 Overlord 控制台风格首次配置向导，覆盖登记服务器、安装被控 agent、编排 3x-ui/Snell、同步规则与流量、发布前检查；对应文案已接入 `zh-CN/en-US` i18n。
 - README、中文 README、Operations、Release Notes 和项目 docs 首页已同步 release 包、GitHub Release、首次向导和公网防火墙基线：主控前端 `5166/tcp`、后端/agent 回调 `6365/tcp`、ACME HTTP 仅按需开放 `80/tcp`，被控节点只开放实际编排端口。
 - 本地验证：`vite-frontend npm run build` 通过；`git diff --check` 通过；Git Bash 显式路径下 `bash -n scripts/*.sh` 通过；release bundle 实际生成 tar.gz 和 sha256，抽查包内有 `RELEASE_MANIFEST.txt`、`README.zh-CN.md`、`docs/OPERATIONS.md`、`scripts/install-master.sh`，`sha256sum -c` 返回 OK。
 - 环境限制：本机默认 `bash` 仍可能走 WSL 并返回 `E_ACCESSDENIED`，Git Bash 偶发 `couldn't create signal pipe, Win32 error 5`；本轮用提权 Git Bash 完成 release bundle 主路径验证，最终 Linux 侧仍以推送后的 GitHub Actions 为准。
@@ -395,7 +395,7 @@
 
 ### 本轮计划（创建于: 2026-05-24 12:19:30）
 
-1. 结构化诊断输出：增强 agent maintenance 脚本，让 `cert-diagnose` / `firewall-diagnose` / `install-diagnose` 把 DNS、80 端口、证书文件、ACME 工具、防火墙命令、云防火墙提示等诊断项写入 `FLUX_AGENT_RESULT_JSON`。
+1. 结构化诊断输出：增强 agent maintenance 脚本，让 `cert-diagnose` / `firewall-diagnose` / `install-diagnose` 把 DNS、80 端口、证书文件、ACME 工具、防火墙命令、云防火墙提示等诊断项写入 `OB_AGENT_RESULT_JSON`。
 2. 主控 UI 呈现：在部署任务卡上解析 `resultJson.diagnostics.items`，用紧凑状态 chip 展示 “DNS 未解析 / 80 端口被占用 / 证书域名缺失 / 云安全组需检查”等结论，保留原始脚本日志入口。
 3. 文档同步：README、中文 README、Release Notes 说明诊断结果已从日志升级为结构化任务摘要。
 4. 验证与推送：运行后端/前端可用构建、agent mock 或脚本语法检查、`git diff --check`，推送 `origin/future` 并观察 GitHub Actions。
@@ -404,10 +404,10 @@
 
 ### 2026-05-24 16:54:17 进度记录
 
-- 后端 agent maintenance 脚本生成逻辑已新增结构化诊断项：`cert-diagnose`、`firewall-diagnose`、`install-diagnose` 会把 DNS 解析、DNS 指向不一致、80 端口占用、证书文件缺失、ACME 工具缺失、防火墙工具状态、云安全组检查提示等写入 `FLUX_AGENT_RESULT_JSON.diagnostics.items`。
+- 后端 agent maintenance 脚本生成逻辑已新增结构化诊断项：`cert-diagnose`、`firewall-diagnose`、`install-diagnose` 会把 DNS 解析、DNS 指向不一致、80 端口占用、证书文件缺失、ACME 工具缺失、防火墙工具状态、云安全组检查提示等写入 `OB_AGENT_RESULT_JSON.diagnostics.items`。
 - 主控 `/orchestrator` 部署任务卡已能解析 `resultJson.diagnostics.items`，用摘要和状态 chip 展示可读结论，并保留“原始结果 / 查看原始结果”入口，方便继续排查完整 stdout/stderr。
 - README、中文 README、Operations 和 Release Notes 已同步说明：安装/证书/防火墙诊断会先给结构化摘要，再保留原始日志。
-- 本地验证：`vite-frontend npm run build` 通过；Docker Maven JDK21 `mvn -B -DskipTests package` 通过；提权 Git Bash 路径下 `bash -n scripts/*.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh` 通过；`git diff --check` 通过。Vite 仍保留既有 `site.ts` 动静态混合导入 chunk 提示，不影响构建。
+- 本地验证：`vite-frontend npm run build` 通过；Docker Maven JDK21 `mvn -B -DskipTests package` 通过；提权 Git Bash 路径下 `bash -n scripts/*.sh`、`bash scripts/test-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh` 通过；`git diff --check` 通过。Vite 仍保留既有 `site.ts` 动静态混合导入 chunk 提示，不影响构建。
 - 环境限制：普通 Git Bash 在当前 Windows 会话中仍会偶发 `couldn't create signal pipe, Win32 error 5`；本轮改用已批准的提权 Git Bash 路径完成脚本验证。
 - 2026-05-24 17:11:17 追加：已推送 `origin/future` 提交 `09fe949`；GitHub Actions `CI` run `26376592654` 已通过，覆盖 frontend、backend、shell scripts、agent mock、3x-ui fixture、compose config、dry-run/full compose smoke、Debian/Ubuntu/Alpine/Rocky Linux/Oracle Linux install matrix；`Docker Images` run `26376592682` 已通过。
 
@@ -448,14 +448,14 @@
 - 编排安全已收口：低于 `200 MB` 的 Nano 被控会拒绝完整 3x-ui/Xray 一键编排、普通 Xray/3x-ui 部署任务和 Xray 协议节点创建/更新；Snell 与远端端口转发仍作为推荐轻量路径保留。
 - 主控 UI 已在服务器卡片、服务器选择项、一键编排弹窗和协议节点表单展示 Nano 风险；中英文词典已补齐新增文案。
 - README、中文 README、Operations 和 Release Notes 已写清 Nano 边界、数据库升级字段和端口/协议建议。
-- 本地验证通过：`bash -n scripts/*.sh`、`bash scripts/test-flux-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、`vite-frontend npm run build`、Docker Maven `mvn -B -DskipTests package`、浏览器 dev server 烟测、`git diff --check`。浏览器烟测后已关闭 5173 端口；Docker Maven 容器已自动清理。
+- 本地验证通过：`bash -n scripts/*.sh`、`bash scripts/test-agent-mock.sh`、`bash scripts/test-three-xui-fixture.sh`、`vite-frontend npm run build`、Docker Maven `mvn -B -DskipTests package`、浏览器 dev server 烟测、`git diff --check`。浏览器烟测后已关闭 5173 端口；Docker Maven 容器已自动清理。
 
 ## 2026-05-25 真机端口收敛修复验证
 
 ### 2026-05-25 07:23:34 -07:00 进度记录
 
 - 修复结论：主控默认已改为单公网入口 `5166/tcp`，浏览器访问和被控 agent 回调都走 `http://<master>:5166`。
-- Compose 方案：`docker-compose-v4.yml` / `docker-compose-v6.yml` 默认只发布 `frontend:${FRONTEND_PORT}->80`；后端 `6365`、MySQL、phpMyAdmin 保持 Docker 内网。只有设置 `FLUX_EXPOSE_BACKEND=1` 或 `FLUX_PHPMYADMIN_PORT` 时，安装脚本才生成对应 override 文件暴露调试端口。
+- Compose 方案：`docker-compose-v4.yml` / `docker-compose-v6.yml` 默认只发布 `frontend:${FRONTEND_PORT}->80`；后端 `6365`、MySQL、phpMyAdmin 保持 Docker 内网。只有设置 `OB_EXPOSE_BACKEND=1` 或 `OB_PHPMYADMIN_PORT` 时，安装脚本才生成对应 override 文件暴露调试端口。
 - 旧安装迁移：`scripts/install-master.sh upgrade` 会把旧 `FRONTEND_PORT=80` 迁到 `5166`，把 `EXPOSE_BACKEND` 重置为 `0`，并默认清空 phpMyAdmin 公网端口，避免继续暴露 `6365/8066`。
 - 推送状态：修复提交 `639c621` 已推送到 `origin/main` 和 `origin/future`。
 - 验证状态：GitHub Actions `main`/`future` 的 CI 和 Docker Images 均成功，Pages 成功；GHCR backend/frontend `latest` manifest 可读取；本地 dry-run compose smoke 通过；本地未留下 Docker 容器或监听端口。

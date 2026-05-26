@@ -1,99 +1,50 @@
 # TASK.md
 
-## Handoff Summary
+## 当前目标
 
-当前目标：
-- 本轮已按用户要求删除旧分体 compose、旧 backend/frontend 镜像发布面和旧 Flux 安装脚本链路，只保留 `flux-master` 单体主控镜像与当前 `flux-agent` 被控安装方式。
-- 继续朝 `flux-master` 单体主控架构推进：内置 Web UI、API、任务引擎、状态同步、Runtime Provider 层、MySQL/可选 SQLite，以及由 `flux-agent` 执行和回报的被控端闭环。
-- 本轮已完成“操作审计日志”的本地实现、验证、提交、推送和 GHCR 镜像补推。
+把项目收口为一个独立的 Overlord Broil 单项目：单体 overlord-master 主控镜像、overlord-agent 被控执行器、默认单公网入口 5166/tcp，并清理旧分体运行面和旧产品命名残留。完成后推送 origin/main 和 origin/future，再检查 GitHub Actions / GHCR。
 
-已完成：
-- 项目边界已锁定在 `C:\Users\echo\Downloads\claude\flux-panel-3xui-orchestrator`，父级目录只作为存放根目录。
-- 默认正式主控形态已是 `flux-master` 单体镜像，主控公网入口为 `5166/tcp`。
-- Runtime Provider 已覆盖 `xui`、`snell`、`forward`、`certificate`、`firewall`。
-- Agent 已通过任务 claim/report 执行 Xray/3x-ui、Snell、转发、防火墙、诊断、日志、升级等动作。
-- SQLite 可选主控模式、单端口契约、真实 3x-ui E2E harness、agent 安全升级、runtime state/state sync 等能力已落地并推送过。
-- 本轮已新增/修改 Operation Audit 相关后端实体、服务、API、schema、测试、前端 API/type/UI 和文档。
-- 主控任务创建、编排、拒绝、状态更新、重试、删除、agent claim、agent report 已进入统一审计记录。
-- agent report 审计只记录 stdout/stderr/resultJson 长度，不保存原始输出内容。
-- `origin/main` 和 `origin/future` 均已推送到 `f6381606c7410e1d8b89c6b93aaecbfbf210697f`。
-- GHCR 上一轮曾确认 `flux-master` 镜像；本轮产品面改为只发布 `flux-master`，旧分体运行镜像不再作为支持目标。
-- 已删除旧 `install.sh`、`panel_install.sh`、`proxy.sh`、legacy compose、分体 Dockerfile、旧 VitePress 文档站和旧 standalone frontend Nginx 配置。
-- GitHub Docker Images workflow 已收口为只构建/推送 `ghcr.io/zhizhishu/flux-3xui-orchestrator-master`。
-- 后端节点安装命令已改为当前项目 `install-flux-agent-bootstrap.sh`，前端配置页改为主控访问地址 `http://MASTER_IP:5166` 语义。
-- 浏览器标题、OG/meta 和前端包名已改为 `Flux 3x-ui Orchestrator` / `flux-3xui-orchestrator-ui`。
+## 本轮已完成
 
-下一步：
-- 提交并推送 `origin/main` 与 `origin/main:future`。
-- 推送后检查 GitHub Actions Docker Images/CI，以及 GHCR `flux-master` 镜像。
+- 项目根目录确认：C:\Users\echo\Downloads\claude\overlord-broil。
+- GitHub remote 确认：origin -> https://github.com/zhizhishu/overlord-broil.git。
+- GitHub Actions Docker workflow 已收口为只构建 / 推送 ghcr.io/zhizhishu/overlord-broil 单镜像。
+- compose 默认形态已是 overlord-master 单体主控，主控只公开 5166/tcp。
+- 新安装资源名已统一为 overlord-master、overlord-mysql、overlord-network、overlord.sql、overlord_master_logs。
+- Agent 安装链路统一为 install-agent.sh / install-agent-bootstrap.sh / overlord-agent.sh 和 OB_* 环境变量。
+- README、中文 README、docs 首页、Operations、Release Notes 已按 Overlord Broil 产品名更新，并保留 README 致谢区。
+- DB 默认 app_name 改为 Overlord Broil，SQLite schema 和后端配置读取会修正历史旧值。
+- 3x-ui inbound 注释、转发服务描述、README 截图文字已改为 Overlord Broil 产品语义。
+- 已修复本轮批量替换造成的中文文档乱码。
 
-关键文件：
-- `springboot-backend/src/main/java/com/admin/entity/OperationAuditLog.java`
-- `springboot-backend/src/main/java/com/admin/common/dto/OperationAuditLogQueryDto.java`
-- `springboot-backend/src/main/java/com/admin/config/OperationAuditSchemaInitializer.java`
-- `springboot-backend/src/main/java/com/admin/controller/OperationAuditLogController.java`
-- `springboot-backend/src/main/java/com/admin/service/OperationAuditLogService.java`
-- `springboot-backend/src/main/java/com/admin/service/impl/OperationAuditLogServiceImpl.java`
-- `springboot-backend/src/main/java/com/admin/service/impl/DeployTaskServiceImpl.java`
-- `springboot-backend/src/main/resources/schema-sqlite.sql`
-- `gost.sql`
-- `vite-frontend/src/pages/orchestrator.tsx`
-- `vite-frontend/src/api/index.ts`
-- `vite-frontend/src/types/index.ts`
-- `vite-frontend/src/i18n/index.tsx`
-- `scripts/test-sqlite-schema.sh`
-- `README.md`
-- `README.zh-CN.md`
-- `docs/OPERATIONS.md`
-- `docs/RELEASE_NOTES.md`
-- `docs/index.html`
-- `PROJECT_CONTEXT.md`
+## 已通过验证
 
-验证状态：
-- 本轮本地验证已通过；待远端 Actions/GHCR 确认。
-- 已通过 `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'`。
-- 已通过 `bash scripts/test-sqlite-schema.sh`。
-- 已通过 `git diff --check`，仅有仓库既有 LF/CRLF 提示。
-- 已通过 `npm run build`，仅有既有 Vite dynamic/static import chunk 提示。
-- 已通过 Docker Maven targeted test：`RuntimeProviderServiceTest,DeployTaskServiceImplTest`，25 tests，0 failures。
-- 已通过 Docker Maven package build：`docker run --rm -v "$PWD/springboot-backend:/workspace" -v flux-3xui-m2:/root/.m2 -w /workspace maven:3.9-eclipse-temurin-21 mvn -B -DskipTests package`。
-- 已通过 `bash scripts/test-master-port-contract.sh`。
-- 已通过 `bash scripts/test-compose-smoke.sh --build-local --dry-run`。
-- 已通过 `bash scripts/test-compose-smoke.sh --compose-file docker-compose.sqlite.yml --build-local --dry-run`。
-- 已通过 `bash scripts/test-flux-agent-mock.sh`。
-- 已通过 `bash scripts/test-three-xui-fixture.sh`。
-- 本轮未跑完整 `bash scripts/release-check.sh`，避免继续长时间空转；最终以 GitHub Actions/Docker Images 远端门禁为准。
-- `gh run list --commit f6381606c7410e1d8b89c6b93aaecbfbf210697f` 未返回 Actions run；已用本地 Docker buildx 手动补推并用 `docker buildx imagetools inspect` 验证 GHCR 三镜像。
-- 前端镜像重建时 `npm run build` 在 Docker 内通过，仅有既有 Vite dynamic/static import chunk 提示。
-- 记录提交 `1fc801068ec3df0d8b329f4560bc40f140bd9182` 推送后，`main CI` run `26448892387` 成功；`future CI` run `26448900654` 初次受 GitHub checkout/action 下载 403 影响失败，重跑失败项后成功；Pages run `26448891539` 初次下载官方 action 失败，重跑后成功。
+- bash scripts/test-master-port-contract.sh
+- bash scripts/test-agent-mock.sh
+- bash scripts/test-compose-smoke.sh --build-local --dry-run
+- bash scripts/test-compose-smoke.sh --compose-file docker-compose.sqlite.yml --build-local --dry-run
+- bash scripts/test-sqlite-schema.sh
+- bash scripts/test-three-xui-fixture.sh
+- npm run build
+- git diff --check，仅有仓库既有 LF/CRLF 提示。
 
-风险/待确认：
-- 真实 VPS 矩阵和真实 3x-ui endpoint/token 的手动 E2E 记录仍是 1.0 前最大缺口。
-- Snell 是产品层统一的独立 runtime，不是 3x-ui/Xray 内核原生协议。
-- 企业级治理还缺 RBAC、审计保留/导出、agent token 过期/吊销、密钥轮换。
-- UI 还需要继续打磨移动端、加载态、错误态和任务详情。
+## 下一步
 
-资源清理：
-- 本轮未启动长期 dev server。
-- 前端 buildx 镜像构建未保留服务进程；保留 buildx builder 容器 `buildx_buildkit_halowebui-multi0` 作为 Docker buildx 基础设施。
-- Docker Maven 使用 `--rm`，已完成且不保留测试容器；保留 Maven 缓存卷 `flux-3xui-m2` 以加速后续本地验证。
+1. 重跑最终本地验证。
+2. 更新 LOG.md。
+3. commit。
+4. push origin main 和 origin main:future。
+5. 检查 GitHub Actions、GHCR 镜像和 Pages。
 
-最后更新：2026-05-26
+## 风险
 
-## Active Tasks
-
-- [x] **Goal:** 建立单体 `flux-master` 默认运行形态，主控入口收口到 `5166`。
-- [x] **Goal:** 建立 Runtime Provider 层和 agent claim/report 执行闭环。
-- [x] **Goal:** 完成 SQLite 可选主控模式和任务安全硬化。
-- [x] **Goal:** Operation Audit Log 已完成本地验证、提交推送和 GHCR 镜像成果确认。
-- [x] **Goal:** 删除旧分体 runtime 面、修正 agent 安装命令、更新 GitHub Actions 只发布 `flux-master`。
-- [ ] **Goal:** 后续继续推进真实 VPS 矩阵、真实 3x-ui E2E 记录、UI polish 和安全治理。
+- 真实 VPS 矩阵仍未覆盖到 1.0 标准。
+- 真实 3x-ui endpoint/token 的端到端测试需要外部服务器密钥。
+- Snell 是产品层统一协议节点，底层仍是独立服务，不是 Xray 内核原生协议。
 
 ## Notes For Next Agent
 
-- 不要在父级存放根目录创建日志、计划或报告。
-- 推送只面向 `origin`：`zhizhishu/flux-3xui-orchestrator`。
-- 不要向 `upstream` / Flux Panel 作者仓库开 PR 或推送。
-- 主控默认公网入口是 `5166`。
-- 被控 agent 使用 `http://MASTER_IP:5166` 作为 `FLUX_PANEL_URL`，默认不暴露公网管理端口。
-- 修改代码前先读 `PROJECT_ID.md`、`AGENTS.md`、`PROJECT_CONTEXT.md`、`TASK.md`。
+- 不要在父级存放根目录写日志、计划或报告。
+- 推送只面向 origin，不要向 upstream 开 PR 或推送。
+- Serena 使用 Serena Pool。
+- 主控默认入口是 5166；被控 Agent 默认不开放管理端口。

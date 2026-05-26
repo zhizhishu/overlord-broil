@@ -1,11 +1,11 @@
 #!/bin/sh
 set -eu
 
-REPO="${FLUX_REPO:-zhizhishu/flux-3xui-orchestrator}"
-REF="${FLUX_REF:-main}"
-RAW_BASE="${FLUX_RAW_BASE:-https://raw.githubusercontent.com/${REPO}/${REF}}"
-GITHUB_TOKEN="${FLUX_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
-INSTALLER="/tmp/flux-install-master.sh"
+REPO="${OB_REPO:-zhizhishu/overlord-broil}"
+REF="${OB_REF:-main}"
+RAW_BASE="${OB_RAW_BASE:-https://raw.githubusercontent.com/${REPO}/${REF}}"
+GITHUB_TOKEN="${OB_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
+INSTALLER="/tmp/overlord-install-master.sh"
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "Please run this bootstrap as root." >&2

@@ -258,3 +258,4 @@ gitee/
 *.cert
 android-app/
 ios-app/
+.ace-tool/

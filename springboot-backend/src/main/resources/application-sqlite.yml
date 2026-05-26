@@ -1,7 +1,7 @@
 spring:
   datasource:
     driver-class-name: org.sqlite.JDBC
-    url: jdbc:sqlite:${SQLITE_DB_PATH:/app/data/flux-master.sqlite}
+    url: jdbc:sqlite:${SQLITE_DB_PATH:/app/data/overlord-master.sqlite}
     username:
     password:
     hikari:
