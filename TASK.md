@@ -2,7 +2,7 @@
 
 ## Handoff Summary
 
-当前目标：继续朝用户给出的 `flux-master` 单体主控架构推进，把 `Task -> Agent -> Execute -> Report -> Master` 链路做实；Runtime Provider Action Catalog 已完成远端验证。本轮已收口默认单端口主控契约，准备提交推送并等待 GitHub Actions / GHCR 镜像结果。
+当前目标：继续朝用户给出的 `flux-master` 单体主控架构推进，把 `Task -> Agent -> Execute -> Report -> Master` 链路做实；Runtime Provider Action Catalog 和单端口主控契约均已完成本地验证、提交推送和远端 GitHub Actions / GHCR 镜像验证。
 
 已完成：
 - 已确认父级 `C:\Users\echo\Downloads\claude` 只是存放根目录，不在父级写日志或计划。
@@ -42,10 +42,12 @@
 - 本轮已新增 `scripts/test-master-port-contract.sh`，验证默认 `docker-compose.yml`、`docker-compose-v4.yml`、`docker-compose-v6.yml` 只公开一个 `flux-master` 主控入口。
 - 本轮已把端口契约测试接入 GitHub Actions CI 和 `scripts/release-check.sh`。
 - 本轮已同步 README、中文 README、Operations、Release Notes 和 PROJECT_CONTEXT，说明单端口主控、旧容器迁移清理和验证命令。
+- 已提交并推送 `ca95d4b Tighten master single-port contract` 到 `origin/main` 和 `origin/future`。
+- 已确认 `ca95d4b` 的 GitHub Actions：main CI、main Pages、future CI 均成功；手动触发的 main/future Docker Images 均成功。
+- 已确认 GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 更新到 index digest `sha256:6ac01a8f03dbf17187d2c8a3ed69514dd79e841ffea30c6b5b753abbe092ba31`，linux/amd64 digest `sha256:205667901f5dd3b59c765b56fca05dc4a52c948620e442a11de3ca0bc91bf240`。
 
 下一步：
-- 提交并推送单端口主控契约改动到 `origin/main` 和 `origin/future`。
-- 等待并确认 GitHub Actions / GHCR 镜像结果。
+- 继续推进正式版缺口：真实 3x-ui 容器级 E2E、VPS 矩阵验证、UI 错误态/加载态 polish、安全治理和 agent 自动升级。
 
 关键文件：
 - `scripts/flux-agent.sh`
@@ -95,6 +97,7 @@
 - 本轮单端口契约已通过 `bash scripts/test-compose-smoke.sh --build-local --dry-run`。
 - 本轮单端口契约已通过 `bash scripts/test-install-matrix.sh --image debian:12-slim`。
 - 本轮单端口契约已通过 `git diff --check`，仅有 Windows LF/CRLF 提示。
+- 本轮单端口契约已通过远端 GitHub Actions / GHCR 验证：`ca95d4b` 的 main/future CI 成功，main Pages 成功；手动 Docker Images run 成功并刷新 GHCR latest。
 
 风险/待确认：
 - Runtime Provider 已是融合架构关键层，但真实 VPS 矩阵和真实 3x-ui E2E 仍是正式 1.0 前最大缺口。
@@ -112,7 +115,7 @@
 - 本轮 Action Catalog Docker Maven 测试容器 `flux-action-catalog-test` 使用 `--rm`，已结束且无残留。
 - 本轮 Action Catalog agent mock server 随脚本结束并清理临时目录。
 
-最后更新：2026-05-25 17:31:00 -07:00
+最后更新：2026-05-25 17:36:34 -07:00
 
 ## Active Tasks
 
@@ -132,7 +135,8 @@
 - [x] **Goal:** Runtime Provider Action Catalog 统一动作清单、后端校验和主控触发入口。
 - [x] **Goal:** 提交推送并确认 Action Catalog 的 GitHub Actions / GHCR 成果。
 - [x] **Goal:** 收口默认单端口主控契约，并验证旧分离容器/端口不会干扰正式安装。
-- [ ] **Goal:** 提交推送并确认单端口主控契约的 GitHub Actions / GHCR 成果。
+- [x] **Goal:** 提交推送并确认单端口主控契约的 GitHub Actions / GHCR 成果。
+- [ ] **Goal:** 继续推进正式版缺口：真实 3x-ui E2E、VPS 矩阵、UI polish、安全治理和 agent 自动升级。
 
 ## Notes For Next Agent
 

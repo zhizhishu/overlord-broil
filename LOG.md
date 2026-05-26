@@ -175,3 +175,15 @@
   - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
 - 清理：本阶段未启动长期服务；Debian install-matrix Docker 容器使用 `--rm` 自动清理；未保留端口监听。
 - 后续：提交并推送到 `origin/main` 和 `origin/future`，再确认 GitHub Actions 与 GHCR 镜像状态。
+
+### Master Single-Port Remote Verification
+
+- 完成：确认 `ca95d4b Tighten master single-port contract` 已同步到 `origin/main` 和 `origin/future`，并完成远端 CI、Pages、Docker Images 与 GHCR 镜像验证。
+- 验证：
+  - `origin/main` 和 `origin/future` 均指向 `ca95d4b35e31e47d4ddd2b4caf93962e9a36aceb`。
+  - main CI run `26425570607` 成功，main Pages deployment 成功。
+  - future CI run `26425570585` 成功。
+  - 手动触发 main Docker Images run `26425624672` 成功，手动触发 future Docker Images run `26425624679` 成功。
+  - GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 可读取，index digest 为 `sha256:6ac01a8f03dbf17187d2c8a3ed69514dd79e841ffea30c6b5b753abbe092ba31`，linux/amd64 digest 为 `sha256:205667901f5dd3b59c765b56fca05dc4a52c948620e442a11de3ca0bc91bf240`。
+- 清理：本阶段只使用 `gh` 和 Docker imagetools 读取远端状态，未启动本地服务、未占用端口、未创建容器。
+- 后续：继续推进正式版缺口：真实 3x-ui 容器级 E2E、真实 VPS 矩阵、UI 错误/加载/空状态 polish、安全治理和 agent 自动升级。
