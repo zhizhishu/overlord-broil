@@ -235,6 +235,128 @@ PY
   trap - RETURN
 }
 
+run_idle_case() {
+  local label="idle"
+  local case_dir="${TMP_DIR}/${label}"
+  local server_script="${case_dir}/mock_server.py"
+  local ready_file="${case_dir}/ready.txt"
+  local reports_file="${case_dir}/reports.jsonl"
+  local heartbeats_file="${case_dir}/heartbeats.jsonl"
+  local stderr_file="${case_dir}/agent.stderr"
+  local server_pid=""
+
+  mkdir -p "$case_dir"
+  cat > "$server_script" <<'PY'
+import json
+import os
+import pathlib
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+reports_path = pathlib.Path(os.environ["REPORTS_FILE"])
+heartbeats_path = pathlib.Path(os.environ["HEARTBEATS_FILE"])
+ready_path = pathlib.Path(os.environ["READY_FILE"])
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, fmt, *args):
+        return
+
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        body = self.rfile.read(length).decode("utf-8") if length else ""
+
+        if self.path == "/api/v1/control-server/heartbeat":
+            with heartbeats_path.open("a", encoding="utf-8") as fh:
+                fh.write(body + "\n")
+            self._send({"success": True, "data": None})
+            return
+
+        if self.path == "/api/v1/agent-task/claim":
+            self._send({"success": True, "data": None})
+            return
+
+        if self.path == "/api/v1/agent-task/report":
+            with reports_path.open("a", encoding="utf-8") as fh:
+                fh.write(body + "\n")
+            self._send({"success": True, "data": None})
+            return
+
+        self.send_response(404)
+        self.end_headers()
+
+    def _send(self, payload):
+        raw = json.dumps(payload).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
+
+server = HTTPServer(("127.0.0.1", 0), Handler)
+ready_path.write_text(str(server.server_address[1]), encoding="utf-8")
+server.serve_forever()
+PY
+
+  REPORTS_FILE="$reports_file" HEARTBEATS_FILE="$heartbeats_file" READY_FILE="$ready_file" "$PYTHON_BIN" "$server_script" &
+  server_pid="$!"
+  trap 'if [ -n "${server_pid:-}" ]; then kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true; fi' RETURN
+
+  local i
+  for i in $(seq 1 100); do
+    [ -f "$ready_file" ] && break
+    sleep 0.1
+  done
+  if [ ! -f "$ready_file" ]; then
+    echo "mock server for idle did not become ready." >&2
+    exit 1
+  fi
+
+  local port
+  port="$(cat "$ready_file")"
+
+  OB_PANEL_URL="http://127.0.0.1:${port}" \
+  OB_SERVER_ID="1" \
+  OB_AGENT_TOKEN="test-agent-token" \
+  OB_WORK_DIR="${case_dir}/work" \
+  OB_AGENT_LOCK_FILE="${case_dir}/agent.lock" \
+  OB_HTTP_RETRIES="1" \
+  OB_HTTP_CONNECT_TIMEOUT="2" \
+  OB_HTTP_MAX_TIME="5" \
+    bash "${PROJECT_ROOT}/scripts/overlord-agent.sh" --once 2>"$stderr_file"
+
+  if grep -q "claim response did not include a task id" "$stderr_file"; then
+    echo "idle claim must not warn about a missing task id." >&2
+    cat "$stderr_file" >&2
+    exit 1
+  fi
+
+  if [ -s "$reports_file" ]; then
+    echo "idle claim must not create task reports." >&2
+    cat "$reports_file" >&2
+    exit 1
+  fi
+
+  "$PYTHON_BIN" - "$heartbeats_file" <<'PY'
+import json
+import pathlib
+import sys
+
+heartbeats_path = pathlib.Path(sys.argv[1])
+heartbeats = [
+    json.loads(line)
+    for line in heartbeats_path.read_text(encoding="utf-8").splitlines()
+    if line.strip()
+]
+if not heartbeats:
+    raise SystemExit("idle case captured no heartbeat")
+print(json.dumps({"idleHeartbeats": len(heartbeats)}, ensure_ascii=False))
+PY
+
+  kill "$server_pid" 2>/dev/null || true
+  wait "$server_pid" 2>/dev/null || true
+  server_pid=""
+  trap - RETURN
+}
+
 detect_python
 
 version_output="$(bash "${PROJECT_ROOT}/scripts/overlord-agent.sh" --version)"
@@ -259,6 +381,7 @@ OB_WORK_DIR="${TMP_DIR}/doctor-work" \
 OB_AGENT_LOCK_FILE="${TMP_DIR}/doctor.lock" \
   bash "${PROJECT_ROOT}/scripts/overlord-agent.sh" --doctor >/dev/null
 
+run_idle_case
 run_case "success" $'echo hello-agent\nprintf "%s\\n" '\''OB_AGENT_RESULT_JSON={"node":"ok"}'\''' "10" "succeeded" "0" "false"
 run_case "timeout" $'sleep 5\necho should-not-finish' "1" "failed" "124" "true"
 

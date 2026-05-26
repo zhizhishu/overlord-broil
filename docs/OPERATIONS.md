@@ -31,7 +31,7 @@ This checklist is for running Overlord Broil as a small authorized master/agent 
 | SQLite | Local DB file | Optional mode only; no network port. |
 | phpMyAdmin | Maintenance UI | Disabled by default. Expose temporarily with `OB_PHPMYADMIN_PORT`. |
 
-The installer removes legacy split-stack containers and optional phpMyAdmin helpers during install/upgrade. This prevents older deployments from leaving public `80/6365/8066` ports active after the default runtime has moved to the single `overlord-master` entry.
+The installer removes legacy split-stack containers and optional phpMyAdmin helpers during install/upgrade. This prevents older deployments from leaving public `80/6365/8066` ports active after the default runtime has moved to the single `overlord-master` entry. In SQLite mode, the installer also stops the obsolete `gost-mysql` container while keeping its Docker volumes and old install files for manual recovery.
 
 Standalone backend/frontend runtime images and legacy split compose files are intentionally removed from the supported install path. Use the single `overlord-master` image for master deployments.
 

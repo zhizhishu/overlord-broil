@@ -65,6 +65,23 @@ assert_installer_migration_guard() {
     exit 1
   }
 
+  for legacy_container in vite-frontend springboot-backend gost-phpmyadmin; do
+    grep -q "$legacy_container" "$installer" || {
+      echo "install-master.sh must include legacy container ${legacy_container} in the migration cleanup guard." >&2
+      exit 1
+    }
+  done
+
+  grep -q 'docker container inspect gost-mysql' "$installer" || {
+    echo "install-master.sh must remove the obsolete gost-mysql container when migrating to SQLite mode." >&2
+    exit 1
+  }
+
+  grep -q 'Kept legacy MySQL Docker volumes' "$installer" || {
+    echo "install-master.sh must document that SQLite migration removes only the old MySQL container, not its volumes." >&2
+    exit 1
+  }
+
   grep -q 'Migrated legacy FRONTEND_PORT=80' "$installer" || {
     echo "install-master.sh must keep the FRONTEND_PORT=80 migration guard." >&2
     exit 1

@@ -67,7 +67,7 @@ const en: Record<string, string> = {
   "同步规则与流量": "Sync rules and traffic",
   "把 3x-ui 入站、Snell 节点、远端转发和流量快照纳入统一规则中心。": "Bring 3x-ui inbounds, Snell nodes, remote forwards and traffic snapshots into unified rules.",
   "发布前检查": "Pre-release check",
-  "确认无严重告警，运行 release gate，备份 .env，并只开放 5166/6365 与业务端口。": "Confirm there are no critical alerts, run the release gate, back up .env, and expose only 5166/6365 plus business ports.",
+  "确认无严重告警，运行 release gate，备份 .env，并只开放 5166 与业务端口；6365 仅在调试时显式开放。": "Confirm there are no critical alerts, run the release gate, back up .env, and expose only 5166 plus business ports; expose 6365 only explicitly for debugging.",
   "查看告警": "View alerts",
   "一键编排": "Orchestrate",
   "新增节点": "Add Node",

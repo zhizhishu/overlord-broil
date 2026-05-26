@@ -396,6 +396,32 @@ else:
 ' "$expr"
 }
 
+claim_state() {
+  "$PYTHON_BIN" -c '
+import json
+import sys
+
+try:
+    payload = json.load(sys.stdin)
+except Exception:
+    print("malformed")
+    sys.exit(0)
+
+data = payload.get("data") if isinstance(payload, dict) else None
+success = payload.get("success") if isinstance(payload, dict) else None
+if success is False:
+    print("malformed")
+elif data is None:
+    print("empty")
+elif isinstance(data, dict) and str(data.get("id") or ""):
+    print("task")
+elif isinstance(data, dict) and not data:
+    print("empty")
+else:
+    print("malformed")
+'
+}
+
 build_report_payload() {
   local task_id="$1"
   local state="$2"
@@ -819,7 +845,16 @@ PY
 
 run_task() {
   local response="$1"
-  local task_id script runtime_provider runtime_provider_key task_file stdout_file stderr_file started_at finished_at exit_code timed_out report_error
+  local state task_id script runtime_provider runtime_provider_key task_file stdout_file stderr_file started_at finished_at exit_code timed_out report_error
+
+  state="$(printf '%s' "$response" | claim_state || true)"
+  if [ "$state" = "empty" ]; then
+    return 0
+  fi
+  if [ "$state" != "task" ]; then
+    warn "claim response did not include a task id"
+    return 1
+  fi
 
   task_id="$(printf '%s' "$response" | json_get "data.id" || true)"
   if [ -z "$task_id" ]; then

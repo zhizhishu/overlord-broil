@@ -14,7 +14,7 @@ The project is currently a `0.6.0` public-trial reliability candidate, not a bro
 - Optional SQLite mode uses `docker-compose.sqlite.yml`, `SPRING_PROFILES_ACTIVE=sqlite`, the embedded `schema-sqlite.sql`, and `/app/data/overlord-master.sqlite` mounted from the install directory. It is meant for small labs or single-node trials, not as a forced replacement for MySQL.
 - `phpmyadmin`: optional maintenance override only. It is not part of the default compose stack and is created by the installer only when `PHPMYADMIN_PORT` is set.
 - Legacy split `backend`/`frontend` compose files and standalone backend/frontend runtime images are no longer part of the supported product surface.
-- During install or upgrade, the installer removes old split-stack containers and optional phpMyAdmin helpers before starting the single-image master stack.
+- During install or upgrade, the installer removes old split-stack containers and optional phpMyAdmin helpers before starting the single-image master stack. In SQLite mode it also removes the obsolete `gost-mysql` legacy container while keeping its Docker volumes and old install files for manual recovery.
 
 Default public master exposure:
 

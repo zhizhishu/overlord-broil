@@ -103,7 +103,7 @@ The master exposes one public entry by default:
 | SQLite | Optional local master DB file | no network port |
 | phpMyAdmin | temporary maintenance | no, only with `OB_PHPMYADMIN_PORT` |
 
-During install or upgrade, the script removes legacy split-stack containers and optional phpMyAdmin helpers so old `80/6365/8066` exposures do not survive the move to the single `overlord-master` entry. CI and the release gate run `scripts/test-master-port-contract.sh` to keep the default compose files publishing only the master entry.
+During install or upgrade, the script removes legacy split-stack containers and optional phpMyAdmin helpers so old `80/6365/8066` exposures do not survive the move to the single `overlord-master` entry. In SQLite mode it also stops the obsolete `gost-mysql` legacy container while keeping its Docker volumes and old install files untouched for manual recovery. CI and the release gate run `scripts/test-master-port-contract.sh` to keep the default compose files publishing only the master entry.
 
 MySQL remains the default production path. For tiny labs or single-node trials, the master can run without the MySQL sidecar by selecting SQLite:
 

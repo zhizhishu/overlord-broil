@@ -2603,7 +2603,7 @@ export default function OrchestratorPage() {
       },
       {
         title: "发布前检查",
-        detail: "确认无严重告警，运行 release gate，备份 .env，并只开放 5166/6365 与业务端口。",
+        detail: "确认无严重告警，运行 release gate，备份 .env，并只开放 5166 与业务端口；6365 仅在调试时显式开放。",
         state: hasBlockingAlerts ? "warning" : hasRules ? "done" : "todo",
         actionLabel: hasBlockingAlerts ? "查看告警" : "刷新",
         onAction: loadData

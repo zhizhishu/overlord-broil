@@ -722,6 +722,11 @@ list_legacy_split_containers() {
       printf '%s\n' "$container"
     fi
   done
+
+  if [ "$(read_env_value DB_MODE "$ENV_FILE")" = "sqlite" ] \
+    && docker container inspect gost-mysql >/dev/null 2>&1; then
+    printf '%s\n' "gost-mysql"
+  fi
 }
 
 remove_legacy_split_containers() {
@@ -737,6 +742,9 @@ remove_legacy_split_containers() {
     echo "  - ${container}"
     docker rm -f "$container" >/dev/null
   done
+  if printf '%s\n' "$containers" | grep -qx 'gost-mysql'; then
+    echo "Kept legacy MySQL Docker volumes and install files; only the obsolete container was removed for SQLite mode."
+  fi
 }
 
 port_is_listening() {
@@ -1010,7 +1018,7 @@ run_master_doctor() {
     local legacy_containers
     legacy_containers="$(list_legacy_split_containers | paste -sd, - || true)"
     if [ -n "$legacy_containers" ]; then
-      doctor_item warn "legacy-split-containers" "found ${legacy_containers}; install/upgrade will remove them and keep only mysql + overlord-master by default"
+      doctor_item warn "legacy-split-containers" "found ${legacy_containers}; install/upgrade will remove obsolete containers; SQLite mode keeps only overlord-master by default"
     else
       doctor_item ok "legacy-split-containers" "none"
     fi
