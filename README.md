@@ -52,6 +52,8 @@ State Sync now lifts those task-level runtime states into a server-by-provider o
 
 The same State Sync rows can also start Runtime Provider maintenance tasks. Operators can launch provider-aware diagnostics from the overview, and XUI/Snell rows expose repair actions that create normal `agent-maintenance` deployment tasks for the controlled agent to claim, execute and report.
 
+Runtime Provider descriptors now include an Action Catalog for `agent-maintenance` operations. The backend validates maintenance actions from this catalog, and the master UI derives State Sync row actions plus server-card Agent buttons from the same metadata instead of keeping separate hard-coded button lists.
+
 Remote log collection also uses the same `agent-maintenance` path. A `logs` action returns structured `logs.items` for the Flux agent runner, x-ui/Xray services, Snell node services, forwarding/task logs and related service managers, and the control-center task card renders a compact remote-log summary before operators open raw output.
 
 ## UI Preview
@@ -67,6 +69,7 @@ Current UI coverage includes:
 - Snell node create/restart/remove flows
 - remote TCP/UDP forward rules
 - Runtime Provider visibility
+- Runtime Provider Action Catalog-driven maintenance buttons
 - State Sync runtime overview by server and provider
 - State Sync runtime diagnostics and repair task shortcuts
 - agent diagnostics, logs, restart, upgrade, uninstall and repair tasks

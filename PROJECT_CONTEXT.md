@@ -63,6 +63,7 @@ Controlled hosts may expose business ports depending on orchestration choices:
 - Flux-style dense operations UI with Chinese-first language and `zh-CN` / `en-US` switch.
 - Server registry, agent token generation/rotation, heartbeats, status updates, and Nano memory detection.
 - Runtime Provider registry and API for `xui`, `snell`, `forward`, `certificate`, and `firewall` task assignment.
+- Runtime Provider Action Catalog for `agent-maintenance` labels, categories, danger flags and State Sync visibility; backend validation and master UI buttons reuse it.
 - Runtime Provider metadata travels through task claim/report and is stored in task result JSON for audit.
 - Runtime State is stored in `resultJson.runtimeState` and rendered on task cards, normalizing provider, protocol/action, task state, resolved status/source, services, nodes, forwarding, certificates and diagnostics.
 - State Sync overview aggregates latest `runtimeState` task results with server heartbeat service/certificate fields through `/api/v1/deploy-task/runtime-state/overview` and renders a server-by-provider panel in the master control center.

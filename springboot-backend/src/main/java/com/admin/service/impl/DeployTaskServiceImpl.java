@@ -260,11 +260,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             String action = dto.getAction() == null || dto.getAction().trim().isEmpty()
                     ? "doctor"
                     : dto.getAction().trim().toLowerCase();
-            Set<String> allowedActions = new HashSet<>(Arrays.asList(
-                    "doctor", "status", "logs", "restart-agent", "upgrade-agent", "uninstall-agent",
-                    "install-diagnose", "cert-diagnose", "firewall-diagnose",
-                    "repair-xui", "repair-xray", "repair-snell", "repair-all"));
-            return allowedActions.contains(action) ? null : "unsupported agent maintenance action";
+            return runtimeProviderService.isAllowedAgentMaintenanceAction(action) ? null : "unsupported agent maintenance action";
         }
         Integer listenPort = dto.getListenPort() != null ? dto.getListenPort() : profile == null ? null : profile.getListenPort();
         if (listenPort != null && !ProtocolValidationUtils.isValidPort(listenPort)) {

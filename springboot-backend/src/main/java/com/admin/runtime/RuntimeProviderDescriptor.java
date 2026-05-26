@@ -30,6 +30,8 @@ public class RuntimeProviderDescriptor {
 
     private List<String> actions = new ArrayList<>();
 
+    private List<RuntimeProviderAction> actionCatalog = new ArrayList<>();
+
     private List<String> capabilities = new ArrayList<>();
 
     private List<String> requiredServerFields = new ArrayList<>();

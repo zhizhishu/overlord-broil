@@ -17,6 +17,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DeployTaskServiceImplTest {
@@ -166,6 +167,22 @@ class DeployTaskServiceImplTest {
         assertTrue(script.contains("def load_logs(path):"));
         assertTrue(script.contains("payload[\"logs\"]"));
         assertTrue(script.contains("rm -f \"$LOG_FILE\""));
+    }
+
+    @Test
+    void validatesAgentMaintenanceActionsFromRuntimeProviderCatalog() {
+        DeployTaskDto dto = new DeployTaskDto();
+        dto.setProtocol("agent-maintenance");
+
+        dto.setAction("repair-snell");
+        assertNull(ReflectionTestUtils.invokeMethod(service, "validateDeployTask", dto, null, "agent-maintenance"));
+
+        dto.setAction("");
+        assertNull(ReflectionTestUtils.invokeMethod(service, "validateDeployTask", dto, null, "agent-maintenance"));
+
+        dto.setAction("format-disk");
+        assertEquals("unsupported agent maintenance action",
+                ReflectionTestUtils.invokeMethod(service, "validateDeployTask", dto, null, "agent-maintenance"));
     }
 
     @Test

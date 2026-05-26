@@ -58,7 +58,7 @@ import {
   updateProtocolProfile,
   updateServerForwardRule
 } from "@/api";
-import type { ControlServer, DeployTask, MonitorAlert, ProtocolNode, ProtocolProfile, RuntimeProviderDescriptor, RuntimeState, RuntimeStateOverview, RuntimeStateOverviewItem, ServerForwardRule, ThreeXuiTrafficSnapshot } from "@/types";
+import type { ControlServer, DeployTask, MonitorAlert, ProtocolNode, ProtocolProfile, RuntimeProviderAction, RuntimeProviderDescriptor, RuntimeState, RuntimeStateOverview, RuntimeStateOverviewItem, ServerForwardRule, ThreeXuiTrafficSnapshot } from "@/types";
 
 interface ServerForm {
   id?: number;
@@ -204,25 +204,63 @@ type SetupStepState = "done" | "active" | "todo" | "warning";
 type FormCheckState = "ok" | "warning" | "missing";
 type DiagnosticState = "ok" | "warning" | "fail";
 type StatusColor = "default" | "primary" | "secondary" | "success" | "warning" | "danger";
-type AgentMaintenanceAction =
-  | "doctor"
-  | "logs"
-  | "restart-agent"
-  | "upgrade-agent"
-  | "uninstall-agent"
-  | "install-diagnose"
-  | "cert-diagnose"
-  | "firewall-diagnose"
-  | "repair-xui"
-  | "repair-xray"
-  | "repair-snell"
-  | "repair-all";
+type AgentMaintenanceAction = RuntimeProviderAction | string;
 
-const runtimeProviderDiagnosticAction = (providerKey?: string): AgentMaintenanceAction => {
-  if (providerKey === "certificate") return "cert-diagnose";
-  if (providerKey === "firewall" || providerKey === "forward") return "firewall-diagnose";
-  if (providerKey === "xui") return "install-diagnose";
-  return "doctor";
+const fallbackAction = (
+  key: string,
+  label: string,
+  category: RuntimeProviderAction["category"],
+  providerKey: string,
+  danger = false,
+  primary = true,
+  stateSync = false
+): RuntimeProviderAction => ({
+  key,
+  label,
+  category,
+  protocol: "agent-maintenance",
+  providerKey,
+  danger,
+  primary,
+  stateSync
+});
+
+const FALLBACK_AGENT_MAINTENANCE_ACTIONS: RuntimeProviderAction[] = [
+  fallbackAction("doctor", "诊断", "diagnostic", "xui", false, true, false),
+  fallbackAction("status", "状态", "diagnostic", "xui", false, false, false),
+  fallbackAction("logs", "日志", "diagnostic", "xui", false, true, false),
+  fallbackAction("install-diagnose", "安装诊断", "diagnostic", "xui", false, true, true),
+  fallbackAction("cert-diagnose", "证书诊断", "diagnostic", "certificate", false, true, true),
+  fallbackAction("firewall-diagnose", "防火墙诊断", "diagnostic", "firewall", false, true, true),
+  fallbackAction("firewall-diagnose", "防火墙诊断", "diagnostic", "forward", false, true, true),
+  fallbackAction("repair-all", "一键修复", "repair", "xui", false, true, false),
+  fallbackAction("repair-xui", "修复 3x-ui", "repair", "xui", false, true, true),
+  fallbackAction("repair-xray", "修复 Xray", "repair", "xui", false, true, true),
+  fallbackAction("repair-snell", "修复 Snell", "repair", "snell", false, true, true),
+  fallbackAction("restart-agent", "重启 agent", "maintenance", "xui"),
+  fallbackAction("upgrade-agent", "升级 agent", "maintenance", "xui"),
+  fallbackAction("uninstall-agent", "卸载 agent", "danger", "xui", true, false, false)
+];
+
+const AGENT_ACTION_ORDER = [
+  "doctor",
+  "logs",
+  "install-diagnose",
+  "cert-diagnose",
+  "firewall-diagnose",
+  "repair-all",
+  "repair-xui",
+  "repair-xray",
+  "repair-snell",
+  "restart-agent",
+  "upgrade-agent",
+  "uninstall-agent",
+  "status"
+];
+
+const actionOrderIndex = (key?: string) => {
+  const index = AGENT_ACTION_ORDER.indexOf(key || "");
+  return index >= 0 ? index : AGENT_ACTION_ORDER.length;
 };
 
 const runtimeProviderStatusNeedsRepair = (status?: string) => {
@@ -230,12 +268,86 @@ const runtimeProviderStatusNeedsRepair = (status?: string) => {
   return ["failed", "fail", "error", "danger", "missing", "timeout", "inactive", "expired", "unreadable", "offline"].includes(status.toLowerCase());
 };
 
-const runtimeProviderRepairAction = (item?: RuntimeStateOverviewItem): AgentMaintenanceAction | null => {
-  if (item?.providerKey === "xui") {
-    return runtimeProviderStatusNeedsRepair(item.serviceStatuses?.xray) ? "repair-xray" : "repair-xui";
+const sortRuntimeProviderActions = (actions: RuntimeProviderAction[]) => {
+  return [...actions].sort((left, right) => {
+    const orderDelta = actionOrderIndex(left.key) - actionOrderIndex(right.key);
+    return orderDelta !== 0 ? orderDelta : left.key.localeCompare(right.key);
+  });
+};
+
+const mergeProviderActions = (runtimeProviders: RuntimeProviderDescriptor[]) => {
+  const actions = new Map<string, RuntimeProviderAction>();
+  for (const action of FALLBACK_AGENT_MAINTENANCE_ACTIONS) {
+    actions.set(`${action.providerKey}:${action.key}`, action);
   }
-  if (item?.providerKey === "snell") return "repair-snell";
-  return null;
+  for (const provider of runtimeProviders) {
+    for (const action of provider.actionCatalog || []) {
+      if (action.protocol === "agent-maintenance" && action.key) {
+        actions.set(`${action.providerKey || provider.key}:${action.key}`, { ...action, providerKey: action.providerKey || provider.key });
+      }
+    }
+  }
+  return sortRuntimeProviderActions(Array.from(actions.values()));
+};
+
+const dedupeActionsByKey = (actions: RuntimeProviderAction[]) => {
+  const byKey = new Map<string, RuntimeProviderAction>();
+  for (const action of actions) {
+    if (!byKey.has(action.key) || action.providerKey !== "xui") {
+      byKey.set(action.key, action);
+    }
+  }
+  return sortRuntimeProviderActions(Array.from(byKey.values()));
+};
+
+const runtimeProviderActionColor = (action: RuntimeProviderAction): StatusColor => {
+  if (action.danger || action.category === "danger") return "danger";
+  if (action.category === "repair" || action.category === "maintenance") return "warning";
+  return "default";
+};
+
+const actionLabel = (action: RuntimeProviderAction | string, actions: RuntimeProviderAction[]) => {
+  if (typeof action !== "string") {
+    return action.label || action.key;
+  }
+  return actions.find(item => item.key === action)?.label
+    || FALLBACK_AGENT_MAINTENANCE_ACTIONS.find(item => item.key === action)?.label
+    || action;
+};
+
+const findProviderAction = (actions: RuntimeProviderAction[], providerKey: string | undefined, key: string) => {
+  return actions.find(action => action.providerKey === providerKey && action.key === key)
+    || actions.find(action => action.key === key);
+};
+
+const runtimeProviderDiagnosticAction = (item: RuntimeStateOverviewItem | undefined, actions: RuntimeProviderAction[]): RuntimeProviderAction => {
+  const providerKey = item?.providerKey;
+  if (providerKey === "xui") {
+    return findProviderAction(actions, providerKey, "install-diagnose")
+      || findProviderAction(actions, providerKey, "doctor")
+      || FALLBACK_AGENT_MAINTENANCE_ACTIONS[0];
+  }
+  const providerDiagnostic = actions.find(action =>
+    action.providerKey === providerKey &&
+    action.category === "diagnostic" &&
+    action.stateSync
+  );
+  return providerDiagnostic
+    || findProviderAction(actions, providerKey, "doctor")
+    || FALLBACK_AGENT_MAINTENANCE_ACTIONS[0];
+};
+
+const runtimeProviderRepairAction = (item: RuntimeStateOverviewItem | undefined, actions: RuntimeProviderAction[]): RuntimeProviderAction | null => {
+  if (item?.providerKey === "xui") {
+    return runtimeProviderStatusNeedsRepair(item.serviceStatuses?.xray)
+      ? findProviderAction(actions, item.providerKey, "repair-xray") || null
+      : findProviderAction(actions, item.providerKey, "repair-xui") || null;
+  }
+  return actions.find(action =>
+    action.providerKey === item?.providerKey &&
+    action.category === "repair" &&
+    action.stateSync
+  ) || null;
 };
 
 interface UnifiedRuleRow {
@@ -1163,6 +1275,12 @@ export default function OrchestratorPage() {
 
   const recentAlerts = useMemo(() => monitorAlerts.slice(0, 5), [monitorAlerts]);
 
+  const agentMaintenanceActions = useMemo(() => mergeProviderActions(runtimeProviders), [runtimeProviders]);
+
+  const serverAgentActions = useMemo(() => {
+    return dedupeActionsByKey(agentMaintenanceActions.filter(action => action.primary && action.key !== "status"));
+  }, [agentMaintenanceActions]);
+
   const runtimeProviderTaskCounts = useMemo(() => {
     return tasks.reduce<Record<string, number>>((counts, task) => {
       const key = task.runtimeProvider?.key || "unknown";
@@ -1863,44 +1981,35 @@ export default function OrchestratorPage() {
   };
 
   const createAgentMaintenance = async (server: ControlServer, action: AgentMaintenanceAction, meta: Record<string, unknown> = {}) => {
-    const actionName: Record<AgentMaintenanceAction, string> = {
-      doctor: "诊断",
-      logs: "日志",
-      "restart-agent": "重启 agent",
-      "upgrade-agent": "升级 agent",
-      "uninstall-agent": "卸载 agent",
-      "install-diagnose": "安装诊断",
-      "cert-diagnose": "证书诊断",
-      "firewall-diagnose": "防火墙诊断",
-      "repair-xui": "修复 3x-ui",
-      "repair-xray": "修复 Xray",
-      "repair-snell": "修复 Snell",
-      "repair-all": "一键修复"
-    };
+    const actionKey = typeof action === "string" ? action : action.key;
+    const actionText = actionLabel(action, agentMaintenanceActions);
 
     setSubmitting(true);
     const res = await createDeployTask({
       serverId: server.id,
       protocol: "agent-maintenance",
-      action,
+      action: actionKey,
       requestJson: JSON.stringify({
         source: "orchestrator-ui",
         ...meta,
         serverId: server.id,
         serverName: server.name,
-        action
+        action: actionKey,
+        actionLabel: actionText,
+        actionProvider: typeof action === "string" ? undefined : action.providerKey,
+        actionCategory: typeof action === "string" ? undefined : action.category
       })
     });
     setSubmitting(false);
 
     if (res.code === 0) {
-      toast.success(t("{name} {action}任务已生成", { name: server.name, action: t(actionName[action]) }));
-      setScriptTitle(t("任务 #{id} / {name} / {action}", { id: res.data.id, name: server.name, action: t(actionName[action]) }));
+      toast.success(t("{name} {action}任务已生成", { name: server.name, action: t(actionText) }));
+      setScriptTitle(t("任务 #{id} / {name} / {action}", { id: res.data.id, name: server.name, action: t(actionText) }));
       setScriptText(res.data.script || "");
       setScriptModalOpen(true);
       loadData();
     } else {
-      toast.error(res.msg || t("{action}任务生成失败", { action: t(actionName[action]) }));
+      toast.error(res.msg || t("{action}任务生成失败", { action: t(actionText) }));
     }
   };
 
@@ -2492,8 +2601,8 @@ export default function OrchestratorPage() {
                       const serviceEntries = Object.entries(item.serviceStatuses || {}).filter(([, value]) => value);
                       const diagnostic = item.diagnosticSummary;
                       const sourceLabel = item.source === "task" ? t("任务结果") : t("服务器心跳");
-                      const diagnosticAction = runtimeProviderDiagnosticAction(item.providerKey);
-                      const repairAction = runtimeProviderRepairAction(item);
+                      const diagnosticAction = runtimeProviderDiagnosticAction(item, agentMaintenanceActions);
+                      const repairAction = runtimeProviderRepairAction(item, agentMaintenanceActions);
                       const stateSyncMeta = {
                         trigger: "state-sync",
                         runtimeProvider: item.providerKey,
@@ -2554,17 +2663,17 @@ export default function OrchestratorPage() {
                                 isDisabled={!targetServer || submitting}
                                 onPress={() => targetServer ? createAgentMaintenance(targetServer, diagnosticAction, stateSyncMeta) : toast.error(t("缺少服务器"))}
                               >
-                                {t("运行时诊断")}
+                                {t(diagnosticAction.label || "运行时诊断")}
                               </Button>
                               {repairAction && (
                                 <Button
                                   size="sm"
-                                  color="warning"
+                                  color={runtimeProviderActionColor(repairAction) as any}
                                   variant="flat"
                                   isDisabled={!targetServer || submitting}
                                   onPress={() => targetServer ? createAgentMaintenance(targetServer, repairAction, stateSyncMeta) : toast.error(t("缺少服务器"))}
                                 >
-                                  {t("运行时修复")}
+                                  {t(repairAction.label || "运行时修复")}
                                 </Button>
                               )}
                             </div>
@@ -2907,18 +3016,17 @@ export default function OrchestratorPage() {
                       <Button size="sm" variant="flat" onPress={() => restartXray(server)}>{t("重启 Xray")}</Button>
                     </ServerActionGroup>
                     <ServerActionGroup title="Agent">
-                      <Button size="sm" variant="flat" onPress={() => createAgentMaintenance(server, "doctor")}>{t("诊断")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => createAgentMaintenance(server, "logs")}>{t("日志")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => createAgentMaintenance(server, "install-diagnose")}>{t("安装诊断")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => createAgentMaintenance(server, "cert-diagnose")}>{t("证书诊断")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => createAgentMaintenance(server, "firewall-diagnose")}>{t("防火墙诊断")}</Button>
-                      <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "repair-all")}>{t("一键修复")}</Button>
-                      <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "repair-xui")}>{t("修复 3x-ui")}</Button>
-                      <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "repair-xray")}>{t("修复 Xray")}</Button>
-                      <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "repair-snell")}>{t("修复 Snell")}</Button>
-                      <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "restart-agent")}>{t("重启")}</Button>
-                      <Button size="sm" variant="flat" color="warning" onPress={() => createAgentMaintenance(server, "upgrade-agent")}>{t("升级")}</Button>
-                      <Button size="sm" variant="light" color="danger" onPress={() => createAgentMaintenance(server, "uninstall-agent")}>{t("卸载 agent")}</Button>
+                      {serverAgentActions.map(action => (
+                        <Button
+                          key={action.key}
+                          size="sm"
+                          variant={action.danger ? "light" : "flat"}
+                          color={runtimeProviderActionColor(action) as any}
+                          onPress={() => createAgentMaintenance(server, action)}
+                        >
+                          {t(action.label || action.key)}
+                        </Button>
+                      ))}
                     </ServerActionGroup>
                     <ServerActionGroup title="管理">
                       <Button size="sm" variant="flat" onPress={() => openServerModal(server)}>{t("编辑")}</Button>

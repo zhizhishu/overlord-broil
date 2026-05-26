@@ -127,3 +127,21 @@
   - 生产包已确认包含 `远端日志` 和 `查看完整日志`；后端脚本已确认包含 `FLUX_MAINTENANCE_LOG_LINES`、`capture_journal_log` 和 `payload["logs"]`。
 - 清理：Docker Maven 容器 `flux-remote-logs-test` 使用 `--rm`，已结束无残留；agent mock 临时服务随脚本结束；本阶段未启动长期 dev server。
 - 后续：提交并推送到 `origin/main` 和 `origin/future`，再检查 GitHub Actions 与 GHCR 镜像状态。
+
+### Runtime Provider Action Catalog
+
+- 完成：新增 Runtime Provider Action Catalog，把 `agent-maintenance` 动作的 label、category、danger、stateSync 等元数据收回 Runtime Provider 层，主控 UI、后端校验和 Agent 维护任务入口共用同一份动作契约。
+- 修改：
+  - 新增 `RuntimeProviderAction`，`RuntimeProviderDescriptor` 暴露 `actionCatalog`。
+  - `RuntimeProviderService` 注册 XUI、Snell、Forward、Certificate、Firewall 的维护动作，并提供 `listAgentMaintenanceActions()` / `isAllowedAgentMaintenanceAction()`。
+  - `DeployTaskServiceImpl.validateDeployTask` 改为复用 catalog 校验 `agent-maintenance`，不再维护散落字符串白名单。
+  - `vite-frontend/src/pages/orchestrator.tsx` 增加 fallback catalog；State Sync 行动作和服务器卡片 Agent 按钮从 Runtime Provider action catalog 派生。
+  - README、中文 README、Operations、Release Notes 和 PROJECT_CONTEXT 补充 Action Catalog 说明。
+- 验证：
+  - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
+  - Docker Maven `RuntimeProviderServiceTest,DeployTaskServiceImplTest` 通过，16 个测试全部成功。
+  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
+  - `bash scripts/test-flux-agent-mock.sh` 通过。
+  - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
+- 清理：Docker Maven 容器 `flux-action-catalog-test` 使用 `--rm`，已结束无残留；agent mock 临时服务随脚本结束；本阶段未启动长期 dev server。
+- 后续：提交并推送到 `origin/main` 和 `origin/future`，再检查 GitHub Actions 与 GHCR 镜像状态。

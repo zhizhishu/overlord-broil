@@ -185,6 +185,17 @@ export interface ServerRuleOverview {
   xuiOutbounds?: any;
 }
 
+export interface RuntimeProviderAction {
+  key: string;
+  label: string;
+  category: "diagnostic" | "repair" | "maintenance" | "danger" | string;
+  protocol: string;
+  providerKey: string;
+  danger: boolean;
+  primary: boolean;
+  stateSync: boolean;
+}
+
 export interface RuntimeProviderDescriptor {
   key: string;
   name: string;
@@ -197,6 +208,7 @@ export interface RuntimeProviderDescriptor {
   nanoSupported: boolean;
   protocols: string[];
   actions: string[];
+  actionCatalog?: RuntimeProviderAction[];
   capabilities: string[];
   requiredServerFields: string[];
   exposedPorts: string[];

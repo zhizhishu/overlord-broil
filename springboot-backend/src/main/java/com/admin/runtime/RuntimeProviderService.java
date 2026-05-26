@@ -90,6 +90,31 @@ public class RuntimeProviderService {
         return providerMap.get("xui");
     }
 
+    public List<RuntimeProviderAction> listAgentMaintenanceActions() {
+        Map<String, RuntimeProviderAction> actions = new LinkedHashMap<>();
+        for (RuntimeProviderDescriptor provider : providers) {
+            for (RuntimeProviderAction action : provider.getActionCatalog()) {
+                if ("agent-maintenance".equals(normalize(action.getProtocol()))) {
+                    actions.putIfAbsent(normalize(action.getKey()), action);
+                }
+            }
+        }
+        return new ArrayList<>(actions.values());
+    }
+
+    public boolean isAllowedAgentMaintenanceAction(String action) {
+        String normalizedAction = normalize(action);
+        if (normalizedAction.isEmpty()) {
+            normalizedAction = "doctor";
+        }
+        for (RuntimeProviderAction candidate : listAgentMaintenanceActions()) {
+            if (normalizedAction.equals(normalize(candidate.getKey()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void applyToTask(DeployTask task) {
         if (task == null) {
             return;
@@ -143,6 +168,18 @@ public class RuntimeProviderService {
                 false,
                 list("vless", "vmess", "trojan", "shadowsocks", "xui-orchestrator"),
                 list("present", "absent", "restart", "orchestrate", "repair-xui", "repair-xray", "sync-traffic"),
+                list(
+                        action("doctor", "诊断", "diagnostic", "agent-maintenance", "xui", false, true, true),
+                        action("status", "状态", "diagnostic", "agent-maintenance", "xui", false, false, false),
+                        action("logs", "日志", "diagnostic", "agent-maintenance", "xui", false, true, false),
+                        action("install-diagnose", "安装诊断", "diagnostic", "agent-maintenance", "xui", false, true, true),
+                        action("repair-xui", "修复 3x-ui", "repair", "agent-maintenance", "xui", false, true, true),
+                        action("repair-xray", "修复 Xray", "repair", "agent-maintenance", "xui", false, true, true),
+                        action("repair-all", "一键修复", "repair", "agent-maintenance", "xui", false, true, false),
+                        action("restart-agent", "重启 agent", "maintenance", "agent-maintenance", "xui", false, false, false),
+                        action("upgrade-agent", "升级 agent", "maintenance", "agent-maintenance", "xui", false, false, false),
+                        action("uninstall-agent", "卸载 agent", "danger", "agent-maintenance", "xui", true, false, false)
+                ),
                 list("install-3x-ui", "configure-panel", "create-inbound", "manage-outbound", "restart-xray", "sync-traffic"),
                 list("xuiEndpoint", "xuiApiToken or xuiUsername/xuiPassword"),
                 list("5168 optional panel", "user-defined inbound ports"),
@@ -160,6 +197,9 @@ public class RuntimeProviderService {
                 true,
                 list("snell"),
                 list("present", "absent", "restart", "repair-snell"),
+                list(
+                        action("repair-snell", "修复 Snell", "repair", "agent-maintenance", "snell", false, true, true)
+                ),
                 list("install-snell", "write-snell.conf", "restart-service", "report-service-state"),
                 list("agent token", "listen port", "psk"),
                 list("user-defined snell ports"),
@@ -177,6 +217,9 @@ public class RuntimeProviderService {
                 true,
                 list("forward", "tcp", "udp"),
                 list("present", "absent", "restart"),
+                list(
+                        action("firewall-diagnose", "防火墙诊断", "diagnostic", "agent-maintenance", "forward", false, true, true)
+                ),
                 list("install-socat", "write-service", "restart-service", "sync-forward-rule"),
                 list("listen port", "target host", "target port"),
                 list("user-defined forward listen ports"),
@@ -194,6 +237,9 @@ public class RuntimeProviderService {
                 false,
                 list("certificate", "acme-http", "self-signed"),
                 list("issue", "renew", "cert-diagnose"),
+                list(
+                        action("cert-diagnose", "证书诊断", "diagnostic", "agent-maintenance", "certificate", false, true, true)
+                ),
                 list("self-signed", "acme-http", "expiry-report", "diagnose-dns-and-port"),
                 list("certificate domain for acme-http"),
                 list("80 only for acme-http validation"),
@@ -211,6 +257,9 @@ public class RuntimeProviderService {
                 true,
                 list("firewall"),
                 list("open", "close", "firewall-diagnose"),
+                list(
+                        action("firewall-diagnose", "防火墙诊断", "diagnostic", "agent-maintenance", "firewall", false, true, true)
+                ),
                 list("ufw/firewalld/iptables-detect", "port-diagnose", "open-runtime-ports"),
                 list("runtime ports"),
                 list("runtime-dependent ports"),
@@ -230,6 +279,7 @@ public class RuntimeProviderService {
                                                boolean nanoSupported,
                                                List<String> protocols,
                                                List<String> actions,
+                                               List<RuntimeProviderAction> actionCatalog,
                                                List<String> capabilities,
                                                List<String> requiredServerFields,
                                                List<String> exposedPorts,
@@ -246,11 +296,37 @@ public class RuntimeProviderService {
         descriptor.setNanoSupported(nanoSupported);
         descriptor.setProtocols(protocols);
         descriptor.setActions(actions);
+        descriptor.setActionCatalog(actionCatalog);
         descriptor.setCapabilities(capabilities);
         descriptor.setRequiredServerFields(requiredServerFields);
         descriptor.setExposedPorts(exposedPorts);
         descriptor.setRelatedProviders(relatedProviders);
         return descriptor;
+    }
+
+    private RuntimeProviderAction action(String key,
+                                         String label,
+                                         String category,
+                                         String protocol,
+                                         String providerKey,
+                                         boolean danger,
+                                         boolean primary,
+                                         boolean stateSync) {
+        RuntimeProviderAction action = new RuntimeProviderAction();
+        action.setKey(key);
+        action.setLabel(label);
+        action.setCategory(category);
+        action.setProtocol(protocol);
+        action.setProviderKey(providerKey);
+        action.setDanger(danger);
+        action.setPrimary(primary);
+        action.setStateSync(stateSync);
+        return action;
+    }
+
+    @SafeVarargs
+    private final <T> List<T> list(T... values) {
+        return new ArrayList<>(Arrays.asList(values));
     }
 
     private List<String> list(String... values) {

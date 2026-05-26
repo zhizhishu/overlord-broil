@@ -20,6 +20,33 @@ class RuntimeProviderServiceTest {
     }
 
     @Test
+    void exposesAgentMaintenanceActionCatalog() {
+        RuntimeProviderDescriptor xui = service.getProvider("xui");
+        RuntimeProviderDescriptor snell = service.getProvider("snell");
+
+        assertTrue(xui.getActionCatalog().stream().anyMatch(action ->
+                "install-diagnose".equals(action.getKey())
+                        && "diagnostic".equals(action.getCategory())
+                        && action.isStateSync()));
+        assertTrue(xui.getActionCatalog().stream().anyMatch(action ->
+                "uninstall-agent".equals(action.getKey())
+                        && action.isDanger()));
+        assertTrue(snell.getActionCatalog().stream().anyMatch(action ->
+                "repair-snell".equals(action.getKey())
+                        && "repair".equals(action.getCategory())
+                        && "agent-maintenance".equals(action.getProtocol())));
+    }
+
+    @Test
+    void validatesAgentMaintenanceActionsFromCatalog() {
+        assertTrue(service.isAllowedAgentMaintenanceAction("doctor"));
+        assertTrue(service.isAllowedAgentMaintenanceAction("repair-snell"));
+        assertTrue(service.isAllowedAgentMaintenanceAction("firewall-diagnose"));
+        assertTrue(service.isAllowedAgentMaintenanceAction(null));
+        assertEquals(13, service.listAgentMaintenanceActions().size());
+    }
+
+    @Test
     void resolvesProtocolAndMaintenanceActions() {
         assertEquals("xui", service.assign("vless", "present").getKey());
         assertEquals("snell", service.assign("snell", "present").getKey());
