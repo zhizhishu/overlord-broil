@@ -22,7 +22,6 @@
   - `flux-3xui-orchestrator-frontend:latest/main/sha-f638160` -> `sha256:b7ea04d1081d21f6e00287087543eb65de89d67fcd7f6d21abd647291febdbbd`
 
 下一步：
-- 提交并推送本次远端镜像验证记录。
 - 继续推进真实 VPS 矩阵、真实 3x-ui E2E 记录、UI polish 和安全治理。
 
 关键文件：
@@ -56,6 +55,7 @@
 - 本轮未跑完整 `bash scripts/release-check.sh`，避免继续长时间空转；最终以 GitHub Actions/Docker Images 远端门禁为准。
 - `gh run list --commit f6381606c7410e1d8b89c6b93aaecbfbf210697f` 未返回 Actions run；已用本地 Docker buildx 手动补推并用 `docker buildx imagetools inspect` 验证 GHCR 三镜像。
 - 前端镜像重建时 `npm run build` 在 Docker 内通过，仅有既有 Vite dynamic/static import chunk 提示。
+- 记录提交 `1fc801068ec3df0d8b329f4560bc40f140bd9182` 推送后，`main CI` run `26448892387` 成功；`future CI` run `26448900654` 初次受 GitHub checkout/action 下载 403 影响失败，重跑失败项后成功；Pages run `26448891539` 初次下载官方 action 失败，重跑后成功。
 
 风险/待确认：
 - 真实 VPS 矩阵和真实 3x-ui endpoint/token 的手动 E2E 记录仍是 1.0 前最大缺口。

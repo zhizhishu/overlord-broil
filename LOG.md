@@ -12,6 +12,7 @@
   - `ghcr.io/zhizhishu/flux-3xui-orchestrator-frontend:latest/main/sha-f638160` index digest 为 `sha256:b7ea04d1081d21f6e00287087543eb65de89d67fcd7f6d21abd647291febdbbd`。
   - 前端 Docker build 内部 `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
 - 注意：`gh run list --commit f6381606c7410e1d8b89c6b93aaecbfbf210697f` 未返回 Actions run，因此本次以手动 Docker buildx push 和 `imagetools inspect` 作为镜像成果证明。
+- Actions：远端验证记录提交 `1fc801068ec3df0d8b329f4560bc40f140bd9182` 已推送到 `main` 和 `future`；`main CI` run `26448892387` 成功，`future CI` run `26448900654` 初次受 GitHub checkout/action 下载 403 影响失败，重跑失败项后成功，Pages run `26448891539` 初次下载官方 action 失败，重跑后成功。
 - 清理：未启动本地 dev server，未占用 `5166/5168/6365/8066` 等项目端口；保留 Docker buildx builder 容器 `buildx_buildkit_halowebui-multi0`。
 - 后续：继续推进真实 VPS 矩阵、真实 3x-ui E2E 记录、UI polish、安全治理和镜像发布自动化稳定性。
 
