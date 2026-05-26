@@ -45,7 +45,11 @@ Snell 已统一到产品层的“协议节点”管理里, 但它不是 Xray 或
 
 ## UI Preview
 
-![Overlord Broil control plane preview](docs/assets/overlord-broil-screenshot.svg)
+![Overlord Broil live control center](docs/assets/actual-orchestrator-top.png)
+
+Live screenshots were captured from the `isrco-hk` validation master after redeploying `ghcr.io/zhizhishu/overlord-broil:latest` in SQLite single-container mode.
+
+![Overlord Broil login](docs/assets/actual-login.png)
 
 UI 方向是高信息密度的运维控制台: 服务器卡片, 操作分组, 状态 chip, 统一规则视图, Runtime State, 任务审计和中英文切换.
 

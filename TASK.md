@@ -61,19 +61,18 @@ Push the project toward the pre-1.0 goals requested by the user:
 
 ## In Progress
 
-- Docker Maven Java 21 targeted tests `RuntimeProviderServiceTest,DeployTaskServiceImplTest` passed: 25 tests, 0 failures.
-- Frontend `npm run build`, shell syntax, agent mock, 3x-ui fixture, master port contract and SQLite schema tests passed after the current hardening pass.
-- After push, rebuild/redeploy the master image, then rerun `scripts/test-snell-real-smoke.sh` against `isrco-hk` on the updated master.
-- Use Browser MCP to capture real console screenshots into `docs/assets/`.
+- Real UI evidence capture is complete. Browser MCP and Chrome DevTools verified the live `isrco-hk` console at `http://82.158.91.116:5166/?v=3437e2b#/orchestrator`.
+- Captured screenshots:
+  - `docs/assets/actual-login.png`
+  - `docs/assets/actual-orchestrator-top.png`
+  - `docs/assets/actual-orchestrator-full.png`
+- README, Chinese README, GitHub Pages and release notes now reference the live UI screenshots.
 
 ## Remaining
 
-1. Rerun Snell real smoke after the patched master is deployed.
-2. Run or record real 3x-ui write E2E against a real endpoint if a safe endpoint/token is available; otherwise keep fixture write E2E as the current local proof.
-3. Capture UI screenshots from the actual `http://82.158.91.116:5166/#/orchestrator` console.
-4. Update README, Operations, Release Notes, Pages and LOG.
-5. Commit and push to `origin/main` and `origin/future`.
-6. Confirm GitHub Actions and GHCR image result after push.
+1. Commit and push the screenshot/docs follow-up to `origin/main` and `origin/future`.
+2. Confirm GitHub Actions and Pages after push.
+3. Real 3x-ui write E2E still needs a safe real endpoint/token. Fixture E2E remains the current local proof.
 
 ## Risks
 

@@ -2,6 +2,16 @@
 
 ## 2026-05-26
 
+### Live UI Evidence And Screenshot Capture
+
+- Completed: verified the live `isrco-hk` master UI after redeploying `ghcr.io/zhizhishu/overlord-broil:latest` in SQLite single-container mode.
+- Completed: confirmed the remote HTML now serves the Vite module script and the control center renders at `http://82.158.91.116:5166/?v=3437e2b#/orchestrator`.
+- Completed: captured real screenshots into `docs/assets/actual-login.png`, `docs/assets/actual-orchestrator-top.png` and `docs/assets/actual-orchestrator-full.png`.
+- Completed: README, README.zh-CN, GitHub Pages and Release Notes now reference the live console screenshot.
+- Validation: Chrome DevTools snapshot showed the live control center with server registry, State Sync, Runtime Provider layer, Operation Audit, Snell task history and server-card action groups.
+- Note: Browser cache can keep an old `/#/` shell; use a query before the hash, for example `/?v=<commit>#/orchestrator`, when validating a freshly redeployed image.
+- Next: commit, push to `origin/main` and `origin/future`, then confirm CI/Pages.
+
 ### Snell Cleanup And Operator Confirmation Hardening
 
 - Completed: Snell generated delete scripts now verify service shutdown and closed listen ports before reporting success.

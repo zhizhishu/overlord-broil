@@ -71,7 +71,11 @@ Agent upgrade now uses the same controlled task loop with a safer lifecycle: the
 
 ## UI Preview
 
-![Overlord Broil control plane](docs/assets/overlord-broil-screenshot.svg)
+![Overlord Broil live control center](docs/assets/actual-orchestrator-top.png)
+
+The screenshots below were captured from the live `isrco-hk` validation master after redeploying `ghcr.io/zhizhishu/overlord-broil:latest` in SQLite single-container mode.
+
+![Overlord Broil login](docs/assets/actual-login.png)
 
 The UI is a dense operations console: server cards, grouped actions, compact status chips and a unified rule view. It is built for repeated infrastructure work, not for a marketing landing page.
 
