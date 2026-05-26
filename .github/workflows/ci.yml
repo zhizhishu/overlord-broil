@@ -55,6 +55,13 @@ jobs:
         run: bash scripts/test-flux-agent-mock.sh
       - name: Run 3x-ui fixture tests
         run: bash scripts/test-three-xui-fixture.sh
+      - name: Run optional real 3x-ui E2E contract
+        env:
+          THREE_XUI_E2E_URL: ${{ secrets.THREE_XUI_E2E_URL }}
+          THREE_XUI_E2E_TOKEN: ${{ secrets.THREE_XUI_E2E_TOKEN }}
+          THREE_XUI_E2E_BASE_PATH: ${{ secrets.THREE_XUI_E2E_BASE_PATH }}
+          THREE_XUI_E2E_WRITE: "0"
+        run: bash scripts/test-three-xui-e2e.sh
       - name: Validate compose files
         env:
           DB_NAME: gost

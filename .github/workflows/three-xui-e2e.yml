@@ -1,0 +1,47 @@
+name: Real 3x-ui E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Optional 3x-ui endpoint URL. Falls back to secret THREE_XUI_E2E_URL."
+        required: false
+        type: string
+      base_path:
+        description: "Optional custom base path before /panel, for example /xui. Falls back to secret THREE_XUI_E2E_BASE_PATH."
+        required: false
+        type: string
+      write:
+        description: "Create, toggle and delete a temporary VLESS inbound."
+        required: true
+        default: false
+        type: boolean
+      port:
+        description: "Required when write=true. Use an unused high port on the target 3x-ui host."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  real-three-xui-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run real 3x-ui contract smoke
+        env:
+          INPUT_THREE_XUI_E2E_URL: ${{ inputs.url }}
+          SECRET_THREE_XUI_E2E_URL: ${{ secrets.THREE_XUI_E2E_URL }}
+          THREE_XUI_E2E_TOKEN: ${{ secrets.THREE_XUI_E2E_TOKEN }}
+          INPUT_THREE_XUI_E2E_BASE_PATH: ${{ inputs.base_path }}
+          SECRET_THREE_XUI_E2E_BASE_PATH: ${{ secrets.THREE_XUI_E2E_BASE_PATH }}
+          THREE_XUI_E2E_WRITE: ${{ inputs.write }}
+          THREE_XUI_E2E_PORT: ${{ inputs.port }}
+        run: |
+          export THREE_XUI_E2E_URL="${INPUT_THREE_XUI_E2E_URL:-$SECRET_THREE_XUI_E2E_URL}"
+          export THREE_XUI_E2E_BASE_PATH="${INPUT_THREE_XUI_E2E_BASE_PATH:-$SECRET_THREE_XUI_E2E_BASE_PATH}"
+          bash scripts/test-three-xui-e2e.sh

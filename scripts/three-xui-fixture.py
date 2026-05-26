@@ -12,7 +12,7 @@ import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 
 class FixtureState:
@@ -177,7 +177,7 @@ class Handler(BaseHTTPRequestHandler):
     def _route(self) -> None:
         parsed = urlparse(self.path)
         parts = [unquote(part) for part in parsed.path.strip("/").split("/") if part]
-        body = self._read_json()
+        body = self._read_payload()
         body_map = body if isinstance(body, dict) else {}
         method = self.command.upper()
 
@@ -255,6 +255,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if parts in (
             ["panel", "api", "xray", "config"],
+            ["panel", "api", "server", "getConfigJson"],
             ["panel", "api", "server", "config"],
             ["panel", "xray", "config"],
             ["panel", "xray", "getXrayConfig"],
@@ -296,17 +297,39 @@ class Handler(BaseHTTPRequestHandler):
             return False
         return True
 
-    def _read_json(self) -> Any:
+    def _read_payload(self) -> Any:
         length = int(self.headers.get("Content-Length", "0") or "0")
         if length <= 0:
             return {}
         raw = self.rfile.read(length).decode("utf-8")
         if not raw:
             return {}
+        content_type = self.headers.get("Content-Type", "")
+        if "application/x-www-form-urlencoded" in content_type:
+            parsed = parse_qs(raw, keep_blank_values=True)
+            return {
+                key: self._coerce_form_value(values[-1] if values else "")
+                for key, values in parsed.items()
+            }
         try:
             value = json.loads(raw)
         except json.JSONDecodeError:
             return {}
+        return value
+
+    @staticmethod
+    def _coerce_form_value(value: str) -> Any:
+        trimmed = value.strip()
+        lowered = trimmed.lower()
+        if lowered == "true":
+            return True
+        if lowered == "false":
+            return False
+        if trimmed.startswith("{") or trimmed.startswith("["):
+            try:
+                return json.loads(trimmed)
+            except json.JSONDecodeError:
+                return value
         return value
 
     def _ok(self, obj: Any) -> None:

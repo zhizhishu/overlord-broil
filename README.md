@@ -290,14 +290,29 @@ Common smoke checks:
 ```bash
 bash scripts/test-flux-agent-mock.sh
 bash scripts/test-three-xui-fixture.sh
+bash scripts/test-three-xui-e2e.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
 bash scripts/test-compose-smoke.sh --build-local
+```
+
+Real 3x-ui contract smoke is optional and skips unless a target endpoint and API token are provided:
+
+```bash
+export THREE_XUI_E2E_URL="https://xui.example.com:5168"
+export THREE_XUI_E2E_TOKEN="YOUR_3XUI_API_TOKEN"
+bash scripts/test-three-xui-e2e.sh
+```
+
+To create, toggle and delete a temporary VLESS inbound on the real 3x-ui host, opt in explicitly:
+
+```bash
+THREE_XUI_E2E_WRITE=1 THREE_XUI_E2E_PORT=42123 bash scripts/test-three-xui-e2e.sh
 ```
 
 ## Remaining Work Before 1.0
 
 - Real VPS matrix: Debian, Ubuntu, Rocky Linux, Oracle Linux and Alpine.
-- Real 3x-ui container or VPS end-to-end smoke.
+- Run and record real 3x-ui container or VPS end-to-end smoke results through `scripts/test-three-xui-e2e.sh`.
 - Better certificate, firewall and cloud-security-group diagnostics.
 - RBAC, audit logs, agent token expiry/revocation and key-rotation migration.
 - Mobile layout, loading/error states and task-detail polish.

@@ -15,6 +15,7 @@ Default checks:
   - shell syntax
   - agent mock test
   - tokenized 3x-ui fixture test
+  - optional real 3x-ui E2E contract when THREE_XUI_E2E_URL/TOKEN are set
   - default/legacy compose config validation
   - frontend install and production build in Docker Node 22
   - git whitespace check
@@ -94,6 +95,9 @@ bash scripts/test-flux-agent-mock.sh
 
 step "Run tokenized 3x-ui fixture tests"
 bash scripts/test-three-xui-fixture.sh
+
+step "Run optional real 3x-ui E2E contract"
+bash scripts/test-three-xui-e2e.sh
 
 step "Validate compose files"
 docker compose -f docker-compose.yml config --quiet

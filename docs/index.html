@@ -216,13 +216,13 @@ POST /api/v1/three-xui/restart-xray</code></pre>
       <section id="roadmap" class="section">
         <div class="section-header">
           <h2>0.6.0 之后继续补真实运行保障</h2>
-          <p>核心链路已经进入 0.6.0 reliability gate：Docker/CI 会跑安装矩阵、fixture、agent mock 和 compose smoke。下一步重点是真实 VPS 矩阵、真实 3x-ui 端到端、密钥轮换和更完整的安全治理。</p>
+          <p>核心链路已经进入 0.6.0 reliability gate：Docker/CI 会跑安装矩阵、fixture、agent mock、compose smoke 和可选真实 3x-ui E2E gate。下一步重点是真实 VPS 矩阵、记录真实 3x-ui 端到端结果、密钥轮换和更完整的安全治理。</p>
         </div>
         <ol class="roadmap">
           <li>
             <div>
               <strong>Real 3x-ui smoke</strong>
-              <span>现有 release gate 已覆盖 API fixture、agent mock、安装矩阵和一次性 compose 烟测；后续接入真实 3x-ui 容器或 VPS 端到端。</span>
+              <span>已新增手动 GitHub workflow 和 `scripts/test-three-xui-e2e.sh`，可用真实 endpoint/token 校验状态、入站和 Xray config；写入模式会显式创建、切换并删除临时 inbound。</span>
             </div>
           </li>
           <li>

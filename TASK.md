@@ -45,9 +45,15 @@
 - 已提交并推送 `ca95d4b Tighten master single-port contract` 到 `origin/main` 和 `origin/future`。
 - 已确认 `ca95d4b` 的 GitHub Actions：main CI、main Pages、future CI 均成功；手动触发的 main/future Docker Images 均成功。
 - 已确认 GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 更新到 index digest `sha256:6ac01a8f03dbf17187d2c8a3ed69514dd79e841ffea30c6b5b753abbe092ba31`，linux/amd64 digest `sha256:205667901f5dd3b59c765b56fca05dc4a52c948620e442a11de3ca0bc91bf240`。
+- 本轮已新增真实 3x-ui E2E 合同烟测入口 `scripts/test-three-xui-e2e.sh`，支持真实 endpoint/token 的只读状态、入站和 Xray config 检查；显式写入模式支持创建、切换并删除临时 VLESS inbound。
+- 本轮已新增手动 GitHub workflow `Real 3x-ui E2E`，可从 GitHub Actions 手动传入 endpoint/base path/write/port，并复用 repo secrets 中的 3x-ui token。
+- 本轮已把可选真实 3x-ui E2E gate 接入 CI 和 `scripts/release-check.sh`；缺少真实 endpoint/token 时按设计 skip，不伪装成真机通过。
+- 本轮已增强本地 3x-ui fixture：支持 form-urlencoded payload 和 `/panel/api/server/getConfigJson`，并让 fixture 测试反向调用真实 E2E 脚本验证读写路径。
+- 本轮已同步 README、中文 README、Operations、Release Notes、GitHub Pages 和 PROJECT_CONTEXT，说明真实 3x-ui E2E 的使用方法、skip 语义和 1.0 前剩余真实运行证明。
 
 下一步：
-- 继续推进正式版缺口：真实 3x-ui 容器级 E2E、VPS 矩阵验证、UI 错误态/加载态 polish、安全治理和 agent 自动升级。
+- 推送本轮真实 3x-ui E2E harness 到 `origin/main` 和 `origin/future`，确认 GitHub Actions / Pages / GHCR 镜像成果。
+- 后续在 repo secrets 配置真实 `THREE_XUI_E2E_URL` / `THREE_XUI_E2E_TOKEN` 后，手动运行 `Real 3x-ui E2E` workflow 取得真实 3x-ui 容器或 VPS 证明。
 
 关键文件：
 - `scripts/flux-agent.sh`
@@ -61,10 +67,16 @@
 - `vite-frontend/src/types/index.ts`
 - `vite-frontend/src/pages/orchestrator.tsx`
 - `vite-frontend/src/i18n/index.tsx`
+- `.github/workflows/three-xui-e2e.yml`
+- `scripts/test-three-xui-e2e.sh`
+- `scripts/test-three-xui-fixture.sh`
+- `scripts/three-xui-fixture.py`
+- `scripts/release-check.sh`
 - `README.md`
 - `README.zh-CN.md`
 - `docs/OPERATIONS.md`
 - `docs/RELEASE_NOTES.md`
+- `docs/index.html`
 - `PROJECT_CONTEXT.md`
 
 验证状态：
@@ -98,9 +110,14 @@
 - 本轮单端口契约已通过 `bash scripts/test-install-matrix.sh --image debian:12-slim`。
 - 本轮单端口契约已通过 `git diff --check`，仅有 Windows LF/CRLF 提示。
 - 本轮单端口契约已通过远端 GitHub Actions / GHCR 验证：`ca95d4b` 的 main/future CI 成功，main Pages 成功；手动 Docker Images run 成功并刷新 GHCR latest。
+- 本轮真实 3x-ui E2E harness 已通过 `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'`。
+- 本轮真实 3x-ui E2E harness 已通过 `bash scripts/test-three-xui-e2e.sh` 的无 endpoint/token skip 行为检查。
+- 本轮真实 3x-ui E2E harness 已通过 `bash scripts/test-three-xui-fixture.sh`，其中 fixture 反打新脚本完成状态、入站、Xray config、临时 inbound 创建/切换/删除。
+- 本轮真实 3x-ui E2E harness 已通过 `bash scripts/release-check.sh`，覆盖 shell、agent mock、3x-ui fixture + E2E fixture 反打、可选真实 E2E skip、compose config、master port contract、Docker Node 22 前端 build、compose dry-run 和 `git diff --check`。
 
 风险/待确认：
-- Runtime Provider 已是融合架构关键层，但真实 VPS 矩阵和真实 3x-ui E2E 仍是正式 1.0 前最大缺口。
+- Runtime Provider 已是融合架构关键层；真实 3x-ui E2E harness 已具备，但还需要配置真实 endpoint/token 并跑出实际容器或 VPS 记录，不能把 skip 当真机证明。
+- 真实 VPS 矩阵仍是正式 1.0 前最大缺口。
 - Snell 是产品层统一、Agent 执行的独立 runtime，不是 Xray/3x-ui 内核原生协议。
 - `future` 分支用于持续验证；正式 GHCR 镜像以 `main` 和 `v*` tag 为准。
 
@@ -114,8 +131,11 @@
 - 本轮远端日志 agent mock server 随脚本结束并清理临时目录。
 - 本轮 Action Catalog Docker Maven 测试容器 `flux-action-catalog-test` 使用 `--rm`，已结束且无残留。
 - 本轮 Action Catalog agent mock server 随脚本结束并清理临时目录。
+- 本轮真实 3x-ui E2E fixture 反打启动的本地 Python fixture 随脚本退出清理；临时 inbound 已删除。
+- 本轮 `release-check.sh` 使用 Docker Node 22 容器 `--rm` 运行，未保留容器；复查 `4173/5166/6365/12101` 无本轮端口监听。
+- 本轮保留 Docker Desktop 和 Codex/Cursor/MCP 常驻进程；未关闭归属不明进程。
 
-最后更新：2026-05-25 17:36:34 -07:00
+最后更新：2026-05-25 19:08:10 -07:00
 
 ## Active Tasks
 
@@ -136,7 +156,9 @@
 - [x] **Goal:** 提交推送并确认 Action Catalog 的 GitHub Actions / GHCR 成果。
 - [x] **Goal:** 收口默认单端口主控契约，并验证旧分离容器/端口不会干扰正式安装。
 - [x] **Goal:** 提交推送并确认单端口主控契约的 GitHub Actions / GHCR 成果。
-- [ ] **Goal:** 继续推进正式版缺口：真实 3x-ui E2E、VPS 矩阵、UI polish、安全治理和 agent 自动升级。
+- [x] **Goal:** 新增真实 3x-ui E2E harness、手动 GitHub workflow、CI/release gate 接入和文档说明。
+- [ ] **Goal:** 推送并确认真实 3x-ui E2E harness 的 GitHub Actions / Pages / GHCR 镜像成果。
+- [ ] **Goal:** 继续推进正式版缺口：真实 VPS 矩阵、真实 3x-ui endpoint 记录、UI polish、安全治理和 agent 自动升级。
 
 ## Notes For Next Agent
 

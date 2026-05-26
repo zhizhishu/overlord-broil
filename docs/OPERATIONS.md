@@ -216,9 +216,24 @@ bash scripts/release-check.sh
 bash scripts/release-check.sh --full
 bash scripts/test-flux-agent-mock.sh
 bash scripts/test-three-xui-fixture.sh
+bash scripts/test-three-xui-e2e.sh
 bash scripts/test-install-matrix.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
 bash scripts/test-compose-smoke.sh --build-local
 ```
 
-The 3x-ui fixture test uses a short-lived local Python HTTP server and exits without leaving ports open. The install matrix is useful shell portability coverage, but it is not a substitute for a real VPS matrix with systemd/OpenRC, cloud firewall and public DNS. The full compose smoke test should remove its disposable containers, network and volumes when it exits.
+The 3x-ui fixture test uses a short-lived local Python HTTP server and exits without leaving ports open. The real 3x-ui E2E script is a gated contract smoke: it exits as skipped unless `THREE_XUI_E2E_URL` and `THREE_XUI_E2E_TOKEN` are set, and write checks require `THREE_XUI_E2E_WRITE=1` plus `THREE_XUI_E2E_PORT`. The install matrix is useful shell portability coverage, but it is not a substitute for a real VPS matrix with systemd/OpenRC, cloud firewall and public DNS. The full compose smoke test should remove its disposable containers, network and volumes when it exits.
+
+Manual real 3x-ui read-only check:
+
+```bash
+export THREE_XUI_E2E_URL="https://xui.example.com:5168"
+export THREE_XUI_E2E_TOKEN="YOUR_3XUI_API_TOKEN"
+bash scripts/test-three-xui-e2e.sh
+```
+
+Manual real 3x-ui write check:
+
+```bash
+THREE_XUI_E2E_WRITE=1 THREE_XUI_E2E_PORT=42123 bash scripts/test-three-xui-e2e.sh
+```

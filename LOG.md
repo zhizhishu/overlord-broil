@@ -187,3 +187,19 @@
   - GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 可读取，index digest 为 `sha256:6ac01a8f03dbf17187d2c8a3ed69514dd79e841ffea30c6b5b753abbe092ba31`，linux/amd64 digest 为 `sha256:205667901f5dd3b59c765b56fca05dc4a52c948620e442a11de3ca0bc91bf240`。
 - 清理：本阶段只使用 `gh` 和 Docker imagetools 读取远端状态，未启动本地服务、未占用端口、未创建容器。
 - 后续：继续推进正式版缺口：真实 3x-ui 容器级 E2E、真实 VPS 矩阵、UI 错误/加载/空状态 polish、安全治理和 agent 自动升级。
+
+### Real 3x-ui E2E Harness
+
+- 完成：新增真实 3x-ui E2E 合同烟测入口，继续把 3x-ui/Xray Runtime 从 API fixture 推向可验证的真实端到端 gate。
+- 修改：
+  - 新增 `scripts/test-three-xui-e2e.sh`，支持真实 3x-ui endpoint/token 的状态、入站、Xray config 只读检查，以及显式写入模式下临时 VLESS inbound 创建、切换和删除。
+  - 新增 `.github/workflows/three-xui-e2e.yml` 手动 workflow，并把可选真实 E2E gate 接入 CI 和 `scripts/release-check.sh`。
+  - 增强 `scripts/three-xui-fixture.py` 的 form-urlencoded 和 `/panel/api/server/getConfigJson` 覆盖，让 `scripts/test-three-xui-fixture.sh` 能反打真实 E2E 脚本。
+  - README、中文 README、Operations、Release Notes、GitHub Pages 和 PROJECT_CONTEXT 补充真实 E2E 的使用方式、skip 语义和剩余真机证明边界。
+- 验证：
+  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
+  - `bash scripts/test-three-xui-e2e.sh` 在无 endpoint/token 时按设计 skip。
+  - `bash scripts/test-three-xui-fixture.sh` 通过，并完成新 E2E 脚本对本地 fixture 的状态、入站、Xray config、临时 inbound 创建/切换/删除验证。
+  - `bash scripts/release-check.sh` 通过，覆盖 agent mock、3x-ui fixture、可选真实 E2E skip、compose、master port contract、Docker Node 22 前端 build、compose dry-run 和 `git diff --check`。
+- 清理：本地 3x-ui fixture 随脚本退出清理；临时 inbound 已删除；Docker Node 22 验证容器使用 `--rm`；未保留本轮端口监听。
+- 后续：提交推送到 `origin/main` 和 `origin/future`，确认 GitHub Actions、Pages 和 GHCR 镜像成果；配置真实 3x-ui secrets 后再跑手动 workflow。

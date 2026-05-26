@@ -111,6 +111,7 @@ CI currently covers:
 - Agent mock tests, including Runtime Provider claim/report metadata.
 - Backend Runtime Provider / Runtime State tests for task-result audit metadata.
 - 3x-ui fixture tests.
+- Optional real 3x-ui E2E contract smoke through `scripts/test-three-xui-e2e.sh`; it skips unless endpoint/token are configured and only performs write checks when explicitly enabled.
 - Default, v4/v6 and legacy compose config.
 - Disposable compose smoke stack with the `flux-master` single image.
 - Debian, Ubuntu, Alpine, Rocky Linux, and Oracle Linux installer diagnostics.
@@ -123,7 +124,7 @@ bash scripts/release-check.sh --full
 
 ## Known Boundaries
 
-- Real VPS matrix and real 3x-ui end-to-end smoke are still the biggest gaps before `1.0`.
+- Real VPS matrix and recorded real 3x-ui end-to-end smoke runs are still the biggest gaps before `1.0`; the E2E harness exists but does not prove real-host coverage until endpoint secrets are configured and run.
 - Snell is product-layer unified but runtime-independent; do not describe it as a native 3x-ui/Xray protocol.
 - Alpine/OpenRC supports the agent, Snell tasks, and remote forwarding, but full 3x-ui install/configure orchestration is intended for systemd hosts.
 - Certificate automation depends on DNS, port `80`, local firewall, and cloud security groups.

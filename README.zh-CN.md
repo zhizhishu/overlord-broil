@@ -281,10 +281,24 @@ npm install --legacy-peer-deps
 npm run build
 ```
 
+真实 3x-ui 合同烟测是可选项；没有配置真实地址和 API token 时会自动跳过：
+
+```bash
+export THREE_XUI_E2E_URL="https://xui.example.com:5168"
+export THREE_XUI_E2E_TOKEN="YOUR_3XUI_API_TOKEN"
+bash scripts/test-three-xui-e2e.sh
+```
+
+如果要在真实 3x-ui 上创建、切换并删除一个临时 VLESS inbound，需要显式开启写入并指定一个未占用端口：
+
+```bash
+THREE_XUI_E2E_WRITE=1 THREE_XUI_E2E_PORT=42123 bash scripts/test-three-xui-e2e.sh
+```
+
 ## 离 1.0 还差什么
 
 - 真实 VPS 矩阵：Debian、Ubuntu、Rocky、Oracle Linux、Alpine。
-- 真实 3x-ui 容器或 VPS 端到端烟测。
+- 通过 `scripts/test-three-xui-e2e.sh` 跑通并记录真实 3x-ui 容器或 VPS 端到端烟测结果。
 - 更完整的证书、防火墙和云安全组诊断。
 - RBAC、审计日志、Agent token 过期 / 吊销、密钥轮换。
 - 移动端、加载态、失败态和任务详情继续打磨。

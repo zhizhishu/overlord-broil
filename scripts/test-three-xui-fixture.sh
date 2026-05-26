@@ -236,4 +236,10 @@ assert_json 'data["success"] is False and "token" in data["msg"]'
 set_auth "fixture-token"
 run_core_flow
 
+THREE_XUI_E2E_URL="${BASE_URL}" \
+  THREE_XUI_E2E_TOKEN="fixture-token" \
+  THREE_XUI_E2E_WRITE=1 \
+  THREE_XUI_E2E_PORT=12101 \
+  bash "${SCRIPT_DIR}/test-three-xui-e2e.sh"
+
 echo "3x-ui fixture tests passed at ${BASE_URL}"
