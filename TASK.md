@@ -52,11 +52,17 @@ Push the project toward the pre-1.0 goals requested by the user:
 - UI polish:
   - added stable `data-testid` hooks for the control center, key panels, server cards and 3x-ui/Agent action groups.
   - replaced native `window.confirm` dangerous-action prompts with an in-app confirmation modal.
+- Current hardening pass:
+  - Snell delete scripts now fail if the service remains active or the listen port stays open.
+  - Snell failed/timeout agent reports now write protocol-node `failed` / `delete_failed` plus `lastError`.
+  - `scripts/test-snell-real-smoke.sh` now verifies cleanup after temporary-node deletion.
+  - source default Spring Boot port now matches the product single-entry port `5166`.
+  - control-center delete/restart/outbound-save flows now use an in-app confirmation modal.
 
 ## In Progress
 
-- Docker Maven Java 21 backend package validation passed.
-- Docker Maven targeted tests `RuntimeProviderServiceTest,DeployTaskServiceImplTest` passed: 25 tests, 0 failures.
+- Docker Maven Java 21 targeted tests `RuntimeProviderServiceTest,DeployTaskServiceImplTest` passed: 25 tests, 0 failures.
+- Frontend `npm run build`, shell syntax, agent mock, 3x-ui fixture, master port contract and SQLite schema tests passed after the current hardening pass.
 - After push, rebuild/redeploy the master image, then rerun `scripts/test-snell-real-smoke.sh` against `isrco-hk` on the updated master.
 - Use Browser MCP to capture real console screenshots into `docs/assets/`.
 

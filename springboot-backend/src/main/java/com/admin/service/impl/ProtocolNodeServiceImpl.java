@@ -349,6 +349,23 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         }
     }
 
+    @Override
+    public void applyAgentTaskFailure(DeployTask task, JSONObject result, String state) {
+        if (task == null || result == null || !"snell".equals(normalize(task.getProtocol(), ""))) {
+            return;
+        }
+        ProtocolNode node = findTaskProtocolNode(task);
+        if (node == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        node.setState("absent".equals(normalize(task.getAction(), "")) ? "delete_failed" : "failed");
+        node.setLastSync(now);
+        node.setLastError(extractTaskError(result, state));
+        node.setUpdatedTime(now);
+        this.updateById(node);
+    }
+
     private DeployTask createSnellTask(ControlServer server, ProtocolNode node, String action) {
         long now = System.currentTimeMillis();
         DeployTask task = new DeployTask();
@@ -364,6 +381,40 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         task.setUpdatedTime(now);
         deployTaskMapper.insert(task);
         return task;
+    }
+
+    private ProtocolNode findTaskProtocolNode(DeployTask task) {
+        try {
+            JSONObject request = JSON.parseObject(task.getRequestJson());
+            JSONObject nodeMeta = request == null ? null : request.getJSONObject("node");
+            Long id = nodeMeta == null ? null : nodeMeta.getLong("id");
+            if (id != null) {
+                return this.getById(id);
+            }
+        } catch (Exception ignored) {
+            return null;
+        }
+        return null;
+    }
+
+    private String extractTaskError(JSONObject result, String state) {
+        String stderr = result.getString("stderr");
+        if (!isBlank(stderr)) {
+            return truncate(stderr.trim(), 1000);
+        }
+        String stdout = result.getString("stdout");
+        if (!isBlank(stdout)) {
+            return truncate(stdout.trim(), 1000);
+        }
+        Integer exitCode = result.getInteger("exitCode");
+        return "agent task " + normalize(state, "failed") + (exitCode == null ? "" : " with exit code " + exitCode);
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
     }
 
     private String validateSnellNode(ProtocolNode node) {

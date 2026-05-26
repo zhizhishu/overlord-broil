@@ -215,6 +215,16 @@ interface PendingAgentMaintenance {
   meta: Record<string, unknown>;
 }
 
+interface PendingUiConfirmation {
+  title: string;
+  message: string;
+  detail?: string;
+  confirmText?: string;
+  color?: StatusColor;
+  testId?: string;
+  onConfirm: () => Promise<void> | void;
+}
+
 const fallbackAction = (
   key: string,
   label: string,
@@ -1312,6 +1322,7 @@ export default function OrchestratorPage() {
   const [scriptTitle, setScriptTitle] = useState("");
   const [scriptText, setScriptText] = useState("");
   const [pendingAgentMaintenance, setPendingAgentMaintenance] = useState<PendingAgentMaintenance | null>(null);
+  const [pendingUiConfirmation, setPendingUiConfirmation] = useState<PendingUiConfirmation | null>(null);
   const [xraySettingServerId, setXraySettingServerId] = useState<number | null>(null);
   const [xraySettingText, setXraySettingText] = useState("");
   const [outboundTestUrl, setOutboundTestUrl] = useState("https://www.google.com/generate_204");
@@ -1967,7 +1978,32 @@ export default function OrchestratorPage() {
     }
   };
 
-  const removeProtocolNode = async (node: ProtocolNode) => {
+  const requestUiConfirmation = (confirmation: PendingUiConfirmation) => {
+    setPendingUiConfirmation(confirmation);
+  };
+
+  const confirmPendingUiAction = async () => {
+    if (!pendingUiConfirmation) {
+      return;
+    }
+    const pending = pendingUiConfirmation;
+    setPendingUiConfirmation(null);
+    await pending.onConfirm();
+  };
+
+  const removeProtocolNode = async (node: ProtocolNode, confirmed = false) => {
+    if (!confirmed) {
+      requestUiConfirmation({
+        title: t("确认删除"),
+        message: t("确定删除协议节点 {name}?", { name: node.name || node.id }),
+        detail: t("如该节点由被控 Agent 托管, 主控会生成远端清理任务。"),
+        confirmText: t("确认删除"),
+        color: "danger",
+        testId: "confirm-delete-protocol-node",
+        onConfirm: () => removeProtocolNode(node, true)
+      });
+      return;
+    }
     const res = await deleteProtocolNode(node.id);
     if (res.code === 0) {
       toast.success(node.engine === "snell" ? t("Snell 删除任务已生成") : t("协议节点已删除"));
@@ -1977,7 +2013,19 @@ export default function OrchestratorPage() {
     }
   };
 
-  const restartNode = async (node: ProtocolNode) => {
+  const restartNode = async (node: ProtocolNode, confirmed = false) => {
+    if (!confirmed) {
+      requestUiConfirmation({
+        title: t("确认重启"),
+        message: t("确定重启协议节点 {name}?", { name: node.name || node.id }),
+        detail: t("节点可能会短暂中断。"),
+        confirmText: t("确认重启"),
+        color: "warning",
+        testId: "confirm-restart-protocol-node",
+        onConfirm: () => restartNode(node, true)
+      });
+      return;
+    }
     const res = await restartProtocolNode(node.id);
     if (res.code === 0) {
       toast.success(node.engine === "snell" ? t("Snell 重启任务已生成") : t("已请求重启 Xray"));
@@ -2022,7 +2070,19 @@ export default function OrchestratorPage() {
     }
   };
 
-  const removeServerForwardRule = async (rule: ServerForwardRule) => {
+  const removeServerForwardRule = async (rule: ServerForwardRule, confirmed = false) => {
+    if (!confirmed) {
+      requestUiConfirmation({
+        title: t("确认删除"),
+        message: t("确定删除远端转发 {name}?", { name: rule.name || rule.id }),
+        detail: t("主控会生成被控端清理任务。"),
+        confirmText: t("确认删除"),
+        color: "danger",
+        testId: "confirm-delete-forward-rule",
+        onConfirm: () => removeServerForwardRule(rule, true)
+      });
+      return;
+    }
     const res = await deleteServerForwardRule(rule.id);
     if (res.code === 0) {
       toast.success(t("远端转发删除任务已生成"));
@@ -2032,7 +2092,19 @@ export default function OrchestratorPage() {
     }
   };
 
-  const restartForwardRule = async (rule: ServerForwardRule) => {
+  const restartForwardRule = async (rule: ServerForwardRule, confirmed = false) => {
+    if (!confirmed) {
+      requestUiConfirmation({
+        title: t("确认重启"),
+        message: t("确定重启远端转发 {name}?", { name: rule.name || rule.id }),
+        detail: t("转发连接可能会短暂中断。"),
+        confirmText: t("确认重启"),
+        color: "warning",
+        testId: "confirm-restart-forward-rule",
+        onConfirm: () => restartForwardRule(rule, true)
+      });
+      return;
+    }
     const res = await restartServerForwardRule(rule.id);
     if (res.code === 0) {
       toast.success(t("远端转发重启任务已生成"));
@@ -2336,13 +2408,25 @@ export default function OrchestratorPage() {
     patchThreeXuiInboundForm(defaults[protocol]);
   };
 
-  const saveThreeXuiInbound = async () => {
+  const saveThreeXuiInbound = async (confirmed = false) => {
     if (!threeXuiInboundForm.serverId) {
       toast.error(t("请选择服务器"));
       return;
     }
     if (threeXuiInboundForm.mode !== "add" && !threeXuiInboundForm.inboundId.trim()) {
       toast.error(t("更新或删除入站时必须填写 inbound id"));
+      return;
+    }
+    if (threeXuiInboundForm.mode === "delete" && !confirmed) {
+      requestUiConfirmation({
+        title: t("确认删除入站"),
+        message: t("确定删除 3x-ui inbound #{id}?", { id: threeXuiInboundForm.inboundId || "-" }),
+        detail: t("该操作会直接修改远端 3x-ui 面板。"),
+        confirmText: t("确认删除"),
+        color: "danger",
+        testId: "confirm-delete-three-xui-inbound",
+        onConfirm: () => saveThreeXuiInbound(true)
+      });
       return;
     }
 
@@ -2391,7 +2475,7 @@ export default function OrchestratorPage() {
     setXraySettingModalOpen(true);
   };
 
-  const saveXraySetting = async () => {
+  const saveXraySetting = async (confirmed = false) => {
     if (!xraySettingServerId) {
       toast.error(t("缺少服务器"));
       return;
@@ -2400,6 +2484,18 @@ export default function OrchestratorPage() {
       JSON.parse(xraySettingText);
     } catch (error) {
       toast.error(t("Xray 配置 JSON 格式不正确"));
+      return;
+    }
+    if (!confirmed) {
+      requestUiConfirmation({
+        title: t("确认保存出站"),
+        message: t("确定保存 Xray / Outbound 配置到 3x-ui?"),
+        detail: t("无效出站 JSON 可能影响远端路由, 请确认内容后继续。"),
+        confirmText: t("确认保存"),
+        color: "warning",
+        testId: "confirm-save-xray-setting",
+        onConfirm: () => saveXraySetting(true)
+      });
       return;
     }
 
@@ -2420,7 +2516,19 @@ export default function OrchestratorPage() {
     }
   };
 
-  const restartXray = async (server: ControlServer) => {
+  const restartXray = async (server: ControlServer, confirmed = false) => {
+    if (!confirmed) {
+      requestUiConfirmation({
+        title: t("确认重启 Xray"),
+        message: t("确定重启 {name} 的 Xray?", { name: server.name }),
+        detail: t("该服务器上的活动连接可能会重新连接。"),
+        confirmText: t("确认重启"),
+        color: "warning",
+        testId: "confirm-restart-xray",
+        onConfirm: () => restartXray(server, true)
+      });
+      return;
+    }
     const res = await restartThreeXuiXray(server.id);
     if (isThreeXuiSuccess(res)) {
       toast.success(t("已请求重启 Xray"));
@@ -2459,7 +2567,19 @@ export default function OrchestratorPage() {
     }
   };
 
-  const removeServer = async (server: ControlServer) => {
+  const removeServer = async (server: ControlServer, confirmed = false) => {
+    if (!confirmed) {
+      requestUiConfirmation({
+        title: t("确认删除服务器"),
+        message: t("确定删除被控服务器 {name}?", { name: server.name }),
+        detail: t("该操作只删除主控记录, 不会自动卸载远端服务。"),
+        confirmText: t("确认删除"),
+        color: "danger",
+        testId: "confirm-delete-server",
+        onConfirm: () => removeServer(server, true)
+      });
+      return;
+    }
     const res = await deleteControlServer(server.id);
     if (res.code === 0) {
       toast.success(t("服务器已删除"));
@@ -2469,7 +2589,19 @@ export default function OrchestratorPage() {
     }
   };
 
-  const removeProfile = async (profile: ProtocolProfile) => {
+  const removeProfile = async (profile: ProtocolProfile, confirmed = false) => {
+    if (!confirmed) {
+      requestUiConfirmation({
+        title: t("确认删除模板"),
+        message: t("确定删除协议模板 {name}?", { name: profile.name || profile.id }),
+        detail: t("已有节点不会变化, 但该模板无法继续复用。"),
+        confirmText: t("确认删除"),
+        color: "danger",
+        testId: "confirm-delete-profile",
+        onConfirm: () => removeProfile(profile, true)
+      });
+      return;
+    }
     const res = await deleteProtocolProfile(profile.id);
     if (res.code === 0) {
       toast.success(t("协议模板已删除"));
@@ -2479,7 +2611,19 @@ export default function OrchestratorPage() {
     }
   };
 
-  const removeTask = async (task: DeployTask) => {
+  const removeTask = async (task: DeployTask, confirmed = false) => {
+    if (!confirmed) {
+      requestUiConfirmation({
+        title: t("确认删除任务"),
+        message: t("确定删除部署任务 #{id}?", { id: task.id }),
+        detail: t("该任务的脚本和执行结果记录会被移除。"),
+        confirmText: t("确认删除"),
+        color: "danger",
+        testId: "confirm-delete-task",
+        onConfirm: () => removeTask(task, true)
+      });
+      return;
+    }
     const res = await deleteDeployTask(task.id);
     if (res.code === 0) {
       toast.success(t("部署任务已删除"));
@@ -3917,7 +4061,7 @@ export default function OrchestratorPage() {
           </ModalBody>
           <ModalFooter>
             <Button variant="light" onPress={() => setThreeXuiInboundModalOpen(false)}>{t("取消")}</Button>
-            <Button color={threeXuiInboundForm.mode === "delete" ? "danger" : "primary"} isLoading={submitting} onPress={saveThreeXuiInbound}>{t("提交")}</Button>
+            <Button color={threeXuiInboundForm.mode === "delete" ? "danger" : "primary"} isLoading={submitting} onPress={() => saveThreeXuiInbound()}>{t("提交")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
@@ -3938,7 +4082,7 @@ export default function OrchestratorPage() {
           </ModalBody>
           <ModalFooter>
             <Button variant="light" onPress={() => setXraySettingModalOpen(false)}>{t("取消")}</Button>
-            <Button color="primary" isLoading={submitting} onPress={saveXraySetting}>{t("保存到 3x-ui")}</Button>
+            <Button color="primary" isLoading={submitting} onPress={() => saveXraySetting()}>{t("保存到 3x-ui")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
@@ -3961,6 +4105,28 @@ export default function OrchestratorPage() {
           <ModalFooter>
             <Button variant="light" onPress={() => setPendingAgentMaintenance(null)}>{t("取消")}</Button>
             <Button color="danger" isLoading={submitting} onPress={confirmPendingAgentMaintenance}>{t("确认执行")}</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={Boolean(pendingUiConfirmation)} onOpenChange={open => !open && setPendingUiConfirmation(null)} size="lg">
+        <ModalContent data-testid={pendingUiConfirmation?.testId || "ui-action-confirm"}>
+          <ModalHeader>{pendingUiConfirmation?.title || t("确认操作")}</ModalHeader>
+          <ModalBody>
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-gray-900 dark:text-white">{pendingUiConfirmation?.message}</p>
+              {pendingUiConfirmation?.detail && (
+                <div className="rounded-small border border-warning-200 bg-warning-50 p-3 text-sm text-warning-800 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-200">
+                  {pendingUiConfirmation.detail}
+                </div>
+              )}
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={() => setPendingUiConfirmation(null)}>{t("取消")}</Button>
+            <Button color={(pendingUiConfirmation?.color || "danger") as any} isLoading={submitting} onPress={confirmPendingUiAction}>
+              {pendingUiConfirmation?.confirmText || t("确认")}
+            </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

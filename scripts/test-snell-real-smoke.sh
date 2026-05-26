@@ -291,6 +291,61 @@ verify_snell_present() {
   fi
 }
 
+verify_snell_absent() {
+  notice "Verifying Snell service ${SERVICE_NAME} and port ${SNELL_PORT} were removed."
+  if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+    if systemctl is-active "$SERVICE_NAME" >/dev/null 2>&1; then
+      systemctl --no-pager --full status "$SERVICE_NAME" || true
+      echo "Snell service ${SERVICE_NAME} is still active after delete." >&2
+      exit 1
+    fi
+  elif command -v rc-service >/dev/null 2>&1; then
+    if rc-service "${SERVICE_NAME%.service}" status >/dev/null 2>&1; then
+      rc-service "${SERVICE_NAME%.service}" status || true
+      echo "Snell service ${SERVICE_NAME} is still active after delete." >&2
+      exit 1
+    fi
+  fi
+
+  if command -v ss >/dev/null 2>&1; then
+    if ss -lntup | grep -q ":${SNELL_PORT}\\b"; then
+      ss -lntup | grep ":${SNELL_PORT}\\b" >&2 || true
+      echo "Snell port ${SNELL_PORT} is still listening after delete." >&2
+      exit 1
+    fi
+  elif command -v netstat >/dev/null 2>&1; then
+    if netstat -lntup | grep -q ":${SNELL_PORT}\\b"; then
+      netstat -lntup | grep ":${SNELL_PORT}\\b" >&2 || true
+      echo "Snell port ${SNELL_PORT} is still listening after delete." >&2
+      exit 1
+    fi
+  else
+    echo "ss or netstat is required for port verification." >&2
+    exit 1
+  fi
+
+  api_post /api/v1/protocol-node/list "{\"serverId\":${SERVER_ID},\"engine\":\"snell\"}"
+  RESPONSE_BODY="$RESPONSE_BODY" NODE_ID="$NODE_ID" "$PYTHON_BIN" - <<'PY'
+import json
+import os
+
+target = str(os.environ["NODE_ID"])
+obj = json.loads(os.environ["RESPONSE_BODY"])
+data = obj.get("data")
+items = []
+if isinstance(data, list):
+    items = data
+elif isinstance(data, dict):
+    for key in ("records", "list", "items", "rows"):
+        if isinstance(data.get(key), list):
+            items = data[key]
+            break
+for item in items:
+    if str(item.get("id")) == target and item.get("state") not in ("deleted", "absent"):
+        raise SystemExit(f"Snell node {target} was not deleted: {item}")
+PY
+}
+
 delete_node() {
   if [ -z "$NODE_ID" ]; then
     return
@@ -302,6 +357,7 @@ delete_node() {
   if [ -n "$TASK_ID" ]; then
     run_agent_once
     wait_for_task
+    verify_snell_absent
   fi
 }
 

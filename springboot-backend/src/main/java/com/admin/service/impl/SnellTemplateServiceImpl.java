@@ -183,10 +183,16 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
                 psk = ${PSK}
                 ipv6 = true
                 SNELL_CONFIG
-                  if id -u nobody >/dev/null 2>&1; then
-                    chown nobody "$MAIN_CONFIG_PATH"
-                  fi
+                  chown "$(service_user)" "$MAIN_CONFIG_PATH"
                   chmod 600 "$MAIN_CONFIG_PATH"
+                }
+
+                service_user() {
+                  if id -u nobody >/dev/null 2>&1; then
+                    echo nobody
+                  else
+                    echo root
+                  fi
                 }
 
                 assert_service_active() {
@@ -215,7 +221,7 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
 
                 [Service]
                 Type=simple
-                User=nobody
+                User=$(service_user)
                 ExecStart=${BINARY_PATH} -c ${MAIN_CONFIG_PATH}
                 Restart=on-failure
                 RestartSec=5
@@ -235,7 +241,7 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
                 command="${BINARY_PATH}"
                 command_args="-c ${MAIN_CONFIG_PATH}"
                 command_background="yes"
-                command_user="nobody"
+                command_user="$(service_user)"
                 pidfile="/run/${SERVICE_BASE}.pid"
                 output_log="/var/log/${SERVICE_BASE}.log"
                 error_log="/var/log/${SERVICE_BASE}.err"
@@ -273,16 +279,57 @@ public class SnellTemplateServiceImpl implements SnellTemplateService {
                   manager="$(detect_service_manager)"
                   if [ "$manager" = "systemd" ]; then
                     systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+                    sleep 1
+                    assert_service_inactive "$manager"
                     systemctl disable "$SERVICE_NAME" 2>/dev/null || true
                     rm -f "$SYSTEMD_SERVICE_PATH"
                     systemctl daemon-reload
                   else
                     rc-service "$SERVICE_BASE" stop 2>/dev/null || true
+                    sleep 1
+                    assert_service_inactive "$manager"
                     rc-update del "$SERVICE_BASE" default 2>/dev/null || true
                     rm -f "$OPENRC_SERVICE_PATH"
                   fi
                   rm -f "$MAIN_CONFIG_PATH"
+                  assert_port_closed
                   echo "Snell node removed. Config path was ${MAIN_CONFIG_PATH}."
+                }
+
+                assert_service_inactive() {
+                  local manager="$1"
+                  if [ "$manager" = "systemd" ]; then
+                    if systemctl is-active --quiet "$SERVICE_NAME"; then
+                      systemctl --no-pager --full status "$SERVICE_NAME" || true
+                      echo "Snell service ${SERVICE_NAME} is still active after stop." >&2
+                      exit 1
+                    fi
+                  else
+                    if rc-service "$SERVICE_BASE" status >/dev/null 2>&1; then
+                      rc-service "$SERVICE_BASE" status || true
+                      echo "Snell service ${SERVICE_BASE} is still active after stop." >&2
+                      exit 1
+                    fi
+                  fi
+                }
+
+                port_listening() {
+                  if command -v ss >/dev/null 2>&1; then
+                    ss -lntup | grep -q ":${PORT}\\b"
+                    return
+                  fi
+                  if command -v netstat >/dev/null 2>&1; then
+                    netstat -lntup | grep -q ":${PORT}\\b"
+                    return
+                  fi
+                  return 1
+                }
+
+                assert_port_closed() {
+                  if port_listening; then
+                    echo "Snell port ${PORT} is still listening after removal." >&2
+                    exit 1
+                  fi
                 }
 
                 restart_snell() {

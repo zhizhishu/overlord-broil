@@ -31,8 +31,8 @@ public final class MasterSelfProtectionUtils {
         if (reason == null) {
             return null;
         }
-        return "主控安全模式：master 服务器禁止" + safeLabel(portLabel) + "使用受保护端口 "
-                + port + "（" + reason + "），请更换为 agent 服务器或其他端口。";
+        return "Master safety mode: " + safeLabel(portLabel) + " cannot use protected port "
+                + port + " (" + reason + "). Use an agent server or another port.";
     }
 
     public static String validateAction(ControlServer server, String action, String operationName) {
@@ -43,8 +43,8 @@ public final class MasterSelfProtectionUtils {
         if (!DESTRUCTIVE_ACTIONS.contains(normalized)) {
             return null;
         }
-        return "主控安全模式：master 服务器禁止执行" + safeLabel(operationName)
-                + "的删除、停止或清理类动作（" + normalized + "），请在 agent 服务器上操作。";
+        return "Master safety mode: destructive action " + normalized + " is blocked for "
+                + safeLabel(operationName) + " on the master server. Run it on an agent server.";
     }
 
     public static String validateListenPortAndAction(ControlServer server, Integer port, String action,
@@ -62,16 +62,16 @@ public final class MasterSelfProtectionUtils {
 
     private static Map<Integer, String> protectedListenPorts() {
         Map<Integer, String> ports = new LinkedHashMap<>();
-        ports.put(80, "HTTP/ACME 证书验证端口");
-        ports.put(5166, "默认前端入口端口");
-        ports.put(6365, "后端 API 端口");
-        ports.put(3306, "MySQL 数据库端口");
-        ports.put(8081, "前端端口");
-        ports.put(8066, "phpMyAdmin 端口");
-        ports.put(22, "SSH 管理端口");
-        putEnvPort(ports, "FRONTEND_PORT", "FRONTEND_PORT 前端端口");
-        putEnvPort(ports, "BACKEND_PORT", "BACKEND_PORT 后端端口");
-        putEnvPort(ports, "PHPMYADMIN_PORT", "PHPMYADMIN_PORT phpMyAdmin 端口");
+        ports.put(80, "HTTP/ACME challenge port");
+        ports.put(5166, "master Web/API entry");
+        ports.put(6365, "legacy backend debug alias");
+        ports.put(3306, "database port");
+        ports.put(8081, "legacy frontend port");
+        ports.put(8066, "legacy phpMyAdmin port");
+        ports.put(22, "SSH management port");
+        putEnvPort(ports, "FRONTEND_PORT", "configured master entry port");
+        putEnvPort(ports, "BACKEND_PORT", "configured legacy/debug backend alias");
+        putEnvPort(ports, "PHPMYADMIN_PORT", "configured phpMyAdmin maintenance port");
         return ports;
     }
 
@@ -95,6 +95,6 @@ public final class MasterSelfProtectionUtils {
     }
 
     private static String safeLabel(String label) {
-        return label == null || label.trim().isEmpty() ? "操作" : label.trim();
+        return label == null || label.trim().isEmpty() ? "operation" : label.trim();
     }
 }

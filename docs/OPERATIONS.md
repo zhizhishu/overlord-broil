@@ -261,7 +261,7 @@ The Snell real smoke script is intentionally not part of the default CI gate bec
 OB_MASTER_URL="http://127.0.0.1:5166" OB_SNELL_PORT=18390 bash scripts/test-snell-real-smoke.sh
 ```
 
-By default it creates a temporary Snell protocol node, waits for the agent path, verifies service state and the listen port, queries Runtime State overview, then deletes the node. Set `OB_SNELL_KEEP=1` only when you intentionally want to keep the test node.
+By default it creates a temporary Snell protocol node, waits for the agent path, verifies service state and the listen port, queries Runtime State overview, then deletes the node. The delete phase verifies that the service is inactive, the listen port is closed and the node is no longer active. Set `OB_SNELL_KEEP=1` only when you intentionally want to keep the test node.
 
 Manual real 3x-ui read-only check:
 

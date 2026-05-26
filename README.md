@@ -335,7 +335,7 @@ To create, toggle and delete a temporary VLESS inbound on the real 3x-ui host, o
 THREE_XUI_E2E_WRITE=1 THREE_XUI_E2E_PORT=42123 bash scripts/test-three-xui-e2e.sh
 ```
 
-Real Snell smoke runs against a live master/agent host. It logs in to the master, creates a temporary Snell protocol node, lets the controlled agent claim the task, checks the service and listen port, then deletes the temporary node by default:
+Real Snell smoke runs against a live master/agent host. It logs in to the master, creates a temporary Snell protocol node, lets the controlled agent claim the task, checks the service and listen port, then deletes the temporary node by default. The delete phase also verifies that the service is inactive, the listen port is closed and the protocol-node state is no longer active:
 
 ```bash
 OB_MASTER_URL="http://127.0.0.1:5166" OB_SNELL_PORT=18390 bash scripts/test-snell-real-smoke.sh

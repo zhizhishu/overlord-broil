@@ -23,4 +23,6 @@ public interface ProtocolNodeService extends IService<ProtocolNode> {
     R syncNodes(ProtocolNodeQueryDto dto);
 
     void applyAgentResultNodes(DeployTask task, JSONObject result);
+
+    void applyAgentTaskFailure(DeployTask task, JSONObject result, String state);
 }

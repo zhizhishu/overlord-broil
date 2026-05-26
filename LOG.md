@@ -2,6 +2,18 @@
 
 ## 2026-05-26
 
+### Snell Cleanup And Operator Confirmation Hardening
+
+- Completed: Snell generated delete scripts now verify service shutdown and closed listen ports before reporting success.
+- Completed: failed or timed-out Snell agent reports update the related protocol node to `failed` or `delete_failed` and persist `lastError` for the master UI.
+- Completed: `scripts/test-snell-real-smoke.sh` now verifies service inactive, port closed and node cleanup after deleting the temporary Snell node.
+- Completed: source default Spring Boot port now matches the single master entry `5166`, while `6365` remains only a debug alias when explicitly exposed.
+- Completed: control-center delete/restart/outbound-save flows now reuse an in-app confirmation modal beyond the existing `agent-maintenance` dangerous-action contract.
+- Validation: shell syntax, agent mock, 3x-ui fixture, master port contract, SQLite schema, frontend `npm run build`, Docker Maven targeted tests `RuntimeProviderServiceTest,DeployTaskServiceImplTest` all passed.
+- Next: push to `origin/main` and `origin/future`, wait for GHCR image build, redeploy `isrco-hk`, rerun live Snell smoke and capture console screenshots.
+
+## 2026-05-26
+
 ### Snell Real Smoke And UI Boot Fix
 
 - Completed: added `scripts/test-snell-real-smoke.sh` for live master/agent Snell validation. It logs in to the master, creates a temporary Snell protocol node, lets the agent claim/report it, verifies service state and listen port, queries Runtime State overview and deletes the node by default.

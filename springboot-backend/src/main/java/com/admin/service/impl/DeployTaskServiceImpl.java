@@ -1296,11 +1296,15 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
     }
 
     private void applyAgentResultMetadata(DeployTask task, String resultJson, String state) {
-        if (!STATE_SUCCEEDED.equals(state) || resultJson == null || resultJson.trim().isEmpty()) {
+        if (resultJson == null || resultJson.trim().isEmpty()) {
             return;
         }
         try {
             JSONObject root = JSON.parseObject(resultJson);
+            if (!STATE_SUCCEEDED.equals(state)) {
+                protocolNodeService.applyAgentTaskFailure(task, root, state);
+                return;
+            }
             protocolNodeService.applyAgentResultNodes(task, root);
             serverForwardRuleService.applyAgentResultForwardRules(task, root);
 

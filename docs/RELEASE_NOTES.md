@@ -41,6 +41,8 @@ This release moves the project from the first public production milestone into a
 - Future branch update: added `operation_audit_log` plus a control-center Operation Audit panel. Deploy/orchestration task creation, rejection, manual state update, retry/delete, agent task claim and agent task report events now record actor, server, provider, action, outcome and dangerous-action markers.
 - Future branch update: added `scripts/test-snell-real-smoke.sh` for live master/agent Snell validation, and hardened generated Snell services so configs are readable by the `nobody` runtime user and install/restart tasks fail unless the service becomes active.
 - Future branch update: improved control-center testability and operator safety with stable `data-testid` hooks on key orchestration panels and an in-app dangerous-action confirmation modal.
+- Future branch update: hardened Snell cleanup and failure feedback. Snell delete tasks now verify service shutdown and closed listen ports before reporting success, failed/timeout Snell tasks update protocol-node state and `lastError`, and the live Snell smoke script verifies cleanup after temporary-node deletion.
+- Future branch update: aligned the source default server port with the single master entry (`5166`) and extended in-app confirmation to destructive/restart/save flows outside the agent-maintenance catalog.
 
 ### 0.6.0 Capability Matrix
 
