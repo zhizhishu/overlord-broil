@@ -30,6 +30,7 @@ This release moves the project from the first public production milestone into a
 - Future branch update: State Sync rows can now create provider-aware `agent-maintenance` diagnostics and XUI/Snell repair tasks, keeping the visible state panel connected to the same controlled-agent execution/report path.
 - Future branch update: `agent-maintenance logs` now returns structured `logs.items` for Flux agent, x-ui/Xray, Snell, forwarding and task-log sources, and the master task card can show a remote-log summary before raw output.
 - Future branch update: Runtime Provider descriptors now include an Action Catalog for `agent-maintenance`; backend validation, State Sync row actions and server-card Agent buttons share the same action metadata.
+- Future branch update: tightened the master single-port contract. The installer now removes legacy split-stack containers (`vite-frontend`, `springboot-backend`, `gost-phpmyadmin`) during install/upgrade, and CI/release checks validate that default compose files publish only the `flux-master` entry.
 
 ### 0.6.0 Capability Matrix
 
@@ -50,10 +51,11 @@ This release moves the project from the first public production milestone into a
 | State Sync actions | Runtime rows can generate provider-aware diagnostics and XUI/Snell repairs as normal `agent-maintenance` tasks for the controlled agent. |
 | Runtime Provider Action Catalog | Provider descriptors register maintenance action labels, categories, danger flags and State Sync visibility; backend validation and master UI buttons reuse that catalog. |
 | Remote runtime logs | `agent-maintenance logs` reports structured `logs.items` for Flux agent, x-ui/Xray, Snell, forwarding and task logs, with task-card summaries in the master UI. |
+| Master port contract | Default compose files publish only one host port for `flux-master`; installer upgrades remove legacy split containers so old `80/6365/8066` mappings do not remain. |
 | Linux coverage | Docker/CI diagnostics cover Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux userspaces. |
 | 3x-ui | API fixture remains API-level; full 3x-ui install/configure still targets systemd hosts. |
 | Snell | Product-level protocol node with separate systemd/OpenRC runtime, not a native Xray/3x-ui core protocol. |
-| Verification | Shell syntax, agent mock, 3x-ui fixture, frontend build, backend Maven build, install matrix and single-image compose smoke. |
+| Verification | Shell syntax, agent mock, 3x-ui fixture, master port contract, frontend build, backend Maven build, install matrix and single-image compose smoke. |
 
 ### Honest Boundaries
 

@@ -2,7 +2,7 @@
 
 ## Handoff Summary
 
-当前目标：继续朝用户给出的 `flux-master` 单体主控架构推进，把 `Task -> Agent -> Execute -> Report -> Master` 链路做实；本轮已完成 Runtime Provider Action Catalog 本地实现和验证，准备提交推送并确认 GitHub Actions / GHCR 镜像结果。
+当前目标：继续朝用户给出的 `flux-master` 单体主控架构推进，把 `Task -> Agent -> Execute -> Report -> Master` 链路做实；Runtime Provider Action Catalog 已完成远端验证。本轮已收口默认单端口主控契约，准备提交推送并等待 GitHub Actions / GHCR 镜像结果。
 
 已完成：
 - 已确认父级 `C:\Users\echo\Downloads\claude` 只是存放根目录，不在父级写日志或计划。
@@ -35,9 +35,16 @@
 - 本轮已让 `DeployTaskServiceImpl.validateDeployTask` 复用 Runtime Provider Action Catalog 校验 `agent-maintenance` 动作，移除散落白名单。
 - 本轮已让主控 State Sync 行诊断/修复动作和服务器卡片 Agent 按钮从 catalog 派生，并保留前端 fallback catalog 防止旧后端升级期按钮消失。
 - 本轮已同步 README、中文 README、Operations、Release Notes 和 PROJECT_CONTEXT，说明 Action Catalog 是后端校验和主控按钮的统一动作契约。
+- 已提交并推送 `bfff02e Add runtime provider action catalog` 到 `origin/main` 和 `origin/future`。
+- 已确认 `bfff02e` 的 GitHub Actions：main CI、main Docker Images、main Pages、future CI、future Docker Images 均成功。
+- 已确认 GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 更新到 index digest `sha256:007b640226dc97b977f15f749a47d8af4db09262290d4cfe9aa16a6d78fb5668`，linux/amd64 digest `sha256:6c8055292c50e113d9eb5b47d2fb4150c49af22f973aa97f29fd8dfbaec9aafe`。
+- 本轮已补强默认单端口主控契约：`install-master.sh` 安装/升级前会清理旧分离栈容器 `vite-frontend`、`springboot-backend`、`gost-phpmyadmin`，避免它们继续暴露 `80/6365/8066`。
+- 本轮已新增 `scripts/test-master-port-contract.sh`，验证默认 `docker-compose.yml`、`docker-compose-v4.yml`、`docker-compose-v6.yml` 只公开一个 `flux-master` 主控入口。
+- 本轮已把端口契约测试接入 GitHub Actions CI 和 `scripts/release-check.sh`。
+- 本轮已同步 README、中文 README、Operations、Release Notes 和 PROJECT_CONTEXT，说明单端口主控、旧容器迁移清理和验证命令。
 
 下一步：
-- 提交并推送 Action Catalog 到 `origin/main` 和 `origin/future`。
+- 提交并推送单端口主控契约改动到 `origin/main` 和 `origin/future`。
 - 等待并确认 GitHub Actions / GHCR 镜像结果。
 
 关键文件：
@@ -81,6 +88,13 @@
 - 本轮 Action Catalog 已通过 `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'`。
 - 本轮 Action Catalog 已通过 `bash scripts/test-flux-agent-mock.sh`。
 - 本轮 Action Catalog 已通过 `git diff --check`，仅有 Windows LF/CRLF 提示。
+- 本轮 Action Catalog 已通过远端 GitHub Actions / GHCR 验证：`bfff02e` 的 main/future CI 和 Docker Images 成功，main Pages 成功；GHCR latest index digest 为 `sha256:007b640226dc97b977f15f749a47d8af4db09262290d4cfe9aa16a6d78fb5668`。
+- 本轮单端口契约已通过 `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'`。
+- 本轮单端口契约已通过 `bash scripts/test-master-port-contract.sh`。
+- 本轮单端口契约已通过 `bash scripts/install-master.sh doctor`。
+- 本轮单端口契约已通过 `bash scripts/test-compose-smoke.sh --build-local --dry-run`。
+- 本轮单端口契约已通过 `bash scripts/test-install-matrix.sh --image debian:12-slim`。
+- 本轮单端口契约已通过 `git diff --check`，仅有 Windows LF/CRLF 提示。
 
 风险/待确认：
 - Runtime Provider 已是融合架构关键层，但真实 VPS 矩阵和真实 3x-ui E2E 仍是正式 1.0 前最大缺口。
@@ -98,7 +112,7 @@
 - 本轮 Action Catalog Docker Maven 测试容器 `flux-action-catalog-test` 使用 `--rm`，已结束且无残留。
 - 本轮 Action Catalog agent mock server 随脚本结束并清理临时目录。
 
-最后更新：2026-05-25 17:06:16 -07:00
+最后更新：2026-05-25 17:31:00 -07:00
 
 ## Active Tasks
 
@@ -116,7 +130,9 @@
 - [x] **Goal:** 提交推送并确认 State Sync 行动作的 GitHub Actions / GHCR 成果。
 - [x] **Goal:** Agent 远端运行时日志结构化回传和主控展示。
 - [x] **Goal:** Runtime Provider Action Catalog 统一动作清单、后端校验和主控触发入口。
-- [ ] **Goal:** 提交推送并确认 Action Catalog 的 GitHub Actions / GHCR 成果。
+- [x] **Goal:** 提交推送并确认 Action Catalog 的 GitHub Actions / GHCR 成果。
+- [x] **Goal:** 收口默认单端口主控契约，并验证旧分离容器/端口不会干扰正式安装。
+- [ ] **Goal:** 提交推送并确认单端口主控契约的 GitHub Actions / GHCR 成果。
 
 ## Notes For Next Agent
 

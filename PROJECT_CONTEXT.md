@@ -13,6 +13,7 @@ The project is currently a `0.6.0` public-trial reliability candidate, not a bro
 - `master`: `flux-master` single image. The Dockerfile builds the Vite UI, embeds it into the Spring Boot jar, and serves both Web UI and API on container port `5166`.
 - `phpmyadmin`: optional maintenance override only. It is not part of the default compose stack and is created by the installer only when `PHPMYADMIN_PORT` is set.
 - Legacy split `backend`/`frontend` compose files are retained as `docker-compose.legacy-v4.yml` and `docker-compose.legacy-v6.yml` for rollback/debug only.
+- During install or upgrade, the installer removes old split-stack containers named `vite-frontend`, `springboot-backend`, and `gost-phpmyadmin` before starting the single-image master stack.
 
 Default public master exposure:
 
@@ -77,6 +78,7 @@ Controlled hosts may expose business ports depending on orchestration choices:
 - Agent maintenance actions: diagnostics, logs, restart, upgrade, uninstall, retry, and repair.
 - Structured certificate/firewall/install diagnostic summaries in task results.
 - Local traffic snapshot sync for 3x-ui.
+- Master port contract check: `scripts/test-master-port-contract.sh` validates that default compose files publish only the `flux-master` entry and that installer migration guards stay in place.
 
 ## Install And Upgrade
 

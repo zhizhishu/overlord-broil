@@ -72,6 +72,8 @@ jobs:
           docker compose -f docker-compose-v6.yml config --quiet
           docker compose -f docker-compose.legacy-v4.yml config --quiet
           docker compose -f docker-compose.legacy-v6.yml config --quiet
+      - name: Validate master port contract
+        run: bash scripts/test-master-port-contract.sh
       - name: Dry-run compose smoke script
         run: bash scripts/test-compose-smoke.sh --build-local --dry-run
       - name: Run compose smoke test

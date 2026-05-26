@@ -145,3 +145,33 @@
   - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
 - 清理：Docker Maven 容器 `flux-action-catalog-test` 使用 `--rm`，已结束无残留；agent mock 临时服务随脚本结束；本阶段未启动长期 dev server。
 - 后续：提交并推送到 `origin/main` 和 `origin/future`，再检查 GitHub Actions 与 GHCR 镜像状态。
+
+### Action Catalog Remote Verification
+
+- 完成：确认 `bfff02e Add runtime provider action catalog` 已同步到 `origin/main` 和 `origin/future`，并完成远端 CI、Docker Images、Pages 与 GHCR 镜像验证。
+- 验证：
+  - `origin/main` 和 `origin/future` 均指向 `bfff02e03dc9d3c07a352df9f2982a0ccd7655ec`。
+  - main Docker Images run `26424999510` 成功，main CI run `26424999514` 成功，main Pages deployment 成功。
+  - future Docker Images run `26425008996` 成功，future CI run `26425009019` 成功。
+  - GHCR `ghcr.io/zhizhishu/flux-3xui-orchestrator-master:latest` 可读取，index digest 为 `sha256:007b640226dc97b977f15f749a47d8af4db09262290d4cfe9aa16a6d78fb5668`，linux/amd64 digest 为 `sha256:6c8055292c50e113d9eb5b47d2fb4150c49af22f973aa97f29fd8dfbaec9aafe`。
+- 清理：本阶段只使用 `gh` 和 Docker manifest/imagetools 读取远端状态，未启动本地服务、未占用端口、未创建容器。
+- 后续：收口默认单端口主控契约，避免旧分离容器或可选维护端口影响正式安装体验。
+
+### Master Single-Port Contract
+
+- 完成：补强默认单端口主控契约，确保正式安装继续朝 `mysql + flux-master` 单体主控形态收口。
+- 修改：
+  - `install-master.sh` 安装/升级前会移除旧分离栈容器 `vite-frontend`、`springboot-backend`、`gost-phpmyadmin`，避免旧 `80/6365/8066` 映射残留。
+  - `install-master.sh doctor` 增加旧分离容器提示，并给 Docker daemon 检查加超时，避免预检卡死。
+  - 新增 `scripts/test-master-port-contract.sh`，验证默认 compose 文件只发布一个 `flux-master` 主控入口，并确认安装脚本保留端口迁移、防 phpMyAdmin 默认暴露和旧容器清理保护。
+  - GitHub Actions CI 和 `scripts/release-check.sh` 接入 master port contract 测试。
+  - README、中文 README、Operations、Release Notes 和 PROJECT_CONTEXT 补充单端口主控、旧容器迁移清理和验证命令说明。
+- 验证：
+  - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-flux-agent-bootstrap.sh'` 通过。
+  - `bash scripts/test-master-port-contract.sh` 通过。
+  - `bash scripts/install-master.sh doctor` 通过。
+  - `bash scripts/test-compose-smoke.sh --build-local --dry-run` 通过。
+  - `bash scripts/test-install-matrix.sh --image debian:12-slim` 通过。
+  - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
+- 清理：本阶段未启动长期服务；Debian install-matrix Docker 容器使用 `--rm` 自动清理；未保留端口监听。
+- 后续：提交并推送到 `origin/main` 和 `origin/future`，再确认 GitHub Actions 与 GHCR 镜像状态。

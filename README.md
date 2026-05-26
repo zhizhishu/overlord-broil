@@ -88,6 +88,8 @@ The master exposes one public entry by default:
 | `3306/tcp` | MySQL | no, Docker network only |
 | phpMyAdmin | temporary maintenance | no, only with `FLUX_PHPMYADMIN_PORT` |
 
+During install or upgrade, the script removes legacy split-stack containers named `vite-frontend`, `springboot-backend` and `gost-phpmyadmin` so old `80/6365/8066` exposures do not survive the move to the single `flux-master` entry. CI and the release gate run `scripts/test-master-port-contract.sh` to keep the default compose files publishing only the master entry.
+
 Controlled agents do not need an inbound management port. They call the same master URL users open in the browser, for example:
 
 ```text

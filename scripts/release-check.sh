@@ -102,6 +102,9 @@ docker compose -f docker-compose-v6.yml config --quiet
 docker compose -f docker-compose.legacy-v4.yml config --quiet
 docker compose -f docker-compose.legacy-v6.yml config --quiet
 
+step "Validate master port contract"
+bash scripts/test-master-port-contract.sh
+
 step "Build frontend with Docker Node 22"
 docker run --rm \
   -v "${PROJECT_ROOT}:/workspace" \

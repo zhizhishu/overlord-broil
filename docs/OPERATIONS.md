@@ -29,6 +29,8 @@ This checklist is for running Flux 3x-ui Orchestrator as a small authorized mast
 | `3306/tcp` | MySQL | Docker internal only in shipped compose files. |
 | phpMyAdmin | Maintenance UI | Disabled by default. Expose temporarily with `FLUX_PHPMYADMIN_PORT`. |
 
+The installer removes legacy split-stack containers named `vite-frontend`, `springboot-backend` and `gost-phpmyadmin` during install/upgrade. This prevents old Flux-derived deployments from leaving public `80/6365/8066` ports active after the default runtime has moved to the single `flux-master` entry.
+
 Controlled hosts do not need an inbound agent port. Agents call the same master entry URL that users open in the browser, for example `http://master:5166`.
 
 Controlled-host business ports are created by your orchestration choices: optional 3x-ui panel port `5168`, Xray/Snell node ports, remote-forward listen ports and ACME HTTP `80/tcp` when selected.
@@ -85,6 +87,12 @@ Expose direct backend or phpMyAdmin only during maintenance:
 ```bash
 sudo env FLUX_EXPOSE_BACKEND="1" FLUX_BACKEND_PORT="6365" bash /opt/flux-3xui-orchestrator/install-master.sh upgrade
 sudo env FLUX_PHPMYADMIN_PORT="18066" bash /opt/flux-3xui-orchestrator/install-master.sh upgrade
+```
+
+Verify the single-entry contract from a checkout:
+
+```bash
+bash scripts/test-master-port-contract.sh
 ```
 
 ## Agent Operations

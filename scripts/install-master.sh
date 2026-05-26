@@ -278,6 +278,14 @@ ensure_docker() {
   fi
 }
 
+docker_daemon_reachable() {
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "${FLUX_DOCKER_INFO_TIMEOUT:-20}" docker info >/dev/null 2>&1
+  else
+    docker info >/dev/null 2>&1
+  fi
+}
+
 download_file() {
   local url="$1"
   local output="$2"
@@ -602,6 +610,30 @@ port_owned_by_flux_container() {
   return 1
 }
 
+list_legacy_split_containers() {
+  local container
+  for container in vite-frontend springboot-backend gost-phpmyadmin; do
+    if docker container inspect "$container" >/dev/null 2>&1; then
+      printf '%s\n' "$container"
+    fi
+  done
+}
+
+remove_legacy_split_containers() {
+  local containers
+  containers="$(list_legacy_split_containers || true)"
+  if [ -z "$containers" ]; then
+    return
+  fi
+
+  echo "Removing legacy split-panel container(s) before starting flux-master single-image:"
+  printf '%s\n' "$containers" | while IFS= read -r container; do
+    [ -n "$container" ] || continue
+    echo "  - ${container}"
+    docker rm -f "$container" >/dev/null
+  done
+}
+
 port_is_listening() {
   local port="$1"
   if command -v ss >/dev/null 2>&1; then
@@ -794,6 +826,7 @@ run_master_doctor() {
   local backend_port="${BACKEND_PORT}"
   local phpmyadmin_port="${PHPMYADMIN_PORT}"
   local expose_backend="${EXPOSE_BACKEND}"
+  local docker_daemon_ok="unknown"
 
   echo "Flux master doctor"
   doctor_item ok "os" "$(detect_os_name)"
@@ -818,10 +851,12 @@ run_master_doctor() {
       doctor_item fail "docker-compose" "docker compose plugin is unavailable"
     fi
     if [ "$require_docker" = "1" ]; then
-      if docker info >/dev/null 2>&1; then
+      if docker_daemon_reachable; then
+        docker_daemon_ok="1"
         doctor_item ok "docker-daemon" "reachable"
       else
-        doctor_item fail "docker-daemon" "not reachable; start Docker before installing the master"
+        docker_daemon_ok="0"
+        doctor_item fail "docker-daemon" "not reachable within ${FLUX_DOCKER_INFO_TIMEOUT:-20}s; start Docker before installing the master"
       fi
     else
       doctor_item warn "docker-daemon" "not required for this doctor run"
@@ -852,6 +887,16 @@ run_master_doctor() {
     doctor_port PHPMYADMIN_PORT "$phpmyadmin_port"
   else
     doctor_item ok "PHPMYADMIN_PORT" "not publicly exposed"
+  fi
+
+  if [ "$docker_daemon_ok" = "1" ]; then
+    local legacy_containers
+    legacy_containers="$(list_legacy_split_containers | paste -sd, - || true)"
+    if [ -n "$legacy_containers" ]; then
+      doctor_item warn "legacy-split-containers" "found ${legacy_containers}; install/upgrade will remove them and keep only mysql + flux-master by default"
+    else
+      doctor_item ok "legacy-split-containers" "none"
+    fi
   fi
 
   if { [ "$expose_backend" = "1" ] && [ "$frontend_port" = "$backend_port" ]; } || { [ -n "$phpmyadmin_port" ] && { [ "$frontend_port" = "$phpmyadmin_port" ] || { [ "$expose_backend" = "1" ] && [ "$backend_port" = "$phpmyadmin_port" ]; }; }; }; then
@@ -960,6 +1005,7 @@ install_or_upgrade() {
   require_env_values "$ENV_FILE"
   ensure_backend_override
   ensure_phpmyadmin_override
+  remove_legacy_split_containers
   preflight_ports
   docker_login_if_configured
   pull_or_build_images

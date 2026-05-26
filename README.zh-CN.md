@@ -88,6 +88,8 @@ UI 继续靠近 Flux Panel：高信息密度、服务器卡片、操作分组、
 | `3306/tcp` | MySQL | 否，仅 Docker 内网 |
 | phpMyAdmin | 临时维护 | 否，仅设置 `FLUX_PHPMYADMIN_PORT` 时暴露 |
 
+安装或升级时，脚本会自动移除旧版分离栈留下的 `vite-frontend`、`springboot-backend`、`gost-phpmyadmin` 容器，避免它们继续占用 `80/6365/8066` 等旧端口。CI 和 release gate 会运行 `scripts/test-master-port-contract.sh`，确保默认 compose 只公开 `5166` 对应的主控入口。
+
 被控服务器不需要暴露 Agent 管理端口。Agent 主动连接主控，例如：
 
 ```text
