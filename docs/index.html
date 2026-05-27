@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Overlord Broil</title>
-    <meta name="description" content="Overlord Broil, 统一管理 3x-ui, Xray/Reality, Snell, 端口转发, 证书, 流量和多服务器 Agent 的主控面板.">
+    <meta name="description" content="Overlord Broil, 统一管理 Xray/Reality, Snell, 端口转发, 证书, 流量和多服务器 Agent 的主控面板.">
     <meta property="og:title" content="Overlord Broil">
     <meta property="og:description" content="一个面向多服务器协议节点部署的主控 / 被控运维产品.">
     <meta property="og:type" content="website">
@@ -21,7 +21,7 @@
         <div class="hero-copy">
           <p class="eyebrow">0.6.0 release candidate</p>
           <h1>Overlord Broil</h1>
-          <p class="lead">一个统一的多服务器主控产品: 在同一个工作台里选择多台服务器, 自动安装 / 配置 3x-ui, 创建 Xray/Reality, Snell 和端口转发节点, 并统一查看证书, 流量, 服务状态和任务审计.</p>
+          <p class="lead">一个统一的多服务器主控产品: 在同一个工作台里选择多台服务器, 自动配置 Xray/Reality, Snell 和端口转发节点, 并统一查看证书, 流量, 服务状态和任务审计.</p>
           <div class="hero-actions"><a class="button primary" href="https://github.com/zhizhishu/overlord-broil">Open Repository</a><a class="button" href="#install">Quick Install</a></div>
         </div>
         <div class="hero-panel"><img src="assets/actual-orchestrator-top.png" alt="Overlord Broil live control center screenshot"></div>
@@ -40,7 +40,7 @@
       <section id="runtime" class="section">
         <div class="section-header"><h2>统一运行时</h2><p>Overlord Broil 不把 Snell 硬塞进 Xray 内核, 而是在主控层把它抽象成统一协议节点, 由 Agent 在被控服务器上部署独立服务.</p></div>
         <div class="feature-grid">
-          <article class="feature-card"><span>XUI / Xray</span><p>通过 3x-ui API 管理 inbound, outbound, Reality, 流量同步和 Xray restart.</p></article>
+          <article class="feature-card"><span>Xray Runtime</span><p>统一管理 inbound, outbound, Reality, 路由规则, IPv4/IPv6 策略, 流量同步和 Xray restart.</p></article>
           <article class="feature-card"><span>Snell</span><p>统一显示在协议节点列表里, 底层由 systemd/OpenRC 管理 Snell 服务.</p></article>
           <article class="feature-card"><span>Forward</span><p>把远端端口转发记录到规则中心, 由 Agent 创建 socat 服务并回报状态.</p></article>
           <article class="feature-card"><span>State Sync</span><p>汇总服务器心跳, 证书, 流量, 服务状态, 任务结果和操作审计.</p></article>
@@ -52,12 +52,12 @@
           <div class="status-item"><span>主控 Web / API</span><span class="tag green">5166/tcp</span></div>
           <div class="status-item"><span>被控 Agent</span><span class="tag green">主动轮询, 无入站端口</span></div>
           <div class="status-item"><span>MySQL / phpMyAdmin</span><span class="tag">默认内网 / 不暴露</span></div>
-          <div class="status-item"><span>3x-ui / Xray / Snell / 转发</span><span class="tag">按节点任务开放</span></div>
+          <div class="status-item"><span>Xray / Snell / 转发</span><span class="tag">按节点任务开放</span></div>
         </div>
       </section>
       <section id="roadmap" class="section">
-        <div class="section-header"><h2>离 1.0 还差什么</h2><p>核心链路已经进入 0.6.0 reliability gate. 下一步重点是真实 VPS 矩阵, 真实 3x-ui 端到端记录, 密钥轮换迁移和更完整的安全治理.</p></div>
-        <ol class="roadmap"><li><div><strong>Real VPS matrix</strong><span>Debian, Ubuntu, Rocky, Oracle Linux, Alpine 真机从安装到卸载跑完整闭环.</span></div></li><li><div><strong>Real 3x-ui smoke</strong><span>使用真实 endpoint/token 验证状态, 入站, Xray config, 并在写入模式创建和删除临时 inbound.</span></div></li><li><div><strong>Security governance</strong><span>补齐 RBAC, 审计导出, Agent token 吊销, 密钥轮换迁移和危险操作策略.</span></div></li></ol>
+        <div class="section-header"><h2>离 1.0 还差什么</h2><p>核心链路已经进入 0.6.0 reliability gate. 下一步重点是真实 VPS 矩阵, 真实 Xray 端到端记录, 密钥轮换迁移和更完整的安全治理.</p></div>
+        <ol class="roadmap"><li><div><strong>Real VPS matrix</strong><span>Debian, Ubuntu, Rocky, Oracle Linux, Alpine 真机从安装到卸载跑完整闭环.</span></div></li><li><div><strong>Real Xray smoke</strong><span>使用真实 endpoint/token 验证状态, 入站, Xray config, 并在写入模式创建和删除临时 inbound.</span></div></li><li><div><strong>Security governance</strong><span>补齐 RBAC, 审计导出, Agent token 吊销, 密钥轮换迁移和危险操作策略.</span></div></li></ol>
       </section>
     </main>
     <footer class="footer"><div class="footer-inner"><strong>Overlord Broil</strong><span>Legal infrastructure orchestration only. See README acknowledgements for upstream references.</span></div></footer>

@@ -407,3 +407,16 @@
 - Completed: rewrote README.zh-CN.md and docs/index.html as valid UTF-8 after detecting a PowerShell encoding regression.
 - Validation: shell syntax, master port contract, agent mock, MySQL and SQLite compose dry-runs, SQLite schema, 3x-ui fixture, frontend build, Docker Maven package and git diff --check passed.
 - Cleanup: no long-running dev server was left open; Docker Maven used --rm and only retained the overlord-broil-m2 cache volume.
+
+### Control Console Status-First UI Pass
+
+- Completed: removed the first-run setup guide from the orchestrator first screen.
+- Completed: added a status-first controlled-server panel under the header with heartbeat, Xray, Snell, compatible API, memory, rule sync and last-error signals.
+- Completed: kept inbound, outbound, routing/config, traffic sync, restart and unified-rule actions while changing visible UI language to Overlord-owned `入站/出站`, `Xray 配置`, `路由/出站`, `兼容 API` and `面板入口`.
+- Completed: added route/outbound guidance in the Xray config modal for `outbounds`, `routing.rules`, `domainStrategy`, DNS, IPv4/IPv6 strategy and rule-order priority.
+- Completed: updated README, README.zh-CN, GitHub Pages, release notes and PROJECT_CONTEXT so upstream names are compatibility/reference details rather than the product identity.
+- Validation:
+  - frontend `npm run build` passed.
+  - `bash scripts/test-three-xui-fixture.sh` passed, including temporary inbound create/toggle/delete against the local fixture.
+  - `git diff --check` passed with only Windows CRLF warnings.
+- Cleanup: no dev server or long-running process was left open.

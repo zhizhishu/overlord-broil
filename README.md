@@ -2,7 +2,7 @@
 
 [涓枃璇存槑](README.zh-CN.md)
 
-Overlord Broil is an independent master/agent operations panel for dense multi-server node orchestration. It unifies 3x-ui, Xray/Reality, Snell, remote port forwarding, certificates, firewall checks, traffic sync and agent maintenance behind one control-plane workflow.
+Overlord Broil is an independent master/agent operations panel for dense multi-server node orchestration. It unifies Xray/Reality, Snell, remote port forwarding, certificates, firewall checks, traffic sync and agent maintenance behind one control-plane workflow.
 
 Current release: `0.6.0`, a public-trial / release-candidate build. It is suitable for self-hosted testing and small authorized deployments, but it is not a broad `1.0` long-term compatibility promise yet.
 
@@ -37,21 +37,21 @@ Runtime Providers are the product boundary between the master task engine and co
 
 | Provider | Scope | Executor | Nano hosts |
 | --- | --- | --- | --- |
-| `xui` | 3x-ui, Xray, Reality, inbounds, outbounds, traffic | master API + agent task | not recommended |
+| `xui` | Xray, Reality, inbounds, outbounds, routing rules, IPv4/IPv6 strategy, traffic | master API + agent task | not recommended |
 | `snell` | Snell node services | agent task | supported |
 | `forward` | TCP/UDP remote forwarding | agent task | supported |
 | `certificate` | self-signed, ACME and certificate diagnostics | agent task | task-dependent |
 | `firewall` | firewall diagnostics and runtime port handling | agent task | supported |
 
-Snell is unified at the product/node-management layer, but it is not a native Xray or 3x-ui core protocol. The controlled agent deploys Snell as an independent service on the target host.
+Snell is unified at the product/node-management layer, but it is not a native Xray core protocol. The controlled agent deploys Snell as an independent service on the target host.
 
 Runtime Provider metadata now follows the task from master claim to agent report. The agent logs the provider it executes, reports it inside `resultJson.runtimeProvider`, and the master attaches the same audit metadata when an older agent omits it.
 
-Task results also include a normalized `resultJson.runtimeState` block. It records `providerKey`, `providerName`, `protocol`, `action`, `taskState`, `sourceTaskId`, `serverId`, `resourceType`, resolved `status`, `statusSource`, `updatedAt`, and optional summaries for service states, protocol nodes, forwarding rules, certificates and diagnostics. The control-center task card renders this block so XUI, Snell, forwarding, certificate and firewall tasks share one status model.
+Task results also include a normalized `resultJson.runtimeState` block. It records `providerKey`, `providerName`, `protocol`, `action`, `taskState`, `sourceTaskId`, `serverId`, `resourceType`, resolved `status`, `statusSource`, `updatedAt`, and optional summaries for service states, protocol nodes, forwarding rules, certificates and diagnostics. The control-center task card renders this block so Xray, Snell, forwarding, certificate and firewall tasks share one status model.
 
-State Sync now lifts those task-level runtime states into a server-by-provider overview. The master exposes `/api/v1/deploy-task/runtime-state/overview`, aggregating latest task results with server heartbeat fields for XUI/Xray, Snell and certificates, and the control center renders the same view as a Overlord-style operations panel.
+State Sync now lifts those task-level runtime states into a server-by-provider overview. The master exposes `/api/v1/deploy-task/runtime-state/overview`, aggregating latest task results with server heartbeat fields for Xray, Snell and certificates, and the control center renders the same view as a Overlord-style operations panel.
 
-The same State Sync rows can also start Runtime Provider maintenance tasks. Operators can launch provider-aware diagnostics from the overview, and XUI/Snell rows expose repair actions that create normal `agent-maintenance` deployment tasks for the controlled agent to claim, execute and report.
+The same State Sync rows can also start Runtime Provider maintenance tasks. Operators can launch provider-aware diagnostics from the overview, and Xray/Snell rows expose repair actions that create normal `agent-maintenance` deployment tasks for the controlled agent to claim, execute and report.
 
 Runtime Provider descriptors now include an Action Catalog for `agent-maintenance` operations. The backend validates maintenance actions from this catalog, and the master UI derives State Sync row actions plus server-card Agent buttons from the same metadata instead of keeping separate hard-coded button lists.
 
@@ -59,9 +59,9 @@ Dangerous maintenance actions, such as agent uninstall or runtime-port closure, 
 
 Operation audit logs now cover the same control path. The master writes `operation_audit_log` rows when operators create, reject, manually update, retry or delete deploy/orchestration tasks, when agents claim tasks, and when agents report success, failure or timeout. The control-center audit panel shows recent actor, server, provider, action, outcome and dangerous-action markers.
 
-Xray/3x-ui orchestration tasks now generate agent-executable scripts instead of placeholder payloads. The controlled agent resolves the local or saved 3x-ui endpoint/token, calls the 3x-ui inbound API to add/delete protocol nodes, can restart Xray, and reports inbound metadata back through `OB_AGENT_RESULT_JSON`.
+Xray orchestration tasks now generate agent-executable scripts instead of placeholder payloads. The controlled agent resolves the local or saved compatible-panel endpoint/token, calls the inbound API to add/delete protocol nodes, can restart Xray, and reports inbound metadata back through `OB_AGENT_RESULT_JSON`.
 
-Agent task history redacts 3x-ui secrets before storage. Installation/orchestration reports can still update encrypted server credentials, but stored `resultJson` keeps only configured flags instead of raw API tokens, passwords or 2FA codes.
+Agent task history redacts panel secrets before storage. Installation/orchestration reports can still update encrypted server credentials, but stored `resultJson` keeps only configured flags instead of raw API tokens, passwords or 2FA codes.
 
 Firewall maintenance is also executable from the same provider contract. `open-runtime-ports` and `close-runtime-ports` parse requested runtime ports from task `requestJson`, apply local `ufw`, `firewalld` or `iptables` rules when available, and then return structured diagnostics. Cloud security groups still need operator confirmation.
 
@@ -82,7 +82,7 @@ The UI is a dense operations console: server cards, grouped actions, compact sta
 Current UI coverage includes:
 
 - server registry, tokens, heartbeats and status cards
-- 3x-ui / Xray inbound, outbound, config, traffic and restart actions
+- Xray inbound, outbound, routing, config, traffic and restart actions
 - Snell node create/restart/remove flows
 - remote TCP/UDP forward rules
 - Runtime Provider visibility
@@ -124,7 +124,7 @@ Controlled agents do not need an inbound management port. They call the same mas
 http://MASTER_IP:5166
 ```
 
-Controlled hosts expose only the business ports you choose: optional 3x-ui panel port `5168`, Xray/Reality inbound ports, Snell listen ports, remote-forward listen ports and ACME HTTP `80/tcp` when selected.
+Controlled hosts expose only the business ports you choose: optional compatible-panel port `5168`, Xray/Reality inbound ports, Snell listen ports, remote-forward listen ports and ACME HTTP `80/tcp` when selected.
 
 ## Quick Start
 
@@ -205,7 +205,7 @@ Claimed tasks include their Runtime Provider assignment, so task history can be 
 4. Install the agent with the generated token command.
 5. Wait for heartbeat.
 6. Select one or more servers and run orchestration:
-   - install or reuse 3x-ui
+   - install or reuse the compatible Xray panel runtime
    - create VLESS Reality, VMess WebSocket, Trojan TLS or Shadowsocks nodes
    - deploy Snell nodes
    - issue or bind certificates
@@ -218,7 +218,7 @@ Agent heartbeat reports total memory. The master classifies tiny hosts:
 
 | Profile | Memory | Policy |
 | --- | --- | --- |
-| `nano-critical` | `< 200 MB` | blocks full 3x-ui / Xray orchestration; use Snell or forwarding |
+| `nano-critical` | `< 200 MB` | blocks full Xray orchestration; use Snell or forwarding |
 | `nano` | `< 256 MB` | shows warning; avoid heavy runtimes |
 | `small` | `< 512 MB` | consider swap before complex nodes |
 | `standard` | `>= 512 MB` | normal path |
@@ -231,7 +231,7 @@ Agent heartbeat reports total memory. The master classifies tiny hosts:
 | Agent service | systemd | systemd | OpenRC |
 | Snell node tasks | systemd | systemd | OpenRC |
 | Remote forwarding tasks | systemd + `socat` | systemd + `socat` | OpenRC + `socat` |
-| Full 3x-ui install/configure | supported | supported | not supported in `0.6.0` |
+| Full Xray panel install/configure | supported | supported | not supported in `0.6.0` |
 
 ## Docker And GHCR
 

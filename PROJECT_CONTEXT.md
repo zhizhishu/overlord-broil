@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Overlord Broil is an independent master/agent operations panel for dense multi-server node orchestration. It unifies 3x-ui, Xray/Reality, Snell, remote port forwarding, certificates, traffic snapshots, service status, diagnostics, and agent maintenance tasks behind one control-plane workflow.
+Overlord Broil is an independent master/agent operations panel for dense multi-server node orchestration. It presents Xray/Reality, Snell, remote port forwarding, certificates, traffic snapshots, service status, diagnostics, and agent maintenance tasks as one Overlord control-plane workflow.
 
 The project is currently a `0.6.0` public-trial reliability candidate, not a broad `1.0` long-term production guarantee.
 
@@ -54,7 +54,7 @@ Controlled hosts may expose business ports depending on orchestration choices:
 - `springboot-backend/src/main/java/com/admin/service/`: orchestration, 3x-ui, Snell, forwarding, agent task, traffic, alert, and control-server services.
 - `springboot-backend/src/main/resources/mapper/`: MyBatis mapper XML.
 - `vite-frontend/`: React 18 + Vite + HeroUI frontend.
-- `vite-frontend/src/pages/orchestrator.tsx`: master control center for servers, 3x-ui, Snell, rules, tasks, diagnostics, and traffic workflows.
+- `vite-frontend/src/pages/orchestrator.tsx`: master control center for controlled-server status, Xray inbound/outbound, Snell, rules, tasks, diagnostics, and traffic workflows.
 - `vite-frontend/src/pages/forward.tsx`: forwarding page, now partly internationalized.
 - `vite-frontend/src/i18n/index.tsx`: lightweight `zh-CN` / `en-US` dictionary.
 - `scripts/`: installers, agent runtime, release checks, fixtures, and smoke tests.
@@ -63,7 +63,7 @@ Controlled hosts may expose business ports depending on orchestration choices:
 
 ## Core Features
 
-- Overlord-style dense operations UI with Chinese-first language and `zh-CN` / `en-US` switch.
+- Overlord-style dense operations UI with Chinese-first language and `zh-CN` / `en-US` switch. Visible product copy uses Overlord/Xray/controlled-server terminology; upstream 3x-ui wording is reserved for compatibility notes, API endpoints, tests, and acknowledgements.
 - Server registry, agent token generation/rotation, heartbeats, status updates, and Nano memory detection.
 - Runtime Provider registry and API for `xui`, `snell`, `forward`, `certificate`, and `firewall` task assignment.
 - Runtime Provider Action Catalog for `agent-maintenance` labels, categories, danger flags and State Sync visibility; backend validation and master UI buttons reuse it.

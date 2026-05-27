@@ -201,7 +201,6 @@ interface ServerForwardRuleForm {
 type RuleKindFilter = "all" | "protocol" | "forward" | "xui";
 type RuleHealthFilter = "all" | "healthy" | "warning" | "error";
 type RuleHealth = Exclude<RuleHealthFilter, "all">;
-type SetupStepState = "done" | "active" | "todo" | "warning";
 type FormCheckState = "ok" | "warning" | "missing";
 type DiagnosticState = "ok" | "warning" | "fail";
 type StatusColor = "default" | "primary" | "secondary" | "success" | "warning" | "danger";
@@ -253,7 +252,7 @@ const FALLBACK_AGENT_MAINTENANCE_ACTIONS: RuntimeProviderAction[] = [
   fallbackAction("firewall-diagnose", "防火墙诊断", "diagnostic", "firewall", false, true, true),
   fallbackAction("firewall-diagnose", "防火墙诊断", "diagnostic", "forward", false, true, true),
   fallbackAction("repair-all", "一键修复", "repair", "xui", false, true, false),
-  fallbackAction("repair-xui", "修复 3x-ui", "repair", "xui", false, true, true),
+  fallbackAction("repair-xui", "修复 Xray 面板", "repair", "xui", false, true, true),
   fallbackAction("repair-xray", "修复 Xray", "repair", "xui", false, true, true),
   fallbackAction("repair-snell", "修复 Snell", "repair", "snell", false, true, true),
   fallbackAction("restart-agent", "重启 agent", "maintenance", "xui"),
@@ -388,14 +387,6 @@ interface UnifiedRuleRow {
   node?: ProtocolNode;
   rule?: ServerForwardRule;
   snapshot?: ThreeXuiTrafficSnapshot;
-}
-
-interface SetupGuideStep {
-  title: string;
-  detail: string;
-  state: SetupStepState;
-  actionLabel?: string;
-  onAction?: () => void;
 }
 
 interface FormCheck {
@@ -824,7 +815,7 @@ const MasterRiskNotice = ({ context }: { context: string }) => {
 
   return (
     <div className="rounded-small border border-warning-300 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
-      <span className="font-semibold">{t("主控高风险：")}</span>{t("{context}会作用在控制面服务器上，建议确认 API、3x-ui、Xray 以及证书任务不会影响现有编排。", { context: t(context) })}
+      <span className="font-semibold">{t("主控高风险：")}</span>{t("{context}会作用在控制面服务器上，建议确认 API、Xray 运行时以及证书任务不会影响现有编排。", { context: t(context) })}
     </div>
   );
 };
@@ -1080,64 +1071,6 @@ const AgentUpgradePanel = ({ task, onShowResult }: { task: DeployTask; onShowRes
         <Button size="sm" variant="light" onPress={() => onShowResult(task)}>{t("查看原始结果")}</Button>
       </div>
     </div>
-  );
-};
-
-const SetupGuide = ({ steps }: { steps: SetupGuideStep[] }) => {
-  const { t } = useLanguage();
-  const completed = steps.filter(step => step.state === "done").length;
-  const current = steps.find(step => step.state === "active" || step.state === "warning") || steps.find(step => step.state === "todo");
-  const colorOf = (state: SetupStepState) => {
-    if (state === "done") return "success";
-    if (state === "warning") return "warning";
-    if (state === "active") return "primary";
-    return "default";
-  };
-  const labelOf = (state: SetupStepState) => {
-    if (state === "done") return t("已完成");
-    if (state === "warning") return t("需处理");
-    if (state === "active") return t("当前步骤");
-    return t("待开始");
-  };
-
-  return (
-    <Card radius="sm" className="border border-default-200 bg-white dark:bg-default-50/5">
-      <CardHeader className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("首次配置向导")}</h2>
-            <Chip size="sm" variant="flat" color={completed >= steps.length - 1 ? "success" : "primary"}>
-              {t("{done}/{total} 已就绪", { done: completed, total: steps.length })}
-            </Chip>
-          </div>
-          <p className="mt-1 text-xs text-gray-500">
-            {current ? t("下一步：{step}", { step: t(current.title) }) : t("主控已经具备基础运维闭环，发布前继续跑 release gate。")}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {current?.onAction && current.actionLabel && (
-            <Button size="sm" color="primary" onPress={current.onAction}>{t(current.actionLabel)}</Button>
-          )}
-        </div>
-      </CardHeader>
-      <CardBody>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-          {steps.map((step, index) => (
-            <div key={step.title} className="rounded-small border border-default-200 bg-default-50/60 p-3 dark:bg-default-100/5">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="text-[11px] font-semibold text-gray-500">{String(index + 1).padStart(2, "0")}</span>
-                <Chip size="sm" variant="flat" color={colorOf(step.state) as any}>{labelOf(step.state)}</Chip>
-              </div>
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">{t(step.title)}</p>
-              <p className="mt-1 min-h-10 text-xs leading-5 text-gray-500">{t(step.detail)}</p>
-              {step.onAction && step.actionLabel && (
-                <Button size="sm" variant="light" className="mt-2 px-0" onPress={step.onAction}>{t(step.actionLabel)}</Button>
-              )}
-            </div>
-          ))}
-        </div>
-      </CardBody>
-    </Card>
   );
 };
 
@@ -1540,7 +1473,7 @@ export default function OrchestratorPage() {
       !outboundTag || outboundTagOptions.includes(outboundTag) ? "ok" : "warning",
       "Outbound Tag",
       !outboundTag
-        ? t("留空时使用 3x-ui 默认路由。")
+        ? t("留空时使用默认路由。")
         : outboundTagOptions.includes(outboundTag)
           ? t("已匹配已知出站 tag。")
           : t("未在已知出站 tag 中，保存前请确认远端配置存在。")
@@ -1662,7 +1595,7 @@ export default function OrchestratorPage() {
       health: snapshot.enable === 0 ? "error" as const : "healthy" as const,
       traffic: snapshot.total || ((snapshot.up || 0) + (snapshot.down || 0)),
       syncedAt: snapshot.syncedTime,
-      detail: snapshot.expiryTime ? t("到期 {time}", { time: new Date(snapshot.expiryTime).toLocaleString() }) : t("3x-ui 流量快照"),
+      detail: snapshot.expiryTime ? t("到期 {time}", { time: new Date(snapshot.expiryTime).toLocaleString() }) : t("流量快照"),
       snapshot
     }));
 
@@ -2218,7 +2151,7 @@ export default function OrchestratorPage() {
       return;
     }
     if (selectedOrchestrationCriticalNanoServers.length > 0 && selectedOrchestrationUsesFullXuiStack) {
-      toast.error(t("Nano 被控内存低于 200MB，不支持完整 3x-ui/Xray 编排；请关闭 3x-ui/Xray 相关选项，仅保留 Snell 或端口转发。"));
+      toast.error(t("Nano 被控内存低于 200MB，不支持完整 Xray 编排；请关闭 Xray 相关选项，仅保留 Snell 或端口转发。"));
       return;
     }
     const ports = [
@@ -2312,10 +2245,10 @@ export default function OrchestratorPage() {
   const testXui = async (server: ControlServer) => {
     const res = await testThreeXuiConnection(server.id);
     if (isThreeXuiSuccess(res)) {
-      toast.success(t("3x-ui 连接正常"));
-      showThreeXuiResult(t("{name} 3x-ui 状态", { name: server.name }), res.data);
+      toast.success(t("兼容 API 连接正常"));
+      showThreeXuiResult(t("{name} 运行时状态", { name: server.name }), res.data);
     } else {
-      toast.error(res.msg || res.data?.msg || t("3x-ui 连接失败"));
+      toast.error(res.msg || res.data?.msg || t("兼容 API 连接失败"));
     }
   };
 
@@ -2420,11 +2353,11 @@ export default function OrchestratorPage() {
     if (threeXuiInboundForm.mode === "delete" && !confirmed) {
       requestUiConfirmation({
         title: t("确认删除入站"),
-        message: t("确定删除 3x-ui inbound #{id}?", { id: threeXuiInboundForm.inboundId || "-" }),
-        detail: t("该操作会直接修改远端 3x-ui 面板。"),
+        message: t("确定删除入站 #{id}?", { id: threeXuiInboundForm.inboundId || "-" }),
+        detail: t("该操作会直接修改远端 Xray 入站配置。"),
         confirmText: t("确认删除"),
         color: "danger",
-        testId: "confirm-delete-three-xui-inbound",
+        testId: "confirm-delete-xray-inbound",
         onConfirm: () => saveThreeXuiInbound(true)
       });
       return;
@@ -2452,11 +2385,11 @@ export default function OrchestratorPage() {
     setSubmitting(false);
 
     if (isThreeXuiSuccess(res)) {
-      toast.success(t("3x-ui 入站操作已提交"));
+      toast.success(t("入站操作已提交"));
       setThreeXuiInboundModalOpen(false);
-      showThreeXuiResult(t("3x-ui 入站操作结果"), res.data);
+      showThreeXuiResult(t("入站操作结果"), res.data);
     } else {
-      toast.error(res.msg || res.data?.msg || t("3x-ui 入站操作失败"));
+      toast.error(res.msg || res.data?.msg || t("入站操作失败"));
     }
   };
 
@@ -2489,7 +2422,7 @@ export default function OrchestratorPage() {
     if (!confirmed) {
       requestUiConfirmation({
         title: t("确认保存出站"),
-        message: t("确定保存 Xray / Outbound 配置到 3x-ui?"),
+        message: t("确定保存 Xray / Outbound 出站配置?"),
         detail: t("无效出站 JSON 可能影响远端路由, 请确认内容后继续。"),
         confirmText: t("确认保存"),
         color: "warning",
@@ -2508,9 +2441,9 @@ export default function OrchestratorPage() {
     setSubmitting(false);
 
     if (isThreeXuiSuccess(res)) {
-      toast.success(t("3x-ui 出站配置已保存"));
+      toast.success(t("出站配置已保存"));
       setXraySettingModalOpen(false);
-      showThreeXuiResult(t("3x-ui 出站保存结果"), res.data);
+      showThreeXuiResult(t("出站保存结果"), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("保存出站配置失败"));
     }
@@ -2719,62 +2652,6 @@ export default function OrchestratorPage() {
     return `${server.certificateStatus}${domain}`;
   };
 
-  const setupGuideSteps = useMemo<SetupGuideStep[]>(() => {
-    const hasServers = servers.length > 0;
-    const firstServer = servers[0];
-    const hasOnlineAgent = onlineServers > 0;
-    const hasXui = servers.some(server => Boolean(server.xuiEndpoint || server.xuiServiceStatus || server.xrayServiceStatus));
-    const hasRules = unifiedRuleRows.length > 0;
-    const hasBlockingAlerts = criticalAlerts > 0 || failedTasks > 0;
-
-    return [
-      {
-        title: "登记服务器",
-        detail: "先把主控和被控服务器加入资产列表，后续任务才有明确目标。",
-        state: hasServers ? "done" : "active",
-        actionLabel: "添加服务器",
-        onAction: () => openServerModal()
-      },
-      {
-        title: "安装被控 agent",
-        detail: "从服务器卡片复制 Token，在被控端安装 agent，等待心跳上线。",
-        state: !hasServers ? "todo" : hasOnlineAgent ? "done" : "active",
-        actionLabel: hasServers ? "查看 Token" : "添加服务器",
-        onAction: () => {
-          if (!firstServer) {
-            openServerModal();
-            return;
-          }
-          showServerToken(firstServer);
-        }
-      },
-      {
-        title: "编排 3x-ui / Snell",
-        detail: "选择一台或多台服务器，一次生成 3x-ui、Xray 节点、Snell 和证书任务。",
-        state: hasXui ? "done" : hasOnlineAgent ? "active" : "todo",
-        actionLabel: "一键编排",
-        onAction: () => openOrchestrationModal(firstServer)
-      },
-      {
-        title: "同步规则与流量",
-        detail: "把 3x-ui 入站、Snell 节点、远端转发和流量快照纳入统一规则中心。",
-        state: hasRules ? "done" : hasXui ? "active" : "todo",
-        actionLabel: "同步流量",
-        onAction: () => {
-          const server = servers.find(item => item.xuiEndpoint || item.xuiServiceStatus) || firstServer;
-          if (server) syncXuiTraffic(server);
-        }
-      },
-      {
-        title: "发布前检查",
-        detail: "确认无严重告警，运行 release gate，备份 .env，并只开放 5166 与业务端口；6365 仅在调试时显式开放。",
-        state: hasBlockingAlerts ? "warning" : hasRules ? "done" : "todo",
-        actionLabel: hasBlockingAlerts ? "查看告警" : "刷新",
-        onAction: loadData
-      }
-    ];
-  }, [criticalAlerts, failedTasks, onlineServers, servers, unifiedRuleRows.length]);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -2800,7 +2677,76 @@ export default function OrchestratorPage() {
           </div>
         </div>
 
-        <SetupGuide steps={setupGuideSteps} />
+        <section data-testid="controlled-server-status">
+          <Card radius="sm" className="border border-default-200 bg-white dark:bg-default-50/5">
+            <CardHeader className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("被控端状态")}</h2>
+                <p className="mt-1 text-xs text-gray-500">
+                  {t("主控直接汇总被控心跳、Xray、Snell、证书和任务状态；异常会在这里先露出。")}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Chip size="sm" variant="flat" color="success">{t("{count} 台在线", { count: onlineServers })}</Chip>
+                <Chip size="sm" variant="flat" color={failedTasks > 0 ? "danger" : "default"}>{t("{count} 个失败任务", { count: failedTasks })}</Chip>
+                <Chip size="sm" variant="flat" color={criticalAlerts > 0 ? "danger" : "default"}>{t("{count} 条严重告警", { count: criticalAlerts })}</Chip>
+                <Button size="sm" variant="light" onPress={loadData}>{t("刷新")}</Button>
+              </div>
+            </CardHeader>
+            <CardBody>
+              {servers.length === 0 ? (
+                <div className="rounded-small border border-dashed border-default-300 p-5 text-center">
+                  <p className="font-medium text-gray-900 dark:text-white">{t("还没有被控端")}</p>
+                  <p className="mt-1 text-sm text-gray-500">{t("添加服务器后，心跳、服务状态和规则同步状态会在这里显示。")}</p>
+                  <Button size="sm" color="primary" variant="flat" className="mt-4" onPress={() => openServerModal()}>{t("添加服务器")}</Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+                  {servers.slice(0, 6).map(server => (
+                    <div key={`status-${server.id}`} className="rounded-small border border-default-200 bg-default-50/60 p-3 dark:bg-default-100/5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-gray-900 dark:text-white">{server.name}</p>
+                          <p className="truncate text-xs text-gray-500">{server.host}:{server.sshPort || 22}</p>
+                        </div>
+                        <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                          <Chip size="sm" variant="flat" color={server.role === "master" ? "warning" : "default"}>{server.role === "master" ? t("主控") : t("副控")}</Chip>
+                          <Chip size="sm" variant="flat" color={heartbeatColor(server) as any}>{heartbeatText(server)}</Chip>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-small bg-white px-2 py-1.5 dark:bg-default-50/5">
+                          <p className="text-gray-500">Xray</p>
+                          <p className="truncate font-medium text-gray-900 dark:text-white">{server.xrayServiceStatus || "-"}</p>
+                        </div>
+                        <div className="rounded-small bg-white px-2 py-1.5 dark:bg-default-50/5">
+                          <p className="text-gray-500">Snell</p>
+                          <p className="truncate font-medium text-gray-900 dark:text-white">{server.snellServiceStatus || "-"}</p>
+                        </div>
+                        <div className="rounded-small bg-white px-2 py-1.5 dark:bg-default-50/5">
+                          <p className="text-gray-500">{t("兼容 API")}</p>
+                          <p className="truncate font-medium text-gray-900 dark:text-white">{server.xuiServiceStatus || (server.xuiEndpoint ? t("已配置") : "-")}</p>
+                        </div>
+                        <div className="rounded-small bg-white px-2 py-1.5 dark:bg-default-50/5">
+                          <p className="text-gray-500">{t("内存")}</p>
+                          <p className="truncate font-medium text-gray-900 dark:text-white">{server.memoryTotalMb ? `${server.memoryTotalMb} MB` : "-"}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        <Chip size="sm" variant="flat">{t("心跳：{time}", { time: formatTime(server.lastHeartbeat) })}</Chip>
+                        <Chip size="sm" variant="flat">{t("规则同步：{time}", { time: formatTime(server.xuiLastSync) })}</Chip>
+                        {server.lastError && <Chip size="sm" variant="flat" color="danger">{server.lastError}</Chip>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {servers.length > 6 && (
+                <p className="mt-3 text-xs text-gray-500">{t("下方服务器列表保留全部 {count} 台被控端。", { count: servers.length })}</p>
+              )}
+            </CardBody>
+          </Card>
+        </section>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card radius="sm">
@@ -2988,7 +2934,7 @@ export default function OrchestratorPage() {
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("Runtime Provider 层")}</h2>
                 <p className="text-xs text-gray-500 mt-1">
-                  {t("主控按运行时边界分派任务：Xray/3x-ui、Snell、转发、证书和防火墙统一进入 agent 执行链。")}
+                  {t("主控按运行时边界分派任务：Xray 入站/出站、Snell、转发、证书和防火墙统一进入 agent 执行链。")}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -3000,7 +2946,7 @@ export default function OrchestratorPage() {
               {runtimeProviders.length === 0 ? (
                 <div className="rounded-small border border-dashed border-default-300 p-5 text-center">
                   <p className="font-medium text-gray-900 dark:text-white">{t("Runtime Provider 尚未加载")}</p>
-                  <p className="text-sm text-gray-500 mt-1">{t("刷新后会显示 XUI、Snell、转发、证书和防火墙运行时注册表。")}</p>
+                  <p className="text-sm text-gray-500 mt-1">{t("刷新后会显示 Xray、Snell、转发、证书和防火墙运行时注册表。")}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -3052,7 +2998,7 @@ export default function OrchestratorPage() {
               {monitorAlerts.length === 0 && (
                 <div className="rounded-small border border-dashed border-default-300 p-5 text-center">
                   <p className="font-medium text-gray-900 dark:text-white">{t("当前没有待确认告警")}</p>
-                  <p className="text-sm text-gray-500 mt-1">{t("副控心跳、证书、Xray、Snell、3x-ui、任务失败和流量异常会在这里汇总。")}</p>
+                  <p className="text-sm text-gray-500 mt-1">{t("副控心跳、证书、Xray、Snell、任务失败和流量异常会在这里汇总。")}</p>
                 </div>
               )}
               {recentAlerts.map(alert => (
@@ -3165,7 +3111,7 @@ export default function OrchestratorPage() {
                   <SelectItem key="all">{t("全部类型")}</SelectItem>
                   <SelectItem key="protocol">{t("协议节点")}</SelectItem>
                   <SelectItem key="forward">{t("远端转发")}</SelectItem>
-                  <SelectItem key="xui">{t("3x-ui 视图")}</SelectItem>
+                  <SelectItem key="xui">{t("入站视图")}</SelectItem>
                 </Select>
                 <Select aria-label={t("规则服务器")} selectedKeys={[ruleServerFilter]} onSelectionChange={keys => setRuleServerFilter(Array.from(keys)[0] as string)} variant="bordered" size="sm">
                   {ruleServerOptions.map(option => <SelectItem key={option.id}>{option.name}</SelectItem>)}
@@ -3181,7 +3127,7 @@ export default function OrchestratorPage() {
               {unifiedRuleRows.length === 0 && (
                 <div className="rounded-small border border-dashed border-default-300 p-6 text-center">
                   <p className="font-medium text-gray-900 dark:text-white">{t("还没有规则")}</p>
-                  <p className="text-sm text-gray-500 mt-1">{t("创建协议节点、添加远端转发或同步 3x-ui 流量后，这里会汇总展示。")}</p>
+                  <p className="text-sm text-gray-500 mt-1">{t("创建协议节点、添加远端转发或同步远端流量后，这里会汇总展示。")}</p>
                   <div className="mt-4 flex justify-center gap-2">
                     <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
                     <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal()}>{t("新增转发")}</Button>
@@ -3210,7 +3156,7 @@ export default function OrchestratorPage() {
                     <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(220px,1.3fr)_minmax(180px,1fr)_minmax(220px,1.2fr)_minmax(160px,.8fr)_auto] xl:items-center">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <Chip size="sm" variant="flat" color={row.kind === "protocol" ? "primary" : row.kind === "forward" ? "secondary" : "success"}>{row.kind === "protocol" ? t("节点") : row.kind === "forward" ? t("转发") : "3x-ui"}</Chip>
+                          <Chip size="sm" variant="flat" color={row.kind === "protocol" ? "primary" : row.kind === "forward" ? "secondary" : "success"}>{row.kind === "protocol" ? t("节点") : row.kind === "forward" ? t("转发") : t("入站")}</Chip>
                           <Chip size="sm" variant="flat" color={row.health === "healthy" ? "success" : row.health === "warning" ? "warning" : "danger"}>{row.status}</Chip>
                         </div>
                         <p className="mt-2 truncate font-semibold text-gray-900 dark:text-white">{row.title}</p>
@@ -3286,7 +3232,7 @@ export default function OrchestratorPage() {
                   {isLowMemoryServer(server) && (
                     <div className="rounded-small border border-warning-300 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
                       <span className="font-semibold">{t("超小内存提示：")}</span>
-                      {t("该被控总内存约 {memory} MB，完整 3x-ui/Xray 编排可能 OOM；优先使用 Snell、远端端口转发或先开启 swap。", {
+                      {t("该被控总内存约 {memory} MB，完整 Xray 编排可能 OOM；优先使用 Snell、远端端口转发或先开启 swap。", {
                         memory: server.memoryTotalMb || "-"
                       })}
                     </div>
@@ -3297,7 +3243,7 @@ export default function OrchestratorPage() {
                       <p className="truncate">{server.endpoint || "-"}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">3x-ui</p>
+                      <p className="text-gray-500">{t("面板入口")}</p>
                       <p className="truncate">{server.xuiEndpoint || "-"}</p>
                     </div>
                     <div>
@@ -3333,13 +3279,13 @@ export default function OrchestratorPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Chip size="sm" variant="flat" color={serviceColor(server.xuiServiceStatus) as any}>3x-ui {server.xuiServiceStatus || "-"}</Chip>
+                    <Chip size="sm" variant="flat" color={serviceColor(server.xuiServiceStatus) as any}>{t("面板")} {server.xuiServiceStatus || "-"}</Chip>
                     <Chip size="sm" variant="flat" color={serviceColor(server.xrayServiceStatus) as any}>Xray {server.xrayServiceStatus || "-"}</Chip>
                     <Chip size="sm" variant="flat" color={serviceColor(server.snellServiceStatus) as any}>Snell {server.snellServiceStatus || "-"}</Chip>
                     <Chip size="sm" variant="flat" color={serviceColor(server.certificateStatus) as any}>{certificateText(server)}</Chip>
                   </div>
                   <p className="text-xs text-gray-500">{t("心跳：{time}", { time: formatTime(server.lastHeartbeat) })}</p>
-                  <p className="text-xs text-gray-500">{t("3x-ui 同步：{time}", { time: formatTime(server.xuiLastSync) })}</p>
+                  <p className="text-xs text-gray-500">{t("规则同步：{time}", { time: formatTime(server.xuiLastSync) })}</p>
                   {server.certificateExpireAt && <p className="text-xs text-gray-500">{t("证书到期：{time}", { time: formatTime(server.certificateExpireAt) })}</p>}
                   {server.lastError && <p className="text-xs text-danger">{t("最近错误：{error}", { error: server.lastError })}</p>}
                   <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -3355,14 +3301,14 @@ export default function OrchestratorPage() {
                       <Button size="sm" variant="flat" onPress={() => syncXuiTraffic(server)}>{t("同步流量")}</Button>
                       <Button size="sm" variant="flat" onPress={() => showTrafficSnapshots(server)}>{t("流量快照")}</Button>
                     </ServerActionGroup>
-                    <ServerActionGroup title="3x-ui" testId={`three-xui-actions-${server.id}`}>
-                      <Button size="sm" variant="flat" onPress={() => testXui(server)}>{t("测 3x-ui")}</Button>
+                    <ServerActionGroup title={t("入站/出站")} testId={`xray-runtime-actions-${server.id}`}>
+                      <Button size="sm" variant="flat" onPress={() => testXui(server)}>{t("连接测试")}</Button>
                       <Button size="sm" variant="flat" onPress={() => showThreeXuiInbounds(server)}>{t("入站")}</Button>
                       <Button size="sm" variant="flat" onPress={() => openThreeXuiInboundModal(server)}>{t("入站操作")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => showThreeXuiConfig(server)}>{t("配置")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => showThreeXuiConfig(server)}>{t("Xray 配置")}</Button>
                       <Button size="sm" variant="flat" onPress={() => showThreeXuiOutbounds(server)}>{t("出站")}</Button>
                       <Button size="sm" variant="flat" onPress={() => showThreeXuiOutboundTraffic(server)}>{t("出站流量")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => openXraySettingModal(server)}>{t("保存出站")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => openXraySettingModal(server)}>{t("路由/出站")}</Button>
                       <Button size="sm" variant="flat" onPress={() => restartXray(server)}>{t("重启 Xray")}</Button>
                     </ServerActionGroup>
                     <ServerActionGroup title="Agent" testId={`agent-actions-${server.id}`}>
@@ -3401,7 +3347,7 @@ export default function OrchestratorPage() {
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">{t("还没有协议节点")}</p>
-                  <p className="mt-1 max-w-2xl text-sm text-gray-500">{t("先新增一个结构化节点，或用一键编排批量创建 3x-ui/Xray/Snell 节点。")}</p>
+                  <p className="mt-1 max-w-2xl text-sm text-gray-500">{t("先新增一个结构化节点，或用一键编排批量创建 Xray/Snell 节点。")}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
@@ -3599,13 +3545,13 @@ export default function OrchestratorPage() {
               <Input label="SSH 端口" type="number" value={serverForm.sshPort.toString()} onChange={e => setServerForm(prev => ({ ...prev, sshPort: Number(e.target.value) || 22 }))} variant="bordered" />
               <Input label="SSH 用户" value={serverForm.sshUser} onChange={e => setServerForm(prev => ({ ...prev, sshUser: e.target.value }))} variant="bordered" />
               <Input label={t("副控 API")} value={serverForm.endpoint} onChange={e => setServerForm(prev => ({ ...prev, endpoint: e.target.value }))} variant="bordered" />
-              <Input label={t("3x-ui 面板地址")} value={serverForm.xuiEndpoint} onChange={e => setServerForm(prev => ({ ...prev, xuiEndpoint: e.target.value }))} variant="bordered" placeholder="https://1.2.3.4:5168" />
-              <Input label="3x-ui Base Path" value={serverForm.xuiBasePath} onChange={e => setServerForm(prev => ({ ...prev, xuiBasePath: e.target.value }))} variant="bordered" placeholder="/secret-path" />
-              <Input label="3x-ui API Token" value={serverForm.xuiApiToken} onChange={e => setServerForm(prev => ({ ...prev, xuiApiToken: e.target.value }))} variant="bordered" />
-              <Input label={t("3x-ui 用户名")} value={serverForm.xuiUsername} onChange={e => setServerForm(prev => ({ ...prev, xuiUsername: e.target.value }))} variant="bordered" />
-              <Input label={t("3x-ui 密码")} type="password" value={serverForm.xuiPassword} onChange={e => setServerForm(prev => ({ ...prev, xuiPassword: e.target.value }))} variant="bordered" />
-              <Input label="3x-ui 2FA" value={serverForm.xuiTwoFactorCode} onChange={e => setServerForm(prev => ({ ...prev, xuiTwoFactorCode: e.target.value }))} variant="bordered" />
-              <Select label={t("3x-ui TLS 校验")} selectedKeys={[serverForm.xuiAllowInsecure.toString()]} onSelectionChange={keys => setServerForm(prev => ({ ...prev, xuiAllowInsecure: Number(Array.from(keys)[0]) }))} variant="bordered">
+              <Input label={t("面板地址")} value={serverForm.xuiEndpoint} onChange={e => setServerForm(prev => ({ ...prev, xuiEndpoint: e.target.value }))} variant="bordered" placeholder="https://1.2.3.4:5168" />
+              <Input label={t("面板 Base Path")} value={serverForm.xuiBasePath} onChange={e => setServerForm(prev => ({ ...prev, xuiBasePath: e.target.value }))} variant="bordered" placeholder="/secret-path" />
+              <Input label={t("面板 API Token")} value={serverForm.xuiApiToken} onChange={e => setServerForm(prev => ({ ...prev, xuiApiToken: e.target.value }))} variant="bordered" />
+              <Input label={t("面板用户名")} value={serverForm.xuiUsername} onChange={e => setServerForm(prev => ({ ...prev, xuiUsername: e.target.value }))} variant="bordered" />
+              <Input label={t("面板密码")} type="password" value={serverForm.xuiPassword} onChange={e => setServerForm(prev => ({ ...prev, xuiPassword: e.target.value }))} variant="bordered" />
+              <Input label={t("面板 2FA")} value={serverForm.xuiTwoFactorCode} onChange={e => setServerForm(prev => ({ ...prev, xuiTwoFactorCode: e.target.value }))} variant="bordered" />
+              <Select label={t("面板 TLS 校验")} selectedKeys={[serverForm.xuiAllowInsecure.toString()]} onSelectionChange={keys => setServerForm(prev => ({ ...prev, xuiAllowInsecure: Number(Array.from(keys)[0]) }))} variant="bordered">
                 <SelectItem key="0">{t("校验证书")}</SelectItem>
                 <SelectItem key="1">{t("允许自签名")}</SelectItem>
               </Select>
@@ -3764,7 +3710,7 @@ export default function OrchestratorPage() {
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-sm font-semibold text-gray-900 dark:text-white">{t("高级 Payload 预览")}</p>
-                        <p className="text-xs text-gray-500">{t("默认使用结构化表单；排查 3x-ui 入站字段时再展开 JSON。")}</p>
+                        <p className="text-xs text-gray-500">{t("默认使用结构化表单；排查入站字段时再展开 JSON。")}</p>
                       </div>
                       <Button size="sm" variant="flat" onPress={() => setProtocolNodePreviewOpen(open => !open)}>
                         {protocolNodePreviewOpen ? t("收起") : t("展开")}
@@ -3855,7 +3801,7 @@ export default function OrchestratorPage() {
 
       <Modal isOpen={orchestrationModalOpen} onOpenChange={setOrchestrationModalOpen} size="5xl" scrollBehavior="inside">
         <ModalContent>
-          <ModalHeader>{t("一键编排 3x-ui / Xray / Snell")}</ModalHeader>
+          <ModalHeader>{t("一键编排 Xray / Snell")}</ModalHeader>
           <ModalBody>
             <div className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -3880,7 +3826,7 @@ export default function OrchestratorPage() {
                   {renderServerOptions()}
                 </Select>
                 <Input label={t("公网主机")} value={orchestrationForm.publicHost} onChange={e => patchOrchestrationForm({ publicHost: e.target.value })} variant="bordered" />
-                <Input label={t("3x-ui 版本")} value={orchestrationForm.xuiVersion} onChange={e => patchOrchestrationForm({ xuiVersion: e.target.value })} variant="bordered" placeholder={t("留空使用最新版")} />
+                <Input label={t("面板版本")} value={orchestrationForm.xuiVersion} onChange={e => patchOrchestrationForm({ xuiVersion: e.target.value })} variant="bordered" placeholder={t("留空使用最新版")} />
               </div>
               {selectedOrchestrationHasMaster && (
                 <MasterRiskNotice context="生成一键编排任务" />
@@ -3892,14 +3838,14 @@ export default function OrchestratorPage() {
                     : "border-warning-300 bg-warning-50 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300"
                 }`}>
                   <span className="font-semibold">{t("Nano 被控风险：")}</span>
-                  {t("已选择 {count} 台低内存服务器。低于 200MB 时主控会阻止完整 3x-ui/Xray 编排；建议只保留 Snell 或端口转发，并先开启 swap。", {
+                  {t("已选择 {count} 台低内存服务器。低于 200MB 时主控会阻止完整 Xray 编排；建议只保留 Snell 或端口转发，并先开启 swap。", {
                     count: selectedOrchestrationLowMemoryServers.length
                   })}
                 </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-small border border-default-200 p-4">
-                <Switch isSelected={orchestrationForm.installXui} onValueChange={value => patchOrchestrationForm({ installXui: value })}>{t("安装 3x-ui")}</Switch>
+                <Switch isSelected={orchestrationForm.installXui} onValueChange={value => patchOrchestrationForm({ installXui: value })}>{t("安装面板运行时")}</Switch>
                 <Switch isSelected={orchestrationForm.configurePanel} onValueChange={value => patchOrchestrationForm({ configurePanel: value })}>{t("配置面板")}</Switch>
                 <Switch isSelected={orchestrationForm.installSnell} onValueChange={value => patchOrchestrationForm({ installSnell: value })}>{t("安装 Snell")}</Switch>
                 <Switch isSelected={orchestrationForm.createVlessReality || orchestrationForm.createVmessWs || orchestrationForm.createTrojanTls || orchestrationForm.createShadowsocks} isReadOnly>{t("创建节点")}</Switch>
@@ -3961,7 +3907,7 @@ export default function OrchestratorPage() {
 
       <Modal isOpen={threeXuiInboundModalOpen} onOpenChange={setThreeXuiInboundModalOpen} size="5xl" scrollBehavior="inside">
         <ModalContent>
-          <ModalHeader>{t("3x-ui 入站操作")}</ModalHeader>
+          <ModalHeader>{t("入站操作")}</ModalHeader>
           <ModalBody>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Select label={t("动作")} selectedKeys={[threeXuiInboundForm.mode]} onSelectionChange={keys => patchThreeXuiInboundForm({ mode: Array.from(keys)[0] as ThreeXuiInboundForm["mode"] })} variant="bordered">
@@ -3999,7 +3945,7 @@ export default function OrchestratorPage() {
               </Select>
             </div>
             {selectedInboundServer?.role === "master" && (
-              <MasterRiskNotice context="提交 3x-ui 入站操作" />
+              <MasterRiskNotice context="提交入站操作" />
             )}
 
             {threeXuiInboundForm.mode !== "delete" && threeXuiInboundForm.editMode === "form" && (
@@ -4068,9 +4014,18 @@ export default function OrchestratorPage() {
 
       <Modal isOpen={xraySettingModalOpen} onOpenChange={setXraySettingModalOpen} size="5xl" scrollBehavior="inside">
         <ModalContent>
-          <ModalHeader>{t("保存 3x-ui Xray / Outbound 配置")}</ModalHeader>
+          <ModalHeader>{t("保存 Xray 路由 / 出站配置")}</ModalHeader>
           <ModalBody>
             <Input label={t("Outbound 测试地址")} value={outboundTestUrl} onChange={e => setOutboundTestUrl(e.target.value)} variant="bordered" />
+            <div className="rounded-small border border-default-200 bg-default-50/60 p-3 text-xs leading-5 text-gray-600 dark:bg-default-50/5 dark:text-gray-300">
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                <Chip size="sm" variant="flat" color="primary">{t("出站")}</Chip>
+                <Chip size="sm" variant="flat" color="primary">{t("路由规则")}</Chip>
+                <Chip size="sm" variant="flat" color="primary">IPv4 / IPv6</Chip>
+                <Chip size="sm" variant="flat" color="primary">{t("规则优先")}</Chip>
+              </div>
+              {t("这里保存完整 Xray 配置，包含 outbounds、routing.rules、domainStrategy、DNS 和 IPv4/IPv6 相关策略；规则匹配顺序以 JSON 中的数组顺序为准。")}
+            </div>
             <Textarea
               label={t("完整 Xray 配置 JSON")}
               minRows={22}
@@ -4082,7 +4037,7 @@ export default function OrchestratorPage() {
           </ModalBody>
           <ModalFooter>
             <Button variant="light" onPress={() => setXraySettingModalOpen(false)}>{t("取消")}</Button>
-            <Button color="primary" isLoading={submitting} onPress={() => saveXraySetting()}>{t("保存到 3x-ui")}</Button>
+            <Button color="primary" isLoading={submitting} onPress={() => saveXraySetting()}>{t("保存配置")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

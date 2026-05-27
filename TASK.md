@@ -2,12 +2,7 @@
 
 ## Current Goal
 
-Push the project toward the pre-1.0 goals requested by the user:
-
-1. Strengthen real-host and system-matrix validation.
-2. Validate real 3x-ui write E2E behavior.
-3. Validate Snell as a real master-managed protocol node through the agent.
-4. Capture and polish the control-console UI in the Flux-inspired Overlord Broil direction.
+Polish the control-console UI into an Overlord Broil product surface while preserving the Xray/3x-ui-compatible inbound, outbound, routing, traffic and Snell capabilities.
 
 ## Authorization
 
@@ -58,24 +53,23 @@ Push the project toward the pre-1.0 goals requested by the user:
   - `scripts/test-snell-real-smoke.sh` now verifies cleanup after temporary-node deletion.
   - source default Spring Boot port now matches the product single-entry port `5166`.
   - control-center delete/restart/outbound-save flows now use an in-app confirmation modal.
+- Product UI pass:
+  - removed the first-run setup guide from the orchestrator first screen.
+  - added a controlled-server status panel directly under the header, summarizing heartbeat, Xray, Snell, compatible API, memory, sync and errors.
+  - renamed visible UI groups from upstream-branded language to Overlord-owned `入站/出站`, `Xray 配置`, `路由/出站`, `兼容 API`, `面板入口`.
+  - kept inbound list, inbound add/update/delete, outbound/config read, outbound save, traffic sync, restart and unified rules actions intact.
+  - added visible route/outbound hints for `outbounds`, `routing.rules`, `domainStrategy`, `DNS`, `IPv4/IPv6` and rule order inside the Xray config modal.
+  - updated README, Chinese README, GitHub Pages copy, release notes and project context so upstream names appear as compatibility/reference details rather than the product identity.
+  - parallel subagent audits confirmed the main functional entries were retained and called out IPv4/IPv6/rule-priority visibility; the UI now exposes those through the route/outbound config panel.
 
 ## In Progress
 
-- Real UI evidence capture is complete. Browser MCP and Chrome DevTools verified the live `isrco-hk` console at `http://82.158.91.116:5166/?v=3437e2b#/orchestrator`.
-- Captured screenshots:
-  - `docs/assets/actual-login.png`
-  - `docs/assets/actual-orchestrator-top.png`
-  - `docs/assets/actual-orchestrator-full.png`
-- README, Chinese README, GitHub Pages and release notes now reference the live UI screenshots.
-- Real 3x-ui write validation is complete on `isrco-hk`:
-  - started a temporary `ghcr.io/mhsanaei/3x-ui:latest` (`3x-ui 3.1.0`) container on the `overlord-network`.
-  - direct `scripts/test-three-xui-e2e.sh` created, toggled and deleted temporary inbound port `42123`.
-  - Overlord master API created, toggled and deleted temporary inbound port `42124`.
-  - temporary 3x-ui container, API token file and test data were removed after validation.
+- Pending commit and push for the latest Overlord product UI pass.
+- Real UI screenshots in `docs/assets/` still show the previous live console and should be recaptured after GitHub image deployment if visual proof is required for this exact pass.
 
 ## Remaining
 
-1. Commit and push the real 3x-ui E2E compatibility fix plus validation notes to `origin/main` and `origin/future`.
+1. Commit and push this UI/product wording pass to `origin/main` and `origin/future`.
 2. Confirm GitHub Actions and Pages after push.
 3. Broaden real VPS matrix beyond the current `isrco-hk` host before any `1.0` claim.
 
