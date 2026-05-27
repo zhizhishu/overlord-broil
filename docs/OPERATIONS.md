@@ -74,21 +74,21 @@ Create a server in the control center, copy the generated token command, then ru
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent.sh \
-  | sudo env OB_PANEL_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash
+  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash
 ```
 
 Alpine or minimal systems:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent-bootstrap.sh \
-  | sudo env OB_PANEL_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" sh
+  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" sh
 ```
 
 Preflight:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent.sh \
-  | sudo env OB_PANEL_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
+  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
 ```
 
 ## Runtime Providers
@@ -112,7 +112,7 @@ Dangerous actions, including agent uninstall and runtime-port closure, require e
 3. Install the controlled agent with the generated token command.
 4. Wait for heartbeat.
 5. Select one or more servers.
-6. Run orchestration for Xray Runtime, Xray starter nodes, Snell, certificates, firewall checks or remote forwarding.
+6. Run deployments for Xray Runtime, Xray starter nodes, Snell, certificates, firewall checks or remote forwarding.
 7. Use State Sync, task cards and operation audit to verify status.
 
 Snell is unified as a product-layer protocol node, but it remains an independent service on the controlled host.
@@ -121,11 +121,11 @@ Snell is unified as a product-layer protocol node, but it remains an independent
 
 | Memory | Policy |
 | --- | --- |
-| `< 200 MB` | Nano critical. Block full Xray Runtime orchestration and Xray node creation; prefer Snell or remote forwarding. |
+| `< 200 MB` | Nano critical. Block full Xray Runtime deployment and Xray node creation; prefer Snell or remote forwarding. |
 | `< 256 MB` | Nano. Show strong warnings; keep workloads tiny. |
 | `< 512 MB` | Small. Xray can work only with careful swap and low concurrency. |
 
-Alpine/OpenRC can run the agent, Snell and forwarding tasks. Full Xray Runtime install/configure orchestration is intended for systemd hosts.
+Alpine/OpenRC can run the agent, Snell and forwarding tasks. Full Xray Runtime install/configure deployment is intended for systemd hosts.
 
 ## Verification
 

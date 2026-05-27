@@ -14,7 +14,7 @@ import java.util.Map;
 @Service
 public class RuntimeProviderService {
 
-    public static final String XRAY_ORCHESTRATION_PROTOCOL = "xray-runtime";
+    public static final String XRAY_DEPLOYMENT_PLAN_PROTOCOL = "xray-runtime";
 
     private final List<RuntimeProviderDescriptor> providers;
     private final Map<String, RuntimeProviderDescriptor> providerMap;
@@ -81,7 +81,7 @@ public class RuntimeProviderService {
         if ("agent-maintenance".equals(normalizedProtocol)) {
             return resolveAgentMaintenance(normalizedAction);
         }
-        if (XRAY_ORCHESTRATION_PROTOCOL.equals(normalizedProtocol)) {
+        if (XRAY_DEPLOYMENT_PLAN_PROTOCOL.equals(normalizedProtocol)) {
             return providerMap.get("xrayRuntime");
         }
         for (RuntimeProviderDescriptor provider : providers) {
@@ -149,7 +149,7 @@ public class RuntimeProviderService {
 
     private List<String> resolveRelatedProviders(RuntimeProviderDescriptor provider, String protocol) {
         String normalizedProtocol = normalize(protocol);
-        if (XRAY_ORCHESTRATION_PROTOCOL.equals(normalizedProtocol)) {
+        if (XRAY_DEPLOYMENT_PLAN_PROTOCOL.equals(normalizedProtocol)) {
             return Arrays.asList("xrayRuntime", "snell", "certificate", "firewall");
         }
         return new ArrayList<>(provider.getRelatedProviders());
@@ -175,12 +175,12 @@ public class RuntimeProviderService {
                 "proxy-runtime",
                 "master-api + agent-task",
                 "control_server runtime/xray status, runtime traffic snapshots, protocol_node",
-                "Xray Runtime panel API, Xray inbound/outbound, Reality, VMess, Trojan, Shadowsocks and traffic sync.",
+                "Xray Runtime API, Xray inbound/outbound, Reality, VMess, Trojan, Shadowsocks and traffic sync.",
                 true,
                 true,
                 false,
-                list("vless", "vmess", "trojan", "shadowsocks", XRAY_ORCHESTRATION_PROTOCOL),
-                list("present", "absent", "restart", "orchestrate", "repair-xray-runtime", "repair-xray", "sync-traffic"),
+                list("vless", "vmess", "trojan", "shadowsocks", XRAY_DEPLOYMENT_PLAN_PROTOCOL),
+                list("present", "absent", "restart", "deploy-plan", "repair-xray-runtime", "repair-xray", "sync-traffic"),
                 list(
                         action("doctor", "诊断", "diagnostic", "agent-maintenance", "xrayRuntime", false, true, true),
                         action("status", "状态", "diagnostic", "agent-maintenance", "xrayRuntime", false, false, false),
@@ -195,7 +195,7 @@ public class RuntimeProviderService {
                 ),
                 list("install-runtime", "configure-runtime", "create-inbound", "manage-outbound", "read-config", "save-config", "restart-xray", "sync-traffic"),
                 list("runtimeEndpoint", "runtimeApiToken or runtimeUsername/runtimePassword"),
-                list("5168 optional panel", "user-defined inbound ports"),
+                list("5168 optional runtime", "user-defined inbound ports"),
                 list("certificate", "firewall")
         ));
         result.add(provider(
@@ -264,7 +264,7 @@ public class RuntimeProviderService {
                 "network-runtime",
                 "agent-task",
                 "deploy_task diagnostic result",
-                "Firewall runtime opens, diagnoses and reports node, forwarding, ACME and panel ports on controlled servers.",
+                "Firewall runtime opens, diagnoses and reports node, forwarding, ACME and runtime ports on controlled servers.",
                 true,
                 false,
                 true,

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PANEL_URL="${OB_PANEL_URL:-}"
+MASTER_URL="${OB_MASTER_URL:-}"
 SERVER_ID="${OB_SERVER_ID:-}"
 AGENT_TOKEN="${OB_AGENT_TOKEN:-}"
 POLL_INTERVAL="${OB_POLL_INTERVAL:-20}"
@@ -35,13 +35,13 @@ Actions:
   doctor                  Run non-destructive controlled-host diagnostics and exit
 
 Required for install:
-  OB_PANEL_URL          Master panel URL, for example https://master.example.com
-  OB_SERVER_ID          Server id from the master panel
-  OB_AGENT_TOKEN        Agent token from the master panel
+  OB_MASTER_URL          Master URL, for example https://master.example.com
+  OB_SERVER_ID          Server id from the master console
+  OB_AGENT_TOKEN        Agent token from the master console
 
 Doctor environment:
   OB_DOCTOR_REQUIRE_SERVICE_MANAGER  Require systemd/OpenRC during doctor, default 1
-  OB_DOCTOR_REQUIRE_AGENT_ENV        Require OB_PANEL_URL/SERVER_ID/AGENT_TOKEN during doctor, default 1
+  OB_DOCTOR_REQUIRE_AGENT_ENV        Require OB_MASTER_URL/SERVER_ID/AGENT_TOKEN during doctor, default 1
 EOF
 }
 
@@ -191,7 +191,7 @@ detect_service_manager_hint() {
 doctor_agent_env() {
   local require_env="${OB_DOCTOR_REQUIRE_AGENT_ENV:-1}"
   local missing=""
-  [ -n "$PANEL_URL" ] || missing="${missing} OB_PANEL_URL"
+  [ -n "$MASTER_URL" ] || missing="${missing} OB_MASTER_URL"
   [ -n "$SERVER_ID" ] || missing="${missing} OB_SERVER_ID"
   [ -n "$AGENT_TOKEN" ] || missing="${missing} OB_AGENT_TOKEN"
   if [ -n "$missing" ]; then
@@ -201,7 +201,7 @@ doctor_agent_env() {
       doctor_item warn "agent-env" "missing:${missing}"
     fi
   else
-    doctor_item ok "agent-env" "panel=${PANEL_URL}, server=${SERVER_ID}, token=provided"
+    doctor_item ok "agent-env" "master=${MASTER_URL}, server=${SERVER_ID}, token=provided"
   fi
 }
 
@@ -252,8 +252,8 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 2
 fi
 
-if [ -z "$PANEL_URL" ] || [ -z "$SERVER_ID" ] || [ -z "$AGENT_TOKEN" ]; then
-  echo "OB_PANEL_URL, OB_SERVER_ID and OB_AGENT_TOKEN are required." >&2
+if [ -z "$MASTER_URL" ] || [ -z "$SERVER_ID" ] || [ -z "$AGENT_TOKEN" ]; then
+  echo "OB_MASTER_URL, OB_SERVER_ID and OB_AGENT_TOKEN are required." >&2
   exit 2
 fi
 
@@ -282,7 +282,7 @@ else
 fi
 
 {
-  write_env_line "OB_PANEL_URL" "$PANEL_URL"
+  write_env_line "OB_MASTER_URL" "$MASTER_URL"
   write_env_line "OB_SERVER_ID" "$SERVER_ID"
   write_env_line "OB_AGENT_TOKEN" "$AGENT_TOKEN"
   write_env_line "OB_POLL_INTERVAL" "$POLL_INTERVAL"

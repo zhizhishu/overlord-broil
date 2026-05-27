@@ -64,13 +64,13 @@ public final class MasterSelfProtectionUtils {
         Map<Integer, String> ports = new LinkedHashMap<>();
         ports.put(80, "HTTP/ACME challenge port");
         ports.put(5166, "master Web/API entry");
-        ports.put(6365, "legacy backend debug alias");
+        ports.put(6365, "backend debug alias");
         ports.put(3306, "database port");
-        ports.put(8081, "legacy frontend port");
-        ports.put(8066, "legacy phpMyAdmin port");
+        ports.put(8081, "old frontend port");
+        ports.put(8066, "old phpMyAdmin port");
         ports.put(22, "SSH management port");
         putEnvPort(ports, "FRONTEND_PORT", "configured master entry port");
-        putEnvPort(ports, "BACKEND_PORT", "configured legacy/debug backend alias");
+        putEnvPort(ports, "BACKEND_PORT", "configured backend debug alias");
         putEnvPort(ports, "PHPMYADMIN_PORT", "configured phpMyAdmin maintenance port");
         return ports;
     }

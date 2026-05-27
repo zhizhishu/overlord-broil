@@ -7,24 +7,24 @@ import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
 @Data
-public class OrchestrationPlanDto {
+public class DeploymentPlanDto {
 
     @NotNull(message = "server id is required")
     private Long serverId;
 
-    private Boolean installXrayPanel = true;
+    private Boolean installXrayRuntime = true;
 
-    private Boolean configurePanel = true;
+    private Boolean configureRuntime = true;
 
-    private String xrayPanelVersion;
+    private String xrayRuntimeVersion;
 
-    @Min(value = 1, message = "panel port must be greater than 0")
-    @Max(value = 65535, message = "panel port must be less than 65536")
-    private Integer panelPort = 5168;
+    @Min(value = 1, message = "runtime port must be greater than 0")
+    @Max(value = 65535, message = "runtime port must be less than 65536")
+    private Integer runtimePort = 5168;
 
-    private String panelUsername;
+    private String runtimeUsername;
 
-    private String panelPassword;
+    private String runtimePassword;
 
     private String webBasePath;
 

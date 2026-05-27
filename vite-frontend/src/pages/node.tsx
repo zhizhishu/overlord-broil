@@ -485,7 +485,7 @@ export default function NodePage() {
       toast.success('安装命令已复制到剪贴板');
       setInstallCommandModal(false);
     } catch (error) {
-      toast.error('复制失败，请手动选择文本复制。原因：请使用https访问面板（例如nginx反代），http无法复制。');
+      toast.error('复制失败，请手动选择文本复制。原因：请使用 HTTPS 访问控制台，HTTP 无法复制。');
     }
   };
 
@@ -875,7 +875,7 @@ export default function NodePage() {
                 <Alert
                         color="primary"
                         variant="flat"
-                        description="服务器ip是你要添加的服务器的ip地址，不是面板的ip地址。入口ip是用于展示在转发页面，面向用户的访问地址。实在理解不到说明你没这个需求，都填节点的服务器ip就行！"
+                        description="服务器 IP 是你要添加的服务器地址，不是主控地址。入口 IP 用于展示在转发页面，面向用户的访问地址。不了解这个需求时，填节点服务器 IP 即可。"
                         className="mt-4"
                       />
               </div>

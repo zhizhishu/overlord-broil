@@ -37,14 +37,14 @@ CREATE TABLE IF NOT EXISTS control_server (
   role TEXT NOT NULL DEFAULT 'agent',
   endpoint TEXT,
   host TEXT NOT NULL,
-  xray_panel_endpoint TEXT,
-  xray_panel_base_path TEXT,
-  xray_panel_api_token TEXT,
-  xray_panel_username TEXT,
-  xray_panel_password TEXT,
-  xray_panel_two_factor_code TEXT,
-  xray_panel_allow_insecure INTEGER NOT NULL DEFAULT 0,
-  xray_panel_last_sync INTEGER,
+  xray_runtime_endpoint TEXT,
+  xray_runtime_base_path TEXT,
+  xray_runtime_api_token TEXT,
+  xray_runtime_username TEXT,
+  xray_runtime_password TEXT,
+  xray_runtime_two_factor_code TEXT,
+  xray_runtime_allow_insecure INTEGER NOT NULL DEFAULT 0,
+  xray_runtime_last_sync INTEGER,
   ssh_port INTEGER DEFAULT 22,
   ssh_user TEXT DEFAULT 'root',
   api_token TEXT NOT NULL,
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS control_server (
   agent_version TEXT,
   xray_version TEXT,
   snell_version TEXT,
-  xray_panel_service_status TEXT,
+  xray_runtime_service_status TEXT,
   xray_service_status TEXT,
   snell_service_status TEXT,
   certificate_mode TEXT,
@@ -217,7 +217,7 @@ CREATE INDEX IF NOT EXISTS idx_operation_audit_provider_key ON operation_audit_l
 CREATE INDEX IF NOT EXISTS idx_operation_audit_outcome ON operation_audit_log (outcome);
 CREATE INDEX IF NOT EXISTS idx_operation_audit_created_time ON operation_audit_log (created_time);
 
-CREATE TABLE IF NOT EXISTS xray_panel_traffic_snapshot (
+CREATE TABLE IF NOT EXISTS xray_runtime_traffic_snapshot (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   server_id INTEGER NOT NULL,
   server_name TEXT,
@@ -240,9 +240,9 @@ CREATE TABLE IF NOT EXISTS xray_panel_traffic_snapshot (
   status INTEGER NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_xray_panel_traffic_snapshot_server_id ON xray_panel_traffic_snapshot (server_id);
-CREATE INDEX IF NOT EXISTS idx_xray_panel_traffic_snapshot_source_type ON xray_panel_traffic_snapshot (source_type);
-CREATE INDEX IF NOT EXISTS idx_xray_panel_traffic_snapshot_synced_time ON xray_panel_traffic_snapshot (synced_time);
+CREATE INDEX IF NOT EXISTS idx_xray_runtime_traffic_snapshot_server_id ON xray_runtime_traffic_snapshot (server_id);
+CREATE INDEX IF NOT EXISTS idx_xray_runtime_traffic_snapshot_source_type ON xray_runtime_traffic_snapshot (source_type);
+CREATE INDEX IF NOT EXISTS idx_xray_runtime_traffic_snapshot_synced_time ON xray_runtime_traffic_snapshot (synced_time);
 
 CREATE TABLE IF NOT EXISTS speed_limit (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -332,7 +332,3 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_vite_config_name ON vite_config (name);
 
 INSERT OR IGNORE INTO vite_config (id, name, value, time)
 VALUES (1, 'app_name', 'Overlord Broil', 1755147963000);
-
-UPDATE vite_config
-SET value = 'Overlord Broil', time = CAST(strftime('%s', 'now') AS INTEGER) * 1000
-WHERE name = 'app_name' AND lower(value) IN ('flux', 'flux panel', 'flux xray runtime orchestrator');

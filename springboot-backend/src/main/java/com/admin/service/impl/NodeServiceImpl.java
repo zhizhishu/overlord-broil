@@ -337,12 +337,12 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
         ViteConfig viteConfig = viteConfigService.getOne(new QueryWrapper<ViteConfig>().eq("name", "ip"));
         if (viteConfig == null) return R.err("请先前往网站配置中设置主控地址");
 
-        String panelUrl = normalizePanelUrl(processServerAddress(viteConfig.getValue()));
+        String masterUrl = normalizeMasterUrl(processServerAddress(viteConfig.getValue()));
         StringBuilder command = new StringBuilder();
         command.append("curl -fsSL ")
                 .append(shellQuote(AGENT_BOOTSTRAP_URL))
-                .append(" | env OB_PANEL_URL=")
-                .append(shellQuote(panelUrl))
+                .append(" | env OB_MASTER_URL=")
+                .append(shellQuote(masterUrl))
                 .append(" OB_SERVER_ID=")
                 .append(shellQuote(String.valueOf(node.getId())))
                 .append(" OB_AGENT_TOKEN=")
@@ -352,7 +352,7 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
         return R.ok(command.toString());
     }
 
-    private String normalizePanelUrl(String serverAddr) {
+    private String normalizeMasterUrl(String serverAddr) {
         if (StrUtil.isBlank(serverAddr)) {
             return serverAddr;
         }

@@ -16,7 +16,7 @@ public class ControlServerHeartbeatDto {
 
     private String snellVersion;
 
-    private String xrayPanelServiceStatus;
+    private String xrayRuntimeServiceStatus;
 
     private String xrayServiceStatus;
 

@@ -4,7 +4,7 @@ import com.admin.common.dto.AgentTaskClaimDto;
 import com.admin.common.dto.AgentTaskReportDto;
 import com.admin.common.dto.DeployTaskDto;
 import com.admin.common.dto.DeployTaskStateDto;
-import com.admin.common.dto.OrchestrationPlanDto;
+import com.admin.common.dto.DeploymentPlanDto;
 import com.admin.common.lang.R;
 import com.admin.entity.DeployTask;
 import com.baomidou.mybatisplus.extension.service.IService;
@@ -13,7 +13,7 @@ public interface DeployTaskService extends IService<DeployTask> {
 
     R createTask(DeployTaskDto dto);
 
-    R createOrchestrationTask(OrchestrationPlanDto dto);
+    R createDeploymentPlanTask(DeploymentPlanDto dto);
 
     R getAllTasks();
 

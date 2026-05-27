@@ -5,7 +5,7 @@ import {
   NavbarBrand,
   NavbarContent,
 } from "@heroui/navbar";
-import { isWebViewFunc } from '@/utils/panel';
+import { isWebViewFunc } from '@/utils/master';
 import { useNavigate } from "react-router-dom";
 
 import { Logo } from "@/components/icons";

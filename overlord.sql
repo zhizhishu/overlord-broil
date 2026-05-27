@@ -78,14 +78,14 @@ CREATE TABLE `control_server` (
   `role` varchar(30) NOT NULL DEFAULT 'agent',
   `endpoint` varchar(255) DEFAULT NULL,
   `host` varchar(255) NOT NULL,
-  `xray_panel_endpoint` varchar(255) DEFAULT NULL,
-  `xray_panel_base_path` varchar(100) DEFAULT NULL,
-  `xray_panel_api_token` varchar(512) DEFAULT NULL,
-  `xray_panel_username` varchar(100) DEFAULT NULL,
-  `xray_panel_password` varchar(512) DEFAULT NULL,
-  `xray_panel_two_factor_code` varchar(255) DEFAULT NULL,
-  `xray_panel_allow_insecure` int(1) NOT NULL DEFAULT '0',
-  `xray_panel_last_sync` bigint(20) DEFAULT NULL,
+  `xray_runtime_endpoint` varchar(255) DEFAULT NULL,
+  `xray_runtime_base_path` varchar(100) DEFAULT NULL,
+  `xray_runtime_api_token` varchar(512) DEFAULT NULL,
+  `xray_runtime_username` varchar(100) DEFAULT NULL,
+  `xray_runtime_password` varchar(512) DEFAULT NULL,
+  `xray_runtime_two_factor_code` varchar(255) DEFAULT NULL,
+  `xray_runtime_allow_insecure` int(1) NOT NULL DEFAULT '0',
+  `xray_runtime_last_sync` bigint(20) DEFAULT NULL,
   `ssh_port` int(10) DEFAULT '22',
   `ssh_user` varchar(100) DEFAULT 'root',
   `api_token` varchar(100) NOT NULL,
@@ -93,7 +93,7 @@ CREATE TABLE `control_server` (
   `agent_version` varchar(100) DEFAULT NULL,
   `xray_version` varchar(100) DEFAULT NULL,
   `snell_version` varchar(100) DEFAULT NULL,
-  `xray_panel_service_status` varchar(30) DEFAULT NULL,
+  `xray_runtime_service_status` varchar(30) DEFAULT NULL,
   `xray_service_status` varchar(30) DEFAULT NULL,
   `snell_service_status` varchar(30) DEFAULT NULL,
   `certificate_mode` varchar(30) DEFAULT NULL,
@@ -248,7 +248,7 @@ CREATE TABLE `operation_audit_log` (
 
 -- --------------------------------------------------------
 
-CREATE TABLE `xray_panel_traffic_snapshot` (
+CREATE TABLE `xray_runtime_traffic_snapshot` (
   `id` int(10) NOT NULL,
   `server_id` int(10) NOT NULL,
   `server_name` varchar(100) DEFAULT NULL,
@@ -451,7 +451,7 @@ ALTER TABLE `operation_audit_log`
   ADD KEY `outcome` (`outcome`),
   ADD KEY `created_time` (`created_time`);
 
-ALTER TABLE `xray_panel_traffic_snapshot`
+ALTER TABLE `xray_runtime_traffic_snapshot`
   ADD PRIMARY KEY (`id`),
   ADD KEY `server_id` (`server_id`),
   ADD KEY `source_type` (`source_type`),
@@ -522,7 +522,7 @@ ALTER TABLE `monitor_alert`
 ALTER TABLE `operation_audit_log`
   MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
 
-ALTER TABLE `xray_panel_traffic_snapshot`
+ALTER TABLE `xray_runtime_traffic_snapshot`
   MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
 
 --

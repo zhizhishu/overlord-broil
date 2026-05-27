@@ -91,8 +91,8 @@ class RuntimeProviderServiceTest {
     }
 
     @Test
-    void orchestrationExposesRelatedProviders() {
-        RuntimeProviderAssignment assignment = service.assign("xray-runtime", "orchestrate");
+    void deploymentPlanExposesRelatedProviders() {
+        RuntimeProviderAssignment assignment = service.assign("xray-runtime", "deploy-plan");
 
         assertEquals("xrayRuntime", assignment.getKey());
         assertTrue(assignment.getRelatedProviders().contains("snell"));

@@ -16,7 +16,7 @@ import {
   createControlServer,
   createDeployTask,
   createProtocolNode,
-  createOrchestrationTask,
+  createDeploymentPlanTask,
   createProtocolProfile,
   createServerForwardRule,
   deleteControlServer,
@@ -24,8 +24,8 @@ import {
   deleteProtocolNode,
   deleteProtocolProfile,
   deleteServerForwardRule,
-  addXrayPanelInbound,
-  deleteXrayPanelInbound,
+  addXrayRuntimeInbound,
+  deleteXrayRuntimeInbound,
   ensureDefaultProtocolProfiles,
   getControlServerList,
   getControlServerToken,
@@ -39,40 +39,40 @@ import {
   getProtocolProfileList,
   getServerForwardRuleList,
   getServerRuleOverview,
-  getXrayPanelConfig,
-  getXrayPanelOutboundTraffic,
-  getXrayPanelOutbounds,
-  listXrayPanelTraffic,
-  listXrayPanelInbounds,
+  getXrayRuntimeConfig,
+  getXrayRuntimeOutboundTraffic,
+  getXrayRuntimeOutbounds,
+  listXrayRuntimeTraffic,
+  listXrayRuntimeInbounds,
   rotateControlServerToken,
   restartProtocolNode,
   restartServerForwardRule,
-  restartXrayPanelXray,
+  restartXrayRuntimeXray,
   retryDeployTask,
-  saveXrayPanelOutbounds,
-  syncXrayPanelTraffic,
+  saveXrayRuntimeOutbounds,
+  syncXrayRuntimeTraffic,
   syncProtocolNodes,
-  testXrayPanelConnection,
-  updateXrayPanelInbound,
+  testXrayRuntimeConnection,
+  updateXrayRuntimeInbound,
   updateControlServer,
   updateProtocolNode,
   updateProtocolProfile,
   updateServerForwardRule
 } from "@/api";
-import type { ControlServer, DeployTask, MonitorAlert, OperationAuditLog, ProtocolNode, ProtocolProfile, RuntimeProviderAction, RuntimeProviderDescriptor, RuntimeState, RuntimeStateOverview, RuntimeStateOverviewItem, ServerForwardRule, XrayPanelTrafficSnapshot } from "@/types";
+import type { ControlServer, DeployTask, MonitorAlert, OperationAuditLog, ProtocolNode, ProtocolProfile, RuntimeProviderAction, RuntimeProviderDescriptor, RuntimeState, RuntimeStateOverview, RuntimeStateOverviewItem, ServerForwardRule, XrayRuntimeTrafficSnapshot } from "@/types";
 
 interface ServerForm {
   id?: number;
   name: string;
   role: string;
   endpoint: string;
-  xrayPanelEndpoint: string;
-  xrayPanelBasePath: string;
-  xrayPanelApiToken: string;
-  xrayPanelUsername: string;
-  xrayPanelPassword: string;
-  xrayPanelTwoFactorCode: string;
-  xrayPanelAllowInsecure: number;
+  xrayRuntimeEndpoint: string;
+  xrayRuntimeBasePath: string;
+  xrayRuntimeApiToken: string;
+  xrayRuntimeUsername: string;
+  xrayRuntimePassword: string;
+  xrayRuntimeTwoFactorCode: string;
+  xrayRuntimeAllowInsecure: number;
   host: string;
   sshPort: number;
   sshUser: string;
@@ -101,15 +101,15 @@ interface DeployForm {
   psk: string;
 }
 
-interface OrchestrationForm {
+interface DeploymentPlanForm {
   serverId: number | null;
   serverIds: number[];
-  installXrayPanel: boolean;
-  configurePanel: boolean;
-  xrayPanelVersion: string;
-  panelPort: number;
-  panelUsername: string;
-  panelPassword: string;
+  installXrayRuntime: boolean;
+  configureRuntime: boolean;
+  xrayRuntimeVersion: string;
+  runtimePort: number;
+  runtimeUsername: string;
+  runtimePassword: string;
   webBasePath: string;
   publicHost: string;
   listenIp: string;
@@ -133,7 +133,7 @@ interface OrchestrationForm {
   snellPsk: string;
 }
 
-interface XrayPanelInboundForm {
+interface XrayRuntimeInboundForm {
   serverId: number | null;
   inboundId: string;
   mode: "add" | "update" | "delete";
@@ -386,7 +386,7 @@ interface UnifiedRuleRow {
   error?: string;
   node?: ProtocolNode;
   rule?: ServerForwardRule;
-  snapshot?: XrayPanelTrafficSnapshot;
+  snapshot?: XrayRuntimeTrafficSnapshot;
 }
 
 interface FormCheck {
@@ -440,13 +440,13 @@ const blankServerForm: ServerForm = {
   name: "",
   role: "agent",
   endpoint: "",
-  xrayPanelEndpoint: "",
-  xrayPanelBasePath: "",
-  xrayPanelApiToken: "",
-  xrayPanelUsername: "",
-  xrayPanelPassword: "",
-  xrayPanelTwoFactorCode: "",
-  xrayPanelAllowInsecure: 0,
+  xrayRuntimeEndpoint: "",
+  xrayRuntimeBasePath: "",
+  xrayRuntimeApiToken: "",
+  xrayRuntimeUsername: "",
+  xrayRuntimePassword: "",
+  xrayRuntimeTwoFactorCode: "",
+  xrayRuntimeAllowInsecure: 0,
   host: "",
   sshPort: 22,
   sshUser: "root",
@@ -474,15 +474,15 @@ const blankDeployForm: DeployForm = {
   psk: ""
 };
 
-const blankOrchestrationForm: OrchestrationForm = {
+const blankDeploymentPlanForm: DeploymentPlanForm = {
   serverId: null,
   serverIds: [],
-  installXrayPanel: true,
-  configurePanel: true,
-  xrayPanelVersion: "",
-  panelPort: 5168,
-  panelUsername: "",
-  panelPassword: "",
+  installXrayRuntime: true,
+  configureRuntime: true,
+  xrayRuntimeVersion: "",
+  runtimePort: 5168,
+  runtimeUsername: "",
+  runtimePassword: "",
   webBasePath: "ob-control",
   publicHost: "",
   listenIp: "0.0.0.0",
@@ -521,7 +521,7 @@ const defaultInboundPayload = {
   sniffing: "{\"enabled\":true,\"destOverride\":[\"http\",\"tls\",\"quic\",\"fakedns\"]}"
 };
 
-const blankXrayPanelInboundForm: XrayPanelInboundForm = {
+const blankXrayRuntimeInboundForm: XrayRuntimeInboundForm = {
   serverId: null,
   inboundId: "",
   mode: "add",
@@ -801,9 +801,9 @@ const isNanoCriticalServer = (server?: ControlServer) => {
   return Boolean(server?.memoryTotalMb && server.memoryTotalMb > 0 && server.memoryTotalMb < NANO_CRITICAL_MEMORY_MB);
 };
 
-const orchestrationUsesFullXrayPanelStack = (form: OrchestrationForm) => {
-  return form.installXrayPanel
-    || form.configurePanel
+const deploymentPlanUsesFullXrayRuntimeStack = (form: DeploymentPlanForm) => {
+  return form.installXrayRuntime
+    || form.configureRuntime
     || form.createVlessReality
     || form.createVmessWs
     || form.createTrojanTls
@@ -815,7 +815,7 @@ const MasterRiskNotice = ({ context }: { context: string }) => {
 
   return (
     <div className="rounded-small border border-warning-300 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
-      <span className="font-semibold">{t("主控高风险：")}</span>{t("{context}会作用在控制面服务器上，建议确认 API、Xray 运行时以及证书任务不会影响现有编排。", { context: t(context) })}
+      <span className="font-semibold">{t("主控高风险：")}</span>{t("{context}会作用在控制面服务器上，建议确认 API、Xray 运行时以及证书任务不会影响现有部署。", { context: t(context) })}
     </div>
   );
 };
@@ -1084,7 +1084,7 @@ const asTrafficLimit = (gb: number) => {
   return Math.round(gb * GB);
 };
 
-const clientBase = (form: XrayPanelInboundForm) => ({
+const clientBase = (form: XrayRuntimeInboundForm) => ({
   email: form.clientEmail.trim(),
   limitIp: 0,
   totalGB: asTrafficLimit(form.totalGb),
@@ -1096,7 +1096,7 @@ const clientBase = (form: XrayPanelInboundForm) => ({
   reset: 0
 });
 
-const buildInboundPayloadFromForm = (form: XrayPanelInboundForm) => {
+const buildInboundPayloadFromForm = (form: XrayRuntimeInboundForm) => {
   const protocol = form.protocol;
   const sniffing = {
     enabled: true,
@@ -1204,10 +1204,10 @@ const buildInboundPayloadFromForm = (form: XrayPanelInboundForm) => {
   };
 };
 
-const inboundPayloadPreview = (form: XrayPanelInboundForm) => JSON.stringify(buildInboundPayloadFromForm(form), null, 2);
+const inboundPayloadPreview = (form: XrayRuntimeInboundForm) => JSON.stringify(buildInboundPayloadFromForm(form), null, 2);
 
-const inboundFormFromNodeForm = (form: ProtocolNodeForm): XrayPanelInboundForm => ({
-  ...blankXrayPanelInboundForm,
+const inboundFormFromNodeForm = (form: ProtocolNodeForm): XrayRuntimeInboundForm => ({
+  ...blankXrayRuntimeInboundForm,
   serverId: form.serverId,
   remark: form.name,
   listen: form.listen,
@@ -1240,7 +1240,7 @@ export default function ControlCenterPage() {
   const [tasks, setTasks] = useState<DeployTask[]>([]);
   const [runtimeProviders, setRuntimeProviders] = useState<RuntimeProviderDescriptor[]>([]);
   const [runtimeStateOverview, setRuntimeStateOverview] = useState<RuntimeStateOverview | null>(null);
-  const [trafficSnapshots, setTrafficSnapshots] = useState<XrayPanelTrafficSnapshot[]>([]);
+  const [trafficSnapshots, setTrafficSnapshots] = useState<XrayRuntimeTrafficSnapshot[]>([]);
   const [monitorAlerts, setMonitorAlerts] = useState<MonitorAlert[]>([]);
   const [operationAuditLogs, setOperationAuditLogs] = useState<OperationAuditLog[]>([]);
   const [serverModalOpen, setServerModalOpen] = useState(false);
@@ -1248,9 +1248,9 @@ export default function ControlCenterPage() {
   const [protocolNodeModalOpen, setProtocolNodeModalOpen] = useState(false);
   const [serverForwardModalOpen, setServerForwardModalOpen] = useState(false);
   const [deployModalOpen, setDeployModalOpen] = useState(false);
-  const [orchestrationModalOpen, setOrchestrationModalOpen] = useState(false);
+  const [deploymentPlanModalOpen, setDeploymentPlanModalOpen] = useState(false);
   const [scriptModalOpen, setScriptModalOpen] = useState(false);
-  const [xrayPanelInboundModalOpen, setXrayPanelInboundModalOpen] = useState(false);
+  const [xrayRuntimeInboundModalOpen, setXrayRuntimeInboundModalOpen] = useState(false);
   const [xraySettingModalOpen, setXraySettingModalOpen] = useState(false);
   const [scriptTitle, setScriptTitle] = useState("");
   const [scriptText, setScriptText] = useState("");
@@ -1266,8 +1266,8 @@ export default function ControlCenterPage() {
   const [protocolNodeForm, setProtocolNodeForm] = useState<ProtocolNodeForm>(blankProtocolNodeForm);
   const [serverForwardRuleForm, setServerForwardRuleForm] = useState<ServerForwardRuleForm>(blankServerForwardRuleForm);
   const [deployForm, setDeployForm] = useState<DeployForm>(blankDeployForm);
-  const [orchestrationForm, setOrchestrationForm] = useState<OrchestrationForm>(blankOrchestrationForm);
-  const [xrayPanelInboundForm, setXrayPanelInboundForm] = useState<XrayPanelInboundForm>(blankXrayPanelInboundForm);
+  const [deploymentPlanForm, setDeploymentPlanForm] = useState<DeploymentPlanForm>(blankDeploymentPlanForm);
+  const [xrayRuntimeInboundForm, setXrayRuntimeInboundForm] = useState<XrayRuntimeInboundForm>(blankXrayRuntimeInboundForm);
   const [ruleSearch, setRuleSearch] = useState("");
   const [ruleKindFilter, setRuleKindFilter] = useState<RuleKindFilter>("all");
   const [ruleServerFilter, setRuleServerFilter] = useState("all");
@@ -1494,18 +1494,18 @@ export default function ControlCenterPage() {
     };
   }, [protocolNodeChecks]);
 
-  const selectedOrchestrationServers = useMemo(() => {
-    return servers.filter(server => orchestrationForm.serverIds.includes(server.id));
-  }, [orchestrationForm.serverIds, servers]);
+  const selectedDeploymentPlanServers = useMemo(() => {
+    return servers.filter(server => deploymentPlanForm.serverIds.includes(server.id));
+  }, [deploymentPlanForm.serverIds, servers]);
 
-  const selectedOrchestrationHasMaster = selectedOrchestrationServers.some(server => server.role === "master");
-  const selectedOrchestrationLowMemoryServers = selectedOrchestrationServers.filter(isLowMemoryServer);
-  const selectedOrchestrationCriticalNanoServers = selectedOrchestrationServers.filter(isNanoCriticalServer);
-  const selectedOrchestrationUsesFullXrayPanelStack = orchestrationUsesFullXrayPanelStack(orchestrationForm);
+  const selectedDeploymentPlanHasMaster = selectedDeploymentPlanServers.some(server => server.role === "master");
+  const selectedDeploymentPlanLowMemoryServers = selectedDeploymentPlanServers.filter(isLowMemoryServer);
+  const selectedDeploymentPlanCriticalNanoServers = selectedDeploymentPlanServers.filter(isNanoCriticalServer);
+  const selectedDeploymentPlanUsesFullXrayRuntimeStack = deploymentPlanUsesFullXrayRuntimeStack(deploymentPlanForm);
 
   const selectedInboundServer = useMemo(() => {
-    return servers.find(server => server.id === xrayPanelInboundForm.serverId);
-  }, [servers, xrayPanelInboundForm.serverId]);
+    return servers.find(server => server.id === xrayRuntimeInboundForm.serverId);
+  }, [servers, xrayRuntimeInboundForm.serverId]);
 
   const rememberOutboundTags = (source: any) => {
     const tags = collectOutboundTags(source);
@@ -1582,7 +1582,7 @@ export default function ControlCenterPage() {
       rule
     }));
 
-    const xrayPanelRows = trafficSnapshots.map(snapshot => ({
+    const xrayRuntimeRows = trafficSnapshots.map(snapshot => ({
       id: `xrayRuntime-${snapshot.id}`,
       kind: "xrayRuntime" as const,
       title: snapshot.inboundRemark || snapshot.email || snapshot.tag || `${snapshot.sourceType} #${snapshot.inboundId || snapshot.id}`,
@@ -1599,7 +1599,7 @@ export default function ControlCenterPage() {
       snapshot
     }));
 
-    return [...nodeRows, ...forwardRows, ...xrayPanelRows];
+    return [...nodeRows, ...forwardRows, ...xrayRuntimeRows];
   }, [forwardRules, protocolNodes, servers, t, trafficSnapshots]);
 
   const filteredRuleRows = useMemo(() => {
@@ -1671,13 +1671,13 @@ export default function ControlCenterPage() {
       name: server.name,
       role: server.role || "agent",
       endpoint: server.endpoint || "",
-      xrayPanelEndpoint: server.xrayPanelEndpoint || "",
-      xrayPanelBasePath: server.xrayPanelBasePath || "",
-      xrayPanelApiToken: server.xrayPanelApiToken || "",
-      xrayPanelUsername: server.xrayPanelUsername || "",
-      xrayPanelPassword: server.xrayPanelPassword || "",
-      xrayPanelTwoFactorCode: server.xrayPanelTwoFactorCode || "",
-      xrayPanelAllowInsecure: server.xrayPanelAllowInsecure || 0,
+      xrayRuntimeEndpoint: server.xrayRuntimeEndpoint || "",
+      xrayRuntimeBasePath: server.xrayRuntimeBasePath || "",
+      xrayRuntimeApiToken: server.xrayRuntimeApiToken || "",
+      xrayRuntimeUsername: server.xrayRuntimeUsername || "",
+      xrayRuntimePassword: server.xrayRuntimePassword || "",
+      xrayRuntimeTwoFactorCode: server.xrayRuntimeTwoFactorCode || "",
+      xrayRuntimeAllowInsecure: server.xrayRuntimeAllowInsecure || 0,
       host: server.host || "",
       sshPort: server.sshPort || 22,
       sshUser: server.sshUser || "root",
@@ -1777,22 +1777,22 @@ export default function ControlCenterPage() {
     setDeployModalOpen(true);
   };
 
-  const openOrchestrationModal = (server?: ControlServer) => {
+  const openDeploymentPlanModal = (server?: ControlServer) => {
     const firstServer = server || servers[0];
     const host = firstServer?.host || "";
-    setOrchestrationForm({
-      ...blankOrchestrationForm,
+    setDeploymentPlanForm({
+      ...blankDeploymentPlanForm,
       serverId: firstServer?.id || null,
       serverIds: firstServer?.id ? [firstServer.id] : [],
       publicHost: host,
       certificateDomain: host.includes(".") ? host : "",
       webBasePath: firstServer?.id ? `ob-${firstServer.id}` : "ob-control"
     });
-    setOrchestrationModalOpen(true);
+    setDeploymentPlanModalOpen(true);
   };
 
-  const patchOrchestrationForm = (patch: Partial<OrchestrationForm>) => {
-    setOrchestrationForm(prev => ({ ...prev, ...patch }));
+  const patchDeploymentPlanForm = (patch: Partial<DeploymentPlanForm>) => {
+    setDeploymentPlanForm(prev => ({ ...prev, ...patch }));
   };
 
   const saveServer = async () => {
@@ -2050,7 +2050,7 @@ export default function ControlCenterPage() {
   const showServerRuleOverview = async (server: ControlServer) => {
     const res = await getServerRuleOverview(server.id);
     if (res.code === 0) {
-      showXrayPanelResult(t("{name} 出入站与转发规则", { name: server.name }), res.data);
+      showXrayRuntimeResult(t("{name} 出入站与转发规则", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || t("读取服务器规则失败"));
     }
@@ -2138,29 +2138,29 @@ export default function ControlCenterPage() {
     await executeAgentMaintenance(pending);
   };
 
-  const saveOrchestrationTask = async () => {
-    const targetServerIds = orchestrationForm.serverIds.length > 0
-      ? orchestrationForm.serverIds
-      : orchestrationForm.serverId ? [orchestrationForm.serverId] : [];
+  const saveDeploymentPlanTask = async () => {
+    const targetServerIds = deploymentPlanForm.serverIds.length > 0
+      ? deploymentPlanForm.serverIds
+      : deploymentPlanForm.serverId ? [deploymentPlanForm.serverId] : [];
     if (targetServerIds.length === 0) {
       toast.error(t("请选择目标服务器"));
       return;
     }
-    if (orchestrationForm.certificateMode === "acme-http" && !orchestrationForm.certificateDomain.trim()) {
+    if (deploymentPlanForm.certificateMode === "acme-http" && !deploymentPlanForm.certificateDomain.trim()) {
       toast.error(t("ACME 证书模式需要填写域名"));
       return;
     }
-    if (selectedOrchestrationCriticalNanoServers.length > 0 && selectedOrchestrationUsesFullXrayPanelStack) {
-      toast.error(t("Nano 被控内存低于 200MB，不支持完整 Xray 编排；请关闭 Xray 相关选项，仅保留 Snell 或端口转发。"));
+    if (selectedDeploymentPlanCriticalNanoServers.length > 0 && selectedDeploymentPlanUsesFullXrayRuntimeStack) {
+      toast.error(t("Nano 被控内存低于 200MB，不支持完整 Xray 部署；请关闭 Xray 相关选项，仅保留 Snell 或端口转发。"));
       return;
     }
     const ports = [
-      ["面板", orchestrationForm.panelPort, true],
-      ["VLESS Reality", orchestrationForm.vlessPort, orchestrationForm.createVlessReality],
-      ["VMess WS", orchestrationForm.vmessPort, orchestrationForm.createVmessWs],
-      ["Trojan TLS", orchestrationForm.trojanPort, orchestrationForm.createTrojanTls],
-      ["Shadowsocks", orchestrationForm.shadowsocksPort, orchestrationForm.createShadowsocks],
-      ["Snell", orchestrationForm.snellPort, orchestrationForm.installSnell]
+      ["Xray Runtime", deploymentPlanForm.runtimePort, true],
+      ["VLESS Reality", deploymentPlanForm.vlessPort, deploymentPlanForm.createVlessReality],
+      ["VMess WS", deploymentPlanForm.vmessPort, deploymentPlanForm.createVmessWs],
+      ["Trojan TLS", deploymentPlanForm.trojanPort, deploymentPlanForm.createTrojanTls],
+      ["Shadowsocks", deploymentPlanForm.shadowsocksPort, deploymentPlanForm.createShadowsocks],
+      ["Snell", deploymentPlanForm.snellPort, deploymentPlanForm.installSnell]
     ] as const;
     const usedPorts = new Map<number, string>();
     for (const [name, port, enabled] of ports) {
@@ -2179,28 +2179,28 @@ export default function ControlCenterPage() {
     setSubmitting(true);
     const results = [];
     for (const serverId of targetServerIds) {
-      const payload = { ...orchestrationForm } as any;
+      const payload = { ...deploymentPlanForm } as any;
       delete payload.serverIds;
       const targetServer = servers.find(server => server.id === serverId);
-      results.push(await createOrchestrationTask({
+      results.push(await createDeploymentPlanTask({
         ...payload,
         serverId,
-        publicHost: targetServer?.host || orchestrationForm.publicHost,
-        certificateDomain: orchestrationForm.certificateDomain || (targetServer?.host?.includes(".") ? targetServer.host : "")
+        publicHost: targetServer?.host || deploymentPlanForm.publicHost,
+        certificateDomain: deploymentPlanForm.certificateDomain || (targetServer?.host?.includes(".") ? targetServer.host : "")
       }));
     }
     setSubmitting(false);
 
     const failed = results.find(res => res.code !== 0);
     if (!failed) {
-      toast.success(t("已生成 {count} 个一键编排任务，等待副控 agent 自动领取", { count: results.length }));
-      setOrchestrationModalOpen(false);
-      setScriptTitle(t("一键编排任务"));
+      toast.success(t("已生成 {count} 个一键部署任务，等待副控 agent 自动领取", { count: results.length }));
+      setDeploymentPlanModalOpen(false);
+      setScriptTitle(t("一键部署任务"));
       setScriptText(results.map(res => `# Task ${res.data.id} / ${res.data.serverName || res.data.serverId}\n${res.data.script || ""}`).join("\n\n"));
       setScriptModalOpen(true);
       loadData();
     } else {
-      toast.error(failed.msg || t("生成一键编排任务失败"));
+      toast.error(failed.msg || t("生成一键部署任务失败"));
     }
   };
 
@@ -2234,67 +2234,67 @@ export default function ControlCenterPage() {
     setScriptModalOpen(true);
   };
 
-  const isXrayPanelSuccess = (res: any) => res.code === 0 && (!res.data || res.data.success !== false);
+  const isXrayRuntimeSuccess = (res: any) => res.code === 0 && (!res.data || res.data.success !== false);
 
-  const showXrayPanelResult = (title: string, data: any) => {
+  const showXrayRuntimeResult = (title: string, data: any) => {
     setScriptTitle(title);
     setScriptText(typeof data === "string" ? data : JSON.stringify(data, null, 2));
     setScriptModalOpen(true);
   };
 
-  const testXrayPanel = async (server: ControlServer) => {
-    const res = await testXrayPanelConnection(server.id);
-    if (isXrayPanelSuccess(res)) {
-      toast.success(t("兼容 API 连接正常"));
-      showXrayPanelResult(t("{name} 运行时状态", { name: server.name }), res.data);
+  const testXrayRuntime = async (server: ControlServer) => {
+    const res = await testXrayRuntimeConnection(server.id);
+    if (isXrayRuntimeSuccess(res)) {
+      toast.success(t("Runtime API 连接正常"));
+      showXrayRuntimeResult(t("{name} 运行时状态", { name: server.name }), res.data);
     } else {
-      toast.error(res.msg || res.data?.msg || t("兼容 API 连接失败"));
+      toast.error(res.msg || res.data?.msg || t("Runtime API 连接失败"));
     }
   };
 
-  const showXrayPanelInbounds = async (server: ControlServer) => {
-    const res = await listXrayPanelInbounds(server.id);
-    if (isXrayPanelSuccess(res)) {
-      showXrayPanelResult(t("{name} 入站列表", { name: server.name }), res.data);
+  const showXrayRuntimeInbounds = async (server: ControlServer) => {
+    const res = await listXrayRuntimeInbounds(server.id);
+    if (isXrayRuntimeSuccess(res)) {
+      showXrayRuntimeResult(t("{name} 入站列表", { name: server.name }), res.data);
       loadData();
     } else {
       toast.error(res.msg || res.data?.msg || t("读取入站失败"));
     }
   };
 
-  const showXrayPanelConfig = async (server: ControlServer) => {
-    const res = await getXrayPanelConfig(server.id);
-    if (isXrayPanelSuccess(res)) {
-      showXrayPanelResult(t("{name} Xray 配置", { name: server.name }), res.data);
+  const showXrayRuntimeConfig = async (server: ControlServer) => {
+    const res = await getXrayRuntimeConfig(server.id);
+    if (isXrayRuntimeSuccess(res)) {
+      showXrayRuntimeResult(t("{name} Xray 配置", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("读取配置失败"));
     }
   };
 
-  const showXrayPanelOutbounds = async (server: ControlServer) => {
-    const res = await getXrayPanelOutbounds(server.id);
-    if (isXrayPanelSuccess(res)) {
+  const showXrayRuntimeOutbounds = async (server: ControlServer) => {
+    const res = await getXrayRuntimeOutbounds(server.id);
+    if (isXrayRuntimeSuccess(res)) {
       rememberOutboundTags(res.data);
-      showXrayPanelResult(t("{name} 出站配置", { name: server.name }), res.data);
+      showXrayRuntimeResult(t("{name} 出站配置", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("读取出站失败"));
     }
   };
 
-  const showXrayPanelOutboundTraffic = async (server: ControlServer) => {
-    const res = await getXrayPanelOutboundTraffic(server.id);
-    if (isXrayPanelSuccess(res)) {
-      showXrayPanelResult(t("{name} 出站流量", { name: server.name }), res.data);
+  const showXrayRuntimeOutboundTraffic = async (server: ControlServer) => {
+    const res = await getXrayRuntimeOutboundTraffic(server.id);
+    if (isXrayRuntimeSuccess(res)) {
+      showXrayRuntimeResult(t("{name} 出站流量", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("读取出站流量失败"));
     }
   };
 
-  const syncPanelTraffic = async (server: ControlServer) => {
-    const res = await syncXrayPanelTraffic(server.id);
-    if (isXrayPanelSuccess(res)) {
+  const syncRuntimeTraffic = async (server: ControlServer) => {
+    const res = await syncXrayRuntimeTraffic(server.id);
+    if (isXrayRuntimeSuccess(res)) {
       toast.success(t("远端流量已同步入库"));
-      showXrayPanelResult(t("{name} 流量同步结果", { name: server.name }), res.data);
+      showXrayRuntimeResult(t("{name} 流量同步结果", { name: server.name }), res.data);
       loadData();
     } else {
       toast.error(res.msg || res.data?.msg || t("同步流量失败"));
@@ -2302,27 +2302,27 @@ export default function ControlCenterPage() {
   };
 
   const showTrafficSnapshots = async (server: ControlServer) => {
-    const res = await listXrayPanelTraffic({ serverId: server.id, limit: 120 });
+    const res = await listXrayRuntimeTraffic({ serverId: server.id, limit: 120 });
     if (res.code === 0) {
       const snapshots = res.data || [];
       setTrafficSnapshots(snapshots);
-      showXrayPanelResult(t("{name} 本地流量快照", { name: server.name }), snapshots);
+      showXrayRuntimeResult(t("{name} 本地流量快照", { name: server.name }), snapshots);
     } else {
       toast.error(res.msg || t("读取本地流量快照失败"));
     }
   };
 
-  const openXrayPanelInboundModal = (server: ControlServer) => {
-    setXrayPanelInboundForm({
-      ...blankXrayPanelInboundForm,
+  const openXrayRuntimeInboundModal = (server: ControlServer) => {
+    setXrayRuntimeInboundForm({
+      ...blankXrayRuntimeInboundForm,
       serverId: server.id,
-      payloadJson: inboundPayloadPreview({ ...blankXrayPanelInboundForm, serverId: server.id })
+      payloadJson: inboundPayloadPreview({ ...blankXrayRuntimeInboundForm, serverId: server.id })
     });
-    setXrayPanelInboundModalOpen(true);
+    setXrayRuntimeInboundModalOpen(true);
   };
 
-  const patchXrayPanelInboundForm = (patch: Partial<XrayPanelInboundForm>) => {
-    setXrayPanelInboundForm(prev => {
+  const patchXrayRuntimeInboundForm = (patch: Partial<XrayRuntimeInboundForm>) => {
+    setXrayRuntimeInboundForm(prev => {
       const next = { ...prev, ...patch };
       return {
         ...next,
@@ -2331,34 +2331,34 @@ export default function ControlCenterPage() {
     });
   };
 
-  const updateInboundProtocol = (protocol: XrayPanelInboundForm["protocol"]) => {
-    const defaults: Record<XrayPanelInboundForm["protocol"], Partial<XrayPanelInboundForm>> = {
+  const updateInboundProtocol = (protocol: XrayRuntimeInboundForm["protocol"]) => {
+    const defaults: Record<XrayRuntimeInboundForm["protocol"], Partial<XrayRuntimeInboundForm>> = {
       vless: { protocol, remark: "ob-vless", port: 443, network: "tcp", security: "reality", flow: "xtls-rprx-vision" },
       vmess: { protocol, remark: "ob-vmess", port: 2086, network: "ws", security: "none", flow: "" },
       trojan: { protocol, remark: "ob-trojan", port: 443, network: "tcp", security: "tls", flow: "" },
       shadowsocks: { protocol, remark: "ob-shadowsocks", port: 8388, network: "tcp", security: "none", flow: "" }
     };
-    patchXrayPanelInboundForm(defaults[protocol]);
+    patchXrayRuntimeInboundForm(defaults[protocol]);
   };
 
-  const saveXrayPanelInbound = async (confirmed = false) => {
-    if (!xrayPanelInboundForm.serverId) {
+  const saveXrayRuntimeInbound = async (confirmed = false) => {
+    if (!xrayRuntimeInboundForm.serverId) {
       toast.error(t("请选择服务器"));
       return;
     }
-    if (xrayPanelInboundForm.mode !== "add" && !xrayPanelInboundForm.inboundId.trim()) {
+    if (xrayRuntimeInboundForm.mode !== "add" && !xrayRuntimeInboundForm.inboundId.trim()) {
       toast.error(t("更新或删除入站时必须填写 inbound id"));
       return;
     }
-    if (xrayPanelInboundForm.mode === "delete" && !confirmed) {
+    if (xrayRuntimeInboundForm.mode === "delete" && !confirmed) {
       requestUiConfirmation({
         title: t("确认删除入站"),
-        message: t("确定删除入站 #{id}?", { id: xrayPanelInboundForm.inboundId || "-" }),
+        message: t("确定删除入站 #{id}?", { id: xrayRuntimeInboundForm.inboundId || "-" }),
         detail: t("该操作会直接修改远端 Xray 入站配置。"),
         confirmText: t("确认删除"),
         color: "danger",
         testId: "confirm-delete-xray-inbound",
-        onConfirm: () => saveXrayPanelInbound(true)
+        onConfirm: () => saveXrayRuntimeInbound(true)
       });
       return;
     }
@@ -2366,36 +2366,36 @@ export default function ControlCenterPage() {
     setSubmitting(true);
     let res: any;
     try {
-      const inboundId = xrayPanelInboundForm.inboundId ? Number(xrayPanelInboundForm.inboundId) : undefined;
-      if (xrayPanelInboundForm.mode === "delete") {
-        res = await deleteXrayPanelInbound({ serverId: xrayPanelInboundForm.serverId, inboundId });
+      const inboundId = xrayRuntimeInboundForm.inboundId ? Number(xrayRuntimeInboundForm.inboundId) : undefined;
+      if (xrayRuntimeInboundForm.mode === "delete") {
+        res = await deleteXrayRuntimeInbound({ serverId: xrayRuntimeInboundForm.serverId, inboundId });
       } else {
-        const payload = xrayPanelInboundForm.editMode === "json"
-          ? JSON.parse(xrayPanelInboundForm.payloadJson)
-          : buildInboundPayloadFromForm(xrayPanelInboundForm);
-        res = xrayPanelInboundForm.mode === "add"
-          ? await addXrayPanelInbound({ serverId: xrayPanelInboundForm.serverId, payload })
-          : await updateXrayPanelInbound({ serverId: xrayPanelInboundForm.serverId, inboundId, payload });
+        const payload = xrayRuntimeInboundForm.editMode === "json"
+          ? JSON.parse(xrayRuntimeInboundForm.payloadJson)
+          : buildInboundPayloadFromForm(xrayRuntimeInboundForm);
+        res = xrayRuntimeInboundForm.mode === "add"
+          ? await addXrayRuntimeInbound({ serverId: xrayRuntimeInboundForm.serverId, payload })
+          : await updateXrayRuntimeInbound({ serverId: xrayRuntimeInboundForm.serverId, inboundId, payload });
       }
     } catch (error) {
       setSubmitting(false);
-      toast.error(xrayPanelInboundForm.editMode === "json" ? t("入站 JSON 格式不正确") : t("入站表单内容不完整"));
+      toast.error(xrayRuntimeInboundForm.editMode === "json" ? t("入站 JSON 格式不正确") : t("入站表单内容不完整"));
       return;
     }
     setSubmitting(false);
 
-    if (isXrayPanelSuccess(res)) {
+    if (isXrayRuntimeSuccess(res)) {
       toast.success(t("入站操作已提交"));
-      setXrayPanelInboundModalOpen(false);
-      showXrayPanelResult(t("入站操作结果"), res.data);
+      setXrayRuntimeInboundModalOpen(false);
+      showXrayRuntimeResult(t("入站操作结果"), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("入站操作失败"));
     }
   };
 
   const openXraySettingModal = async (server: ControlServer) => {
-    const res = await getXrayPanelConfig(server.id);
-    if (!isXrayPanelSuccess(res)) {
+    const res = await getXrayRuntimeConfig(server.id);
+    if (!isXrayRuntimeSuccess(res)) {
       toast.error(res.msg || res.data?.msg || t("读取 Xray 配置失败"));
       return;
     }
@@ -2433,17 +2433,17 @@ export default function ControlCenterPage() {
     }
 
     setSubmitting(true);
-    const res = await saveXrayPanelOutbounds({
+    const res = await saveXrayRuntimeOutbounds({
       serverId: xraySettingServerId,
       xraySetting: xraySettingText,
       outboundTestUrl
     });
     setSubmitting(false);
 
-    if (isXrayPanelSuccess(res)) {
+    if (isXrayRuntimeSuccess(res)) {
       toast.success(t("出站配置已保存"));
       setXraySettingModalOpen(false);
-      showXrayPanelResult(t("出站保存结果"), res.data);
+      showXrayRuntimeResult(t("出站保存结果"), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("保存出站配置失败"));
     }
@@ -2462,10 +2462,10 @@ export default function ControlCenterPage() {
       });
       return;
     }
-    const res = await restartXrayPanelXray(server.id);
-    if (isXrayPanelSuccess(res)) {
+    const res = await restartXrayRuntimeXray(server.id);
+    if (isXrayRuntimeSuccess(res)) {
       toast.success(t("已请求重启 Xray"));
-      showXrayPanelResult(t("{name} Xray 重启结果", { name: server.name }), res.data);
+      showXrayRuntimeResult(t("{name} Xray 重启结果", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("重启 Xray 失败"));
     }
@@ -2666,10 +2666,10 @@ export default function ControlCenterPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between" data-testid="control-center-header">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("主控中心")}</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("服务器编排、统一协议节点、Snell / Xray 运维")}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("服务器部署、统一协议节点、Snell / Xray 运维")}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button color="primary" data-testid="open-orchestration" onPress={() => openOrchestrationModal()}>{t("一键编排")}</Button>
+            <Button color="primary" data-testid="open-deployment-plan" onPress={() => openDeploymentPlanModal()}>{t("一键部署")}</Button>
             <Button color="primary" variant="flat" data-testid="open-protocol-node" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
             <Button color="primary" data-testid="open-deploy-task" onPress={() => openDeployModal()}>{t("新建部署")}</Button>
             <Button variant="flat" data-testid="open-server-modal" onPress={() => openServerModal()}>{t("添加服务器")}</Button>
@@ -2724,8 +2724,8 @@ export default function ControlCenterPage() {
                           <p className="truncate font-medium text-gray-900 dark:text-white">{server.snellServiceStatus || "-"}</p>
                         </div>
                         <div className="rounded-small bg-white px-2 py-1.5 dark:bg-default-50/5">
-                          <p className="text-gray-500">{t("兼容 API")}</p>
-                          <p className="truncate font-medium text-gray-900 dark:text-white">{server.xrayPanelServiceStatus || (server.xrayPanelEndpoint ? t("已配置") : "-")}</p>
+                          <p className="text-gray-500">Runtime API</p>
+                          <p className="truncate font-medium text-gray-900 dark:text-white">{server.xrayRuntimeServiceStatus || (server.xrayRuntimeEndpoint ? t("已配置") : "-")}</p>
                         </div>
                         <div className="rounded-small bg-white px-2 py-1.5 dark:bg-default-50/5">
                           <p className="text-gray-500">{t("内存")}</p>
@@ -2734,7 +2734,7 @@ export default function ControlCenterPage() {
                       </div>
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         <Chip size="sm" variant="flat">{t("心跳：{time}", { time: formatTime(server.lastHeartbeat) })}</Chip>
-                        <Chip size="sm" variant="flat">{t("规则同步：{time}", { time: formatTime(server.xrayPanelLastSync) })}</Chip>
+                        <Chip size="sm" variant="flat">{t("规则同步：{time}", { time: formatTime(server.xrayRuntimeLastSync) })}</Chip>
                         {server.lastError && <Chip size="sm" variant="flat" color="danger">{server.lastError}</Chip>}
                       </div>
                     </div>
@@ -3014,7 +3014,7 @@ export default function ControlCenterPage() {
                       <p className="text-xs text-gray-500">{t("首次 {first}，最近 {last}", { first: formatTime(alert.firstSeenAt), last: formatTime(alert.lastSeenAt) })}</p>
                     </div>
                     <div className="flex flex-wrap gap-2 lg:justify-end">
-                      {alert.detailJson && <Button size="sm" variant="flat" onPress={() => showXrayPanelResult(t("告警详情"), alert.detailJson)}>{t("详情")}</Button>}
+                      {alert.detailJson && <Button size="sm" variant="flat" onPress={() => showXrayRuntimeResult(t("告警详情"), alert.detailJson)}>{t("详情")}</Button>}
                       <Button size="sm" color="primary" variant="flat" onPress={() => acknowledgeAlert(alert)}>{t("确认")}</Button>
                     </div>
                   </div>
@@ -3077,7 +3077,7 @@ export default function ControlCenterPage() {
                       </div>
                     </div>
                     <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
-                      {log.detailJson && <Button size="sm" variant="flat" onPress={() => showXrayPanelResult(t("审计详情"), log.detailJson || "")}>{t("详情")}</Button>}
+                      {log.detailJson && <Button size="sm" variant="flat" onPress={() => showXrayRuntimeResult(t("审计详情"), log.detailJson || "")}>{t("详情")}</Button>}
                     </div>
                   </div>
                 </div>
@@ -3227,12 +3227,12 @@ export default function ControlCenterPage() {
                 </CardHeader>
                 <CardBody className="space-y-4">
                   {server.role === "master" && (
-                    <MasterRiskNotice context="在该卡片执行一键编排、入站/出站保存或重启" />
+                    <MasterRiskNotice context="在该卡片执行一键部署、入站/出站保存或重启" />
                   )}
                   {isLowMemoryServer(server) && (
                     <div className="rounded-small border border-warning-300 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
                       <span className="font-semibold">{t("超小内存提示：")}</span>
-                      {t("该被控总内存约 {memory} MB，完整 Xray 编排可能 OOM；优先使用 Snell、远端端口转发或先开启 swap。", {
+                      {t("该被控总内存约 {memory} MB，完整 Xray 部署可能 OOM；优先使用 Snell、远端端口转发或先开启 swap。", {
                         memory: server.memoryTotalMb || "-"
                       })}
                     </div>
@@ -3244,7 +3244,7 @@ export default function ControlCenterPage() {
                     </div>
                     <div>
                       <p className="text-gray-500">{t("Xray Runtime 入口")}</p>
-                      <p className="truncate">{server.xrayPanelEndpoint || "-"}</p>
+                      <p className="truncate">{server.xrayRuntimeEndpoint || "-"}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">Agent</p>
@@ -3279,18 +3279,18 @@ export default function ControlCenterPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Chip size="sm" variant="flat" color={serviceColor(server.xrayPanelServiceStatus) as any}>{t("面板")} {server.xrayPanelServiceStatus || "-"}</Chip>
+                    <Chip size="sm" variant="flat" color={serviceColor(server.xrayRuntimeServiceStatus) as any}>Runtime {server.xrayRuntimeServiceStatus || "-"}</Chip>
                     <Chip size="sm" variant="flat" color={serviceColor(server.xrayServiceStatus) as any}>Xray {server.xrayServiceStatus || "-"}</Chip>
                     <Chip size="sm" variant="flat" color={serviceColor(server.snellServiceStatus) as any}>Snell {server.snellServiceStatus || "-"}</Chip>
                     <Chip size="sm" variant="flat" color={serviceColor(server.certificateStatus) as any}>{certificateText(server)}</Chip>
                   </div>
                   <p className="text-xs text-gray-500">{t("心跳：{time}", { time: formatTime(server.lastHeartbeat) })}</p>
-                  <p className="text-xs text-gray-500">{t("规则同步：{time}", { time: formatTime(server.xrayPanelLastSync) })}</p>
+                  <p className="text-xs text-gray-500">{t("规则同步：{time}", { time: formatTime(server.xrayRuntimeLastSync) })}</p>
                   {server.certificateExpireAt && <p className="text-xs text-gray-500">{t("证书到期：{time}", { time: formatTime(server.certificateExpireAt) })}</p>}
                   {server.lastError && <p className="text-xs text-danger">{t("最近错误：{error}", { error: server.lastError })}</p>}
                   <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                    <ServerActionGroup title="编排">
-                      <Button size="sm" color="primary" variant="flat" onPress={() => openOrchestrationModal(server)}>{t("一键编排")}</Button>
+                    <ServerActionGroup title="部署计划">
+                      <Button size="sm" color="primary" variant="flat" onPress={() => openDeploymentPlanModal(server)}>{t("一键部署")}</Button>
                       <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal(server)}>{t("新增节点")}</Button>
                       <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal(server)}>{t("新增转发")}</Button>
                       <Button size="sm" variant="flat" onPress={() => openDeployModal(server)}>{t("部署")}</Button>
@@ -3298,16 +3298,16 @@ export default function ControlCenterPage() {
                     <ServerActionGroup title="规则流量">
                       <Button size="sm" variant="flat" onPress={() => showServerRuleOverview(server)}>{t("规则总览")}</Button>
                       <Button size="sm" variant="flat" onPress={() => syncServerProtocolNodes(server)}>{t("同步节点")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => syncPanelTraffic(server)}>{t("同步流量")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => syncRuntimeTraffic(server)}>{t("同步流量")}</Button>
                       <Button size="sm" variant="flat" onPress={() => showTrafficSnapshots(server)}>{t("流量快照")}</Button>
                     </ServerActionGroup>
                     <ServerActionGroup title={t("入站/出站")} testId={`xray-runtime-actions-${server.id}`}>
-                      <Button size="sm" variant="flat" onPress={() => testXrayPanel(server)}>{t("连接测试")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => showXrayPanelInbounds(server)}>{t("入站")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => openXrayPanelInboundModal(server)}>{t("入站操作")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => showXrayPanelConfig(server)}>{t("Xray 配置")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => showXrayPanelOutbounds(server)}>{t("出站")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => showXrayPanelOutboundTraffic(server)}>{t("出站流量")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => testXrayRuntime(server)}>{t("连接测试")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => showXrayRuntimeInbounds(server)}>{t("入站")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => openXrayRuntimeInboundModal(server)}>{t("入站操作")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => showXrayRuntimeConfig(server)}>{t("Xray 配置")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => showXrayRuntimeOutbounds(server)}>{t("出站")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => showXrayRuntimeOutboundTraffic(server)}>{t("出站流量")}</Button>
                       <Button size="sm" variant="flat" onPress={() => openXraySettingModal(server)}>{t("路由/出站")}</Button>
                       <Button size="sm" variant="flat" onPress={() => restartXray(server)}>{t("重启 Xray")}</Button>
                     </ServerActionGroup>
@@ -3347,11 +3347,11 @@ export default function ControlCenterPage() {
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">{t("还没有协议节点")}</p>
-                  <p className="mt-1 max-w-2xl text-sm text-gray-500">{t("先新增一个结构化节点，或用一键编排批量创建 Xray/Snell 节点。")}</p>
+                  <p className="mt-1 max-w-2xl text-sm text-gray-500">{t("先新增一个结构化节点，或用一键部署批量创建 Xray/Snell 节点。")}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
-                  <Button size="sm" variant="flat" onPress={() => openOrchestrationModal()}>{t("一键编排")}</Button>
+                  <Button size="sm" variant="flat" onPress={() => openDeploymentPlanModal()}>{t("一键部署")}</Button>
                 </div>
               </div>
             </div>
@@ -3545,13 +3545,13 @@ export default function ControlCenterPage() {
               <Input label="SSH 端口" type="number" value={serverForm.sshPort.toString()} onChange={e => setServerForm(prev => ({ ...prev, sshPort: Number(e.target.value) || 22 }))} variant="bordered" />
               <Input label="SSH 用户" value={serverForm.sshUser} onChange={e => setServerForm(prev => ({ ...prev, sshUser: e.target.value }))} variant="bordered" />
               <Input label={t("副控 API")} value={serverForm.endpoint} onChange={e => setServerForm(prev => ({ ...prev, endpoint: e.target.value }))} variant="bordered" />
-              <Input label={t("Xray Runtime 地址")} value={serverForm.xrayPanelEndpoint} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelEndpoint: e.target.value }))} variant="bordered" placeholder="https://1.2.3.4:5168" />
-              <Input label={t("Xray Runtime Base Path")} value={serverForm.xrayPanelBasePath} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelBasePath: e.target.value }))} variant="bordered" placeholder="/secret-path" />
-              <Input label={t("Xray Runtime API Token")} value={serverForm.xrayPanelApiToken} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelApiToken: e.target.value }))} variant="bordered" />
-              <Input label={t("Xray Runtime 用户名")} value={serverForm.xrayPanelUsername} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelUsername: e.target.value }))} variant="bordered" />
-              <Input label={t("Xray Runtime 密码")} type="password" value={serverForm.xrayPanelPassword} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelPassword: e.target.value }))} variant="bordered" />
-              <Input label={t("Xray Runtime 2FA")} value={serverForm.xrayPanelTwoFactorCode} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelTwoFactorCode: e.target.value }))} variant="bordered" />
-              <Select label={t("Xray Runtime TLS 校验")} selectedKeys={[serverForm.xrayPanelAllowInsecure.toString()]} onSelectionChange={keys => setServerForm(prev => ({ ...prev, xrayPanelAllowInsecure: Number(Array.from(keys)[0]) }))} variant="bordered">
+              <Input label={t("Xray Runtime 地址")} value={serverForm.xrayRuntimeEndpoint} onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeEndpoint: e.target.value }))} variant="bordered" placeholder="https://1.2.3.4:5168" />
+              <Input label={t("Xray Runtime Base Path")} value={serverForm.xrayRuntimeBasePath} onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeBasePath: e.target.value }))} variant="bordered" placeholder="/secret-path" />
+              <Input label={t("Xray Runtime API Token")} value={serverForm.xrayRuntimeApiToken} onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeApiToken: e.target.value }))} variant="bordered" />
+              <Input label={t("Xray Runtime 用户名")} value={serverForm.xrayRuntimeUsername} onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeUsername: e.target.value }))} variant="bordered" />
+              <Input label={t("Xray Runtime 密码")} type="password" value={serverForm.xrayRuntimePassword} onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimePassword: e.target.value }))} variant="bordered" />
+              <Input label={t("Xray Runtime 2FA")} value={serverForm.xrayRuntimeTwoFactorCode} onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeTwoFactorCode: e.target.value }))} variant="bordered" />
+              <Select label={t("Xray Runtime TLS 校验")} selectedKeys={[serverForm.xrayRuntimeAllowInsecure.toString()]} onSelectionChange={keys => setServerForm(prev => ({ ...prev, xrayRuntimeAllowInsecure: Number(Array.from(keys)[0]) }))} variant="bordered">
                 <SelectItem key="0">{t("校验证书")}</SelectItem>
                 <SelectItem key="1">{t("允许自签名")}</SelectItem>
               </Select>
@@ -3799,146 +3799,146 @@ export default function ControlCenterPage() {
         </ModalContent>
       </Modal>
 
-      <Modal isOpen={orchestrationModalOpen} onOpenChange={setOrchestrationModalOpen} size="5xl" scrollBehavior="inside">
+      <Modal isOpen={deploymentPlanModalOpen} onOpenChange={setDeploymentPlanModalOpen} size="5xl" scrollBehavior="inside">
         <ModalContent>
-          <ModalHeader>{t("一键编排 Xray / Snell")}</ModalHeader>
+          <ModalHeader>{t("一键部署 Xray / Snell")}</ModalHeader>
           <ModalBody>
             <div className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Select
                   label={t("目标服务器")}
                   selectionMode="multiple"
-                  selectedKeys={orchestrationForm.serverIds.map(id => id.toString())}
+                  selectedKeys={deploymentPlanForm.serverIds.map(id => id.toString())}
                   onSelectionChange={keys => {
                     const serverIds = Array.from(keys).map(key => Number(key)).filter(Boolean);
                     const serverId = serverIds[0] || null;
                     const server = servers.find(item => item.id === serverId);
-                    patchOrchestrationForm({
+                    patchDeploymentPlanForm({
                       serverId,
                       serverIds,
-                      publicHost: server?.host || orchestrationForm.publicHost,
-                      certificateDomain: server?.host?.includes(".") ? server.host : orchestrationForm.certificateDomain,
-                      webBasePath: serverId ? `ob-${serverId}` : orchestrationForm.webBasePath
+                      publicHost: server?.host || deploymentPlanForm.publicHost,
+                      certificateDomain: server?.host?.includes(".") ? server.host : deploymentPlanForm.certificateDomain,
+                      webBasePath: serverId ? `ob-${serverId}` : deploymentPlanForm.webBasePath
                     });
                   }}
                   variant="bordered"
                 >
                   {renderServerOptions()}
                 </Select>
-                <Input label={t("公网主机")} value={orchestrationForm.publicHost} onChange={e => patchOrchestrationForm({ publicHost: e.target.value })} variant="bordered" />
-                <Input label={t("Xray Runtime 版本")} value={orchestrationForm.xrayPanelVersion} onChange={e => patchOrchestrationForm({ xrayPanelVersion: e.target.value })} variant="bordered" placeholder={t("留空使用最新版")} />
+                <Input label={t("公网主机")} value={deploymentPlanForm.publicHost} onChange={e => patchDeploymentPlanForm({ publicHost: e.target.value })} variant="bordered" />
+                <Input label={t("Xray Runtime 版本")} value={deploymentPlanForm.xrayRuntimeVersion} onChange={e => patchDeploymentPlanForm({ xrayRuntimeVersion: e.target.value })} variant="bordered" placeholder={t("留空使用最新版")} />
               </div>
-              {selectedOrchestrationHasMaster && (
-                <MasterRiskNotice context="生成一键编排任务" />
+              {selectedDeploymentPlanHasMaster && (
+                <MasterRiskNotice context="生成一键部署任务" />
               )}
-              {selectedOrchestrationLowMemoryServers.length > 0 && (
+              {selectedDeploymentPlanLowMemoryServers.length > 0 && (
                 <div className={`rounded-small border px-3 py-2 text-xs leading-5 ${
-                  selectedOrchestrationCriticalNanoServers.length > 0
+                  selectedDeploymentPlanCriticalNanoServers.length > 0
                     ? "border-danger-300 bg-danger-50 text-danger-700 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-300"
                     : "border-warning-300 bg-warning-50 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300"
                 }`}>
                   <span className="font-semibold">{t("Nano 被控风险：")}</span>
-                  {t("已选择 {count} 台低内存服务器。低于 200MB 时主控会阻止完整 Xray 编排；建议只保留 Snell 或端口转发，并先开启 swap。", {
-                    count: selectedOrchestrationLowMemoryServers.length
+                  {t("已选择 {count} 台低内存服务器。低于 200MB 时主控会阻止完整 Xray 部署；建议只保留 Snell 或端口转发，并先开启 swap。", {
+                    count: selectedDeploymentPlanLowMemoryServers.length
                   })}
                 </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-small border border-default-200 p-4">
-                <Switch isSelected={orchestrationForm.installXrayPanel} onValueChange={value => patchOrchestrationForm({ installXrayPanel: value })}>{t("安装 Xray Runtime")}</Switch>
-                <Switch isSelected={orchestrationForm.configurePanel} onValueChange={value => patchOrchestrationForm({ configurePanel: value })}>{t("配置 Xray Runtime")}</Switch>
-                <Switch isSelected={orchestrationForm.installSnell} onValueChange={value => patchOrchestrationForm({ installSnell: value })}>{t("安装 Snell")}</Switch>
-                <Switch isSelected={orchestrationForm.createVlessReality || orchestrationForm.createVmessWs || orchestrationForm.createTrojanTls || orchestrationForm.createShadowsocks} isReadOnly>{t("创建节点")}</Switch>
+                <Switch isSelected={deploymentPlanForm.installXrayRuntime} onValueChange={value => patchDeploymentPlanForm({ installXrayRuntime: value })}>{t("安装 Xray Runtime")}</Switch>
+                <Switch isSelected={deploymentPlanForm.configureRuntime} onValueChange={value => patchDeploymentPlanForm({ configureRuntime: value })}>{t("配置 Xray Runtime")}</Switch>
+                <Switch isSelected={deploymentPlanForm.installSnell} onValueChange={value => patchDeploymentPlanForm({ installSnell: value })}>{t("安装 Snell")}</Switch>
+                <Switch isSelected={deploymentPlanForm.createVlessReality || deploymentPlanForm.createVmessWs || deploymentPlanForm.createTrojanTls || deploymentPlanForm.createShadowsocks} isReadOnly>{t("创建节点")}</Switch>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input label={t("Xray Runtime 端口")} type="number" value={orchestrationForm.panelPort.toString()} onChange={e => patchOrchestrationForm({ panelPort: Number(e.target.value) || 5168 })} variant="bordered" />
-                <Input label={t("Xray Runtime 用户名")} value={orchestrationForm.panelUsername} onChange={e => patchOrchestrationForm({ panelUsername: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
-                <Input label={t("Xray Runtime 密码")} type="password" value={orchestrationForm.panelPassword} onChange={e => patchOrchestrationForm({ panelPassword: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
-                <Input label="Web Base Path" value={orchestrationForm.webBasePath} onChange={e => patchOrchestrationForm({ webBasePath: e.target.value })} variant="bordered" />
-                <Input label={t("监听 IP")} value={orchestrationForm.listenIp} onChange={e => patchOrchestrationForm({ listenIp: e.target.value })} variant="bordered" />
-                <Select label={t("证书模式")} selectedKeys={[orchestrationForm.certificateMode]} onSelectionChange={keys => patchOrchestrationForm({ certificateMode: Array.from(keys)[0] as OrchestrationForm["certificateMode"] })} variant="bordered">
+                <Input label={t("Xray Runtime 端口")} type="number" value={deploymentPlanForm.runtimePort.toString()} onChange={e => patchDeploymentPlanForm({ runtimePort: Number(e.target.value) || 5168 })} variant="bordered" />
+                <Input label={t("Xray Runtime 用户名")} value={deploymentPlanForm.runtimeUsername} onChange={e => patchDeploymentPlanForm({ runtimeUsername: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
+                <Input label={t("Xray Runtime 密码")} type="password" value={deploymentPlanForm.runtimePassword} onChange={e => patchDeploymentPlanForm({ runtimePassword: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
+                <Input label="Web Base Path" value={deploymentPlanForm.webBasePath} onChange={e => patchDeploymentPlanForm({ webBasePath: e.target.value })} variant="bordered" />
+                <Input label={t("监听 IP")} value={deploymentPlanForm.listenIp} onChange={e => patchDeploymentPlanForm({ listenIp: e.target.value })} variant="bordered" />
+                <Select label={t("证书模式")} selectedKeys={[deploymentPlanForm.certificateMode]} onSelectionChange={keys => patchDeploymentPlanForm({ certificateMode: Array.from(keys)[0] as DeploymentPlanForm["certificateMode"] })} variant="bordered">
                   <SelectItem key="self-signed">{t("自签名")}</SelectItem>
                   <SelectItem key="acme-http">ACME HTTP</SelectItem>
                   <SelectItem key="none">{t("不配置")}</SelectItem>
                 </Select>
-                <Input label={t("证书域名")} value={orchestrationForm.certificateDomain} onChange={e => patchOrchestrationForm({ certificateDomain: e.target.value })} variant="bordered" />
-                <Input label={t("ACME 邮箱")} value={orchestrationForm.acmeEmail} onChange={e => patchOrchestrationForm({ acmeEmail: e.target.value })} variant="bordered" />
+                <Input label={t("证书域名")} value={deploymentPlanForm.certificateDomain} onChange={e => patchDeploymentPlanForm({ certificateDomain: e.target.value })} variant="bordered" />
+                <Input label={t("ACME 邮箱")} value={deploymentPlanForm.acmeEmail} onChange={e => patchDeploymentPlanForm({ acmeEmail: e.target.value })} variant="bordered" />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 rounded-small border border-default-200 p-4">
                 <div className="space-y-3">
-                  <Switch isSelected={orchestrationForm.createVlessReality} onValueChange={value => patchOrchestrationForm({ createVlessReality: value })}>VLESS Reality</Switch>
-                  <Input label={t("VLESS 端口")} type="number" value={orchestrationForm.vlessPort.toString()} onChange={e => patchOrchestrationForm({ vlessPort: Number(e.target.value) || 443 })} variant="bordered" />
-                  <Input label="Reality SNI" value={orchestrationForm.realitySni} onChange={e => patchOrchestrationForm({ realitySni: e.target.value })} variant="bordered" />
-                  <Input label="Reality Dest" value={orchestrationForm.realityDest} onChange={e => patchOrchestrationForm({ realityDest: e.target.value })} variant="bordered" />
+                  <Switch isSelected={deploymentPlanForm.createVlessReality} onValueChange={value => patchDeploymentPlanForm({ createVlessReality: value })}>VLESS Reality</Switch>
+                  <Input label={t("VLESS 端口")} type="number" value={deploymentPlanForm.vlessPort.toString()} onChange={e => patchDeploymentPlanForm({ vlessPort: Number(e.target.value) || 443 })} variant="bordered" />
+                  <Input label="Reality SNI" value={deploymentPlanForm.realitySni} onChange={e => patchDeploymentPlanForm({ realitySni: e.target.value })} variant="bordered" />
+                  <Input label="Reality Dest" value={deploymentPlanForm.realityDest} onChange={e => patchDeploymentPlanForm({ realityDest: e.target.value })} variant="bordered" />
                 </div>
                 <div className="space-y-3">
-                  <Switch isSelected={orchestrationForm.createVmessWs} onValueChange={value => patchOrchestrationForm({ createVmessWs: value })}>VMess WS</Switch>
-                  <Input label={t("VMess 端口")} type="number" value={orchestrationForm.vmessPort.toString()} onChange={e => patchOrchestrationForm({ vmessPort: Number(e.target.value) || 2086 })} variant="bordered" />
-                  <Input label="WS Path" value={orchestrationForm.wsPath} onChange={e => patchOrchestrationForm({ wsPath: e.target.value })} variant="bordered" />
+                  <Switch isSelected={deploymentPlanForm.createVmessWs} onValueChange={value => patchDeploymentPlanForm({ createVmessWs: value })}>VMess WS</Switch>
+                  <Input label={t("VMess 端口")} type="number" value={deploymentPlanForm.vmessPort.toString()} onChange={e => patchDeploymentPlanForm({ vmessPort: Number(e.target.value) || 2086 })} variant="bordered" />
+                  <Input label="WS Path" value={deploymentPlanForm.wsPath} onChange={e => patchDeploymentPlanForm({ wsPath: e.target.value })} variant="bordered" />
                 </div>
                 <div className="space-y-3">
-                  <Switch isSelected={orchestrationForm.createTrojanTls} onValueChange={value => patchOrchestrationForm({ createTrojanTls: value })}>Trojan TLS</Switch>
-                  <Input label={t("Trojan 端口")} type="number" value={orchestrationForm.trojanPort.toString()} onChange={e => patchOrchestrationForm({ trojanPort: Number(e.target.value) || 8443 })} variant="bordered" />
+                  <Switch isSelected={deploymentPlanForm.createTrojanTls} onValueChange={value => patchDeploymentPlanForm({ createTrojanTls: value })}>Trojan TLS</Switch>
+                  <Input label={t("Trojan 端口")} type="number" value={deploymentPlanForm.trojanPort.toString()} onChange={e => patchDeploymentPlanForm({ trojanPort: Number(e.target.value) || 8443 })} variant="bordered" />
                 </div>
                 <div className="space-y-3">
-                  <Switch isSelected={orchestrationForm.createShadowsocks} onValueChange={value => patchOrchestrationForm({ createShadowsocks: value })}>Shadowsocks</Switch>
-                  <Input label={t("SS 端口")} type="number" value={orchestrationForm.shadowsocksPort.toString()} onChange={e => patchOrchestrationForm({ shadowsocksPort: Number(e.target.value) || 8388 })} variant="bordered" />
-                  <Input label={t("SS 加密")} value={orchestrationForm.ssMethod} onChange={e => patchOrchestrationForm({ ssMethod: e.target.value })} variant="bordered" />
+                  <Switch isSelected={deploymentPlanForm.createShadowsocks} onValueChange={value => patchDeploymentPlanForm({ createShadowsocks: value })}>Shadowsocks</Switch>
+                  <Input label={t("SS 端口")} type="number" value={deploymentPlanForm.shadowsocksPort.toString()} onChange={e => patchDeploymentPlanForm({ shadowsocksPort: Number(e.target.value) || 8388 })} variant="bordered" />
+                  <Input label={t("SS 加密")} value={deploymentPlanForm.ssMethod} onChange={e => patchDeploymentPlanForm({ ssMethod: e.target.value })} variant="bordered" />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input label={t("Snell 端口")} type="number" value={orchestrationForm.snellPort.toString()} onChange={e => patchOrchestrationForm({ snellPort: Number(e.target.value) || 8390 })} variant="bordered" />
+                <Input label={t("Snell 端口")} type="number" value={deploymentPlanForm.snellPort.toString()} onChange={e => patchDeploymentPlanForm({ snellPort: Number(e.target.value) || 8390 })} variant="bordered" />
                 <div className="space-y-2">
-                  <Input label="Snell PSK" value={orchestrationForm.snellPsk} onChange={e => patchOrchestrationForm({ snellPsk: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
-                  <Button size="sm" variant="flat" onPress={() => patchOrchestrationForm({ snellPsk: randomToken(32) })}>{t("生成 PSK")}</Button>
+                  <Input label="Snell PSK" value={deploymentPlanForm.snellPsk} onChange={e => patchDeploymentPlanForm({ snellPsk: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
+                  <Button size="sm" variant="flat" onPress={() => patchDeploymentPlanForm({ snellPsk: randomToken(32) })}>{t("生成 PSK")}</Button>
                 </div>
               </div>
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setOrchestrationModalOpen(false)}>{t("取消")}</Button>
-            <Button color="primary" isLoading={submitting} onPress={saveOrchestrationTask}>{t("生成一键任务")}</Button>
+            <Button variant="light" onPress={() => setDeploymentPlanModalOpen(false)}>{t("取消")}</Button>
+            <Button color="primary" isLoading={submitting} onPress={saveDeploymentPlanTask}>{t("生成一键任务")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
-      <Modal isOpen={xrayPanelInboundModalOpen} onOpenChange={setXrayPanelInboundModalOpen} size="5xl" scrollBehavior="inside">
+      <Modal isOpen={xrayRuntimeInboundModalOpen} onOpenChange={setXrayRuntimeInboundModalOpen} size="5xl" scrollBehavior="inside">
         <ModalContent>
           <ModalHeader>{t("入站操作")}</ModalHeader>
           <ModalBody>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Select label={t("动作")} selectedKeys={[xrayPanelInboundForm.mode]} onSelectionChange={keys => patchXrayPanelInboundForm({ mode: Array.from(keys)[0] as XrayPanelInboundForm["mode"] })} variant="bordered">
+              <Select label={t("动作")} selectedKeys={[xrayRuntimeInboundForm.mode]} onSelectionChange={keys => patchXrayRuntimeInboundForm({ mode: Array.from(keys)[0] as XrayRuntimeInboundForm["mode"] })} variant="bordered">
                 <SelectItem key="add">{t("新增 inbound")}</SelectItem>
                 <SelectItem key="update">{t("更新 inbound")}</SelectItem>
                 <SelectItem key="delete">{t("删除 inbound")}</SelectItem>
               </Select>
-              <Select label={t("编辑方式")} selectedKeys={[xrayPanelInboundForm.editMode]} onSelectionChange={keys => patchXrayPanelInboundForm({ editMode: Array.from(keys)[0] as XrayPanelInboundForm["editMode"] })} variant="bordered">
+              <Select label={t("编辑方式")} selectedKeys={[xrayRuntimeInboundForm.editMode]} onSelectionChange={keys => patchXrayRuntimeInboundForm({ editMode: Array.from(keys)[0] as XrayRuntimeInboundForm["editMode"] })} variant="bordered">
                 <SelectItem key="form">{t("结构化表单")}</SelectItem>
                 <SelectItem key="json">{t("高级 JSON")}</SelectItem>
               </Select>
-              <Input label={t("服务器 ID")} value={xrayPanelInboundForm.serverId?.toString() || ""} isReadOnly variant="bordered" />
-              <Input label="Inbound ID" value={xrayPanelInboundForm.inboundId} onChange={e => patchXrayPanelInboundForm({ inboundId: e.target.value })} variant="bordered" />
-              <Input label={t("备注")} value={xrayPanelInboundForm.remark} onChange={e => patchXrayPanelInboundForm({ remark: e.target.value })} variant="bordered" />
-              <Select label={t("启用")} selectedKeys={[xrayPanelInboundForm.enable.toString()]} onSelectionChange={keys => patchXrayPanelInboundForm({ enable: Number(Array.from(keys)[0]) })} variant="bordered">
+              <Input label={t("服务器 ID")} value={xrayRuntimeInboundForm.serverId?.toString() || ""} isReadOnly variant="bordered" />
+              <Input label="Inbound ID" value={xrayRuntimeInboundForm.inboundId} onChange={e => patchXrayRuntimeInboundForm({ inboundId: e.target.value })} variant="bordered" />
+              <Input label={t("备注")} value={xrayRuntimeInboundForm.remark} onChange={e => patchXrayRuntimeInboundForm({ remark: e.target.value })} variant="bordered" />
+              <Select label={t("启用")} selectedKeys={[xrayRuntimeInboundForm.enable.toString()]} onSelectionChange={keys => patchXrayRuntimeInboundForm({ enable: Number(Array.from(keys)[0]) })} variant="bordered">
                 <SelectItem key="1">{t("启用")}</SelectItem>
                 <SelectItem key="0">{t("停用")}</SelectItem>
               </Select>
-              <Input label={t("监听地址")} value={xrayPanelInboundForm.listen} onChange={e => patchXrayPanelInboundForm({ listen: e.target.value })} variant="bordered" placeholder={t("留空监听所有地址")} />
-              <Input label={t("端口")} type="number" value={xrayPanelInboundForm.port.toString()} onChange={e => patchXrayPanelInboundForm({ port: Number(e.target.value) || 0 })} variant="bordered" />
-              <Select label={t("协议")} selectedKeys={[xrayPanelInboundForm.protocol]} onSelectionChange={keys => updateInboundProtocol(Array.from(keys)[0] as XrayPanelInboundForm["protocol"])} variant="bordered">
+              <Input label={t("监听地址")} value={xrayRuntimeInboundForm.listen} onChange={e => patchXrayRuntimeInboundForm({ listen: e.target.value })} variant="bordered" placeholder={t("留空监听所有地址")} />
+              <Input label={t("端口")} type="number" value={xrayRuntimeInboundForm.port.toString()} onChange={e => patchXrayRuntimeInboundForm({ port: Number(e.target.value) || 0 })} variant="bordered" />
+              <Select label={t("协议")} selectedKeys={[xrayRuntimeInboundForm.protocol]} onSelectionChange={keys => updateInboundProtocol(Array.from(keys)[0] as XrayRuntimeInboundForm["protocol"])} variant="bordered">
                 <SelectItem key="vless">VLESS</SelectItem>
                 <SelectItem key="vmess">VMess</SelectItem>
                 <SelectItem key="trojan">Trojan</SelectItem>
                 <SelectItem key="shadowsocks">Shadowsocks</SelectItem>
               </Select>
-              <Select label={t("传输")} selectedKeys={[xrayPanelInboundForm.network]} onSelectionChange={keys => patchXrayPanelInboundForm({ network: Array.from(keys)[0] as XrayPanelInboundForm["network"] })} variant="bordered">
+              <Select label={t("传输")} selectedKeys={[xrayRuntimeInboundForm.network]} onSelectionChange={keys => patchXrayRuntimeInboundForm({ network: Array.from(keys)[0] as XrayRuntimeInboundForm["network"] })} variant="bordered">
                 <SelectItem key="tcp">TCP</SelectItem>
                 <SelectItem key="ws">WebSocket</SelectItem>
               </Select>
-              <Select label={t("安全")} selectedKeys={[xrayPanelInboundForm.security]} onSelectionChange={keys => patchXrayPanelInboundForm({ security: Array.from(keys)[0] as XrayPanelInboundForm["security"] })} variant="bordered">
+              <Select label={t("安全")} selectedKeys={[xrayRuntimeInboundForm.security]} onSelectionChange={keys => patchXrayRuntimeInboundForm({ security: Array.from(keys)[0] as XrayRuntimeInboundForm["security"] })} variant="bordered">
                 <SelectItem key="none">None</SelectItem>
                 <SelectItem key="tls">TLS</SelectItem>
                 <SelectItem key="reality">Reality</SelectItem>
@@ -3948,66 +3948,66 @@ export default function ControlCenterPage() {
               <MasterRiskNotice context="提交入站操作" />
             )}
 
-            {xrayPanelInboundForm.mode !== "delete" && xrayPanelInboundForm.editMode === "form" && (
+            {xrayRuntimeInboundForm.mode !== "delete" && xrayRuntimeInboundForm.editMode === "form" && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Input label={t("客户端 Email")} value={xrayPanelInboundForm.clientEmail} onChange={e => patchXrayPanelInboundForm({ clientEmail: e.target.value })} variant="bordered" />
-                  {xrayPanelInboundForm.protocol !== "trojan" && xrayPanelInboundForm.protocol !== "shadowsocks" && (
+                  <Input label={t("客户端 Email")} value={xrayRuntimeInboundForm.clientEmail} onChange={e => patchXrayRuntimeInboundForm({ clientEmail: e.target.value })} variant="bordered" />
+                  {xrayRuntimeInboundForm.protocol !== "trojan" && xrayRuntimeInboundForm.protocol !== "shadowsocks" && (
                     <div className="space-y-2">
-                      <Input label={t("客户端 UUID")} value={xrayPanelInboundForm.clientId} onChange={e => patchXrayPanelInboundForm({ clientId: e.target.value })} variant="bordered" />
-                      <Button size="sm" variant="flat" onPress={() => patchXrayPanelInboundForm({ clientId: randomUuid() })}>{t("生成 UUID")}</Button>
+                      <Input label={t("客户端 UUID")} value={xrayRuntimeInboundForm.clientId} onChange={e => patchXrayRuntimeInboundForm({ clientId: e.target.value })} variant="bordered" />
+                      <Button size="sm" variant="flat" onPress={() => patchXrayRuntimeInboundForm({ clientId: randomUuid() })}>{t("生成 UUID")}</Button>
                     </div>
                   )}
-                  {(xrayPanelInboundForm.protocol === "trojan" || xrayPanelInboundForm.protocol === "shadowsocks") && (
-                    <Input label={t("客户端密码 / PSK")} value={xrayPanelInboundForm.clientPassword} onChange={e => patchXrayPanelInboundForm({ clientPassword: e.target.value })} variant="bordered" />
+                  {(xrayRuntimeInboundForm.protocol === "trojan" || xrayRuntimeInboundForm.protocol === "shadowsocks") && (
+                    <Input label={t("客户端密码 / PSK")} value={xrayRuntimeInboundForm.clientPassword} onChange={e => patchXrayRuntimeInboundForm({ clientPassword: e.target.value })} variant="bordered" />
                   )}
-                  {xrayPanelInboundForm.protocol === "vless" && (
-                    <Input label="Flow" value={xrayPanelInboundForm.flow} onChange={e => patchXrayPanelInboundForm({ flow: e.target.value })} variant="bordered" />
+                  {xrayRuntimeInboundForm.protocol === "vless" && (
+                    <Input label="Flow" value={xrayRuntimeInboundForm.flow} onChange={e => patchXrayRuntimeInboundForm({ flow: e.target.value })} variant="bordered" />
                   )}
-                  <Input label={t("流量限制 GB")} type="number" value={xrayPanelInboundForm.totalGb.toString()} onChange={e => patchXrayPanelInboundForm({ totalGb: Number(e.target.value) || 0 })} variant="bordered" />
-                  <Input label={t("有效期天数")} type="number" value={xrayPanelInboundForm.expiryDays.toString()} onChange={e => patchXrayPanelInboundForm({ expiryDays: Number(e.target.value) || 0 })} variant="bordered" />
+                  <Input label={t("流量限制 GB")} type="number" value={xrayRuntimeInboundForm.totalGb.toString()} onChange={e => patchXrayRuntimeInboundForm({ totalGb: Number(e.target.value) || 0 })} variant="bordered" />
+                  <Input label={t("有效期天数")} type="number" value={xrayRuntimeInboundForm.expiryDays.toString()} onChange={e => patchXrayRuntimeInboundForm({ expiryDays: Number(e.target.value) || 0 })} variant="bordered" />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Input label="SNI / Host" value={xrayPanelInboundForm.sni} onChange={e => patchXrayPanelInboundForm({ sni: e.target.value })} variant="bordered" />
-                  {xrayPanelInboundForm.protocol === "vless" && xrayPanelInboundForm.security === "reality" && (
+                  <Input label="SNI / Host" value={xrayRuntimeInboundForm.sni} onChange={e => patchXrayRuntimeInboundForm({ sni: e.target.value })} variant="bordered" />
+                  {xrayRuntimeInboundForm.protocol === "vless" && xrayRuntimeInboundForm.security === "reality" && (
                     <>
-                        <Input label="Reality Dest" value={xrayPanelInboundForm.realityDest} onChange={e => patchXrayPanelInboundForm({ realityDest: e.target.value })} variant="bordered" />
+                        <Input label="Reality Dest" value={xrayRuntimeInboundForm.realityDest} onChange={e => patchXrayRuntimeInboundForm({ realityDest: e.target.value })} variant="bordered" />
                         <div className="space-y-2">
-                          <Input label="Reality Private Key" value={xrayPanelInboundForm.realityPrivateKey} onChange={e => patchXrayPanelInboundForm({ realityPrivateKey: e.target.value })} variant="bordered" />
-                        <Button size="sm" variant="flat" onPress={() => patchXrayPanelInboundForm({ realityPrivateKey: randomRealityPrivateKey() })}>{t("生成私钥")}</Button>
+                          <Input label="Reality Private Key" value={xrayRuntimeInboundForm.realityPrivateKey} onChange={e => patchXrayRuntimeInboundForm({ realityPrivateKey: e.target.value })} variant="bordered" />
+                        <Button size="sm" variant="flat" onPress={() => patchXrayRuntimeInboundForm({ realityPrivateKey: randomRealityPrivateKey() })}>{t("生成私钥")}</Button>
                       </div>
                       <div className="space-y-2">
-                        <Input label="Reality Short ID" value={xrayPanelInboundForm.realityShortId} onChange={e => patchXrayPanelInboundForm({ realityShortId: e.target.value })} variant="bordered" />
-                        <Button size="sm" variant="flat" onPress={() => patchXrayPanelInboundForm({ realityShortId: randomHex(8) })}>{t("生成 Short ID")}</Button>
+                        <Input label="Reality Short ID" value={xrayRuntimeInboundForm.realityShortId} onChange={e => patchXrayRuntimeInboundForm({ realityShortId: e.target.value })} variant="bordered" />
+                        <Button size="sm" variant="flat" onPress={() => patchXrayRuntimeInboundForm({ realityShortId: randomHex(8) })}>{t("生成 Short ID")}</Button>
                       </div>
                     </>
                   )}
-                  {xrayPanelInboundForm.protocol === "vmess" && (
-                    <Input label="WebSocket Path" value={xrayPanelInboundForm.wsPath} onChange={e => patchXrayPanelInboundForm({ wsPath: e.target.value })} variant="bordered" />
+                  {xrayRuntimeInboundForm.protocol === "vmess" && (
+                    <Input label="WebSocket Path" value={xrayRuntimeInboundForm.wsPath} onChange={e => patchXrayRuntimeInboundForm({ wsPath: e.target.value })} variant="bordered" />
                   )}
-                  {xrayPanelInboundForm.protocol === "shadowsocks" && (
-                    <Input label={t("加密方法")} value={xrayPanelInboundForm.ssMethod} onChange={e => patchXrayPanelInboundForm({ ssMethod: e.target.value })} variant="bordered" />
+                  {xrayRuntimeInboundForm.protocol === "shadowsocks" && (
+                    <Input label={t("加密方法")} value={xrayRuntimeInboundForm.ssMethod} onChange={e => patchXrayRuntimeInboundForm({ ssMethod: e.target.value })} variant="bordered" />
                   )}
                 </div>
               </div>
             )}
 
-            {xrayPanelInboundForm.mode !== "delete" && (
+            {xrayRuntimeInboundForm.mode !== "delete" && (
               <Textarea
-                label={xrayPanelInboundForm.editMode === "json" ? "Inbound Payload JSON" : t("生成的 Payload 预览")}
+                label={xrayRuntimeInboundForm.editMode === "json" ? "Inbound Payload JSON" : t("生成的 Payload 预览")}
                 minRows={14}
-                value={xrayPanelInboundForm.editMode === "json" ? xrayPanelInboundForm.payloadJson : inboundPayloadPreview(xrayPanelInboundForm)}
-                onChange={e => patchXrayPanelInboundForm({ payloadJson: e.target.value })}
-                readOnly={xrayPanelInboundForm.editMode === "form"}
+                value={xrayRuntimeInboundForm.editMode === "json" ? xrayRuntimeInboundForm.payloadJson : inboundPayloadPreview(xrayRuntimeInboundForm)}
+                onChange={e => patchXrayRuntimeInboundForm({ payloadJson: e.target.value })}
+                readOnly={xrayRuntimeInboundForm.editMode === "form"}
                 variant="bordered"
                 classNames={{ input: "font-mono text-xs" }}
               />
             )}
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setXrayPanelInboundModalOpen(false)}>{t("取消")}</Button>
-            <Button color={xrayPanelInboundForm.mode === "delete" ? "danger" : "primary"} isLoading={submitting} onPress={() => saveXrayPanelInbound()}>{t("提交")}</Button>
+            <Button variant="light" onPress={() => setXrayRuntimeInboundModalOpen(false)}>{t("取消")}</Button>
+            <Button color={xrayRuntimeInboundForm.mode === "delete" ? "danger" : "primary"} isLoading={submitting} onPress={() => saveXrayRuntimeInbound()}>{t("提交")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

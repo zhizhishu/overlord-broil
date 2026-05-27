@@ -474,8 +474,8 @@ resolve_restore_compose_file() {
 }
 
 detect_host() {
-  if [ -n "${OB_PANEL_HOST:-}" ]; then
-    echo "$OB_PANEL_HOST"
+  if [ -n "${OB_MASTER_HOST:-}" ]; then
+    echo "$OB_MASTER_HOST"
     return
   fi
 
@@ -650,7 +650,7 @@ ENV
     write_env_value FRONTEND_PORT "$FRONTEND_PORT" "$ENV_FILE"
   elif [ "$(read_env_value FRONTEND_PORT "$ENV_FILE")" = "80" ]; then
     write_env_value FRONTEND_PORT "5166" "$ENV_FILE"
-    echo "Migrated legacy FRONTEND_PORT=80 to the single-entry default 5166. Set OB_FRONTEND_PORT=80 if you intentionally want port 80."
+    echo "Migrated old FRONTEND_PORT=80 to the single-entry default 5166. Set OB_FRONTEND_PORT=80 if you intentionally want port 80."
   fi
 
   if [ "$BACKEND_PORT_EXPLICIT" = "1" ]; then
@@ -715,7 +715,7 @@ port_owned_by_overlord_container() {
   return 1
 }
 
-list_legacy_split_containers() {
+list_obsolete_split_containers() {
   local container
   for container in vite-frontend springboot-backend overlord-phpmyadmin gost-phpmyadmin; do
     if docker container inspect "$container" >/dev/null 2>&1; then
@@ -729,21 +729,21 @@ list_legacy_split_containers() {
   fi
 }
 
-remove_legacy_split_containers() {
+remove_obsolete_split_containers() {
   local containers
-  containers="$(list_legacy_split_containers || true)"
+  containers="$(list_obsolete_split_containers || true)"
   if [ -z "$containers" ]; then
     return
   fi
 
-  echo "Removing legacy split-panel container(s) before starting overlord-master single-image:"
+  echo "Removing obsolete split-stack container(s) before starting overlord-master single-image:"
   printf '%s\n' "$containers" | while IFS= read -r container; do
     [ -n "$container" ] || continue
     echo "  - ${container}"
     docker rm -f "$container" >/dev/null
   done
   if printf '%s\n' "$containers" | grep -qx 'gost-mysql'; then
-    echo "Kept legacy MySQL Docker volumes and install files; only the obsolete container was removed for SQLite mode."
+    echo "Kept old MySQL Docker volumes and install files; only the obsolete container was removed for SQLite mode."
   fi
 }
 
@@ -831,18 +831,18 @@ print_success() {
   FINAL_BACKEND_PORT="$(read_env_value BACKEND_PORT "$ENV_FILE")"
   FINAL_PHPMYADMIN_PORT="$(read_env_value PHPMYADMIN_PORT "$ENV_FILE")"
   FINAL_EXPOSE_BACKEND="$(read_env_value EXPOSE_BACKEND "$ENV_FILE")"
-  PANEL_HOST="$(detect_host)"
+  MASTER_HOST="$(detect_host)"
 
   cat <<EOF
 
 Overlord Broil is running.
 
 Install dir: ${INSTALL_DIR}
-Master URL:  http://${PANEL_HOST}:${FINAL_FRONTEND_PORT}
-Agent URL:   http://${PANEL_HOST}:${FINAL_FRONTEND_PORT}
+Master URL:  http://${MASTER_HOST}:${FINAL_FRONTEND_PORT}
+Agent URL:   http://${MASTER_HOST}:${FINAL_FRONTEND_PORT}
 Runtime:     overlord-master single-image + $(if [ "$FINAL_DB_MODE" = "sqlite" ]; then printf 'SQLite'; else printf 'MySQL'; fi)
-Backend API: $(if [ "$FINAL_EXPOSE_BACKEND" = "1" ]; then printf 'http://%s:%s  (debug alias for the same overlord-master app; agents should still use the Master URL)' "$PANEL_HOST" "$FINAL_BACKEND_PORT"; else printf 'served by the same Master URL under /api/v1/*'; fi)
-phpMyAdmin:  $(if [ "$FINAL_DB_MODE" = "sqlite" ]; then printf 'not available in SQLite mode'; elif [ -n "$FINAL_PHPMYADMIN_PORT" ]; then printf 'http://%s:%s  (restrict by firewall in production)' "$PANEL_HOST" "$FINAL_PHPMYADMIN_PORT"; else printf 'not publicly exposed; set OB_PHPMYADMIN_PORT or --phpmyadmin-port to expose temporarily'; fi)
+Backend API: $(if [ "$FINAL_EXPOSE_BACKEND" = "1" ]; then printf 'http://%s:%s  (debug alias for the same overlord-master app; agents should still use the Master URL)' "$MASTER_HOST" "$FINAL_BACKEND_PORT"; else printf 'served by the same Master URL under /api/v1/*'; fi)
+phpMyAdmin:  $(if [ "$FINAL_DB_MODE" = "sqlite" ]; then printf 'not available in SQLite mode'; elif [ -n "$FINAL_PHPMYADMIN_PORT" ]; then printf 'http://%s:%s  (restrict by firewall in production)' "$MASTER_HOST" "$FINAL_PHPMYADMIN_PORT"; else printf 'not publicly exposed; set OB_PHPMYADMIN_PORT or --phpmyadmin-port to expose temporarily'; fi)
 
 Default login:
   username: admin_user
@@ -1015,12 +1015,12 @@ run_master_doctor() {
   fi
 
   if [ "$docker_daemon_ok" = "1" ]; then
-    local legacy_containers
-    legacy_containers="$(list_legacy_split_containers | paste -sd, - || true)"
-    if [ -n "$legacy_containers" ]; then
-      doctor_item warn "legacy-split-containers" "found ${legacy_containers}; install/upgrade will remove obsolete containers; SQLite mode keeps only overlord-master by default"
+    local obsolete_containers
+    obsolete_containers="$(list_obsolete_split_containers | paste -sd, - || true)"
+    if [ -n "$obsolete_containers" ]; then
+      doctor_item warn "obsolete-split-containers" "found ${obsolete_containers}; install/upgrade will remove obsolete containers; SQLite mode keeps only overlord-master by default"
     else
-      doctor_item ok "legacy-split-containers" "none"
+      doctor_item ok "obsolete-split-containers" "none"
     fi
   fi
 
@@ -1226,7 +1226,7 @@ install_or_upgrade() {
   ensure_backend_override
   ensure_phpmyadmin_override
   ensure_sqlite_data_dir
-  remove_legacy_split_containers
+  remove_obsolete_split_containers
   preflight_ports
   docker_login_if_configured
   pull_or_build_images

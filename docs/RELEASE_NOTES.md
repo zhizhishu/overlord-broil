@@ -2,199 +2,64 @@
 
 ## 0.6.0 - reliability gate
 
-This release moves the project from the first public production milestone into a reliability-focused release candidate. It is still below a `1.0` compatibility promise, but the installer, agent and CI checks now catch more real-world setup problems before users send tasks to live servers.
-
-### Reliability Additions
-
-- Added non-destructive `doctor` commands for the master installer, agent installer and local agent runtime.
-- Added `scripts/test-install-matrix.sh` to run installer diagnostics inside Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux containers.
-- Added a CI `install-matrix` job that runs the same diagnostics per image.
-- Extended `scripts/release-check.sh --full` so the release gate includes the install matrix before the disposable compose smoke test.
-- Added `microdnf` support to master/agent installers and bootstrap scripts for Oracle Linux slim-style images.
-- Added agent maintenance deployment tasks for remote `doctor`, `logs`, `restart-agent` and `upgrade-agent` actions through the existing task claim/report channel.
-- Added a server-card `Agent` action group in the control-center UI for diagnostics, logs, restart and upgrade.
-- Strengthened agent diagnostics so Python is treated as a blocking runtime dependency instead of a soft warning.
-- Future branch update: agent maintenance now also covers delayed uninstall, install diagnostics, ACME/certificate diagnostics, firewall diagnostics, one-click Xray Runtime/Xray/Snell repair and failed-task retry from the task card.
-- Future branch update: added `scripts/build-release-bundle.sh` and a `Release` workflow that validates `VERSION`, runs `scripts/release-check.sh --full`, builds a tarball plus sha256 checksum and uploads both to GitHub Releases for `v*` tags or manual runs.
-- Future branch update: replaced the first-run setup guide with a controlled-server status-first console, so the first screen shows heartbeat, Xray, Snell, certificate, task and alert state before deeper operations.
-- Future branch update: tightened the master compose layout to a single public entry port: `5166/tcp` serves both browser users and controlled-agent callbacks, while backend `6365`, MySQL and phpMyAdmin stay internal unless explicitly exposed for debugging or maintenance.
-- Future branch update: removed the legacy split backend/frontend runtime surface. The Vite UI is built into the Spring Boot jar, so supported deployments use `mysql + overlord-master` or the optional SQLite `overlord-master` stack.
-- Future branch update: refined protocol-node creation with structured form checks for target server, port reuse, credentials, Reality fields, Snell PSK/version and outbound tags; the generated inbound JSON is now an advanced preview instead of the default editing surface.
-- Future branch update: install, certificate and firewall diagnostics now emit structured `diagnostics.items`; the master task card summarizes DNS, port `80`, certificate-file, ACME-tooling, local-firewall and cloud-firewall findings before users open raw logs.
-- Future branch update: connected the forwarding workspace to the shared `zh-CN` / `en-US` dictionary for its main flows, including toasts, form validation, empty states, import/export, delete confirmation, address copy and diagnostics modals.
-- Future branch update: added Nano controlled-server detection from agent heartbeat memory totals. The master stores `nano-critical` below `200 MB`, `nano` below `256 MB`, `small` below `512 MB`, raises low-memory alerts and blocks full Xray Runtime/Xray orchestration plus Xray protocol-node creation on `nano-critical` hosts.
-- Future branch update: added the Runtime Provider registry for `xrayRuntime`, `snell`, `forward`, `certificate` and `firewall`; deployment tasks now expose provider metadata to the master UI and controlled-agent claim payloads.
-- Future branch update: connected Runtime Provider metadata through the controlled-agent execution report path. Agents log and report the claimed provider, while the master attaches provider audit metadata to stored task results when older agents omit it.
-- Future branch update: added normalized `resultJson.runtimeState` to task results and the master task card. Runtime status now records provider, protocol/action, task state, resolved status/source, service states, node/forward counts, certificate state and diagnostic summaries in one model.
-- Future branch update: added the State Sync runtime overview API and control-center panel. The master aggregates latest task runtime states with server heartbeat service/certificate fields, producing a server-by-provider view for Xray Runtime/Xray, Snell and certificate health.
-- Future branch update: State Sync rows can now create provider-aware `agent-maintenance` diagnostics and Xray Runtime/Snell repair tasks, keeping the visible state panel connected to the same controlled-agent execution/report path.
-- Future branch update: `agent-maintenance logs` now returns structured `logs.items` for Overlord agent, Xray Runtime/Xray, Snell, forwarding and task-log sources, and the master task card can show a remote-log summary before raw output.
-- Future branch update: Runtime Provider descriptors now include an Action Catalog for `agent-maintenance`; backend validation, State Sync row actions and server-card Agent buttons share the same action metadata.
-- Future branch update: hardened `agent-maintenance upgrade-agent`; agent binaries expose `--version`, upgrades validate downloads before install, keep timestamped backups, calculate SHA-256 and report `maintenance.upgrade` metadata back to the master UI.
-- Future branch update: tightened the master single-port contract. The installer now removes legacy split-stack containers and optional phpMyAdmin helpers during install/upgrade, removes the obsolete `gost-mysql` container in SQLite migration while keeping its volumes and old files, and CI/release checks validate that default compose files publish only the `overlord-master` entry.
-- Future branch update: added `scripts/test-xray-runtime-e2e.sh` plus a manual `Real Xray Runtime E2E` GitHub workflow. The gate checks real Xray Runtime status, inbound list and Xray config when endpoint/token secrets exist, and can explicitly create/toggle/delete a temporary inbound when write mode is enabled.
-- Future branch update: Xray Runtime deployment tasks now produce agent-executable scripts that call the Xray Runtime inbound add/delete/restart APIs and report inbound metadata back to the master.
-- Future branch update: agent task results now redact Xray Runtime API tokens, passwords, 2FA codes and `serverSecrets` before storing task history, while still allowing encrypted server metadata updates.
-- Future branch update: firewall Runtime Provider actions now include executable `open-runtime-ports` and `close-runtime-ports` tasks, parsing task ports and applying local `ufw`, `firewalld` or `iptables` rules before returning diagnostics.
-- Future branch update: added optional SQLite master mode through `OB_DB_MODE=sqlite`, `application-sqlite.yml`, an embedded SQLite schema, `docker-compose.sqlite.yml`, installer backup/restore awareness and CI/release smoke coverage. MySQL remains the default production path.
-- Future branch update: hardened the task engine with atomic agent task claiming, dangerous `agent-maintenance` confirmation checks and richer Runtime State trace fields (`sourceTaskId`, `serverId`, `resourceType`, `resourceId`, `danger`).
-- Future branch update: added `operation_audit_log` plus a control-center Operation Audit panel. Deploy/orchestration task creation, rejection, manual state update, retry/delete, agent task claim and agent task report events now record actor, server, provider, action, outcome and dangerous-action markers.
-- Future branch update: added `scripts/test-snell-real-smoke.sh` for live master/agent Snell validation, and hardened generated Snell services so configs are readable by the `nobody` runtime user and install/restart tasks fail unless the service becomes active.
-- Future branch update: improved control-center testability and operator safety with stable `data-testid` hooks on key orchestration panels and an in-app dangerous-action confirmation modal.
-- Future branch update: hardened Snell cleanup and failure feedback. Snell delete tasks now verify service shutdown and closed listen ports before reporting success, failed/timeout Snell tasks update protocol-node state and `lastError`, and the live Snell smoke script verifies cleanup after temporary-node deletion.
-- Future branch update: aligned the source default server port with the single master entry (`5166`) and extended in-app confirmation to destructive/restart/save flows outside the agent-maintenance catalog.
-- Future branch update: captured live `isrco-hk` screenshots for the login page and master control center after redeploying the latest single-container SQLite master.
-- Future branch update: real Xray Runtime E2E now accepts newer Xray Runtime status responses with `obj: null`; `isrco-hk` passed direct `Xray Runtime 3.1.0` inbound add/toggle/delete and Overlord master API add/toggle/delete against a temporary Xray Runtime container.
-
-### 0.6.0 Capability Matrix
-
-| Area | 0.6.0 stance |
-| --- | --- |
-| Master install | Same one-command installer as 0.5.0, now with a pre-install doctor for ports, Docker/Compose and `.env` checks. |
-| Master runtime | Default Docker Compose uses MySQL plus the `overlord-master` single image on port `5166`; optional SQLite mode removes the MySQL sidecar for small labs; legacy split backend/frontend compose files are no longer shipped. |
-| Agent install | systemd/OpenRC installer plus preflight doctor and local runtime doctor. |
-| Agent maintenance | Remote diagnostics, log collection, restart and upgrade tasks generated from the master panel. |
-| Release packaging | Future branch includes a clean-tree release bundle builder and GitHub Release workflow; release assets include the tarball and `.sha256`. |
-| First-run UI | Future branch includes an Overlord-style setup guide in the master control center for the first operational path. |
-| Protocol-node UI | Future branch defaults to structured node forms with configuration checks and a collapsible advanced payload preview. |
-| Diagnostic UI | Future branch shows structured task-card diagnostics for install, ACME/certificate and firewall checks, with raw result access retained. |
-| Legacy forwarding UI | Future branch translates the main forwarding workflows through the shared `zh-CN` / `en-US` dictionary and unifies empty/failure/status wording. |
-| Nano controlled hosts | Agent heartbeat reports total memory; the master badges low-memory servers and keeps sub-200 MB hosts on Snell or remote-forwarding paths. |
-| Runtime Provider / Runtime State audit | Task claim/report results carry provider metadata and normalized runtime state for `xrayRuntime`, `snell`, `forward`, `certificate` and `firewall`, giving the master a stable audit trail across agent versions. |
-| Operation audit log | Master task creation, orchestration task creation, rejection, manual state updates, retries, deletes, agent claims and agent reports are persisted in `operation_audit_log` and shown in the control center. |
-| State Sync overview | `/api/v1/deploy-task/runtime-state/overview` aggregates latest runtime states plus heartbeat fields into a server-by-provider operations panel. |
-| State Sync actions | Runtime rows can generate provider-aware diagnostics and Xray Runtime/Snell repairs as normal `agent-maintenance` tasks for the controlled agent. |
-| Runtime Provider Action Catalog | Provider descriptors register maintenance action labels, categories, danger flags and State Sync visibility; backend validation and master UI buttons reuse that catalog. |
-| Task engine safety | Agent claims use an atomic `generated -> claimed` state transition, and dangerous maintenance tasks require explicit UI/backend confirmation before an agent can execute them. |
-| Remote runtime logs | `agent-maintenance logs` reports structured `logs.items` for Overlord agent, Xray Runtime/Xray, Snell, forwarding and task logs, with task-card summaries in the master UI. |
-| Master port contract | Default compose files publish only one host port for `overlord-master`; installer upgrades remove legacy split containers so old `80/6365/8066` mappings do not remain, and SQLite migration stops obsolete `gost-mysql` without deleting its volumes. |
-| Linux coverage | Docker/CI diagnostics cover Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux userspaces. |
-| Xray Runtime | API fixture remains in CI, and `isrco-hk` has a recorded real `Xray Runtime 3.1.0` container write smoke for direct API plus Overlord master API inbound add/toggle/delete; full install/configure still targets systemd hosts. |
-| Snell | Product-level protocol node with separate systemd/OpenRC runtime, not a native Xray/Xray Runtime core protocol; live smoke script is available for authorized hosts. |
-| Verification | Shell syntax, agent mock, SQLite schema smoke, Xray Runtime fixture, optional real Xray Runtime E2E gate, master port contract, frontend build, backend Maven build, install matrix and MySQL/SQLite single-image compose smoke. |
-
-### Honest Boundaries
-
-- The Linux matrix in this release is Docker/CI preflight coverage. It is not yet the full real-VPS matrix with public DNS, cloud firewall, ACME HTTP validation and real service managers.
-- The included Xray Runtime fixture is API-level. One real `isrco-hk` container write smoke is now recorded, but a `1.0` claim still needs a broader VPS/provider matrix with endpoint secrets configured.
-- Snell is unified at the product/control-plane layer. It remains a separate runtime service managed by the Overlord agent rather than a native Xray protocol inside Xray Runtime.
-- Nano detection is a protection layer, not a promise that Xray Runtime/Xray will run well on tiny hardware. Sub-200 MB hosts should be treated as Snell or forwarding nodes unless swap and real-host testing prove otherwise.
-- Enterprise-grade governance is still future work: RBAC, audit retention/export, key-rotation migration, agent token expiry/revocation and broader dangerous-operation policy.
-
-## 0.5.0 - production-ready public milestone
-
-This release is the first version intended to be listed and installed as a small production master/agent deployment. It keeps the project below a broad `1.0` compatibility promise, but the install, runtime, CI, image and release-check paths are now explicit enough for public use.
-
-### Release Gate
-
-- Added `scripts/release-check.sh` as the single pre-release gate for shell syntax, agent mock execution, tokenized Xray Runtime fixture coverage, compose validation, frontend build, Docker Maven backend build, disposable compose smoke and `git diff --check`.
-- Moved frontend build baselines to Node 22 and enabled GitHub Actions Node 24 runtime preflight with `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` for repository workflows.
-- Documented live-host assumptions, Linux support boundaries, master ports, controlled-host ports, phpMyAdmin exposure risk, key backup requirements and release publishing checks.
-- Added POSIX bootstrap installers for minimal hosts that need `bash` installed before the normal master or agent installer can run.
-- Kept credential hardening in the release baseline: stored agent tokens and Xray Runtime API/password/2FA fields are encrypted through `SECRET_ENCRYPTION_KEY`, with legacy plaintext rows still readable for gradual upgrades.
-
-### Current Production Scope
-
-| Area | 0.5.0 stance |
-| --- | --- |
-| Master install | One-command installer using public GitHub raw files and GHCR images, with source-build fallback. |
-| Runtime | Docker Compose stack with MySQL, backend, frontend and optional phpMyAdmin. |
-| Agent | systemd/OpenRC service that polls, executes and reports tasks without opening an inbound port. |
-| Xray Runtime | API-token inbound/client flows, Xray config/outbound reads, traffic sync and Xray restart; full install/configure orchestration requires systemd. |
-| Snell | Managed as a protocol node through agent-generated systemd/OpenRC services and configs. |
-| Safety | Master self-control guardrails, protected ports, encrypted credentials and task audit logs. |
-| Verification | Local release gate plus CI backend/frontend/script/compose smoke jobs and GHCR image workflow. |
-
-### Linux Support
-
-| Target | Debian / Ubuntu | Rocky / Oracle Linux | Alpine / OpenRC |
-| --- | --- | --- | --- |
-| Master Docker stack | Supported | Supported | Supported with bootstrap installer |
-| Agent / Snell / remote forwarding | systemd | systemd | OpenRC |
-| Full Xray Runtime install/configure | Supported | Supported | Not supported in `0.5.0`; use a systemd host |
-
-### Known Post-Release Enhancements
-
-- Add real disposable Xray Runtime container orchestration smoke tests once a stable upstream-compatible fixture is selected.
-- Add a documented key-rotation migration for encrypted Xray Runtime credentials and API tokens.
-- Clean remaining legacy upstream wording and mojibake comments in a dedicated documentation pass.
-
-## 0.4.0 - P1-P4 productization batch
-
-This is the first public-facing productization milestone for Overlord Broil. It keeps the project pre-1.0 while making the repository easier to install, verify, operate and release.
+This release closes the product surface around Overlord Broil as one master image, one public master port and one controlled-agent execution loop. It is still below a `1.0` compatibility promise, but the installer, agent and CI checks now catch more real-world setup problems before users send tasks to live servers.
 
 ### Highlights
 
-- Hardening update: `role=master` servers can be selected intentionally, while destructive actions and protected listen ports such as frontend/backend/MySQL/SSH are blocked.
-- Sensitive stored agent tokens and Xray Runtime API/password/2FA fields are encrypted through `SECRET_ENCRYPTION_KEY`, with plaintext legacy rows still readable.
-- The Xray Runtime fixture now covers Bearer token success, missing-token and wrong-token paths in addition to inbound/outbound/config/traffic/restart routes.
-- Frontend forms include compact helpers for UUID, Reality private key/shortId, Snell PSK and outbound tag choices.
-- Master panel installer for public GitHub raw files and GHCR images, with source-build fallback when GHCR pulls are unavailable.
-- Controlled-server agent installer and service runner for claiming deployment tasks, executing scripts and reporting results.
-- Multi-server orchestration workspace for registered servers, Xray Runtime connection settings, protocol nodes, Snell nodes, port forwards, deployment tasks and traffic snapshots.
-- Xray Runtime connector coverage for connection tests, inbound CRUD, client operations, full Xray config reads, outbound traffic reads, Xray restarts and traffic sync.
-- One-click orchestration tasks that can install or reuse Xray Runtime, create starter Xray protocols, install Snell and return runtime metadata.
-- Unified rule center and monitor alert center in the master workspace for day-2 operations across servers.
-- Stateful Xray Runtime API fixture for regression coverage of inbound/client/outbound/config/traffic/restart routes.
-- Docker Compose files for IPv4 and IPv6 deployments using the single GHCR `overlord-master` image.
-- CI-oriented verification commands for backend package builds, frontend production builds, agent mock tests and disposable compose smoke tests.
+- Supported deployments use `overlord-master` as the single master runtime. The Vite UI is embedded into the Spring Boot jar, and the default Compose files publish only `5166/tcp`.
+- The master installer includes non-destructive `doctor`, backup, restore, upgrade and uninstall commands.
+- SQLite mode is available through `OB_DB_MODE=sqlite` for small labs; MySQL remains the default production path.
+- Controlled agents use systemd or OpenRC, poll the master, execute tasks locally and report results without opening an inbound management port.
+- Runtime Providers now cover `xrayRuntime`, `snell`, `forward`, `certificate` and `firewall`.
+- Deployment plans can install or reuse Xray Runtime, create starter Xray protocols, deploy Snell, run certificate/firewall checks and return runtime metadata.
+- Xray Runtime management includes inbound/client flows, config/outbound reads, traffic sync and Xray restart.
+- Snell is represented as a normal product node while remaining an independent systemd/OpenRC service on the controlled host.
+- Remote forwarding uses controlled-agent tasks to create, restart and remove `socat` services.
+- State Sync aggregates latest runtime state plus heartbeat fields into a server-by-provider view.
+- Operation Audit records master task creation, rejection, state changes, retries, deletes, agent claims and agent reports.
+- Agent maintenance includes diagnostics, logs, restart, upgrade, delayed uninstall, install checks, certificate checks, firewall checks and repair tasks.
+- Dangerous actions require explicit UI confirmation and backend confirmation metadata before the agent can execute them.
+- Nano host detection marks sub-200 MB hosts as `nano-critical` and blocks full Xray deployment on those machines.
+- Install-matrix CI covers Debian, Ubuntu, Alpine, Rocky Linux and Oracle Linux userspaces.
+- Release automation validates `VERSION`, runs `scripts/release-check.sh --full`, builds a tarball plus sha256 and publishes release assets for `v*` tags.
 
-### 0.4.0 Capability Matrix
+### Capability Matrix
 
-| Area | Current state |
+| Area | 0.6.0 stance |
 | --- | --- |
-| Master install | `scripts/install-master.sh` via GitHub raw URL; installs into `/opt/overlord-broil`. |
-| Master runtime | Docker Compose with MySQL 5.7, backend, frontend and optional phpMyAdmin. |
-| GHCR image | `ghcr.io/zhizhishu/overlord-broil:latest`. |
-| Source fallback | Installer can download the public source archive and build images locally when GHCR pull fails. |
-| Agent install | `scripts/install-agent.sh` creates `/etc/overlord-agent.env`, `/usr/local/bin/overlord-agent.sh` and `overlord-agent.service`. |
-| Agent execution | Polls task claim/report APIs, stores work under `/var/lib/overlord-agent`, supports retries and task timeouts. |
-| Xray Runtime management | API-token flows for inbounds and clients; login+CSRF path for full Xray/outbound operations. |
-| Snell support | Product-level protocol node backed by agent-generated systemd services and config files. |
-| Port forwarding | Remote `socat` systemd services through auditable agent tasks. |
-| Traffic | Manual and scheduled Xray Runtime traffic sync into local snapshots. |
-| Monitor alerts | Agent offline, service failure, certificate expiry, task failure/timeout and traffic anomaly alerts with acknowledgement API. |
-| Xray Runtime regression | Local Python fixture and shell test covering tokenized core Xray Runtime proxy routes. |
-| CI verification | Backend/frontend build, agent mock test, Xray Runtime fixture test, compose dry run and disposable compose smoke test. |
+| Master install | One-command installer, preflight doctor and GHCR/source-build fallback. |
+| Master runtime | Single `overlord-master` image on `5166/tcp`; optional SQLite mode. |
+| Agent install | systemd/OpenRC service plus preflight doctor and runtime doctor. |
+| Xray Runtime | API fixture in CI plus recorded `isrco-hk` real container write smoke. |
+| Snell | Product-level protocol node backed by generated systemd/OpenRC services. |
+| Remote forwarding | Auditable controlled-agent tasks for TCP/UDP forwarding. |
+| State Sync | Runtime-state aggregation by server and provider. |
+| Operation Audit | Task and agent lifecycle audit in `operation_audit_log`. |
+| Safety | Protected master ports, encrypted secrets, task audit, dangerous-action confirmation and nano-host blocking. |
+| Verification | Shell syntax, agent mock, SQLite schema, Xray Runtime fixture, optional real Xray Runtime E2E, master port contract, frontend build, backend Maven build, install matrix and Compose smoke. |
 
-### Verification Commands
+### Ports
 
-Local build checks:
+| Port | Default |
+| --- | --- |
+| `5166/tcp` | Public master Web/API and agent callback. |
+| `6365/tcp` | Internal unless `OB_EXPOSE_BACKEND=1`. |
+| `3306/tcp` | Docker network only. |
+| phpMyAdmin | Not exposed unless `OB_PHPMYADMIN_PORT` is set. |
+| Agent | No inbound management port. |
+| Controlled-host business ports | Only the Xray, Snell, forwarding or ACME ports selected by the operator. |
 
-```bash
-cd springboot-backend
-mvn -B -DskipTests package
+### Validation Notes
 
-cd ../vite-frontend
-npm install --legacy-peer-deps --no-audit --no-fund
-npm run build
-```
+- `isrco-hk` passed the single-container SQLite master smoke on `5166/tcp`.
+- `isrco-hk` passed a real Xray Runtime add/toggle/delete contract against temporary high ports.
+- The live Snell smoke script can create and delete a temporary Snell node and verify service shutdown plus closed listen port after cleanup.
+- Docker/CI install matrix is useful for packaging confidence, but a wider real-VPS matrix is still required before a `1.0` claim.
 
-Containerized checks:
+### Honest Boundaries
 
-```bash
-docker run --rm -v "$PWD/springboot-backend:/workspace" -w /workspace maven:3.9-eclipse-temurin-21 mvn -B -DskipTests package
-docker run --rm -v "$PWD:/workspace" -v ob_xray-runtime_frontend_node_modules:/workspace/vite-frontend/node_modules -w /workspace/vite-frontend node:22-bookworm bash -lc "npm install --legacy-peer-deps --no-audit --no-fund && npm run build"
-```
-
-Smoke checks:
-
-```bash
-bash scripts/test-agent-mock.sh
-bash scripts/test-xray-runtime-fixture.sh
-bash scripts/test-compose-smoke.sh --build-local --dry-run
-bash scripts/test-compose-smoke.sh --build-local
-```
-
-Release checklist:
-
-```bash
-docker compose -f docker-compose-v4.yml config
-docker compose -f docker-compose-v6.yml config
-```
-
-### Known Gaps Before 1.0
-
-- The included Xray Runtime fixture is API-level; real-container Xray Runtime orchestration smoke tests should still be added before a broad 1.0 compatibility claim.
-- Key rotation for encrypted credentials is intentionally not automatic yet and should be handled through a planned migration.
-- Legacy scripts and docs still contain some upstream-era wording and mojibake text that should be cleaned in a separate documentation pass.
+- The Linux matrix is Docker/CI preflight coverage, not a full real-VPS matrix with public DNS, cloud firewall, ACME HTTP validation and real service managers.
+- Xray Runtime has one recorded real-host container smoke; more providers and VPS images are still needed.
+- Snell remains a separate runtime service managed by the Overlord agent rather than a native Xray protocol.
+- Sub-200 MB hosts should stay on Snell or forwarding unless swap and real-host testing prove otherwise.
+- Enterprise governance is future work: RBAC, audit export/retention, key-rotation migration, agent token expiry/revocation and broader dangerous-operation policy.

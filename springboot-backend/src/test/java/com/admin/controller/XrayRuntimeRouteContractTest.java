@@ -18,16 +18,16 @@ class XrayRuntimeRouteContractTest {
 
     @Test
     void exposesProductRuntimeBaseRoute() {
-        RequestMapping mapping = XrayPanelController.class.getAnnotation(RequestMapping.class);
+        RequestMapping mapping = XrayRuntimeController.class.getAnnotation(RequestMapping.class);
 
         assertEquals(Set.of("/api/v1/runtimes/xray"), Set.of(mapping.value()));
-        String legacyBase = "/api/v1/" + "xray" + "-panel";
-        assertFalse(Arrays.asList(mapping.value()).contains(legacyBase));
+        String retiredBase = "/api/v1/" + "xray" + "-" + "pane" + "l";
+        assertFalse(Arrays.asList(mapping.value()).contains(retiredBase));
     }
 
     @Test
     void exposesExpectedPostRoutes() {
-        Set<String> routes = Arrays.stream(XrayPanelController.class.getDeclaredMethods())
+        Set<String> routes = Arrays.stream(XrayRuntimeController.class.getDeclaredMethods())
                 .flatMap(this::postMappingValues)
                 .collect(Collectors.toSet());
 
@@ -52,8 +52,8 @@ class XrayRuntimeRouteContractTest {
         );
 
         assertTrue(routes.containsAll(expected), "missing routes: " + missing(expected, routes));
-        String legacySegment = "xray" + "-panel";
-        assertFalse(routes.stream().anyMatch(route -> route.contains(legacySegment)));
+        String retiredSegment = "xray" + "-" + "pane" + "l";
+        assertFalse(routes.stream().anyMatch(route -> route.contains(retiredSegment)));
     }
 
     private Stream<String> postMappingValues(Method method) {

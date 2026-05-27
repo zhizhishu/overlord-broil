@@ -1,14 +1,14 @@
 import axios, { AxiosResponse } from 'axios';
-import { getPanelAddresses, isWebViewFunc} from '@/utils/panel';
+import { getMasterAddresses, isWebViewFunc} from '@/utils/master';
 
 
-interface PanelAddress {
+interface MasterAddress {
   name: string;
   address: string;   
   inx: boolean;
 }
 
-const setPanelAddressesFunc = (newAddress: PanelAddress[]) => {
+const setMasterAddressesFunc = (newAddress: MasterAddress[]) => {
   newAddress.forEach(item => {
     if (item.inx) {
       baseURL = `${item.address}/api/v1/`;
@@ -17,16 +17,16 @@ const setPanelAddressesFunc = (newAddress: PanelAddress[]) => {
   });
 }
 
-function getWebViewPanelAddress() {
-  (window as any).setAddresses = setPanelAddressesFunc
-  getPanelAddresses("setAddresses");
+function getWebViewMasterAddress() {
+  (window as any).setAddresses = setMasterAddressesFunc
+  getMasterAddresses("setAddresses");
 };
 
 let baseURL: string = '';
 
 export const reinitializeBaseURL = () => {
   if (isWebViewFunc()) {
-    getWebViewPanelAddress();
+    getWebViewMasterAddress();
   } else {
     baseURL = import.meta.env.VITE_API_BASE ? `${import.meta.env.VITE_API_BASE}/api/v1/` : '/api/v1/';
     axios.defaults.baseURL = baseURL;

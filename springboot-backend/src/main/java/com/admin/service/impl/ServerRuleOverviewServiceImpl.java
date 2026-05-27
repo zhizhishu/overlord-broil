@@ -3,14 +3,14 @@ package com.admin.service.impl;
 import com.admin.common.dto.ProtocolNodeQueryDto;
 import com.admin.common.dto.ServerForwardRuleQueryDto;
 import com.admin.common.dto.ServerRuleOverviewDto;
-import com.admin.common.dto.XrayPanelServerDto;
+import com.admin.common.dto.XrayRuntimeServerDto;
 import com.admin.common.lang.R;
 import com.admin.entity.ControlServer;
 import com.admin.service.ControlServerService;
 import com.admin.service.ProtocolNodeService;
 import com.admin.service.ServerForwardRuleService;
 import com.admin.service.ServerRuleOverviewService;
-import com.admin.service.XrayPanelService;
+import com.admin.service.XrayRuntimeService;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -30,7 +30,7 @@ public class ServerRuleOverviewServiceImpl implements ServerRuleOverviewService 
     private ServerForwardRuleService serverForwardRuleService;
 
     @Resource
-    private XrayPanelService xrayPanelService;
+    private XrayRuntimeService xrayRuntimeService;
 
     @Override
     public R overview(ServerRuleOverviewDto dto) {
@@ -48,15 +48,15 @@ public class ServerRuleOverviewServiceImpl implements ServerRuleOverviewService 
         ServerForwardRuleQueryDto forwardQuery = new ServerForwardRuleQueryDto();
         forwardQuery.setServerId(server.getId());
         forwardQuery.setLimit(500);
-        XrayPanelServerDto xrayPanelDto = new XrayPanelServerDto();
-        xrayPanelDto.setServerId(server.getId());
+        XrayRuntimeServerDto xrayRuntimeDto = new XrayRuntimeServerDto();
+        xrayRuntimeDto.setServerId(server.getId());
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("server", server);
         data.put("protocolNodes", protocolNodeService.listNodes(nodeQuery).getData());
         data.put("forwardRules", serverForwardRuleService.listRules(forwardQuery).getData());
-        data.put("xrayPanelInbounds", safeData(xrayPanelService.listInbounds(xrayPanelDto)));
-        data.put("xrayPanelOutbounds", safeData(xrayPanelService.getOutbounds(xrayPanelDto)));
+        data.put("xrayRuntimeInbounds", safeData(xrayRuntimeService.listInbounds(xrayRuntimeDto)));
+        data.put("xrayRuntimeOutbounds", safeData(xrayRuntimeService.getOutbounds(xrayRuntimeDto)));
         return R.ok(data);
     }
 

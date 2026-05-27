@@ -8,7 +8,7 @@ on:
         required: false
         type: string
       base_path:
-        description: "Optional custom base path before /panel. Falls back to secret XRAY_RUNTIME_E2E_BASE_PATH."
+        description: "Optional custom runtime base path. Falls back to secret XRAY_RUNTIME_E2E_BASE_PATH."
         required: false
         type: string
       write:

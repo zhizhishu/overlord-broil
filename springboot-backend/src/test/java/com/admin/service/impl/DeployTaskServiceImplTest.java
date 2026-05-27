@@ -141,13 +141,13 @@ class DeployTaskServiceImplTest {
         String sanitized = ReflectionTestUtils.invokeMethod(service, "sanitizeAgentResultJson", """
                 {
                   "server": {
-                    "xrayPanelEndpoint": "http://127.0.0.1:5168",
-                    "xrayPanelApiToken": "token-123",
-                    "xrayPanelPassword": "password-123",
-                    "xrayPanelTwoFactorCode": "654321"
+                    "xrayRuntimeEndpoint": "http://127.0.0.1:5168",
+                    "xrayRuntimeApiToken": "token-123",
+                    "xrayRuntimePassword": "password-123",
+                    "xrayRuntimeTwoFactorCode": "654321"
                   },
                   "serverSecrets": {
-                    "xrayPanelApiToken": "token-456"
+                    "xrayRuntimeApiToken": "token-456"
                   }
                 }
                 """);
@@ -155,13 +155,13 @@ class DeployTaskServiceImplTest {
         JSONObject result = JSON.parseObject(sanitized);
         JSONObject server = result.getJSONObject("server");
 
-        assertEquals("http://127.0.0.1:5168", server.getString("xrayPanelEndpoint"));
-        assertNull(server.getString("xrayPanelApiToken"));
-        assertNull(server.getString("xrayPanelPassword"));
-        assertNull(server.getString("xrayPanelTwoFactorCode"));
-        assertTrue(server.getBooleanValue("xrayPanelApiTokenConfigured"));
-        assertTrue(server.getBooleanValue("xrayPanelPasswordConfigured"));
-        assertTrue(server.getBooleanValue("xrayPanelTwoFactorConfigured"));
+        assertEquals("http://127.0.0.1:5168", server.getString("xrayRuntimeEndpoint"));
+        assertNull(server.getString("xrayRuntimeApiToken"));
+        assertNull(server.getString("xrayRuntimePassword"));
+        assertNull(server.getString("xrayRuntimeTwoFactorCode"));
+        assertTrue(server.getBooleanValue("xrayRuntimeApiTokenConfigured"));
+        assertTrue(server.getBooleanValue("xrayRuntimePasswordConfigured"));
+        assertTrue(server.getBooleanValue("xrayRuntimeTwoFactorConfigured"));
         assertNull(result.getJSONObject("serverSecrets"));
     }
 
@@ -315,21 +315,21 @@ class DeployTaskServiceImplTest {
         server.setId(7L);
         server.setName("edge-xray");
         server.setHost("203.0.113.7");
-        server.setXrayPanelEndpoint("http://127.0.0.1:5168");
-        server.setXrayPanelBasePath("/ob");
-        server.setXrayPanelApiToken("token-123");
+        server.setXrayRuntimeEndpoint("http://127.0.0.1:5168");
+        server.setXrayRuntimeBasePath("/ob");
+        server.setXrayRuntimeApiToken("token-123");
 
         String script = ReflectionTestUtils.invokeMethod(service, "buildXrayAgentPayload", dto, profile, server);
 
         assertNotNull(script);
         assertTrue(script.contains("OB_XRAY_TASK="));
-        assertTrue(script.contains("XRAY_PANEL_API_TOKEN='token-123'"));
+        assertTrue(script.contains("XRAY_RUNTIME_API_TOKEN='token-123'"));
         assertTrue(script.contains("/panel/api/inbounds/add"));
         assertTrue(script.contains("OB_AGENT_RESULT_JSON="));
         assertTrue(script.contains("\"inbounds\": []"));
         assertTrue(script.contains("runtimeState") || script.contains("services"));
         assertTrue(script.contains("\"tokenConfigured\": bool(token)"));
-        assertTrue(!script.contains("\"xrayPanelApiToken\": token"));
+        assertTrue(!script.contains("\"xrayRuntimeApiToken\": token"));
         assertTrue(!script.contains("next integration step"));
         assertBashSyntaxValid(script);
     }
@@ -552,7 +552,7 @@ class DeployTaskServiceImplTest {
         server.setId(9L);
         server.setName("oracle-nano");
         server.setLastHeartbeat(System.currentTimeMillis());
-        server.setXrayPanelServiceStatus("active");
+        server.setXrayRuntimeServiceStatus("active");
         server.setXrayServiceStatus("running");
         server.setSnellServiceStatus("not-installed");
         server.setCertificateStatus("expiring");

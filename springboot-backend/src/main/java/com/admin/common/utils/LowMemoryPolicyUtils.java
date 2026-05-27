@@ -38,7 +38,7 @@ public final class LowMemoryPolicyUtils {
             return null;
         }
         if (memoryTotalMb < NANO_CRITICAL_MEMORY_MB) {
-            return "Memory is below 200 MB. Avoid full Xray Runtime/Xray orchestration; prefer Snell or port forwarding and enable swap.";
+            return "Memory is below 200 MB. Avoid full Xray Runtime/Xray deployment; prefer Snell or port forwarding and enable swap.";
         }
         if (memoryTotalMb < NANO_MEMORY_MB) {
             return "Memory is below 256 MB. Treat this as a Nano node; avoid full Xray Runtime/Xray unless swap is available.";

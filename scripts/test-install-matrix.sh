@@ -103,7 +103,7 @@ OB_DOCTOR_REQUIRE_SERVICE_MANAGER=0 \
 OB_DOCTOR_REQUIRE_AGENT_ENV=0 \
   bash scripts/install-agent.sh doctor
 
-OB_PANEL_URL=http://127.0.0.1:18080 \
+OB_MASTER_URL=http://127.0.0.1:18080 \
 OB_SERVER_ID=1 \
 OB_AGENT_TOKEN=test-token \
 OB_WORK_DIR=/tmp/overlord-agent-work \

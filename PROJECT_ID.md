@@ -5,7 +5,6 @@ project_root: C:\Users\echo\Downloads\claude\overlord-broil
 project_type: code
 task_file: C:\Users\echo\Downloads\claude\overlord-broil\TASK.md
 log_file: C:\Users\echo\Downloads\claude\overlord-broil\LOG.md
-legacy_task_log: C:\Users\echo\Downloads\claude\overlord-broil\TASK_LOG.md
 
 serena:
   enabled: true
@@ -24,7 +23,6 @@ boundaries:
   allowed_write:
     - C:\Users\echo\Downloads\claude\overlord-broil
   forbidden_paths:
-    - C:\Users\echo\Downloads\claude\flux-panel
     - C:\Users\echo\Downloads\claude\task-logs
     - C:\Users\echo\Downloads\claude\PROJECT_ID.md
     - C:\Users\echo\Downloads\claude\TASK.md
@@ -32,5 +30,5 @@ boundaries:
 
 notes:
   - This repository is the independent zhizhishu/overlord-broil project.
-  - Do not open pull requests to the upstream Flux Panel repository.
+  - Do not open pull requests outside this repository.
   - The parent folder is a storage root only, not a project or logging location.

@@ -82,14 +82,14 @@ export interface ControlServer {
   name: string;
   role: 'master' | 'agent' | string;
   endpoint?: string;
-  xrayPanelEndpoint?: string;
-  xrayPanelBasePath?: string;
-  xrayPanelApiToken?: string;
-  xrayPanelUsername?: string;
-  xrayPanelPassword?: string;
-  xrayPanelTwoFactorCode?: string;
-  xrayPanelAllowInsecure?: number;
-  xrayPanelLastSync?: number;
+  xrayRuntimeEndpoint?: string;
+  xrayRuntimeBasePath?: string;
+  xrayRuntimeApiToken?: string;
+  xrayRuntimeUsername?: string;
+  xrayRuntimePassword?: string;
+  xrayRuntimeTwoFactorCode?: string;
+  xrayRuntimeAllowInsecure?: number;
+  xrayRuntimeLastSync?: number;
   host: string;
   sshPort?: number;
   sshUser?: string;
@@ -98,7 +98,7 @@ export interface ControlServer {
   agentVersion?: string;
   xrayVersion?: string;
   snellVersion?: string;
-  xrayPanelServiceStatus?: string;
+  xrayRuntimeServiceStatus?: string;
   xrayServiceStatus?: string;
   snellServiceStatus?: string;
   certificateMode?: string;
@@ -181,8 +181,8 @@ export interface ServerRuleOverview {
   server?: ControlServer;
   protocolNodes?: ProtocolNode[];
   forwardRules?: ServerForwardRule[];
-  xrayPanelInbounds?: any;
-  xrayPanelOutbounds?: any;
+  xrayRuntimeInbounds?: any;
+  xrayRuntimeOutbounds?: any;
 }
 
 export interface RuntimeProviderAction {
@@ -315,7 +315,7 @@ export interface DeployTask {
   status: number;
 }
 
-export interface XrayPanelTrafficSnapshot {
+export interface XrayRuntimeTrafficSnapshot {
   id: number;
   serverId: number;
   serverName?: string;

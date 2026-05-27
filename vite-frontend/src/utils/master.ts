@@ -2,46 +2,46 @@
 
 
 // 获取主控地址列表
-export async function getPanelAddresses(callback: string = "setPanelAddresses"){
-    if ((window as any).JsInterface && (window as any).JsInterface.getPanelAddresses) {
-        (window as any).JsInterface.getPanelAddresses(callback);
+export async function getMasterAddresses(callback: string = "setMasterAddresses"){
+    if ((window as any).JsInterface && (window as any).JsInterface.getMasterAddresses) {
+        (window as any).JsInterface.getMasterAddresses(callback);
     } else if ((window as any).webkit && (window as any).webkit.messageHandlers) {
-        (window as any).webkit.messageHandlers.getPanelAddresses.postMessage(callback);
+        (window as any).webkit.messageHandlers.getMasterAddresses.postMessage(callback);
     }
 
 }
 
 // 保存主控地址
-export async function savePanelAddress(name: string, address: string){
+export async function saveMasterAddress(name: string, address: string){
     if ((window as any).JsInterface) {
-        (window as any).JsInterface.savePanelAddress(name, address);
+        (window as any).JsInterface.saveMasterAddress(name, address);
     } else if ((window as any).webkit && (window as any).webkit.messageHandlers) {
-        (window as any).webkit.messageHandlers.savePanelAddress.postMessage({ name, address });
+        (window as any).webkit.messageHandlers.saveMasterAddress.postMessage({ name, address });
     }
 }
 
 // 设置当前主控地址
-export async function setCurrentPanelAddress(name: string) {
+export async function setCurrentMasterAddress(name: string) {
     if ((window as any).JsInterface) {
-        (window as any).JsInterface.setCurrentPanelAddress(name);
+        (window as any).JsInterface.setCurrentMasterAddress(name);
     } else if ((window as any).webkit && (window as any).webkit.messageHandlers) {
-        (window as any).webkit.messageHandlers.setCurrentPanelAddress.postMessage({ name });
+        (window as any).webkit.messageHandlers.setCurrentMasterAddress.postMessage({ name });
     }
 }
 
 // 删除主控地址
-export async function deletePanelAddress(name: string){
+export async function deleteMasterAddress(name: string){
     if ((window as any).JsInterface) {
-        (window as any).JsInterface.deletePanelAddress(name);
+        (window as any).JsInterface.deleteMasterAddress(name);
     } else if ((window as any).webkit && (window as any).webkit.messageHandlers) {
-        (window as any).webkit.messageHandlers.deletePanelAddress.postMessage({ name });
+        (window as any).webkit.messageHandlers.deleteMasterAddress.postMessage({ name });
     }
 }
 
 export function isWebViewFunc(){
-  if((window as any).JsInterface !== undefined && (window as any).JsInterface.getPanelAddresses !== undefined) {
+  if((window as any).JsInterface !== undefined && (window as any).JsInterface.getMasterAddresses !== undefined) {
     return true;
-  }else if((window as any).webkit && (window as any).webkit.messageHandlers && (window as any).webkit.messageHandlers.getPanelAddresses !== undefined) {
+  }else if((window as any).webkit && (window as any).webkit.messageHandlers && (window as any).webkit.messageHandlers.getMasterAddresses !== undefined) {
     return true;
   }else {
     return false;
@@ -49,7 +49,7 @@ export function isWebViewFunc(){
 }
 
 // 验证主控地址格式
-export function validatePanelAddress(address: string): boolean {
+export function validateMasterAddress(address: string): boolean {
   try {
     // 基本格式检查：必须以 http:// 或 https:// 开头
     if (!address.startsWith('http://') && !address.startsWith('https://')) {

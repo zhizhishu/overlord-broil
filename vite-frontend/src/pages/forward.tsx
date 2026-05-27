@@ -785,7 +785,7 @@ export default function ForwardPage() {
       await navigator.clipboard.writeText(text);
       toast.success(t('已复制{label}', { label: t(label) }));
     } catch (error) {
-      toast.error(t('复制失败：请使用 HTTPS 访问面板，HTTP 无法复制。'));
+      toast.error(t('复制失败：请使用 HTTPS 访问控制台，HTTP 无法复制。'));
     }
   };
 
@@ -797,7 +797,7 @@ export default function ForwardPage() {
       ));
       await copyToClipboard(addressItem.address, '地址');
     } catch (error) {
-      toast.error(t('复制失败：请使用 HTTPS 访问面板，HTTP 无法复制。'));
+      toast.error(t('复制失败：请使用 HTTPS 访问控制台，HTTP 无法复制。'));
     } finally {
       setAddressList(prev => prev.map(item => 
         item.id === addressItem.id ? { ...item, copying: false } : item

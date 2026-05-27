@@ -1,8 +1,8 @@
 # Overlord Broil
 
-[涓枃璇存槑](README.zh-CN.md)
+[中文说明](README.zh-CN.md)
 
-Overlord Broil is an independent master/agent operations panel for dense multi-server node orchestration. It unifies Xray/Reality, Snell, remote port forwarding, certificates, firewall checks, traffic sync and agent maintenance behind one control-plane workflow.
+Overlord Broil is an independent master/agent operations console for dense multi-server node deployment. It unifies Xray/Reality, Snell, remote port forwarding, certificates, firewall checks, traffic sync and agent maintenance behind one control-plane workflow.
 
 Current release: `0.6.0`, a public-trial / release-candidate build. It is suitable for self-hosted testing and small authorized deployments, but it is not a broad `1.0` long-term compatibility promise yet.
 
@@ -15,7 +15,7 @@ https://zhizhishu.github.io/
 
 ## Architecture
 
-The default runtime is a single `overlord-master` image:
+The supported runtime is a single `overlord-master` image:
 
 ```text
 Browser / controlled agent
@@ -45,35 +45,11 @@ Runtime Providers are the product boundary between the master task engine and co
 
 Snell is unified at the product/node-management layer, but it is not a native Xray core protocol. The controlled agent deploys Snell as an independent service on the target host.
 
-Runtime Provider metadata now follows the task from master claim to agent report. The agent logs the provider it executes, reports it inside `resultJson.runtimeProvider`, and the master attaches the same audit metadata when an older agent omits it.
-
-Task results also include a normalized `resultJson.runtimeState` block. It records `providerKey`, `providerName`, `protocol`, `action`, `taskState`, `sourceTaskId`, `serverId`, `resourceType`, resolved `status`, `statusSource`, `updatedAt`, and optional summaries for service states, protocol nodes, forwarding rules, certificates and diagnostics. The control-center task card renders this block so Xray, Snell, forwarding, certificate and firewall tasks share one status model.
-
-State Sync now lifts those task-level runtime states into a server-by-provider overview. The master exposes `/api/v1/deploy-task/runtime-state/overview`, aggregating latest task results with server heartbeat fields for Xray, Snell and certificates, and the control center renders the same view as a Overlord-style operations panel.
-
-The same State Sync rows can also start Runtime Provider maintenance tasks. Operators can launch provider-aware diagnostics from the overview, and Xray/Snell rows expose repair actions that create normal `agent-maintenance` deployment tasks for the controlled agent to claim, execute and report.
-
-Runtime Provider descriptors now include an Action Catalog for `agent-maintenance` operations. The backend validates maintenance actions from this catalog, and the master UI derives State Sync row actions plus server-card Agent buttons from the same metadata instead of keeping separate hard-coded button lists.
-
-Dangerous maintenance actions, such as agent uninstall or runtime-port closure, require an explicit confirmation contract. The UI asks for confirmation and the backend rejects the task unless `requestJson` carries `dangerConfirmed=true` and `confirmAction=<action>`.
-
-Operation audit logs now cover the same control path. The master writes `operation_audit_log` rows when operators create, reject, manually update, retry or delete deploy/orchestration tasks, when agents claim tasks, and when agents report success, failure or timeout. The control-center audit panel shows recent actor, server, provider, action, outcome and dangerous-action markers.
-
-Xray orchestration tasks now generate agent-executable scripts instead of placeholder payloads. The controlled agent resolves the local or saved compatible-panel endpoint/token, calls the inbound API to add/delete protocol nodes, can restart Xray, and reports inbound metadata back through `OB_AGENT_RESULT_JSON`.
-
-Agent task history redacts panel secrets before storage. Installation/orchestration reports can still update encrypted server credentials, but stored `resultJson` keeps only configured flags instead of raw API tokens, passwords or 2FA codes.
-
-Firewall maintenance is also executable from the same provider contract. `open-runtime-ports` and `close-runtime-ports` parse requested runtime ports from task `requestJson`, apply local `ufw`, `firewalld` or `iptables` rules when available, and then return structured diagnostics. Cloud security groups still need operator confirmation.
-
-Remote log collection also uses the same `agent-maintenance` path. A `logs` action returns structured `logs.items` for the Overlord agent runner, Xray Runtime/Xray services, Snell node services, forwarding/task logs and related service managers, and the control-center task card renders a compact remote-log summary before operators open raw output.
-
-Agent upgrade now uses the same controlled task loop with a safer lifecycle: the agent binary reports `--version`, the upgrade task downloads to a temporary file, verifies Bash syntax, calculates SHA-256, backs up the previous binary, installs the new file, schedules a service restart, and returns structured `maintenance.upgrade` metadata for the master task card.
+Runtime Provider metadata follows the task from master claim to agent report. Task results include normalized `resultJson.runtimeProvider` and `resultJson.runtimeState`, so Xray, Snell, forwarding, certificate and firewall tasks share one status model.
 
 ## UI Preview
 
 ![Overlord Broil live control center](docs/assets/actual-control-center-top.png)
-
-The screenshots below were captured from the live `isrco-hk` validation master after redeploying `ghcr.io/zhizhishu/overlord-broil:latest` in SQLite single-container mode.
 
 ![Overlord Broil login](docs/assets/actual-login.png)
 
@@ -85,13 +61,10 @@ Current UI coverage includes:
 - Xray inbound, outbound, routing, config, traffic and restart actions
 - Snell node create/restart/remove flows
 - remote TCP/UDP forward rules
-- Runtime Provider visibility
-- Runtime Provider Action Catalog-driven maintenance buttons
+- Runtime Provider visibility and maintenance buttons
 - State Sync runtime overview by server and provider
-- State Sync runtime diagnostics and repair task shortcuts
 - operation audit timeline for task creation, rejection, manual state changes, retry/delete, agent claim and agent report events
 - agent diagnostics, logs, restart, upgrade, uninstall and repair tasks
-- remote log summaries on agent-maintenance task cards
 - monitor alerts and a unified rule center
 - `zh-CN` / `en-US` language switching
 
@@ -107,24 +80,15 @@ The master exposes one public entry by default:
 | SQLite | Optional local master DB file | no network port |
 | phpMyAdmin | temporary maintenance | no, only with `OB_PHPMYADMIN_PORT` |
 
-During install or upgrade, the script removes legacy split-stack containers and optional phpMyAdmin helpers so old `80/6365/8066` exposures do not survive the move to the single `overlord-master` entry. In SQLite mode it also stops the obsolete `gost-mysql` legacy container while keeping its Docker volumes and old install files untouched for manual recovery. CI and the release gate run `scripts/test-master-port-contract.sh` to keep the default compose files publishing only the master entry.
+During install or upgrade, the script removes old split-stack containers and optional phpMyAdmin helpers so previous `80/6365/8066` exposures do not survive the move to the single `overlord-master` entry. In SQLite mode it also stops the obsolete `gost-mysql` container while keeping its Docker volumes and old install files untouched for manual recovery.
 
-MySQL remains the default production path. For tiny labs or single-node trials, the master can run without the MySQL sidecar by selecting SQLite:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh \
-  | sudo env OB_DB_MODE="sqlite" OB_FRONTEND_PORT="5166" bash
-```
-
-SQLite mode still exposes only `5166/tcp`; it stores the database under `/opt/overlord-broil/data` and disables phpMyAdmin because there is no MySQL service.
-
-Controlled agents do not need an inbound management port. They call the same master URL users open in the browser, for example:
+Controlled agents do not need an inbound management port. They call the same master URL users open in the browser:
 
 ```text
 http://MASTER_IP:5166
 ```
 
-Controlled hosts expose only the business ports you choose: optional compatible-panel port `5168`, Xray/Reality inbound ports, Snell listen ports, remote-forward listen ports and ACME HTTP `80/tcp` when selected.
+Controlled hosts expose only the business ports you choose: optional Xray Runtime port `5168`, Xray/Reality inbound ports, Snell listen ports, remote-forward listen ports and ACME HTTP `80/tcp` when selected.
 
 ## Quick Start
 
@@ -140,22 +104,18 @@ Alpine or minimal images without `bash`:
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master-bootstrap.sh | sudo sh
 ```
 
+SQLite mode:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh \
+  | sudo env OB_DB_MODE="sqlite" OB_FRONTEND_PORT="5166" bash
+```
+
 Run a non-destructive preflight before installing on a live host:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh \
   | sudo bash -s -- doctor
-```
-
-Common install overrides:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh \
-  | sudo env OB_FRONTEND_PORT="5166" OB_NETWORK_STACK="v4" bash
-
-# optional lightweight DB mode, no MySQL sidecar
-curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh \
-  | sudo env OB_DB_MODE="sqlite" OB_FRONTEND_PORT="5166" bash
 ```
 
 Day-2 operations:
@@ -167,8 +127,6 @@ sudo bash /opt/overlord-broil/install-master.sh restore --backup-file /opt/overl
 sudo bash /opt/overlord-broil/install-master.sh uninstall --yes
 ```
 
-SQLite backups store the resolved data directory as `sqlite-data/` and restore it back to the `SQLITE_DATA_DIR` recorded in `.env`. A running SQLite master is briefly stopped during `backup` so the copied DB files are consistent.
-
 ## Controlled Agent Install
 
 Create a server in the master control center, then use the server card `Token` action to get `OB_SERVER_ID` and `OB_AGENT_TOKEN`.
@@ -177,25 +135,24 @@ Install the controlled agent on that host:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent.sh \
-  | sudo env OB_PANEL_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash
+  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash
 ```
 
 Alpine or minimal images:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent-bootstrap.sh \
-  | sudo env OB_PANEL_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" sh
+  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" sh
 ```
 
 Preflight:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent.sh \
-  | sudo env OB_PANEL_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
+  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
 ```
 
 The agent runs through systemd or OpenRC, claims tasks from the master, executes them locally and reports results back.
-Claimed tasks include their Runtime Provider assignment, so task history can be audited by `xrayRuntime`, `snell`, `forward`, `certificate` or `firewall`.
 
 ## Operator Flow
 
@@ -204,8 +161,8 @@ Claimed tasks include their Runtime Provider assignment, so task history can be 
 3. Register each controlled server.
 4. Install the agent with the generated token command.
 5. Wait for heartbeat.
-6. Select one or more servers and run orchestration:
-   - install or reuse the compatible Xray Runtime
+6. Select one or more servers and create deployment plans:
+   - install or reuse Xray Runtime
    - create VLESS Reality, VMess WebSocket, Trojan TLS or Shadowsocks nodes
    - deploy Snell nodes
    - issue or bind certificates
@@ -218,7 +175,7 @@ Agent heartbeat reports total memory. The master classifies tiny hosts:
 
 | Profile | Memory | Policy |
 | --- | --- | --- |
-| `nano-critical` | `< 200 MB` | blocks full Xray orchestration; use Snell or forwarding |
+| `nano-critical` | `< 200 MB` | blocks full Xray deployment; use Snell or forwarding |
 | `nano` | `< 256 MB` | shows warning; avoid heavy runtimes |
 | `small` | `< 512 MB` | consider swap before complex nodes |
 | `standard` | `>= 512 MB` | normal path |
@@ -241,7 +198,7 @@ Default master image:
 ghcr.io/zhizhishu/overlord-broil:latest
 ```
 
-The old split backend/frontend runtime images have been removed from the supported product surface. Backend and frontend source modules remain in the repository, but deployment and releases use the single `overlord-master` image.
+Supported deployments use the single `overlord-master` image. Backend and frontend source modules remain in the repository, but deployment and releases are bundled into the master image.
 
 `main` and `v*` tags publish GHCR images. The `future` branch builds images for validation, but does not overwrite release images.
 
@@ -262,15 +219,12 @@ POST /api/v1/control-server/list
 POST /api/v1/control-server/token
 POST /api/v1/control-server/heartbeat
 POST /api/v1/deploy-task/create
-POST /api/v1/deploy-task/orchestrate
+POST /api/v1/deploy-task/plans
 POST /api/v1/deploy-task/list
 POST /api/v1/deploy-task/retry
 POST /api/v1/agent-task/claim
 POST /api/v1/agent-task/report
 ```
-
-Agent reports store both `resultJson.runtimeProvider` and `resultJson.runtimeState`, so task history can be audited by runtime owner, source task, target server, resource type and resolved service/node/diagnostic status.
-`agent-maintenance` log reports additionally store structured `logs.items`, covering Overlord agent, Xray Runtime/Xray, Snell, forwarding and task-log sources for task-card summaries.
 
 Profiles, nodes, forwarding and Xray Runtime:
 
@@ -322,13 +276,12 @@ bash scripts/test-xray-runtime-fixture.sh
 bash scripts/test-snell-real-smoke.sh
 bash scripts/test-xray-runtime-e2e.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
-bash scripts/test-compose-smoke.sh --build-local
 ```
 
 Real Xray Runtime contract smoke is optional and skips unless a target endpoint and API token are provided:
 
 ```bash
-export XRAY_RUNTIME_E2E_URL="https://panel.example.com:5168"
+export XRAY_RUNTIME_E2E_URL="https://xray-runtime.example.com:5168"
 export XRAY_RUNTIME_E2E_TOKEN="YOUR_XRAY_RUNTIME_API_TOKEN"
 bash scripts/test-xray-runtime-e2e.sh
 ```
@@ -339,9 +292,9 @@ To create, toggle and delete a temporary VLESS inbound on the real Xray Runtime 
 XRAY_RUNTIME_E2E_WRITE=1 XRAY_RUNTIME_E2E_PORT=42123 bash scripts/test-xray-runtime-e2e.sh
 ```
 
-Live validation note: on `isrco-hk`, `authorized disposable Xray Runtime image` (`Xray Runtime 3.1.0`) passed the direct real Xray Runtime E2E write contract and the Overlord master API inbound add/toggle/delete path. The temporary ports `42123` and `42124` were cleaned after the run.
+Live validation note: on `isrco-hk`, an authorized disposable Xray Runtime container passed the direct E2E write contract and the Overlord master API inbound add/toggle/delete path. The temporary ports `42123` and `42124` were cleaned after the run.
 
-Real Snell smoke runs against a live master/agent host. It logs in to the master, creates a temporary Snell protocol node, lets the controlled agent claim the task, checks the service and listen port, then deletes the temporary node by default. The delete phase also verifies that the service is inactive, the listen port is closed and the protocol-node state is no longer active:
+Real Snell smoke runs against a live master/agent host. It logs in to the master, creates a temporary Snell protocol node, lets the controlled agent claim the task, checks the service and listen port, then deletes the temporary node by default:
 
 ```bash
 OB_MASTER_URL="http://127.0.0.1:5166" OB_SNELL_PORT=18390 bash scripts/test-snell-real-smoke.sh
@@ -354,15 +307,6 @@ OB_MASTER_URL="http://127.0.0.1:5166" OB_SNELL_PORT=18390 bash scripts/test-snel
 - Better certificate, firewall and cloud-security-group diagnostics.
 - RBAC, audit retention/export, agent token expiry/revocation and key-rotation migration.
 - Mobile layout, loading/error states and task-detail polish.
-
-## References And Acknowledgements
-
-This is an independent project, not an official release of the projects below. It deliberately studies and builds on ideas from:
-
-- [Flux Panel](https://github.com/zhizhishu/flux-panel): UI style, forwarding-panel foundation and original operational surface.
-- Xray-compatible panel APIs: inbound/outbound, routing, traffic and runtime-management behavior used as compatibility targets.
-- [snell.sh](https://github.com/jinqians/snell.sh): Snell installation flow and deployment-script behavior.
-- [Komari Monitor](https://github.com/komari-monitor/komari): master/agent monitoring and multi-server operations ideas.
 
 ## Safety Notice
 

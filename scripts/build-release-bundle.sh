@@ -131,7 +131,7 @@ Recommended release gate before publishing:
 Default ports:
 - master public entry: 5166
 - backend API / agent callback: same overlord-master entry, served under /api/v1
-- controlled Xray Runtime panel default: 5168
+- controlled Xray Runtime default: 5168
 - ACME HTTP validation, only when selected: 80
 
 Runtime images:

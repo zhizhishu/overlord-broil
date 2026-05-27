@@ -16,19 +16,19 @@ public class ControlServerDto {
 
     private String endpoint;
 
-    private String xrayPanelEndpoint;
+    private String xrayRuntimeEndpoint;
 
-    private String xrayPanelBasePath;
+    private String xrayRuntimeBasePath;
 
-    private String xrayPanelApiToken;
+    private String xrayRuntimeApiToken;
 
-    private String xrayPanelUsername;
+    private String xrayRuntimeUsername;
 
-    private String xrayPanelPassword;
+    private String xrayRuntimePassword;
 
-    private String xrayPanelTwoFactorCode;
+    private String xrayRuntimeTwoFactorCode;
 
-    private Integer xrayPanelAllowInsecure = 0;
+    private Integer xrayRuntimeAllowInsecure = 0;
 
     @NotBlank(message = "host is required")
     private String host;

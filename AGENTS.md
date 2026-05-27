@@ -6,7 +6,7 @@
 - Repository: `zhizhishu/overlord-broil`
 - Local root: `C:\Users\echo\Downloads\claude\overlord-broil`
 - Parent folder `C:\Users\echo\Downloads\claude` is only a storage root. Do not create plans, logs, reports, or project files there.
-- This is an independent Overlord Broil project. Do not submit PRs to the upstream Flux Panel author repository.
+- This is an independent Overlord Broil project. Do not submit PRs outside this repository.
 
 ## Required Startup Order
 
@@ -17,8 +17,6 @@ Read these files in order before code changes, tests, service startup, or remote
 3. `PROJECT_CONTEXT.md`
 4. `TASK.md`
 5. `LOG.md` only when history or verification context is needed
-
-`TASK_LOG.md` is a legacy combined task/history file. Keep it as historical reference unless the user explicitly asks for a full migration.
 
 ## Write Boundaries
 
@@ -34,9 +32,9 @@ Read these files in order before code changes, tests, service startup, or remote
 - Keep master-control behavior simple and auditable: the master creates tasks, the authorized agent pulls/executes/reports them.
 - Preserve the default single public master entry: `5166/tcp`.
 - Backend `6365`, MySQL `3306`, and phpMyAdmin are internal by default.
-- Controlled agents should call the master panel URL, for example `http://MASTER_IP:5166`, not a backend debug port.
+- Controlled agents should call the master console URL, for example `http://MASTER_IP:5166`, not a backend debug port.
 - Snell is unified at the product/node-management layer, but it remains an independent runtime service deployed by the agent, not a native Xray or Xray Runtime core protocol.
-- Nano controlled hosts below `200 MB` memory should not run full Xray Runtime/Xray orchestration through the supported path.
+- Nano controlled hosts below `200 MB` memory should not run full Xray Runtime/Xray deployment through the supported path.
 
 ## Validation
 

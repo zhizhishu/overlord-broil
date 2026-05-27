@@ -47,7 +47,7 @@ public class ViteConfigServiceImpl extends ServiceImpl<ViteConfigMapper, ViteCon
      */
     @Override
     public R getConfigs() {
-        normalizeLegacyProductConfig();
+        normalizeDefaultProductConfig();
         List<ViteConfig> configList = this.list();
         Map<String, String> configMap = new HashMap<>();
         
@@ -71,7 +71,7 @@ public class ViteConfigServiceImpl extends ServiceImpl<ViteConfigMapper, ViteCon
         }
 
         if (APP_NAME_KEY.equals(name)) {
-            normalizeLegacyProductConfig();
+            normalizeDefaultProductConfig();
         }
 
         QueryWrapper<ViteConfig> queryWrapper = new QueryWrapper<>();
@@ -165,7 +165,7 @@ public class ViteConfigServiceImpl extends ServiceImpl<ViteConfigMapper, ViteCon
         }
     }
 
-    private void normalizeLegacyProductConfig() {
+    private void normalizeDefaultProductConfig() {
         QueryWrapper<ViteConfig> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("name", APP_NAME_KEY);
         ViteConfig config = this.getOne(queryWrapper);
@@ -179,10 +179,7 @@ public class ViteConfigServiceImpl extends ServiceImpl<ViteConfigMapper, ViteCon
         }
 
         String value = config.getValue();
-        if (!StringUtils.hasText(value)
-                || "flux".equalsIgnoreCase(value.trim())
-                || "flux panel".equalsIgnoreCase(value.trim())
-                || "flux Xray Runtime orchestrator".equalsIgnoreCase(value.trim())) {
+        if (!StringUtils.hasText(value)) {
             config.setValue(DEFAULT_APP_NAME);
             config.setTime(System.currentTimeMillis());
             this.updateById(config);

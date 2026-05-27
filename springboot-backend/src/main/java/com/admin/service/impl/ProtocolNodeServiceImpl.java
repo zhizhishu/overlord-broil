@@ -5,8 +5,8 @@ import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.admin.common.dto.ProtocolNodeDto;
 import com.admin.common.dto.ProtocolNodeQueryDto;
-import com.admin.common.dto.XrayPanelInboundDto;
-import com.admin.common.dto.XrayPanelServerDto;
+import com.admin.common.dto.XrayRuntimeInboundDto;
+import com.admin.common.dto.XrayRuntimeServerDto;
 import com.admin.common.lang.R;
 import com.admin.common.utils.LowMemoryPolicyUtils;
 import com.admin.common.utils.MasterSelfProtectionUtils;
@@ -19,7 +19,7 @@ import com.admin.mapper.ProtocolNodeMapper;
 import com.admin.service.ControlServerService;
 import com.admin.service.ProtocolNodeService;
 import com.admin.service.SnellTemplateService;
-import com.admin.service.XrayPanelService;
+import com.admin.service.XrayRuntimeService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
@@ -41,7 +41,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
     private ControlServerService controlServerService;
 
     @Resource
-    private XrayPanelService xrayPanelService;
+    private XrayRuntimeService xrayRuntimeService;
 
     @Resource
     private SnellTemplateService snellTemplateService;
@@ -115,10 +115,10 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         if (validation != null) {
             return R.err(validation);
         }
-        XrayPanelInboundDto inboundDto = new XrayPanelInboundDto();
+        XrayRuntimeInboundDto inboundDto = new XrayRuntimeInboundDto();
         inboundDto.setServerId(server.getId());
         inboundDto.setPayload(payload);
-        R remote = xrayPanelService.addInbound(inboundDto);
+        R remote = xrayRuntimeService.addInbound(inboundDto);
         if (!isRemoteSuccess(remote)) {
             return R.err(remoteError(remote, "Xray Runtime inbound create failed"));
         }
@@ -188,11 +188,11 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
             if (validation != null) {
                 return R.err(validation);
             }
-            XrayPanelInboundDto inboundDto = new XrayPanelInboundDto();
+            XrayRuntimeInboundDto inboundDto = new XrayRuntimeInboundDto();
             inboundDto.setServerId(server.getId());
             inboundDto.setInboundId(parseInt(exists.getRemoteId()));
             inboundDto.setPayload(payload);
-            R remote = xrayPanelService.updateInbound(inboundDto);
+            R remote = xrayRuntimeService.updateInbound(inboundDto);
             if (!isRemoteSuccess(remote)) {
                 return R.err(remoteError(remote, "Xray Runtime inbound update failed"));
             }
@@ -254,10 +254,10 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         }
 
         if (!isBlank(node.getRemoteId())) {
-            XrayPanelInboundDto inboundDto = new XrayPanelInboundDto();
+            XrayRuntimeInboundDto inboundDto = new XrayRuntimeInboundDto();
             inboundDto.setServerId(server.getId());
             inboundDto.setInboundId(parseInt(node.getRemoteId()));
-            R remote = xrayPanelService.deleteInbound(inboundDto);
+            R remote = xrayRuntimeService.deleteInbound(inboundDto);
             if (!isRemoteSuccess(remote)) {
                 return R.err(remoteError(remote, "Xray Runtime inbound delete failed"));
             }
@@ -289,7 +289,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
             this.updateById(node);
             return R.ok(result(node, task));
         }
-        return xrayPanelService.restartXray(serverDto(server.getId()));
+        return xrayRuntimeService.restartXray(serverDto(server.getId()));
     }
 
     @Override
@@ -301,7 +301,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         if (server == null) {
             return R.err("server not found");
         }
-        R remote = xrayPanelService.listInbounds(serverDto(server.getId()));
+        R remote = xrayRuntimeService.listInbounds(serverDto(server.getId()));
         if (!isRemoteSuccess(remote)) {
             return R.err(remoteError(remote, "Xray Runtime inbound sync failed"));
         }
@@ -338,7 +338,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         for (Object item : toJsonArray(result.get("inbounds"))) {
             JSONObject inbound = toJsonObject(item);
             if (inbound != null) {
-                upsertOrchestratedInbound(server, inbound, now);
+                upsertManagedInbound(server, inbound, now);
             }
         }
         for (Object item : toJsonArray(result.get("protocolNodes"))) {
@@ -536,7 +536,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         saveOrUpdate(node);
     }
 
-    private void upsertOrchestratedInbound(ControlServer server, JSONObject inbound, long now) {
+    private void upsertManagedInbound(ControlServer server, JSONObject inbound, long now) {
         JSONObject response = parseObject(inbound.getString("response"));
         JSONObject obj = toJsonObject(response == null ? null : response.get("obj"));
         String remoteId = obj == null ? null : stringValue(obj.get("id"));
@@ -697,8 +697,8 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         return data;
     }
 
-    private XrayPanelServerDto serverDto(Long serverId) {
-        XrayPanelServerDto dto = new XrayPanelServerDto();
+    private XrayRuntimeServerDto serverDto(Long serverId) {
+        XrayRuntimeServerDto dto = new XrayRuntimeServerDto();
         dto.setServerId(serverId);
         return dto;
     }

@@ -4,7 +4,7 @@ import com.admin.common.annotation.RequireRole;
 import com.admin.common.aop.LogAnnotation;
 import com.admin.common.dto.DeployTaskDto;
 import com.admin.common.dto.DeployTaskStateDto;
-import com.admin.common.dto.OrchestrationPlanDto;
+import com.admin.common.dto.DeploymentPlanDto;
 import com.admin.common.lang.R;
 import com.admin.service.DeployTaskService;
 import org.springframework.validation.annotation.Validated;
@@ -30,9 +30,9 @@ public class DeployTaskController {
 
     @LogAnnotation
     @RequireRole
-    @PostMapping("/orchestrate")
-    public R orchestrate(@Validated @RequestBody OrchestrationPlanDto dto) {
-        return deployTaskService.createOrchestrationTask(dto);
+    @PostMapping("/plans")
+    public R createDeploymentPlan(@Validated @RequestBody DeploymentPlanDto dto) {
+        return deployTaskService.createDeploymentPlanTask(dto);
     }
 
     @LogAnnotation

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Overlord Broil</title>
-    <meta name="description" content="Overlord Broil, 统一管理 Xray/Reality, Snell, 端口转发, 证书, 流量和多服务器 Agent 的主控面板.">
+    <meta name="description" content="Overlord Broil, 统一管理 Xray/Reality, Snell, 端口转发, 证书, 流量和多服务器 Agent 的主控控制台.">
     <meta property="og:title" content="Overlord Broil">
     <meta property="og:description" content="一个面向多服务器协议节点部署的主控 / 被控运维产品.">
     <meta property="og:type" content="website">
@@ -24,7 +24,7 @@
           <p class="lead">一个统一的多服务器主控产品: 在同一个工作台里选择多台服务器, 自动配置 Xray/Reality, Snell 和端口转发节点, 并统一查看证书, 流量, 服务状态和任务审计.</p>
           <div class="hero-actions"><a class="button primary" href="https://github.com/zhizhishu/overlord-broil">Open Repository</a><a class="button" href="#install">Quick Install</a></div>
         </div>
-        <div class="hero-panel"><img src="assets/actual-control-center-top.png" alt="Overlord Broil live control center screenshot"></div>
+        <div class="hero-preview"><img src="assets/actual-control-center-top.png" alt="Overlord Broil live control center screenshot"></div>
       </section>
       <section id="install" class="section">
         <div class="section-header"><h2>一键安装</h2><p>默认主控只公开一个入口: <code>5166/tcp</code>. 浏览器和被控 Agent 都访问这个端口, MySQL, 后端调试别名和 phpMyAdmin 默认不暴露到宿主机公网.</p></div>
@@ -33,7 +33,7 @@
           <article class="card"><h3>SQLite 轻量模式</h3><p>小规模烟测可跳过 MySQL sidecar. 迁移旧分离栈时, 脚本会停掉旧容器, SQLite 模式也会停掉旧 <code>gost-mysql</code> 容器, 但保留卷和旧文件.</p><pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh \
   | sudo env OB_DB_MODE="sqlite" OB_FRONTEND_PORT="5166" bash</code></pre></article>
           <article class="card"><h3>安装被控 Agent</h3><p>先在主控创建服务器并复制 token. Agent 无需开放管理端口, 它会主动轮询主控并执行任务.</p><pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent.sh \
-  | sudo env OB_PANEL_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash</code></pre></article>
+  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash</code></pre></article>
           <article class="card"><h3>迁移旧部署</h3><p>安装 / 升级会移除 <code>vite-frontend</code>, <code>springboot-backend</code>, <code>gost-phpmyadmin</code> 等旧分离栈容器, 避免 <code>80/6365/8066</code> 继续暴露.</p><pre class="runbook"><code>sudo /opt/overlord-broil/install-master.sh upgrade</code></pre></article>
         </div>
       </section>
@@ -60,6 +60,6 @@
         <ol class="roadmap"><li><div><strong>Real VPS matrix</strong><span>Debian, Ubuntu, Rocky, Oracle Linux, Alpine 真机从安装到卸载跑完整闭环.</span></div></li><li><div><strong>Real Xray smoke</strong><span>使用真实 endpoint/token 验证状态, 入站, Xray config, 并在写入模式创建和删除临时 inbound.</span></div></li><li><div><strong>Security governance</strong><span>补齐 RBAC, 审计导出, Agent token 吊销, 密钥轮换迁移和危险操作策略.</span></div></li></ol>
       </section>
     </main>
-    <footer class="footer"><div class="footer-inner"><strong>Overlord Broil</strong><span>Legal infrastructure orchestration only. See README acknowledgements for upstream references.</span></div></footer>
+    <footer class="footer"><div class="footer-inner"><strong>Overlord Broil</strong><span>Authorized infrastructure deployment and operations only.</span></div></footer>
   </body>
 </html>

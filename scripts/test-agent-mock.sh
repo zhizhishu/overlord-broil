@@ -143,7 +143,7 @@ PY
   local port
   port="$(cat "$ready_file")"
 
-  OB_PANEL_URL="http://127.0.0.1:${port}" \
+  OB_MASTER_URL="http://127.0.0.1:${port}" \
   OB_SERVER_ID="1" \
   OB_AGENT_TOKEN="test-agent-token" \
   OB_WORK_DIR="${case_dir}/work" \
@@ -313,7 +313,7 @@ PY
   local port
   port="$(cat "$ready_file")"
 
-  OB_PANEL_URL="http://127.0.0.1:${port}" \
+  OB_MASTER_URL="http://127.0.0.1:${port}" \
   OB_SERVER_ID="1" \
   OB_AGENT_TOKEN="test-agent-token" \
   OB_WORK_DIR="${case_dir}/work" \
@@ -374,7 +374,7 @@ fi
 TMP_DIR="$(mktemp -d)"
 trap cleanup_tmp_dir EXIT
 
-OB_PANEL_URL="http://127.0.0.1:1" \
+OB_MASTER_URL="http://127.0.0.1:1" \
 OB_SERVER_ID="1" \
 OB_AGENT_TOKEN="test-agent-token" \
 OB_WORK_DIR="${TMP_DIR}/doctor-work" \

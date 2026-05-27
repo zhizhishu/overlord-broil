@@ -50,7 +50,7 @@ assert_single_public_entry() {
   }
 
   if printf '%s\n' "$config" | grep -Eq '^  (backend|frontend|phpmyadmin):$'; then
-    echo "${file} default stack must not include legacy backend/frontend/phpMyAdmin services." >&2
+    echo "${file} default stack must not include obsolete backend/frontend/phpMyAdmin services." >&2
     exit 1
   fi
 
@@ -74,14 +74,14 @@ assert_direct_compose_default_port() {
 assert_installer_migration_guard() {
   local installer="${PROJECT_ROOT}/scripts/install-master.sh"
 
-  grep -q 'remove_legacy_split_containers' "$installer" || {
-    echo "install-master.sh must remove legacy split-panel containers during install/upgrade." >&2
+  grep -q 'remove_obsolete_split_containers' "$installer" || {
+    echo "install-master.sh must remove obsolete split-stack containers during install/upgrade." >&2
     exit 1
   }
 
-  for legacy_container in vite-frontend springboot-backend gost-phpmyadmin; do
-    grep -q "$legacy_container" "$installer" || {
-      echo "install-master.sh must include legacy container ${legacy_container} in the migration cleanup guard." >&2
+  for obsolete_container in vite-frontend springboot-backend gost-phpmyadmin; do
+    grep -q "$obsolete_container" "$installer" || {
+      echo "install-master.sh must include obsolete container ${obsolete_container} in the migration cleanup guard." >&2
       exit 1
     }
   done
@@ -91,12 +91,12 @@ assert_installer_migration_guard() {
     exit 1
   }
 
-  grep -q 'Kept legacy MySQL Docker volumes' "$installer" || {
+  grep -q 'Kept old MySQL Docker volumes' "$installer" || {
     echo "install-master.sh must document that SQLite migration removes only the old MySQL container, not its volumes." >&2
     exit 1
   }
 
-  grep -q 'Migrated legacy FRONTEND_PORT=80' "$installer" || {
+  grep -q 'Migrated old FRONTEND_PORT=80' "$installer" || {
     echo "install-master.sh must keep the FRONTEND_PORT=80 migration guard." >&2
     exit 1
   }
@@ -117,7 +117,7 @@ assert_installer_migration_guard() {
   }
 
   if grep -q 'for key in DB_MODE JWT_SECRET' "$installer"; then
-    echo "install-master.sh restore validation must accept legacy MySQL .env files without DB_MODE." >&2
+    echo "install-master.sh restore validation must accept old MySQL .env files without DB_MODE." >&2
     exit 1
   fi
 

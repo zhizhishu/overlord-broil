@@ -7,7 +7,7 @@ import com.admin.common.dto.AgentTaskClaimDto;
 import com.admin.common.dto.AgentTaskReportDto;
 import com.admin.common.dto.DeployTaskDto;
 import com.admin.common.dto.DeployTaskStateDto;
-import com.admin.common.dto.OrchestrationPlanDto;
+import com.admin.common.dto.DeploymentPlanDto;
 import com.admin.common.lang.R;
 import com.admin.common.utils.LowMemoryPolicyUtils;
 import com.admin.common.utils.MasterSelfProtectionUtils;
@@ -26,7 +26,7 @@ import com.admin.service.ProtocolNodeService;
 import com.admin.service.ProtocolProfileService;
 import com.admin.service.ServerForwardRuleService;
 import com.admin.service.SnellTemplateService;
-import com.admin.service.XrayPanelOrchestrationScriptService;
+import com.admin.service.XrayRuntimeDeploymentPlanScriptService;
 import com.admin.runtime.RuntimeProviderAssignment;
 import com.admin.runtime.RuntimeProviderAction;
 import com.admin.runtime.RuntimeProviderDescriptor;
@@ -70,7 +70,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
     private SnellTemplateService snellTemplateService;
 
     @Resource
-    private XrayPanelOrchestrationScriptService xrayPanelOrchestrationScriptService;
+    private XrayRuntimeDeploymentPlanScriptService xrayRuntimeDeploymentPlanScriptService;
 
     @Resource
     private ProtocolNodeService protocolNodeService;
@@ -156,24 +156,24 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
     }
 
     @Override
-    public R createOrchestrationTask(OrchestrationPlanDto dto) {
+    public R createDeploymentPlanTask(DeploymentPlanDto dto) {
         ControlServer server = controlServerService.getById(dto.getServerId());
         if (server == null) {
             return R.err("server not found");
         }
-        String validationError = validateOrchestration(dto, server);
+        String validationError = validateDeploymentPlan(dto, server);
         if (validationError != null) {
-            auditRejectedTask(server, RuntimeProviderService.XRAY_ORCHESTRATION_PROTOCOL, "orchestrate", validationError);
+            auditRejectedTask(server, RuntimeProviderService.XRAY_DEPLOYMENT_PLAN_PROTOCOL, "deploy-plan", validationError);
             return R.err(validationError);
         }
 
-        String script = xrayPanelOrchestrationScriptService.buildScript(dto, server);
+        String script = xrayRuntimeDeploymentPlanScriptService.buildScript(dto, server);
         long now = System.currentTimeMillis();
         DeployTask task = new DeployTask();
         task.setServerId(server.getId());
         task.setServerName(server.getName());
-        task.setProtocol(RuntimeProviderService.XRAY_ORCHESTRATION_PROTOCOL);
-        task.setAction("orchestrate");
+        task.setProtocol(RuntimeProviderService.XRAY_DEPLOYMENT_PLAN_PROTOCOL);
+        task.setAction("deploy-plan");
         task.setState(STATE_GENERATED);
         task.setRequestJson(JSON.toJSONString(dto));
         task.setScript(script);
@@ -182,24 +182,24 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         task.setUpdatedTime(now);
 
         if (!this.save(task)) {
-            return R.err("orchestration task create failed");
+            return R.err("deployment plan task create failed");
         }
         runtimeProviderService.applyToTask(task);
-        auditMasterTaskEvent("deploy_task.orchestrated", task,
-                "requested", "Created orchestration task #" + task.getId(), taskDetail(task, "orchestrated"));
+        auditMasterTaskEvent("deploy_task.plan_created", task,
+                "requested", "Created deployment plan task #" + task.getId(), taskDetail(task, "deployment-plan"));
         return R.ok(task);
     }
 
-    private String validateOrchestration(OrchestrationPlanDto dto, ControlServer server) {
+    private String validateDeploymentPlan(DeploymentPlanDto dto, ControlServer server) {
         if (dto == null) {
-            return "orchestration plan is required";
+            return "deployment plan is required";
         }
         if ("acme-http".equalsIgnoreCase(dto.getCertificateMode())
                 && (dto.getCertificateDomain() == null || dto.getCertificateDomain().trim().isEmpty())) {
             return "certificate domain is required for acme-http mode";
         }
-        if (isNanoCritical(server) && requiresFullXrayPanelStack(dto)) {
-            return "server memory is below 200 MB; Nano nodes should use Snell or remote port forwarding instead of full Xray Runtime/Xray orchestration";
+        if (isNanoCritical(server) && requiresFullXrayRuntimeStack(dto)) {
+            return "server memory is below 200 MB; Nano nodes should use Snell or remote port forwarding instead of full Xray Runtime/Xray deployment";
         }
         if (enabled(dto.getCreateVlessReality())) {
             String realityError = ProtocolValidationUtils.validateReality(dto.getRealitySni(), dto.getRealityDest(), null);
@@ -212,9 +212,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             return "snell psk is invalid";
         }
         Set<Integer> ports = new HashSet<>();
-        String guard = MasterSelfProtectionUtils.validateListenPort(server, dto.getPanelPort(), "Xray Runtime 端口");
+        String guard = MasterSelfProtectionUtils.validateListenPort(server, dto.getRuntimePort(), "Xray Runtime 端口");
         if (guard != null) return guard;
-        String duplicate = addPort(ports, dto.getPanelPort(), "panelPort");
+        String duplicate = addPort(ports, dto.getRuntimePort(), "runtimePort");
         if (duplicate != null) {
             return duplicate;
         }
@@ -248,11 +248,11 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             duplicate = addPort(ports, dto.getSnellPort(), "snellPort");
             if (duplicate != null) return duplicate;
         }
-        if (!enabled(dto.getInstallXrayPanel()) && !enabled(dto.getConfigurePanel())
+        if (!enabled(dto.getInstallXrayRuntime()) && !enabled(dto.getConfigureRuntime())
                 && !enabled(dto.getCreateVlessReality()) && !enabled(dto.getCreateVmessWs())
                 && !enabled(dto.getCreateTrojanTls()) && !enabled(dto.getCreateShadowsocks())
                 && !enabled(dto.getInstallSnell())) {
-            return "at least one orchestration action is required";
+            return "at least one deployment plan action is required";
         }
         return null;
     }
@@ -262,9 +262,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 && LowMemoryPolicyUtils.isNanoCritical(server.getMemoryTotalMb());
     }
 
-    private boolean requiresFullXrayPanelStack(OrchestrationPlanDto dto) {
-        return enabled(dto.getInstallXrayPanel())
-                || enabled(dto.getConfigurePanel())
+    private boolean requiresFullXrayRuntimeStack(DeploymentPlanDto dto) {
+        return enabled(dto.getInstallXrayRuntime())
+                || enabled(dto.getConfigureRuntime())
                 || enabled(dto.getCreateVlessReality())
                 || enabled(dto.getCreateVmessWs())
                 || enabled(dto.getCreateTrojanTls())
@@ -313,7 +313,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             return fieldName + " is invalid";
         }
         if (!ports.add(port)) {
-            return "port " + port + " is duplicated in orchestration plan";
+            return "port " + port + " is duplicated in deployment plan";
         }
         return null;
     }
@@ -389,15 +389,15 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
     private void seedServerProviderRuntimeStates(Map<String, Map<String, Object>> items,
                                                  ControlServer server,
                                                  long now) {
-        JSONObject xrayPanelServices = new JSONObject();
-        if (notBlank(server.getXrayPanelServiceStatus())) {
-            xrayPanelServices.put("xrayRuntime", server.getXrayPanelServiceStatus());
+        JSONObject xrayRuntimeServices = new JSONObject();
+        if (notBlank(server.getXrayRuntimeServiceStatus())) {
+            xrayRuntimeServices.put("xrayRuntime", server.getXrayRuntimeServiceStatus());
         }
         if (notBlank(server.getXrayServiceStatus())) {
-            xrayPanelServices.put("xray", server.getXrayServiceStatus());
+            xrayRuntimeServices.put("xray", server.getXrayServiceStatus());
         }
-        String xrayPanelStatus = providerServiceStatus("xrayRuntime", xrayPanelServices);
-        putSeedRuntimeState(items, server, "xrayRuntime", xrayPanelStatus, "control_server.services", xrayPanelServices, null, null, now);
+        String xrayRuntimeStatus = providerServiceStatus("xrayRuntime", xrayRuntimeServices);
+        putSeedRuntimeState(items, server, "xrayRuntime", xrayRuntimeStatus, "control_server.services", xrayRuntimeServices, null, null, now);
 
         JSONObject snellServices = new JSONObject();
         if (notBlank(server.getSnellServiceStatus())) {
@@ -959,9 +959,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         }
         try {
             JSONObject root = JSON.parseObject(resultJson);
-            redactServerSecret(root.getJSONObject("server"), "xrayPanelApiToken", "xrayPanelApiTokenConfigured");
-            redactServerSecret(root.getJSONObject("server"), "xrayPanelPassword", "xrayPanelPasswordConfigured");
-            redactServerSecret(root.getJSONObject("server"), "xrayPanelTwoFactorCode", "xrayPanelTwoFactorConfigured");
+            redactServerSecret(root.getJSONObject("server"), "xrayRuntimeApiToken", "xrayRuntimeApiTokenConfigured");
+            redactServerSecret(root.getJSONObject("server"), "xrayRuntimePassword", "xrayRuntimePasswordConfigured");
+            redactServerSecret(root.getJSONObject("server"), "xrayRuntimeTwoFactorCode", "xrayRuntimeTwoFactorConfigured");
             root.remove("serverSecrets");
             return JSON.toJSONString(root);
         } catch (Exception ignored) {
@@ -1319,15 +1319,15 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             update.setId(task.getServerId());
             update.setUpdatedTime(System.currentTimeMillis());
             if (serverMeta != null) {
-                setIfNotBlank(serverMeta.getString("xrayPanelEndpoint"), update::setXrayPanelEndpoint);
-                setIfNotBlank(serverMeta.getString("xrayPanelBasePath"), update::setXrayPanelBasePath);
-                setIfNotBlank(serverMeta.getString("xrayPanelApiToken"), value -> update.setXrayPanelApiToken(secretCryptoUtils.encryptIfNeeded(value)));
-                setIfNotBlank(serverMeta.getString("xrayPanelUsername"), update::setXrayPanelUsername);
-                setIfNotBlank(serverMeta.getString("xrayPanelPassword"), value -> update.setXrayPanelPassword(secretCryptoUtils.encryptIfNeeded(value)));
-                setIfNotBlank(serverMeta.getString("xrayPanelTwoFactorCode"), value -> update.setXrayPanelTwoFactorCode(secretCryptoUtils.encryptIfNeeded(value)));
-                Integer xrayPanelAllowInsecure = serverMeta.getInteger("xrayPanelAllowInsecure");
-                if (xrayPanelAllowInsecure != null) {
-                    update.setXrayPanelAllowInsecure(xrayPanelAllowInsecure);
+                setIfNotBlank(serverMeta.getString("xrayRuntimeEndpoint"), update::setXrayRuntimeEndpoint);
+                setIfNotBlank(serverMeta.getString("xrayRuntimeBasePath"), update::setXrayRuntimeBasePath);
+                setIfNotBlank(serverMeta.getString("xrayRuntimeApiToken"), value -> update.setXrayRuntimeApiToken(secretCryptoUtils.encryptIfNeeded(value)));
+                setIfNotBlank(serverMeta.getString("xrayRuntimeUsername"), update::setXrayRuntimeUsername);
+                setIfNotBlank(serverMeta.getString("xrayRuntimePassword"), value -> update.setXrayRuntimePassword(secretCryptoUtils.encryptIfNeeded(value)));
+                setIfNotBlank(serverMeta.getString("xrayRuntimeTwoFactorCode"), value -> update.setXrayRuntimeTwoFactorCode(secretCryptoUtils.encryptIfNeeded(value)));
+                Integer xrayRuntimeAllowInsecure = serverMeta.getInteger("xrayRuntimeAllowInsecure");
+                if (xrayRuntimeAllowInsecure != null) {
+                    update.setXrayRuntimeAllowInsecure(xrayRuntimeAllowInsecure);
                 }
                 setIfNotBlank(serverMeta.getString("agentVersion"), update::setAgentVersion);
                 setIfNotBlank(serverMeta.getString("xrayVersion"), update::setXrayVersion);
@@ -1335,7 +1335,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             }
 
             if (serviceMeta != null) {
-                setIfNotBlank(serviceMeta.getString("xrayRuntime"), update::setXrayPanelServiceStatus);
+                setIfNotBlank(serviceMeta.getString("xrayRuntime"), update::setXrayRuntimeServiceStatus);
                 setIfNotBlank(serviceMeta.getString("xray"), update::setXrayServiceStatus);
                 setIfNotBlank(serviceMeta.getString("snell"), update::setSnellServiceStatus);
             }
@@ -1397,10 +1397,10 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         return "#!/usr/bin/env bash\n"
                 + "set -euo pipefail\n"
                 + "OB_XRAY_TASK='" + escapeShell(json) + "'\n"
-                + "XRAY_PANEL_ENDPOINT='" + escapeShell(server.getXrayPanelEndpoint()) + "'\n"
-                + "XRAY_PANEL_BASE_PATH='" + escapeShell(server.getXrayPanelBasePath()) + "'\n"
-                + "XRAY_PANEL_API_TOKEN='" + escapeShell(decryptSecret(server.getXrayPanelApiToken())) + "'\n"
-                + "XRAY_PANEL_SERVICE_STATUS='unknown'\n\n"
+                + "XRAY_RUNTIME_ENDPOINT='" + escapeShell(server.getXrayRuntimeEndpoint()) + "'\n"
+                + "XRAY_RUNTIME_BASE_PATH='" + escapeShell(server.getXrayRuntimeBasePath()) + "'\n"
+                + "XRAY_RUNTIME_API_TOKEN='" + escapeShell(decryptSecret(server.getXrayRuntimeApiToken())) + "'\n"
+                + "XRAY_RUNTIME_SERVICE_STATUS='unknown'\n\n"
                 + xrayAgentTaskBody();
     }
 
@@ -1411,32 +1411,32 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
     private String xrayAgentTaskBody() {
         return """
 
-                XRAY_PANEL_ENDPOINT="${OB_XRAY_PANEL_ENDPOINT:-$XRAY_PANEL_ENDPOINT}"
-                XRAY_PANEL_BASE_PATH="${OB_XRAY_PANEL_BASE_PATH:-$XRAY_PANEL_BASE_PATH}"
-                XRAY_PANEL_API_TOKEN="${OB_XRAY_PANEL_API_TOKEN:-$XRAY_PANEL_API_TOKEN}"
-                XRAY_PANEL_PORT="${OB_XRAY_PANEL_PORT:-5168}"
-                XRAY_PANEL_RUNTIME_NAME="$(printf '%s-%s' 'x' 'ui')"
-                XRAY_PANEL_RUNTIME_DIR="/usr/local/${XRAY_PANEL_RUNTIME_NAME}"
-                XRAY_PANEL_RUNTIME_UNIT="${XRAY_PANEL_RUNTIME_NAME}.service"
+                XRAY_RUNTIME_ENDPOINT="${OB_XRAY_RUNTIME_ENDPOINT:-$XRAY_RUNTIME_ENDPOINT}"
+                XRAY_RUNTIME_BASE_PATH="${OB_XRAY_RUNTIME_BASE_PATH:-$XRAY_RUNTIME_BASE_PATH}"
+                XRAY_RUNTIME_API_TOKEN="${OB_XRAY_RUNTIME_API_TOKEN:-$XRAY_RUNTIME_API_TOKEN}"
+                XRAY_RUNTIME_PORT="${OB_XRAY_RUNTIME_PORT:-5168}"
+                XRAY_RUNTIME_RUNTIME_NAME="$(printf '%s-%s' 'x' 'ui')"
+                XRAY_RUNTIME_RUNTIME_DIR="/usr/local/${XRAY_RUNTIME_RUNTIME_NAME}"
+                XRAY_RUNTIME_RUNTIME_UNIT="${XRAY_RUNTIME_RUNTIME_NAME}.service"
 
-                if [ -z "$XRAY_PANEL_ENDPOINT" ]; then
-                  XRAY_PANEL_ENDPOINT="http://127.0.0.1:${XRAY_PANEL_PORT}"
+                if [ -z "$XRAY_RUNTIME_ENDPOINT" ]; then
+                  XRAY_RUNTIME_ENDPOINT="http://127.0.0.1:${XRAY_RUNTIME_PORT}"
                 fi
 
-                if [ -z "$XRAY_PANEL_API_TOKEN" ] && [ -x "${XRAY_PANEL_RUNTIME_DIR}/${XRAY_PANEL_RUNTIME_NAME}" ]; then
-                  XRAY_PANEL_API_TOKEN="$("${XRAY_PANEL_RUNTIME_DIR}/${XRAY_PANEL_RUNTIME_NAME}" setting -getApiToken true 2>/dev/null | awk '/apiToken:/ {print $2; exit}' || true)"
+                if [ -z "$XRAY_RUNTIME_API_TOKEN" ] && [ -x "${XRAY_RUNTIME_RUNTIME_DIR}/${XRAY_RUNTIME_RUNTIME_NAME}" ]; then
+                  XRAY_RUNTIME_API_TOKEN="$("${XRAY_RUNTIME_RUNTIME_DIR}/${XRAY_RUNTIME_RUNTIME_NAME}" setting -getApiToken true 2>/dev/null | awk '/apiToken:/ {print $2; exit}' || true)"
                 fi
 
-                if [ -z "$XRAY_PANEL_API_TOKEN" ]; then
-                  echo 'Xray Runtime API token is required. Save it on the server card or run this task on a host with a local panel runtime CLI.' >&2
+                if [ -z "$XRAY_RUNTIME_API_TOKEN" ]; then
+                  echo 'Xray Runtime API token is required. Save it on the server card or run this task on a host with a local runtime CLI.' >&2
                   exit 1
                 fi
 
                 if command -v systemctl >/dev/null 2>&1; then
-                  XRAY_PANEL_SERVICE_STATUS="$(systemctl is-active "$XRAY_PANEL_RUNTIME_UNIT" 2>/dev/null || echo unknown)"
+                  XRAY_RUNTIME_SERVICE_STATUS="$(systemctl is-active "$XRAY_RUNTIME_RUNTIME_UNIT" 2>/dev/null || echo unknown)"
                 fi
 
-                export OB_XRAY_TASK XRAY_PANEL_ENDPOINT XRAY_PANEL_BASE_PATH XRAY_PANEL_API_TOKEN XRAY_PANEL_SERVICE_STATUS XRAY_PANEL_RUNTIME_DIR
+                export OB_XRAY_TASK XRAY_RUNTIME_ENDPOINT XRAY_RUNTIME_BASE_PATH XRAY_RUNTIME_API_TOKEN XRAY_RUNTIME_SERVICE_STATUS XRAY_RUNTIME_RUNTIME_DIR
                 python3 <<'PY'
                 import json
                 import os
@@ -1448,13 +1448,13 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 import uuid
 
                 task = json.loads(os.environ["OB_XRAY_TASK"])
-                endpoint = os.environ["XRAY_PANEL_ENDPOINT"].rstrip("/")
-                base_path = (os.environ.get("XRAY_PANEL_BASE_PATH") or "").strip()
+                endpoint = os.environ["XRAY_RUNTIME_ENDPOINT"].rstrip("/")
+                base_path = (os.environ.get("XRAY_RUNTIME_BASE_PATH") or "").strip()
                 if base_path and not base_path.startswith("/"):
                     base_path = "/" + base_path
                 base_path = base_path.rstrip("/")
                 base = endpoint + base_path
-                token = os.environ["XRAY_PANEL_API_TOKEN"]
+                token = os.environ["XRAY_RUNTIME_API_TOKEN"]
                 protocol = (task.get("protocol") or "vless").lower()
                 action = (task.get("action") or "present").lower()
                 listen_port = task.get("listenPort")
@@ -1510,7 +1510,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     return post_form(path, {})
 
                 def find_xray_private_key():
-                    runtime_dir = os.environ.get("XRAY_PANEL_RUNTIME_DIR") or os.path.join("/usr/local", "x-" + "ui")
+                    runtime_dir = os.environ.get("XRAY_RUNTIME_RUNTIME_DIR") or os.path.join("/usr/local", "x-" + "ui")
                     candidates = [
                         os.path.join(runtime_dir, "bin", "xray"),
                         os.path.join(runtime_dir, "bin", "xray-linux-amd64"),
@@ -1626,12 +1626,12 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
 
                 result = {
                     "server": {
-                        "xrayPanelEndpoint": endpoint,
-                        "xrayPanelBasePath": base_path,
+                        "xrayRuntimeEndpoint": endpoint,
+                        "xrayRuntimeBasePath": base_path,
                         "tokenConfigured": bool(token),
                     },
                     "services": {
-                        "xrayRuntime": os.environ.get("XRAY_PANEL_SERVICE_STATUS") or "unknown",
+                        "xrayRuntime": os.environ.get("XRAY_RUNTIME_SERVICE_STATUS") or "unknown",
                     },
                     "inbounds": [],
                 }
@@ -1704,7 +1704,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 + "SOURCE_URL='${OB_AGENT_SOURCE_URL:-${REPO_RAW_URL}/scripts/overlord-agent.sh}'\n"
                 + "LOG_LINES=\"${OB_MAINTENANCE_LOG_LINES:-160}\"\n\n"
                 + "SERVER_HOST='" + escapeShell(server.getHost()) + "'\n"
-                + "XRAY_PANEL_ENDPOINT='" + escapeShell(server.getXrayPanelEndpoint()) + "'\n"
+                + "XRAY_RUNTIME_ENDPOINT='" + escapeShell(server.getXrayRuntimeEndpoint()) + "'\n"
                 + "CERTIFICATE_DOMAIN='" + escapeShell(server.getCertificateDomain()) + "'\n"
                 + "CERTIFICATE_STATUS='" + escapeShell(server.getCertificateStatus()) + "'\n\n"
                 + agentMaintenanceBody();
@@ -2217,18 +2217,18 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   local manager
                   manager="$(detect_service_manager)"
                   section "Xray Runtime repair"
-                  local panel_unit panel_dir panel_bin
-                  panel_unit="$(printf '%s-%s.service' 'x' 'ui')"
-                  panel_dir="/usr/local/$(printf '%s-%s' 'x' 'ui')"
-                  panel_bin="${panel_dir}/$(printf '%s-%s' 'x' 'ui')"
-                  if service_exists "$manager" "$panel_unit"; then
-                    restart_service "$manager" "$panel_unit"
+                  local runtime_unit runtime_dir runtime_bin
+                  runtime_unit="$(printf '%s-%s.service' 'x' 'ui')"
+                  runtime_dir="/usr/local/$(printf '%s-%s' 'x' 'ui')"
+                  runtime_bin="${runtime_dir}/$(printf '%s-%s' 'x' 'ui')"
+                  if service_exists "$manager" "$runtime_unit"; then
+                    restart_service "$manager" "$runtime_unit"
                   else
-                    echo "[fail] Xray Runtime service not found. Run one-click orchestration or the Xray Runtime installer first."
+                    echo "[fail] Xray Runtime service not found. Run one-click deployment or the Xray Runtime installer first."
                     return 1
                   fi
-                  if [ -x "$panel_bin" ]; then
-                    "$panel_bin" setting -show 2>/dev/null || true
+                  if [ -x "$runtime_bin" ]; then
+                    "$runtime_bin" setting -show 2>/dev/null || true
                   fi
                 }
 
@@ -2236,15 +2236,15 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   local manager
                   manager="$(detect_service_manager)"
                   section "Xray repair"
-                  local panel_unit panel_dir
-                  panel_unit="$(printf '%s-%s.service' 'x' 'ui')"
-                  panel_dir="/usr/local/$(printf '%s-%s' 'x' 'ui')"
-                  if [ -x "${panel_dir}/bin/xray" ]; then
-                    "${panel_dir}/bin/xray" version 2>/dev/null | head -n 1 || true
+                  local runtime_unit runtime_dir
+                  runtime_unit="$(printf '%s-%s.service' 'x' 'ui')"
+                  runtime_dir="/usr/local/$(printf '%s-%s' 'x' 'ui')"
+                  if [ -x "${runtime_dir}/bin/xray" ]; then
+                    "${runtime_dir}/bin/xray" version 2>/dev/null | head -n 1 || true
                   fi
-                  if service_exists "$manager" "$panel_unit"; then
+                  if service_exists "$manager" "$runtime_unit"; then
                     echo "Restarting Xray Runtime because it owns the embedded Xray runtime."
-                    restart_service "$manager" "$panel_unit"
+                    restart_service "$manager" "$runtime_unit"
                   elif service_exists "$manager" "xray.service"; then
                     restart_service "$manager" "xray.service"
                   else
@@ -2272,7 +2272,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     done
                   fi
                   if [ "$found" -eq 0 ]; then
-                    echo "[fail] Snell service not found. Create a Snell node from the master panel first."
+                    echo "[fail] Snell service not found. Create a Snell node from the master first."
                     return 1
                   fi
                 }
@@ -2295,7 +2295,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     diag_item ok "agent_env" "agent 环境文件存在" "$AGENT_ENV" ""
                   else
                     echo "[fail] agent env missing: ${AGENT_ENV}"
-                    diag_item fail "agent_env_missing" "agent 环境文件缺失" "$AGENT_ENV" "重新安装 agent，并确认 OB_PANEL_URL、OB_SERVER_ID、OB_AGENT_TOKEN 已写入。"
+                    diag_item fail "agent_env_missing" "agent 环境文件缺失" "$AGENT_ENV" "重新安装 agent，并确认 OB_MASTER_URL、OB_SERVER_ID、OB_AGENT_TOKEN 已写入。"
                   fi
                   if [ -d /var/lib/overlord-agent ]; then
                     echo "[ok] work dir: /var/lib/overlord-agent"
@@ -2305,7 +2305,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     diag_item warning "agent_work_dir_missing" "agent 工作目录缺失" "/var/lib/overlord-agent" "agent 首次运行会创建目录；若任务无法写日志，请检查目录权限。"
                   fi
                   if [ -r "$AGENT_ENV" ]; then
-                    grep -E '^(OB_PANEL_URL|OB_SERVER_ID|OB_POLL_INTERVAL)=' "$AGENT_ENV" || true
+                    grep -E '^(OB_MASTER_URL|OB_SERVER_ID|OB_POLL_INTERVAL)=' "$AGENT_ENV" || true
                     if grep -q '^OB_AGENT_TOKEN=' "$AGENT_ENV"; then
                       echo "[ok] agent token: configured"
                       diag_item ok "agent_token" "agent token 已配置" "$AGENT_ENV" ""
@@ -2518,7 +2518,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
 
                 list_keys = ("ports", "runtimePorts", "listenPorts", "exposedPorts", "firewallPorts")
                 scalar_keys = (
-                    "port", "listenPort", "panelPort", "vlessPort", "vmessPort", "trojanPort",
+                    "port", "listenPort", "runtimePort", "vlessPort", "vmessPort", "trojanPort",
                     "shadowsocksPort", "snellPort", "forwardListenPort", "remotePort", "acmePort"
                 )
                 for source in candidates:
@@ -2639,7 +2639,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   section "Firewall ${mode} runtime ports"
                   if [ -z "$ports" ]; then
                     echo "[fail] no runtime ports were provided in requestJson."
-                    diag_item fail "firewall_ports_missing" "No runtime ports provided" "requestJson did not include ports/runtimePorts/listenPort/panelPort/etc." "Pass ports such as {\\\"ports\\\":[{\\\"port\\\":443,\\\"protocol\\\":\\\"tcp\\\"}]}."
+                    diag_item fail "firewall_ports_missing" "No runtime ports provided" "requestJson did not include ports/runtimePorts/listenPort/runtimePort/etc." "Pass ports such as {\\\"ports\\\":[{\\\"port\\\":443,\\\"protocol\\\":\\\"tcp\\\"}]}."
                     return 1
                   fi
                   while read -r proto port; do
@@ -2658,7 +2658,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   echo "stored certificate status: ${CERTIFICATE_STATUS:-unknown}"
                   if [ -z "$domain" ]; then
                     echo "[warn] 证书域名缺失：ACME HTTP 模式必须填写域名。"
-                    diag_item warning "certificate_domain_missing" "证书域名缺失" "ACME HTTP 模式必须填写域名。" "在一键编排或服务器配置中填写 certificateDomain。"
+                    diag_item warning "certificate_domain_missing" "证书域名缺失" "ACME HTTP 模式必须填写域名。" "在一键部署或服务器配置中填写 certificateDomain。"
                   else
                     echo "certificate domain: ${domain}"
                     diag_item ok "certificate_domain" "证书域名已配置" "$domain" ""
@@ -2833,7 +2833,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                         "status": sys.argv[2],
                         "serviceManager": sys.argv[3],
                         "agentServiceStatus": sys.argv[4],
-                        "xrayPanelServiceStatus": sys.argv[5],
+                        "xrayRuntimeServiceStatus": sys.argv[5],
                         "snellServiceStatus": sys.argv[6],
                         "agentBinary": sys.argv[7],
                         "reportedAt": int(time.time() * 1000),

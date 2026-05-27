@@ -2,19 +2,19 @@ package com.admin.service.impl;
 
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
-import com.admin.common.dto.OrchestrationPlanDto;
+import com.admin.common.dto.DeploymentPlanDto;
 import com.admin.entity.ControlServer;
-import com.admin.service.XrayPanelOrchestrationScriptService;
+import com.admin.service.XrayRuntimeDeploymentPlanScriptService;
 import org.springframework.stereotype.Service;
 
 @Service
-public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchestrationScriptService {
+public class XrayRuntimeDeploymentPlanScriptServiceImpl implements XrayRuntimeDeploymentPlanScriptService {
 
     @Override
-    public String buildScript(OrchestrationPlanDto dto, ControlServer server) {
+    public String buildScript(DeploymentPlanDto dto, ControlServer server) {
         String host = firstNotBlank(dto.getPublicHost(), server.getHost(), "127.0.0.1");
-        String username = firstNotBlank(dto.getPanelUsername(), "ob_" + IdUtil.simpleUUID().substring(0, 8));
-        String password = firstNotBlank(dto.getPanelPassword(), IdUtil.simpleUUID().substring(0, 16));
+        String username = firstNotBlank(dto.getRuntimeUsername(), "ob_" + IdUtil.simpleUUID().substring(0, 8));
+        String password = firstNotBlank(dto.getRuntimePassword(), IdUtil.simpleUUID().substring(0, 16));
         String webBasePath = normalizeBasePath(firstNotBlank(dto.getWebBasePath(), "ob-" + IdUtil.simpleUUID().substring(0, 12)));
         String certMode = normalizeCertMode(dto.getCertificateMode());
         String certDomain = firstNotBlank(dto.getCertificateDomain(), host);
@@ -23,13 +23,13 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
         StringBuilder script = new StringBuilder();
         script.append("#!/usr/bin/env bash\n");
         script.append("set -euo pipefail\n\n");
-        appendVar(script, "OB_AGENT_VERSION", "overlord-agent/0.2-orchestrator");
-        appendVar(script, "INSTALL_XRAY_PANEL", enabled(dto.getInstallXrayPanel()) ? "1" : "0");
-        appendVar(script, "CONFIGURE_PANEL", enabled(dto.getConfigurePanel()) ? "1" : "0");
-        appendVar(script, "XRAY_PANEL_VERSION", firstNotBlank(dto.getXrayPanelVersion(), ""));
-        appendVar(script, "PANEL_PORT", String.valueOf(firstNotNull(dto.getPanelPort(), 5168)));
-        appendVar(script, "PANEL_USERNAME", username);
-        appendVar(script, "PANEL_PASSWORD", password);
+        appendVar(script, "OB_AGENT_VERSION", "overlord-agent/0.2-runtime");
+        appendVar(script, "INSTALL_XRAY_RUNTIME", enabled(dto.getInstallXrayRuntime()) ? "1" : "0");
+        appendVar(script, "CONFIGURE_RUNTIME", enabled(dto.getConfigureRuntime()) ? "1" : "0");
+        appendVar(script, "XRAY_RUNTIME_VERSION", firstNotBlank(dto.getXrayRuntimeVersion(), ""));
+        appendVar(script, "RUNTIME_PORT", String.valueOf(firstNotNull(dto.getRuntimePort(), 5168)));
+        appendVar(script, "RUNTIME_USERNAME", username);
+        appendVar(script, "RUNTIME_PASSWORD", password);
         appendVar(script, "WEB_BASE_PATH", webBasePath);
         appendVar(script, "PUBLIC_HOST", host);
         appendVar(script, "LISTEN_IP", firstNotBlank(dto.getListenIp(), "0.0.0.0"));
@@ -59,22 +59,22 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
 
     private String body() {
         return """
-                PANEL_LEGACY_NAME="$(printf 'x-%s' 'ui')"
-                XRAY_PANEL_FOLDER="/usr/local/${PANEL_LEGACY_NAME}"
-                XRAY_PANEL_SERVICE_DIR='/etc/systemd/system'
-                XRAY_PANEL_CLI="/usr/bin/${PANEL_LEGACY_NAME}"
-                XRAY_PANEL_UNIT="${PANEL_LEGACY_NAME}.service"
-                XRAY_PANEL_RELEASE_OWNER="${XRAY_PANEL_RELEASE_OWNER:-$(printf '%s%s%s' 'M' 'H' 'Sanaei')}"
-                XRAY_PANEL_RELEASE_NAME="${XRAY_PANEL_RELEASE_NAME:-$(printf '%sx-%s' '3' 'ui')}"
-                XRAY_PANEL_RELEASE_REPO="${XRAY_PANEL_RELEASE_OWNER}/${XRAY_PANEL_RELEASE_NAME}"
-                RESULT_FILE='/tmp/overlord-xrayPanel-orchestration-result.json'
+                RUNTIME_BINARY_NAME="$(printf 'x-%s' 'ui')"
+                XRAY_RUNTIME_FOLDER="/usr/local/${RUNTIME_BINARY_NAME}"
+                XRAY_RUNTIME_SERVICE_DIR='/etc/systemd/system'
+                XRAY_RUNTIME_CLI="/usr/bin/${RUNTIME_BINARY_NAME}"
+                XRAY_RUNTIME_UNIT="${RUNTIME_BINARY_NAME}.service"
+                XRAY_RUNTIME_RELEASE_OWNER="${XRAY_RUNTIME_RELEASE_OWNER:-$(printf '%s%s%s' 'M' 'H' 'Sanaei')}"
+                XRAY_RUNTIME_RELEASE_NAME="${XRAY_RUNTIME_RELEASE_NAME:-$(printf '%sx-%s' '3' 'ui')}"
+                XRAY_RUNTIME_RELEASE_REPO="${XRAY_RUNTIME_RELEASE_OWNER}/${XRAY_RUNTIME_RELEASE_NAME}"
+                RESULT_FILE='/tmp/overlord-xrayRuntime-deployment-plan-result.json'
                 CERT_FILE=''
                 KEY_FILE=''
                 LOCAL_SCHEME='http'
-                XRAY_PANEL_ALLOW_INSECURE=0
+                XRAY_RUNTIME_ALLOW_INSECURE=0
 
                 log() {
-                  printf '[overlord-orchestrator] %s\\n' "$*"
+                  printf '[overlord-runtime] %s\\n' "$*"
                 }
 
                 require_root() {
@@ -86,7 +86,7 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
 
                 require_systemd_host() {
                   if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then
-                    echo 'Xray Runtime orchestration requires a Linux host with running systemd. Use Debian, Ubuntu, Rocky Linux or Oracle Linux for full Xray Runtime install/configure tasks; Alpine/OpenRC is supported only for the Overlord agent, Snell node tasks and remote forwarding tasks.' >&2
+                    echo 'Xray Runtime deployment requires a Linux host with running systemd. Use Debian, Ubuntu, Rocky Linux or Oracle Linux for full Xray Runtime install/configure tasks; Alpine/OpenRC is supported only for the Overlord agent, Snell node tasks and remote forwarding tasks.' >&2
                     exit 1
                   fi
                 }
@@ -143,11 +143,11 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                   esac
                 }
 
-                latest_xrayPanel_version() {
+                latest_xrayRuntime_version() {
                   local tag
-                  tag="$(curl -fsSL https://api.github.com/repos/${XRAY_PANEL_RELEASE_REPO}/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\\1/' | head -n 1 || true)"
+                  tag="$(curl -fsSL https://api.github.com/repos/${XRAY_RUNTIME_RELEASE_REPO}/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\\1/' | head -n 1 || true)"
                   if [ -z "$tag" ]; then
-                    tag="$(curl -4fsSL https://api.github.com/repos/${XRAY_PANEL_RELEASE_REPO}/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\\1/' | head -n 1 || true)"
+                    tag="$(curl -4fsSL https://api.github.com/repos/${XRAY_RUNTIME_RELEASE_REPO}/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\\1/' | head -n 1 || true)"
                   fi
                   if [ -z "$tag" ]; then
                     echo 'Failed to resolve latest Xray Runtime version.' >&2
@@ -156,66 +156,66 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                   echo "$tag"
                 }
 
-                install_xrayPanel() {
+                install_xrayRuntime() {
                   local arch version tarball url work
-                  if [ "$INSTALL_XRAY_PANEL" != "1" ]; then
-                    if command -v "$PANEL_LEGACY_NAME" >/dev/null 2>&1 || [ -x "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}" ]; then
+                  if [ "$INSTALL_XRAY_RUNTIME" != "1" ]; then
+                    if command -v "$RUNTIME_BINARY_NAME" >/dev/null 2>&1 || [ -x "$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}" ]; then
                       log 'Xray Runtime install step skipped.'
                       return
                     fi
-                    echo 'Xray Runtime is not installed and installXrayPanel is disabled.' >&2
+                    echo 'Xray Runtime is not installed and installXrayRuntime is disabled.' >&2
                     exit 1
                   fi
 
                   arch="$(map_arch)"
-                  version="$XRAY_PANEL_VERSION"
+                  version="$XRAY_RUNTIME_VERSION"
                   if [ -z "$version" ]; then
-                    version="$(latest_xrayPanel_version)"
+                    version="$(latest_xrayRuntime_version)"
                   fi
-                  url="https://github.com/${XRAY_PANEL_RELEASE_REPO}/releases/download/${version}/${PANEL_LEGACY_NAME}-linux-${arch}.tar.gz"
+                  url="https://github.com/${XRAY_RUNTIME_RELEASE_REPO}/releases/download/${version}/${RUNTIME_BINARY_NAME}-linux-${arch}.tar.gz"
                   work="$(mktemp -d)"
                   log "Installing Xray Runtime ${version} for ${arch}"
-                  curl -4fL "$url" -o "${work}/${PANEL_LEGACY_NAME}-linux-${arch}.tar.gz"
-                  tar zxf "${work}/${PANEL_LEGACY_NAME}-linux-${arch}.tar.gz" -C "$work"
+                  curl -4fL "$url" -o "${work}/${RUNTIME_BINARY_NAME}-linux-${arch}.tar.gz"
+                  tar zxf "${work}/${RUNTIME_BINARY_NAME}-linux-${arch}.tar.gz" -C "$work"
 
-                  systemctl stop "$XRAY_PANEL_UNIT" 2>/dev/null || true
-                  rm -rf "$XRAY_PANEL_FOLDER"
-                  mv "${work}/${PANEL_LEGACY_NAME}" "$XRAY_PANEL_FOLDER"
-                  chmod +x "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}" "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}.sh" || true
-                  if [ -f "$XRAY_PANEL_FOLDER/bin/xray-linux-${arch}" ]; then
-                    chmod +x "$XRAY_PANEL_FOLDER/bin/xray-linux-${arch}"
+                  systemctl stop "$XRAY_RUNTIME_UNIT" 2>/dev/null || true
+                  rm -rf "$XRAY_RUNTIME_FOLDER"
+                  mv "${work}/${RUNTIME_BINARY_NAME}" "$XRAY_RUNTIME_FOLDER"
+                  chmod +x "$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}" "$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}.sh" || true
+                  if [ -f "$XRAY_RUNTIME_FOLDER/bin/xray-linux-${arch}" ]; then
+                    chmod +x "$XRAY_RUNTIME_FOLDER/bin/xray-linux-${arch}"
                   fi
-                  if [ -f "$XRAY_PANEL_FOLDER/bin/xray-linux-arm" ]; then
-                    chmod +x "$XRAY_PANEL_FOLDER/bin/xray-linux-arm"
+                  if [ -f "$XRAY_RUNTIME_FOLDER/bin/xray-linux-arm" ]; then
+                    chmod +x "$XRAY_RUNTIME_FOLDER/bin/xray-linux-arm"
                   fi
-                  cp -f "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}.sh" "$XRAY_PANEL_CLI"
-                  chmod +x "$XRAY_PANEL_CLI"
-                  mkdir -p /var/log/${PANEL_LEGACY_NAME}
+                  cp -f "$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}.sh" "$XRAY_RUNTIME_CLI"
+                  chmod +x "$XRAY_RUNTIME_CLI"
+                  mkdir -p /var/log/${RUNTIME_BINARY_NAME}
 
-                  if [ -f "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}.service" ]; then
-                    cp -f "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}.service" "$XRAY_PANEL_SERVICE_DIR/${XRAY_PANEL_UNIT}"
-                  elif [ -f "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}.service.debian" ]; then
-                    cp -f "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}.service.debian" "$XRAY_PANEL_SERVICE_DIR/${XRAY_PANEL_UNIT}"
-                  elif [ -f "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}.service.rhel" ]; then
-                    cp -f "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}.service.rhel" "$XRAY_PANEL_SERVICE_DIR/${XRAY_PANEL_UNIT}"
+                  if [ -f "$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}.service" ]; then
+                    cp -f "$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}.service" "$XRAY_RUNTIME_SERVICE_DIR/${XRAY_RUNTIME_UNIT}"
+                  elif [ -f "$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}.service.debian" ]; then
+                    cp -f "$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}.service.debian" "$XRAY_RUNTIME_SERVICE_DIR/${XRAY_RUNTIME_UNIT}"
+                  elif [ -f "$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}.service.rhel" ]; then
+                    cp -f "$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}.service.rhel" "$XRAY_RUNTIME_SERVICE_DIR/${XRAY_RUNTIME_UNIT}"
                   else
-                    curl -4fL https://raw.githubusercontent.com/${XRAY_PANEL_RELEASE_REPO}/main/${PANEL_LEGACY_NAME}.service.debian -o "$XRAY_PANEL_SERVICE_DIR/${XRAY_PANEL_UNIT}"
+                    curl -4fL https://raw.githubusercontent.com/${XRAY_RUNTIME_RELEASE_REPO}/main/${RUNTIME_BINARY_NAME}.service.debian -o "$XRAY_RUNTIME_SERVICE_DIR/${XRAY_RUNTIME_UNIT}"
                   fi
-                  chown root:root "$XRAY_PANEL_SERVICE_DIR/${XRAY_PANEL_UNIT}"
-                  chmod 644 "$XRAY_PANEL_SERVICE_DIR/${XRAY_PANEL_UNIT}"
+                  chown root:root "$XRAY_RUNTIME_SERVICE_DIR/${XRAY_RUNTIME_UNIT}"
+                  chmod 644 "$XRAY_RUNTIME_SERVICE_DIR/${XRAY_RUNTIME_UNIT}"
                   systemctl daemon-reload
-                  systemctl enable "$XRAY_PANEL_UNIT"
-                  systemctl start "$XRAY_PANEL_UNIT"
+                  systemctl enable "$XRAY_RUNTIME_UNIT"
+                  systemctl start "$XRAY_RUNTIME_UNIT"
                   rm -rf "$work"
                 }
 
-                configure_xrayPanel_panel() {
+                configure_xrayRuntime() {
                   local clean_base
                   clean_base="${WEB_BASE_PATH#/}"
-                  if [ "$CONFIGURE_PANEL" = "1" ]; then
-                    log "Configuring Xray Runtime panel on port ${PANEL_PORT}/${clean_base}"
-                    "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}" setting -username "$PANEL_USERNAME" -password "$PANEL_PASSWORD" -port "$PANEL_PORT" -webBasePath "$clean_base" -listenIP "$LISTEN_IP"
-                    systemctl restart "$XRAY_PANEL_UNIT"
+                  if [ "$CONFIGURE_RUNTIME" = "1" ]; then
+                    log "Configuring Xray Runtime on port ${RUNTIME_PORT}/${clean_base}"
+                    "$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}" setting -username "$RUNTIME_USERNAME" -password "$RUNTIME_PASSWORD" -port "$RUNTIME_PORT" -webBasePath "$clean_base" -listenIP "$LISTEN_IP"
+                    systemctl restart "$XRAY_RUNTIME_UNIT"
                   fi
                 }
 
@@ -235,10 +235,10 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                     chmod 600 "$KEY_FILE"
                     chmod 644 "$CERT_FILE"
                   fi
-                  "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}" cert -webCert "$CERT_FILE" -webCertKey "$KEY_FILE" || true
+                  "$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}" cert -webCert "$CERT_FILE" -webCertKey "$KEY_FILE" || true
                   LOCAL_SCHEME='https'
-                  XRAY_PANEL_ALLOW_INSECURE=1
-                  systemctl restart "$XRAY_PANEL_UNIT"
+                  XRAY_RUNTIME_ALLOW_INSECURE=1
+                  systemctl restart "$XRAY_RUNTIME_UNIT"
                 }
 
                 setup_acme_cert() {
@@ -256,10 +256,10 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                   fi
                   cert_dir="/root/cert/${domain}"
                   mkdir -p "$cert_dir"
-                  systemctl stop "$XRAY_PANEL_UNIT" 2>/dev/null || true
+                  systemctl stop "$XRAY_RUNTIME_UNIT" 2>/dev/null || true
                   ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt --force
                   ~/.acme.sh/acme.sh --issue -d "$domain" --listen-v6 --standalone --httpport 80 --force
-                  reload_cmd='systemctl restart "$XRAY_PANEL_UNIT"'
+                  reload_cmd='systemctl restart "$XRAY_RUNTIME_UNIT"'
                   ~/.acme.sh/acme.sh --installcert -d "$domain" \\
                     --key-file "${cert_dir}/privkey.pem" \\
                     --fullchain-file "${cert_dir}/fullchain.pem" \\
@@ -268,11 +268,11 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                   KEY_FILE="${cert_dir}/privkey.pem"
                   chmod 600 "$KEY_FILE" 2>/dev/null || true
                   chmod 644 "$CERT_FILE" 2>/dev/null || true
-                  "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}" cert -webCert "$CERT_FILE" -webCertKey "$KEY_FILE"
+                  "$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}" cert -webCert "$CERT_FILE" -webCertKey "$KEY_FILE"
                   LOCAL_SCHEME='https'
-                  XRAY_PANEL_ALLOW_INSECURE=0
-                  systemctl start "$XRAY_PANEL_UNIT"
-                  systemctl restart "$XRAY_PANEL_UNIT"
+                  XRAY_RUNTIME_ALLOW_INSECURE=0
+                  systemctl start "$XRAY_RUNTIME_UNIT"
+                  systemctl restart "$XRAY_RUNTIME_UNIT"
                 }
 
                 setup_certificate() {
@@ -292,9 +292,9 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                   local arch candidate
                   arch="$(map_arch)"
                   for candidate in \\
-                    "$XRAY_PANEL_FOLDER/bin/xray-linux-${arch}" \\
-                    "$XRAY_PANEL_FOLDER/bin/xray-linux-arm" \\
-                    "$XRAY_PANEL_FOLDER/bin/xray" \\
+                    "$XRAY_RUNTIME_FOLDER/bin/xray-linux-${arch}" \\
+                    "$XRAY_RUNTIME_FOLDER/bin/xray-linux-arm" \\
+                    "$XRAY_RUNTIME_FOLDER/bin/xray" \\
                     "$(command -v xray 2>/dev/null || true)"; do
                     if [ -n "$candidate" ] && [ -x "$candidate" ]; then
                       echo "$candidate"
@@ -336,16 +336,16 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                   esac
                 }
 
-                wait_for_panel() {
+                wait_for_runtime() {
                   local base attempt
-                  base="${LOCAL_SCHEME}://127.0.0.1:${PANEL_PORT}/${WEB_BASE_PATH#/}"
+                  base="${LOCAL_SCHEME}://127.0.0.1:${RUNTIME_PORT}/${WEB_BASE_PATH#/}"
                   for attempt in $(seq 1 40); do
                     if curl -kfsS "${base}/panel/api/server/status" -H "Authorization: Bearer ${API_TOKEN}" >/dev/null 2>&1; then
                       return 0
                     fi
                     sleep 2
                   done
-                  echo "Xray Runtime panel did not become ready at ${base}" >&2
+                  echo "Xray Runtime did not become ready at ${base}" >&2
                   exit 1
                 }
 
@@ -418,13 +418,13 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                 }
 
                 create_inbounds() {
-                  local reality_private_key panel_base
+                  local reality_private_key runtime_base
                   reality_private_key=''
                   if [ "$CREATE_VLESS_REALITY" = "1" ]; then
                     reality_private_key="$(generate_reality_private_key)"
                   fi
-                  panel_base="${LOCAL_SCHEME}://127.0.0.1:${PANEL_PORT}/${WEB_BASE_PATH#/}"
-                  PANEL_BASE="$panel_base" REALITY_PRIVATE_KEY="$reality_private_key" CERT_FILE="$CERT_FILE" KEY_FILE="$KEY_FILE" python3 <<'PY'
+                  runtime_base="${LOCAL_SCHEME}://127.0.0.1:${RUNTIME_PORT}/${WEB_BASE_PATH#/}"
+                  RUNTIME_BASE="$runtime_base" REALITY_PRIVATE_KEY="$reality_private_key" CERT_FILE="$CERT_FILE" KEY_FILE="$KEY_FILE" python3 <<'PY'
                 import json
                 import os
                 import ssl
@@ -433,7 +433,7 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                 import urllib.request
                 import uuid
 
-                base = os.environ["PANEL_BASE"].rstrip("/")
+                base = os.environ["RUNTIME_BASE"].rstrip("/")
                 api_token = os.environ["API_TOKEN"]
                 cert_file = os.environ.get("CERT_FILE", "")
                 key_file = os.environ.get("KEY_FILE", "")
@@ -634,7 +634,7 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
 
                 build_result_marker() {
                   local xray_bin xray_version snell_version endpoint base_path api_token
-                  local xray_panel_service_status xray_service_status snell_service_status cert_status cert_expire_at now_ts
+                  local xray_runtime_service_status xray_service_status snell_service_status cert_status cert_expire_at now_ts
                   local snell_arch snell_download_url snell_checksum_sha
                   xray_version=''
                   snell_version=''
@@ -651,7 +651,7 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                   if command -v snell-server >/dev/null 2>&1; then
                     snell_version="$(snell-server -v 2>&1 | head -n 1 || true)"
                   fi
-                  xray_panel_service_status="$(systemctl is-active "$XRAY_PANEL_UNIT" 2>/dev/null || echo unknown)"
+                  xray_runtime_service_status="$(systemctl is-active "$XRAY_RUNTIME_UNIT" 2>/dev/null || echo unknown)"
                   snell_service_status="$(systemctl is-active snell 2>/dev/null || echo not-installed)"
                   if pgrep -fa '[x]ray' >/dev/null 2>&1; then
                     xray_service_status='active'
@@ -680,9 +680,9 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                     fi
                   fi
                   base_path="/${WEB_BASE_PATH#/}"
-                  endpoint="${LOCAL_SCHEME}://${PUBLIC_HOST}:${PANEL_PORT}"
+                  endpoint="${LOCAL_SCHEME}://${PUBLIC_HOST}:${RUNTIME_PORT}"
                   api_token="$API_TOKEN"
-                  XRAY_PANEL_ENDPOINT="$endpoint" XRAY_PANEL_BASE_PATH="$base_path" XRAY_PANEL_API_TOKEN="$api_token" XRAY_PANEL_USERNAME="$PANEL_USERNAME" XRAY_PANEL_PASSWORD="$PANEL_PASSWORD" XRAY_PANEL_ALLOW_INSECURE="$XRAY_PANEL_ALLOW_INSECURE" XRAY_VERSION="$xray_version" SNELL_RUNTIME_VERSION="$snell_version" XRAY_PANEL_SERVICE_STATUS="$xray_panel_service_status" XRAY_SERVICE_STATUS="$xray_service_status" SNELL_SERVICE_STATUS="$snell_service_status" CERT_STATUS="$cert_status" CERT_EXPIRE_AT="$cert_expire_at" INSTALL_SNELL="$INSTALL_SNELL" SNELL_PORT="$SNELL_PORT" SNELL_PSK="$SNELL_PSK" SNELL_VERSION="$SNELL_VERSION" SNELL_DOWNLOAD_URL="$snell_download_url" SNELL_CHECKSUM_SHA256="$snell_checksum_sha" python3 <<'PY'
+                  XRAY_RUNTIME_ENDPOINT="$endpoint" XRAY_RUNTIME_BASE_PATH="$base_path" XRAY_RUNTIME_API_TOKEN="$api_token" XRAY_RUNTIME_USERNAME="$RUNTIME_USERNAME" XRAY_RUNTIME_PASSWORD="$RUNTIME_PASSWORD" XRAY_RUNTIME_ALLOW_INSECURE="$XRAY_RUNTIME_ALLOW_INSECURE" XRAY_VERSION="$xray_version" SNELL_RUNTIME_VERSION="$snell_version" XRAY_RUNTIME_SERVICE_STATUS="$xray_runtime_service_status" XRAY_SERVICE_STATUS="$xray_service_status" SNELL_SERVICE_STATUS="$snell_service_status" CERT_STATUS="$cert_status" CERT_EXPIRE_AT="$cert_expire_at" INSTALL_SNELL="$INSTALL_SNELL" SNELL_PORT="$SNELL_PORT" SNELL_PSK="$SNELL_PSK" SNELL_VERSION="$SNELL_VERSION" SNELL_DOWNLOAD_URL="$snell_download_url" SNELL_CHECKSUM_SHA256="$snell_checksum_sha" python3 <<'PY'
                 import json
                 import os
 
@@ -692,12 +692,12 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                     with open(path, "r", encoding="utf-8") as fh:
                         result = json.load(fh)
                 result["server"] = {
-                    "xrayPanelEndpoint": os.environ.get("XRAY_PANEL_ENDPOINT"),
-                    "xrayPanelBasePath": os.environ.get("XRAY_PANEL_BASE_PATH"),
-                    "xrayPanelApiToken": os.environ.get("XRAY_PANEL_API_TOKEN"),
-                    "xrayPanelUsername": os.environ.get("XRAY_PANEL_USERNAME"),
-                    "xrayPanelPassword": os.environ.get("XRAY_PANEL_PASSWORD"),
-                    "xrayPanelAllowInsecure": int(os.environ.get("XRAY_PANEL_ALLOW_INSECURE", "0")),
+                    "xrayRuntimeEndpoint": os.environ.get("XRAY_RUNTIME_ENDPOINT"),
+                    "xrayRuntimeBasePath": os.environ.get("XRAY_RUNTIME_BASE_PATH"),
+                    "xrayRuntimeApiToken": os.environ.get("XRAY_RUNTIME_API_TOKEN"),
+                    "xrayRuntimeUsername": os.environ.get("XRAY_RUNTIME_USERNAME"),
+                    "xrayRuntimePassword": os.environ.get("XRAY_RUNTIME_PASSWORD"),
+                    "xrayRuntimeAllowInsecure": int(os.environ.get("XRAY_RUNTIME_ALLOW_INSECURE", "0")),
                     "xrayVersion": os.environ.get("XRAY_VERSION"),
                     "snellVersion": os.environ.get("SNELL_RUNTIME_VERSION"),
                     "agentVersion": os.environ.get("OB_AGENT_VERSION"),
@@ -711,7 +711,7 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                     "expireAt": int(os.environ["CERT_EXPIRE_AT"]) if os.environ.get("CERT_EXPIRE_AT") else None,
                 }
                 result["services"] = {
-                    "xrayPanel": os.environ.get("XRAY_PANEL_SERVICE_STATUS"),
+                    "xrayRuntime": os.environ.get("XRAY_RUNTIME_SERVICE_STATUS"),
                     "xray": os.environ.get("XRAY_SERVICE_STATUS"),
                     "snell": os.environ.get("SNELL_SERVICE_STATUS"),
                 }
@@ -745,10 +745,10 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                 require_root
                 require_systemd_host
                 install_deps
-                install_xrayPanel
-                configure_xrayPanel_panel
+                install_xrayRuntime
+                configure_xrayRuntime
                 setup_certificate
-                API_TOKEN="$("$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}" setting -getApiToken true | awk '/apiToken:/ {print $2; exit}')"
+                API_TOKEN="$("$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}" setting -getApiToken true | awk '/apiToken:/ {print $2; exit}')"
                 if [ -z "$API_TOKEN" ]; then
                   echo 'Failed to get or create Xray Runtime API token.' >&2
                   exit 1
@@ -757,14 +757,14 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                 export CREATE_VLESS_REALITY CREATE_VMESS_WS CREATE_TROJAN_TLS CREATE_SHADOWSOCKS
                 export VLESS_PORT VMESS_PORT TROJAN_PORT SHADOWSOCKS_PORT
                 export OB_AGENT_VERSION CERTIFICATE_MODE SNELL_VERSION
-                wait_for_panel
+                wait_for_runtime
                 create_inbounds
                 if [ "$INSTALL_SNELL" = "1" ]; then
                   install_snell
                 fi
-                systemctl restart "$XRAY_PANEL_UNIT"
+                systemctl restart "$XRAY_RUNTIME_UNIT"
                 build_result_marker
-                log 'Orchestration task finished.'
+                log 'Deployment plan task finished.'
                 """;
     }
 

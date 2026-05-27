@@ -3,19 +3,19 @@ package com.admin.service.impl;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
-import com.admin.common.dto.XrayPanelInboundDto;
-import com.admin.common.dto.XrayPanelServerDto;
-import com.admin.common.dto.XrayPanelTrafficQueryDto;
-import com.admin.common.dto.XrayPanelXraySettingDto;
+import com.admin.common.dto.XrayRuntimeInboundDto;
+import com.admin.common.dto.XrayRuntimeServerDto;
+import com.admin.common.dto.XrayRuntimeTrafficQueryDto;
+import com.admin.common.dto.XrayRuntimeXraySettingDto;
 import com.admin.common.lang.R;
 import com.admin.common.utils.MasterSelfProtectionUtils;
 import com.admin.common.utils.SecretCryptoUtils;
 import com.admin.config.RestTemplateConfig;
 import com.admin.entity.ControlServer;
-import com.admin.entity.XrayPanelTrafficSnapshot;
-import com.admin.mapper.XrayPanelTrafficSnapshotMapper;
+import com.admin.entity.XrayRuntimeTrafficSnapshot;
+import com.admin.mapper.XrayRuntimeTrafficSnapshotMapper;
 import com.admin.service.ControlServerService;
-import com.admin.service.XrayPanelService;
+import com.admin.service.XrayRuntimeService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -30,7 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 @Service
-public class XrayPanelServiceImpl implements XrayPanelService {
+public class XrayRuntimeServiceImpl implements XrayRuntimeService {
 
     private static final String DEFAULT_OUTBOUND_TEST_URL = "https://www.google.com/generate_204";
 
@@ -41,25 +41,25 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     private ControlServerService controlServerService;
 
     @Resource
-    private XrayPanelTrafficSnapshotMapper trafficSnapshotMapper;
+    private XrayRuntimeTrafficSnapshotMapper trafficSnapshotMapper;
 
     @Resource
     private SecretCryptoUtils secretCryptoUtils;
 
     @Override
-    public R testConnection(XrayPanelServerDto dto) {
+    public R testConnection(XrayRuntimeServerDto dto) {
         return apiGet(resolveServer(dto.getServerId()), "/panel/api/server/status", true);
     }
 
     @Override
-    public R listInbounds(XrayPanelServerDto dto) {
+    public R listInbounds(XrayRuntimeServerDto dto) {
         R result = apiGet(resolveServer(dto.getServerId()), "/panel/api/inbounds/list", true);
         markSynced(dto.getServerId(), result);
         return result;
     }
 
     @Override
-    public R addInbound(XrayPanelInboundDto dto) {
+    public R addInbound(XrayRuntimeInboundDto dto) {
         ControlServer server = resolveServer(dto.getServerId());
         String guard = guardInboundPort(server, dto.getPayload());
         if (guard != null) {
@@ -69,7 +69,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     }
 
     @Override
-    public R updateInbound(XrayPanelInboundDto dto) {
+    public R updateInbound(XrayRuntimeInboundDto dto) {
         if (dto.getInboundId() == null) {
             return R.err("inbound id is required");
         }
@@ -84,7 +84,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     }
 
     @Override
-    public R deleteInbound(XrayPanelInboundDto dto) {
+    public R deleteInbound(XrayRuntimeInboundDto dto) {
         if (dto.getInboundId() == null) {
             return R.err("inbound id is required");
         }
@@ -92,7 +92,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     }
 
     @Override
-    public R setInboundEnable(XrayPanelInboundDto dto) {
+    public R setInboundEnable(XrayRuntimeInboundDto dto) {
         if (dto.getInboundId() == null || dto.getEnable() == null) {
             return R.err("inbound id and enable are required");
         }
@@ -102,7 +102,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     }
 
     @Override
-    public R addClient(XrayPanelInboundDto dto) {
+    public R addClient(XrayRuntimeInboundDto dto) {
         if (dto.getInboundId() == null || isBlank(dto.getSettingsJson())) {
             return R.err("inbound id and settingsJson are required");
         }
@@ -113,7 +113,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     }
 
     @Override
-    public R updateClient(XrayPanelInboundDto dto) {
+    public R updateClient(XrayRuntimeInboundDto dto) {
         if (dto.getInboundId() == null || isBlank(dto.getClientId()) || isBlank(dto.getSettingsJson())) {
             return R.err("inbound id, client id and settingsJson are required");
         }
@@ -124,7 +124,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     }
 
     @Override
-    public R deleteClient(XrayPanelInboundDto dto) {
+    public R deleteClient(XrayRuntimeInboundDto dto) {
         if (dto.getInboundId() == null || isBlank(dto.getClientId())) {
             return R.err("inbound id and client id are required");
         }
@@ -133,7 +133,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     }
 
     @Override
-    public R resetClientTraffic(XrayPanelInboundDto dto) {
+    public R resetClientTraffic(XrayRuntimeInboundDto dto) {
         if (dto.getInboundId() == null || isBlank(dto.getEmail())) {
             return R.err("inbound id and email are required");
         }
@@ -142,12 +142,12 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     }
 
     @Override
-    public R getConfig(XrayPanelServerDto dto) {
+    public R getConfig(XrayRuntimeServerDto dto) {
         return apiGet(resolveServer(dto.getServerId()), "/panel/api/server/getConfigJson", true);
     }
 
     @Override
-    public R getOutbounds(XrayPanelServerDto dto) {
+    public R getOutbounds(XrayRuntimeServerDto dto) {
         R configResult = getConfig(dto);
         if (configResult.getCode() != 0) {
             return configResult;
@@ -163,9 +163,9 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     }
 
     @Override
-    public R getOutboundsTraffic(XrayPanelServerDto dto) {
+    public R getOutboundsTraffic(XrayRuntimeServerDto dto) {
         ControlServer server = resolveServer(dto.getServerId());
-        XrayPanelSession session = loginSession(server);
+        XrayRuntimeSession session = loginSession(server);
         if (!session.isReady()) {
             return R.err(session.error);
         }
@@ -173,14 +173,14 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     }
 
     @Override
-    public R syncTraffic(XrayPanelServerDto dto) {
+    public R syncTraffic(XrayRuntimeServerDto dto) {
         ControlServer server = resolveServer(dto.getServerId());
         if (server == null) {
             return R.err("server not found");
         }
 
         long now = System.currentTimeMillis();
-        List<XrayPanelTrafficSnapshot> snapshots = new ArrayList<>();
+        List<XrayRuntimeTrafficSnapshot> snapshots = new ArrayList<>();
         TrafficTotals totals = new TrafficTotals();
 
         R inboundResult = apiGet(server, "/panel/api/inbounds/list", true);
@@ -200,7 +200,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
             }
         }
 
-        for (XrayPanelTrafficSnapshot snapshot : snapshots) {
+        for (XrayRuntimeTrafficSnapshot snapshot : snapshots) {
             trafficSnapshotMapper.insert(snapshot);
         }
         markTrafficSynced(server, now, totals);
@@ -222,9 +222,9 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     }
 
     @Override
-    public R listTrafficSnapshots(XrayPanelTrafficQueryDto dto) {
+    public R listTrafficSnapshots(XrayRuntimeTrafficQueryDto dto) {
         int limit = dto.getLimit() == null ? 200 : Math.max(1, Math.min(dto.getLimit(), 500));
-        QueryWrapper<XrayPanelTrafficSnapshot> query = new QueryWrapper<>();
+        QueryWrapper<XrayRuntimeTrafficSnapshot> query = new QueryWrapper<>();
         if (dto.getServerId() != null) {
             query.eq("server_id", dto.getServerId());
         }
@@ -236,9 +236,9 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     }
 
     @Override
-    public R saveXraySetting(XrayPanelXraySettingDto dto) {
+    public R saveXraySetting(XrayRuntimeXraySettingDto dto) {
         ControlServer server = resolveServer(dto.getServerId());
-        XrayPanelSession session = loginSession(server);
+        XrayRuntimeSession session = loginSession(server);
         if (!session.isReady()) {
             return R.err(session.error);
         }
@@ -253,7 +253,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     }
 
     @Override
-    public R restartXray(XrayPanelServerDto dto) {
+    public R restartXray(XrayRuntimeServerDto dto) {
         return apiPostForm(resolveServer(dto.getServerId()), "/panel/api/server/restartXrayService", new LinkedMultiValueMap<>(), true);
     }
 
@@ -272,10 +272,10 @@ public class XrayPanelServiceImpl implements XrayPanelService {
         if (server == null) {
             return R.err("server not found");
         }
-        if (bearerRequired && isBlank(server.getXrayPanelApiToken())) {
+        if (bearerRequired && isBlank(server.getXrayRuntimeApiToken())) {
             return R.err("Xray Runtime api token is required for this action");
         }
-        if (isBlank(server.getXrayPanelEndpoint())) {
+        if (isBlank(server.getXrayRuntimeEndpoint())) {
             return R.err("Xray Runtime endpoint is required");
         }
 
@@ -292,18 +292,18 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     private HttpHeaders apiHeaders(ControlServer server, boolean bearerRequired) {
         HttpHeaders headers = new HttpHeaders();
         headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-        if (server != null && !isBlank(server.getXrayPanelApiToken())) {
-            headers.setBearerAuth(server.getXrayPanelApiToken().trim());
+        if (server != null && !isBlank(server.getXrayRuntimeApiToken())) {
+            headers.setBearerAuth(server.getXrayRuntimeApiToken().trim());
         }
         return headers;
     }
 
-    private XrayPanelSession loginSession(ControlServer server) {
+    private XrayRuntimeSession loginSession(ControlServer server) {
         if (server == null) {
-            return XrayPanelSession.error("server not found");
+            return XrayRuntimeSession.error("server not found");
         }
-        if (isBlank(server.getXrayPanelUsername()) || isBlank(server.getXrayPanelPassword())) {
-            return XrayPanelSession.error("Xray Runtime username and password are required for outbound save");
+        if (isBlank(server.getXrayRuntimeUsername()) || isBlank(server.getXrayRuntimePassword())) {
+            return XrayRuntimeSession.error("Xray Runtime username and password are required for outbound save");
         }
         try {
             RestTemplate client = clientFor(server);
@@ -311,14 +311,14 @@ public class XrayPanelServiceImpl implements XrayPanelService {
             String csrf = extractObjString(csrfResp.getBody());
             List<String> cookies = new ArrayList<>(csrfResp.getHeaders().getOrEmpty(HttpHeaders.SET_COOKIE));
             if (isBlank(csrf)) {
-                return XrayPanelSession.error("Xray Runtime csrf token missing");
+                return XrayRuntimeSession.error("Xray Runtime csrf token missing");
             }
 
             MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-            form.add("username", server.getXrayPanelUsername());
-            form.add("password", server.getXrayPanelPassword());
-            if (!isBlank(server.getXrayPanelTwoFactorCode())) {
-                form.add("twoFactorCode", server.getXrayPanelTwoFactorCode());
+            form.add("username", server.getXrayRuntimeUsername());
+            form.add("password", server.getXrayRuntimePassword());
+            if (!isBlank(server.getXrayRuntimeTwoFactorCode())) {
+                form.add("twoFactorCode", server.getXrayRuntimeTwoFactorCode());
             }
 
             HttpHeaders loginHeaders = new HttpHeaders();
@@ -331,19 +331,19 @@ public class XrayPanelServiceImpl implements XrayPanelService {
             cookies.addAll(loginResp.getHeaders().getOrEmpty(HttpHeaders.SET_COOKIE));
             R loginResult = normalizeResponse(loginResp.getBody());
             if (loginResult.getCode() != 0 || !isSuccessEnvelope(loginResult.getData())) {
-                return XrayPanelSession.error("Xray Runtime login failed");
+                return XrayRuntimeSession.error("Xray Runtime login failed");
             }
 
-            return new XrayPanelSession(csrf, joinCookies(cookies), null);
+            return new XrayRuntimeSession(csrf, joinCookies(cookies), null);
         } catch (Exception e) {
-            return XrayPanelSession.error("Xray Runtime login request failed: " + e.getMessage());
+            return XrayRuntimeSession.error("Xray Runtime login request failed: " + e.getMessage());
         }
     }
 
     private RestTemplate clientFor(ControlServer server) throws Exception {
-        Integer xrayPanelAllowInsecure = server.getXrayPanelAllowInsecure();
-        boolean allowInsecure = (xrayPanelAllowInsecure != null ? xrayPanelAllowInsecure : server.getAllowInsecure()) != null
-                && (xrayPanelAllowInsecure != null ? xrayPanelAllowInsecure : server.getAllowInsecure()) == 1;
+        Integer xrayRuntimeAllowInsecure = server.getXrayRuntimeAllowInsecure();
+        boolean allowInsecure = (xrayRuntimeAllowInsecure != null ? xrayRuntimeAllowInsecure : server.getAllowInsecure()) != null
+                && (xrayRuntimeAllowInsecure != null ? xrayRuntimeAllowInsecure : server.getAllowInsecure()) == 1;
         return allowInsecure ? new RestTemplate(RestTemplateConfig.generateHttpRequestFactory()) : restTemplate;
     }
 
@@ -378,9 +378,9 @@ public class XrayPanelServiceImpl implements XrayPanelService {
         if (server == null) {
             return null;
         }
-        server.setXrayPanelApiToken(secretCryptoUtils.decryptIfNeeded(server.getXrayPanelApiToken()));
-        server.setXrayPanelPassword(secretCryptoUtils.decryptIfNeeded(server.getXrayPanelPassword()));
-        server.setXrayPanelTwoFactorCode(secretCryptoUtils.decryptIfNeeded(server.getXrayPanelTwoFactorCode()));
+        server.setXrayRuntimeApiToken(secretCryptoUtils.decryptIfNeeded(server.getXrayRuntimeApiToken()));
+        server.setXrayRuntimePassword(secretCryptoUtils.decryptIfNeeded(server.getXrayRuntimePassword()));
+        server.setXrayRuntimeTwoFactorCode(secretCryptoUtils.decryptIfNeeded(server.getXrayRuntimeTwoFactorCode()));
         return server;
     }
 
@@ -390,7 +390,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
         }
         ControlServer update = new ControlServer();
         update.setId(serverId);
-        update.setXrayPanelLastSync(System.currentTimeMillis());
+        update.setXrayRuntimeLastSync(System.currentTimeMillis());
         update.setUpdatedTime(System.currentTimeMillis());
         controlServerService.updateById(update);
     }
@@ -398,7 +398,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     private void markTrafficSynced(ControlServer server, long syncedTime, TrafficTotals totals) {
         ControlServer update = new ControlServer();
         update.setId(server.getId());
-        update.setXrayPanelLastSync(syncedTime);
+        update.setXrayRuntimeLastSync(syncedTime);
         update.setUploadTraffic(totals.up);
         update.setDownloadTraffic(totals.down);
         update.setUpdatedTime(syncedTime);
@@ -406,7 +406,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     }
 
     private void syncInboundSnapshots(ControlServer server, JSONArray inbounds, long now,
-                                      List<XrayPanelTrafficSnapshot> snapshots, TrafficTotals totals) {
+                                      List<XrayRuntimeTrafficSnapshot> snapshots, TrafficTotals totals) {
         for (Object item : inbounds) {
             JSONObject inbound = toJsonObject(item);
             if (inbound == null) {
@@ -417,7 +417,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
             String tag = inbound.getString("tag");
             String protocol = inbound.getString("protocol");
 
-            XrayPanelTrafficSnapshot inboundSnapshot = baseSnapshot(server, "inbound", now);
+            XrayRuntimeTrafficSnapshot inboundSnapshot = baseSnapshot(server, "inbound", now);
             inboundSnapshot.setInboundId(inboundId);
             inboundSnapshot.setInboundRemark(remark);
             inboundSnapshot.setProtocol(protocol);
@@ -437,7 +437,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
                 if (client == null) {
                     continue;
                 }
-                XrayPanelTrafficSnapshot clientSnapshot = baseSnapshot(server, "client", now);
+                XrayRuntimeTrafficSnapshot clientSnapshot = baseSnapshot(server, "client", now);
                 clientSnapshot.setInboundId(firstInt(client.getInteger("inboundId"), client.getInteger("inbound_id"), inboundId));
                 clientSnapshot.setInboundRemark(remark);
                 clientSnapshot.setProtocol(protocol);
@@ -456,13 +456,13 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     }
 
     private void syncOutboundSnapshots(ControlServer server, JSONArray outbounds, long now,
-                                       List<XrayPanelTrafficSnapshot> snapshots, TrafficTotals totals) {
+                                       List<XrayRuntimeTrafficSnapshot> snapshots, TrafficTotals totals) {
         for (Object item : outbounds) {
             JSONObject outbound = toJsonObject(item);
             if (outbound == null) {
                 continue;
             }
-            XrayPanelTrafficSnapshot snapshot = baseSnapshot(server, "outbound", now);
+            XrayRuntimeTrafficSnapshot snapshot = baseSnapshot(server, "outbound", now);
             snapshot.setTag(outbound.getString("tag"));
             snapshot.setUp(longValue(outbound, "up"));
             snapshot.setDown(longValue(outbound, "down"));
@@ -472,8 +472,8 @@ public class XrayPanelServiceImpl implements XrayPanelService {
         }
     }
 
-    private XrayPanelTrafficSnapshot baseSnapshot(ControlServer server, String sourceType, long now) {
-        XrayPanelTrafficSnapshot snapshot = new XrayPanelTrafficSnapshot();
+    private XrayRuntimeTrafficSnapshot baseSnapshot(ControlServer server, String sourceType, long now) {
+        XrayRuntimeTrafficSnapshot snapshot = new XrayRuntimeTrafficSnapshot();
         snapshot.setServerId(server.getId());
         snapshot.setServerName(server.getName());
         snapshot.setSourceType(sourceType);
@@ -484,9 +484,9 @@ public class XrayPanelServiceImpl implements XrayPanelService {
         return snapshot;
     }
 
-    private int countType(List<XrayPanelTrafficSnapshot> snapshots, String sourceType) {
+    private int countType(List<XrayRuntimeTrafficSnapshot> snapshots, String sourceType) {
         int count = 0;
-        for (XrayPanelTrafficSnapshot snapshot : snapshots) {
+        for (XrayRuntimeTrafficSnapshot snapshot : snapshots) {
             if (sourceType.equals(snapshot.getSourceType())) {
                 count++;
             }
@@ -495,8 +495,8 @@ public class XrayPanelServiceImpl implements XrayPanelService {
     }
 
     private String buildUrl(ControlServer server, String path) {
-        String endpoint = trimTrailingSlash(server.getXrayPanelEndpoint().trim());
-        String basePath = normalizeBasePath(server.getXrayPanelBasePath());
+        String endpoint = trimTrailingSlash(server.getXrayRuntimeEndpoint().trim());
+        String basePath = normalizeBasePath(server.getXrayRuntimeBasePath());
         String cleanPath = path.startsWith("/") ? path : "/" + path;
         return endpoint + basePath + cleanPath;
     }
@@ -709,19 +709,19 @@ public class XrayPanelServiceImpl implements XrayPanelService {
         }
     }
 
-    private static class XrayPanelSession {
+    private static class XrayRuntimeSession {
         private final String csrf;
         private final String cookie;
         private final String error;
 
-        private XrayPanelSession(String csrf, String cookie, String error) {
+        private XrayRuntimeSession(String csrf, String cookie, String error) {
             this.csrf = csrf;
             this.cookie = cookie;
             this.error = error;
         }
 
-        private static XrayPanelSession error(String error) {
-            return new XrayPanelSession(null, null, error);
+        private static XrayRuntimeSession error(String error) {
+            return new XrayRuntimeSession(null, null, error);
         }
 
         private boolean isReady() {

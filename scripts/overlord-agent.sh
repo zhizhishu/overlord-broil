@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PANEL_URL="${OB_PANEL_URL:-}"
+MASTER_URL="${OB_MASTER_URL:-}"
 SERVER_ID="${OB_SERVER_ID:-}"
 AGENT_TOKEN="${OB_AGENT_TOKEN:-}"
 WORK_DIR="${OB_WORK_DIR:-/var/lib/overlord-agent}"
@@ -31,7 +31,7 @@ Commands:
   --version    Print agent version and exit.
 
 Required environment:
-  OB_PANEL_URL
+  OB_MASTER_URL
   OB_SERVER_ID
   OB_AGENT_TOKEN
 EOF
@@ -110,13 +110,13 @@ run_agent_doctor() {
   doctor_command flock 0
   doctor_command openssl 0
 
-  if [ -n "$PANEL_URL" ]; then
-    case "$PANEL_URL" in
-      http://*|https://*) doctor_item ok "panel-url" "${PANEL_URL%/}" ;;
-      *) doctor_item fail "panel-url" "must start with http:// or https://" ;;
+  if [ -n "$MASTER_URL" ]; then
+    case "$MASTER_URL" in
+      http://*|https://*) doctor_item ok "master-url" "${MASTER_URL%/}" ;;
+      *) doctor_item fail "master-url" "must start with http:// or https://" ;;
     esac
   else
-    doctor_item fail "panel-url" "OB_PANEL_URL is required"
+    doctor_item fail "master-url" "OB_MASTER_URL is required"
   fi
 
   case "$SERVER_ID" in
@@ -281,8 +281,8 @@ if [ "$AGENT_COMMAND" = "--version" ]; then
   exit 0
 fi
 
-if [ -z "$PANEL_URL" ] || [ -z "$SERVER_ID" ] || [ -z "$AGENT_TOKEN" ]; then
-  error "OB_PANEL_URL, OB_SERVER_ID and OB_AGENT_TOKEN are required."
+if [ -z "$MASTER_URL" ] || [ -z "$SERVER_ID" ] || [ -z "$AGENT_TOKEN" ]; then
+  error "OB_MASTER_URL, OB_SERVER_ID and OB_AGENT_TOKEN are required."
   exit 2
 fi
 
@@ -304,7 +304,7 @@ require_positive_int "OB_TASK_TIMEOUT_SECONDS" "$TASK_TIMEOUT_SECONDS"
 require_positive_int "OB_TASK_TIMEOUT_KILL_SECONDS" "$TASK_TIMEOUT_KILL_SECONDS"
 
 mkdir -p "$WORK_DIR"
-PANEL_URL="${PANEL_URL%/}"
+MASTER_URL="${MASTER_URL%/}"
 
 acquire_lock() {
   if command -v flock >/dev/null 2>&1; then
@@ -335,7 +335,7 @@ post_json_once() {
     --max-time "$HTTP_MAX_TIME" \
     -H "Content-Type: application/json" \
     -H "X-Agent-Token: ${AGENT_TOKEN}" \
-    -X POST "${PANEL_URL}${path}" \
+    -X POST "${MASTER_URL}${path}" \
     --data "$payload"
 }
 
@@ -671,8 +671,8 @@ PY
 
 heartbeat_payload() {
   local last_error="$1"
-  local xray_version snell_version cpu mem_usage mem_total net rx tx xrayPanel_service xray_service snell_service cert_json
-  xray_version="$(command_output 'panel_name="$(printf "%s-%s" "x" "ui")"; for f in /usr/local/${panel_name}/bin/xray-linux-* /usr/local/${panel_name}/bin/xray $(command -v xray 2>/dev/null); do [ -x "$f" ] && "$f" version && exit 0; done')"
+  local xray_version snell_version cpu mem_usage mem_total net rx tx xrayRuntime_service xray_service snell_service cert_json
+  xray_version="$(command_output 'runtime_name="$(printf "%s-%s" "x" "ui")"; for f in /usr/local/${runtime_name}/bin/xray-linux-* /usr/local/${runtime_name}/bin/xray $(command -v xray 2>/dev/null); do [ -x "$f" ] && "$f" version && exit 0; done')"
   snell_version="$(command_output 'command -v snell-server >/dev/null 2>&1 && snell-server -v')"
   cpu="$(cpu_usage)"
   mem_usage="$(memory_usage)"
@@ -680,11 +680,11 @@ heartbeat_payload() {
   net="$(net_bytes)"
   rx="${net%% *}"
   tx="${net##* }"
-  xrayPanel_service="$(service_status "$(printf "%s-%s" "x" "ui")")"
+  xrayRuntime_service="$(service_status "$(printf "%s-%s" "x" "ui")")"
   xray_service="$(xray_status)"
   snell_service="$(service_status snell)"
   cert_json="$(certificate_json)"
-  "$PYTHON_BIN" - "$SERVER_ID" "$AGENT_VERSION" "$xray_version" "$snell_version" "$cpu" "$mem_usage" "$mem_total" "$rx" "$tx" "$xrayPanel_service" "$xray_service" "$snell_service" "$last_error" "$cert_json" <<'PY'
+  "$PYTHON_BIN" - "$SERVER_ID" "$AGENT_VERSION" "$xray_version" "$snell_version" "$cpu" "$mem_usage" "$mem_total" "$rx" "$tx" "$xrayRuntime_service" "$xray_service" "$snell_service" "$last_error" "$cert_json" <<'PY'
 import json
 import sys
 
@@ -713,7 +713,7 @@ def low_memory_state(total_mb):
         return (
             True,
             "nano-critical",
-            "Memory is below 200 MB. Avoid full Xray Runtime/Xray orchestration; prefer Snell or port forwarding and enable swap.",
+            "Memory is below 200 MB. Avoid full Xray Runtime/Xray deployment; prefer Snell or port forwarding and enable swap.",
         )
     if total_mb < 256:
         return (
@@ -742,7 +742,7 @@ payload = {
     "memoryTotalMb": memory_total_mb,
     "downloadTraffic": as_int(sys.argv[8]),
     "uploadTraffic": as_int(sys.argv[9]),
-    "xrayPanelServiceStatus": sys.argv[10] or None,
+    "xrayRuntimeServiceStatus": sys.argv[10] or None,
     "xrayServiceStatus": sys.argv[11] or None,
     "snellServiceStatus": sys.argv[12] or None,
     "lastError": sys.argv[13] or None,
