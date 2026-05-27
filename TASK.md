@@ -19,13 +19,11 @@ Fix the HK master login captcha/database failure, harden old-database upgrades, 
 
 ## In Progress
 
-- Run final local validation, commit, push `main` and `future`, then confirm GitHub Actions.
+- None.
 
 ## Remaining
 
-1. Run shell/schema/whitespace checks.
-2. Commit and push to `origin/main` and `origin/future`.
-3. Check GitHub Actions after push.
+1. Monitor the next real install/upgrade run for any other retained-database edge cases.
 
 ## Validation Status
 
@@ -36,6 +34,10 @@ Fix the HK master login captcha/database failure, harden old-database upgrades, 
 - Passed: shell syntax and bootstrap syntax through `bash -n`.
 - Passed: `scripts/test-sqlite-schema.sh`.
 - Passed: `git diff --check`.
+- Passed: pushed `75a99c2` to `origin/main` and `origin/future`.
+- Passed: GitHub Actions `CI` and `Docker Images` succeeded on both `main` and `future`; Pages deployment succeeded on `main`.
+- Passed: HK upgraded to the new `ghcr.io/zhizhishu/overlord-broil:latest` image with `docker compose pull master && docker compose up -d`.
+- Passed: HK local and public frontend/captcha checks return `200`.
 
 ## Risks
 

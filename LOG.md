@@ -27,3 +27,5 @@
 - Completed: generalized backend startup schema repair with `OverlordSchemaInitializer` so old MySQL/SQLite installs can add missing product tables and columns during upgrade.
 - Validation: public frontend and captcha check both returned `200`; HK compose reported `overlord-master` and `overlord-mysql` healthy.
 - Validation: Docker Maven backend package build passed with tests skipped.
+- Release: pushed commit `75a99c2` to `main` and `future`; GitHub Actions `CI` and `Docker Images` succeeded on both branches, and Pages succeeded on `main`.
+- Release: upgraded `isrco-hk` with the new `latest` image; local and public captcha checks returned `200`.
