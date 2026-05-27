@@ -12,6 +12,14 @@ Close the Broil product flow for urgent use: simpler controlled-agent joining, e
 
 ## Completed This Round
 
+- Ran two read-only subagent audits: one for the frontend product surface and one for backend/API/scripts/docs.
+- Made `/control-center` the logged-in product entry and redirected old visible routes (`/dashboard`, `/forward`, `/tunnel`, `/node`, `/user`, `/profile`, `/limit`, `/config`) back to it.
+- Reduced desktop and mobile navigation to the single Overlord Broil product entry.
+- Simplified server registration UI so adding a server only asks for product-level fields and points the user to the generated one-command join flow.
+- Simplified protocol-node creation: default view now asks for server, name, protocol, port and light node settings; transport/security/keys/outbound tags are behind an advanced switch.
+- Simplified one-click deployment: default view emphasizes server selection and protocol bundle toggles; node-core credentials, listen IP and certificate internals are behind an advanced switch.
+- Disabled the old `/api/v1/node/install` long-lived token install route with HTTP 410 guidance toward the join-token flow.
+- Updated README, Chinese README, operations docs, release notes and GitHub Pages copy so the public product is described as one 8-module Overlord Broil surface instead of engineering/provider layers.
 - Added `/api/v1/agent-join/register` and short-lived join-token install commands so each controlled host can join with one command.
 - Added frontend `Join Command` action and auto-opened the install command after creating a controlled server.
 - Simplified protocol-node creation by auto-generating UUID, Trojan/SS password, Reality private key, Reality short id and Snell PSK when the user leaves placeholders.
@@ -26,6 +34,14 @@ Close the Broil product flow for urgent use: simpler controlled-agent joining, e
 
 ## Validation Status
 
+- Passed: `npm run build` in `vite-frontend` after the route/UI simplification.
+- Passed: `bash -n scripts/*.sh` and bootstrap `sh -n`.
+- Passed: `bash scripts/test-master-port-contract.sh`.
+- Passed: `bash scripts/test-agent-mock.sh`.
+- Passed: `bash scripts/test-sqlite-schema.sh`.
+- Passed: `git diff --check`.
+- Passed: public product-surface keyword scan for old visible engineering terms after this cleanup.
+- Attempted: Docker Maven `mvn -B -DskipTests package`; stopped after javac produced no output for about 10 minutes on the Windows bind mount, and the container was cleaned up.
 - Passed: `npm run build` in `vite-frontend`.
 - Passed: Docker Maven backend package build with tests skipped.
 - Passed: `bash -n scripts/*.sh`.
@@ -41,10 +57,10 @@ Close the Broil product flow for urgent use: simpler controlled-agent joining, e
 
 1. Commit and push the current changes to GitHub.
 2. Let GitHub Actions build the public image.
-3. Pull the new image on `isrco-hk` and run a browser/HK smoke with a real master login.
+3. Pull the new image on `isrco-hk` and run a browser/HK smoke with a real master login when remote validation is requested.
 
 ## Risks
 
 - The join flow is now server-card based self-registration: the server record is created first, then the agent exchanges `OB_JOIN_TOKEN` for internal credentials automatically.
 - Xray Runtime connector paths are internal service contracts and must not be blindly renamed.
-- Local host has no native Java/Maven; backend validation uses Docker Maven and is slow on the Windows bind mount.
+- Local host has no native Java/Maven; Docker Maven can be very slow on the Windows bind mount.

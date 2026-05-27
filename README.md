@@ -25,27 +25,28 @@ overlord-master :5166
   - embedded Web UI
   - API
   - task engine
-  - state sync
-  - Runtime Provider layer
+  - node orchestration
+  - status sync
         |
         v
 MySQL on the Docker network
 or optional SQLite in /app/data
 ```
 
-Runtime Providers are the product boundary between the master task engine and concrete host runtimes:
+The master exposes one product surface with eight modules:
 
-| Provider | Scope | Executor | Nano hosts |
-| --- | --- | --- | --- |
-| `xrayRuntime` | Xray, Reality, inbounds, outbounds, routing rules, IPv4/IPv6 strategy, traffic | master API + agent task | not recommended |
-| `snell` | Snell node services | agent task | supported |
-| `forward` | TCP/UDP remote forwarding | agent task | supported |
-| `certificate` | self-signed, ACME and certificate diagnostics | agent task | task-dependent |
-| `firewall` | firewall diagnostics and runtime port handling | agent task | supported |
+| Module | Scope |
+| --- | --- |
+| Dashboard | online state, traffic, node count, alerts and certificate state |
+| Servers | one-command controlled-agent join, heartbeat, CPU, memory and service status |
+| Inbound nodes | VLESS Reality, VMess, Trojan, Shadowsocks and Snell |
+| Outbound and routing | outbounds, routing rules, IPv4/IPv6 strategy and rule order |
+| Forwarding and tunnels | remote TCP/UDP forwarding, tunnel rules and rate limits |
+| Traffic | user, node, inbound and outbound traffic snapshots |
+| Certificates | self-signed, ACME, expiry state and renewal tasks |
+| Settings | users, security, backup, update and operation logs |
 
-Snell is unified at the product/node-management layer, but it is not a native Xray core protocol. The controlled agent deploys Snell as an independent service on the target host.
-
-Runtime Provider metadata follows the task from master claim to agent report. Task results include normalized `resultJson.runtimeProvider` and `resultJson.runtimeState`, so Xray, Snell, forwarding, certificate and firewall tasks share one status model.
+Snell is unified in the inbound-node product flow, but it is not a native Xray core protocol. The controlled agent deploys Snell as an independent service on the target host and reports it through the same node/status model.
 
 ## UI Preview
 
@@ -61,8 +62,8 @@ Current UI coverage includes:
 - Xray inbound, outbound, routing, config, traffic and restart actions
 - Snell node create/restart/remove flows
 - remote TCP/UDP forward rules
-- Runtime Provider visibility and maintenance buttons
-- State Sync runtime overview by server and provider
+- server health, service and certificate state
+- compact operation logs for task and agent events
 - operation audit timeline for task creation, rejection, manual state changes, retry/delete, agent claim and agent report events
 - agent diagnostics, logs, restart, upgrade, uninstall and repair tasks
 - monitor alerts and a unified rule center
@@ -88,7 +89,7 @@ Controlled agents do not need an inbound management port. They call the same mas
 http://MASTER_IP:5166
 ```
 
-Controlled hosts expose only the business ports you choose: optional Xray Runtime port `5168`, Xray/Reality inbound ports, Snell listen ports, remote-forward listen ports and ACME HTTP `80/tcp` when selected.
+Controlled hosts expose only the business ports you choose: optional node-core port `5168`, Xray/Reality inbound ports, Snell listen ports, remote-forward listen ports and ACME HTTP `80/tcp` when selected.
 
 ## Quick Start
 
@@ -162,7 +163,7 @@ The agent runs through systemd or OpenRC, claims tasks from the master, executes
 4. Install the agent with the generated join command.
 5. Wait for heartbeat.
 6. Select one or more servers and create deployment plans:
-   - install or reuse Xray Runtime
+   - install or reuse the node core
    - create VLESS Reality, VMess WebSocket, Trojan TLS or Shadowsocks nodes
    - deploy Snell nodes
    - issue or bind certificates
@@ -188,7 +189,7 @@ Agent heartbeat reports total memory. The master classifies tiny hosts:
 | Agent service | systemd | systemd | OpenRC |
 | Snell node tasks | systemd | systemd | OpenRC |
 | Remote forwarding tasks | systemd + `socat` | systemd + `socat` | OpenRC + `socat` |
-| Full Xray Runtime install/configure | supported | supported | not supported in `0.6.0` |
+| Full node-core install/configure | supported | supported | not supported in `0.6.0` |
 
 ## Docker And GHCR
 
@@ -204,7 +205,7 @@ Supported deployments use the single `overlord-master` image. Backend and fronte
 
 ## API Summary
 
-Runtime Provider:
+Product system APIs:
 
 ```text
 POST /api/v1/runtime-provider/list
@@ -227,7 +228,7 @@ POST /api/v1/agent-task/claim
 POST /api/v1/agent-task/report
 ```
 
-Profiles, nodes, forwarding and Xray Runtime:
+Profiles, nodes, forwarding and node-core routes:
 
 ```text
 POST /api/v1/protocol-profile/create
@@ -279,21 +280,21 @@ bash scripts/test-xray-runtime-e2e.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
 ```
 
-Real Xray Runtime contract smoke is optional and skips unless a target endpoint and API token are provided:
+Real node-core contract smoke is optional and skips unless a target endpoint and API token are provided:
 
 ```bash
-export XRAY_RUNTIME_E2E_URL="https://xray-runtime.example.com:5168"
+export XRAY_RUNTIME_E2E_URL="https://node-core.example.com:5168"
 export XRAY_RUNTIME_E2E_TOKEN="YOUR_XRAY_RUNTIME_API_TOKEN"
 bash scripts/test-xray-runtime-e2e.sh
 ```
 
-To create, toggle and delete a temporary VLESS inbound on the real Xray Runtime host, opt in explicitly:
+To create, toggle and delete a temporary VLESS inbound on the real node-core host, opt in explicitly:
 
 ```bash
 XRAY_RUNTIME_E2E_WRITE=1 XRAY_RUNTIME_E2E_PORT=42123 bash scripts/test-xray-runtime-e2e.sh
 ```
 
-Live validation note: on `isrco-hk`, an authorized disposable Xray Runtime container passed the direct E2E write contract and the Overlord master API inbound add/toggle/delete path. The temporary ports `42123` and `42124` were cleaned after the run.
+Live validation note: on `isrco-hk`, an authorized disposable node-core container passed the direct E2E write contract and the Overlord master API inbound add/toggle/delete path. The temporary ports `42123` and `42124` were cleaned after the run.
 
 Real Snell smoke runs against a live master/agent host. It logs in to the master, creates a temporary Snell protocol node, lets the controlled agent claim the task, checks the service and listen port, then deletes the temporary node by default:
 
@@ -304,7 +305,7 @@ OB_MASTER_URL="http://127.0.0.1:5166" OB_SNELL_PORT=18390 bash scripts/test-snel
 ## Remaining Work Before 1.0
 
 - Real VPS matrix: Debian, Ubuntu, Rocky Linux, Oracle Linux and Alpine.
-- Extend the recorded real Xray Runtime E2E beyond the current `isrco-hk` container run to more VPS/provider targets.
+- Extend the recorded real node-core E2E beyond the current `isrco-hk` container run to more VPS/provider targets.
 - Better certificate, firewall and cloud-security-group diagnostics.
 - RBAC, audit retention/export, agent token expiry/revocation and key-rotation migration.
 - Mobile layout, loading/error states and task-detail polish.

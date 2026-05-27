@@ -1,17 +1,9 @@
-import { Route, Routes, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
 import IndexPage from "@/pages/index";
 import ChangePasswordPage from "@/pages/change-password";
-import DashboardPage from "@/pages/dashboard";
-import ForwardPage from "@/pages/forward";
-import TunnelPage from "@/pages/tunnel";
-import NodePage from "@/pages/node";
 import ControlCenterPage from "@/pages/control-center";
-import UserPage from "@/pages/user";
-import ProfilePage from "@/pages/profile";
-import LimitPage from "@/pages/limit";
-import ConfigPage from "@/pages/config";
 import { SettingsPage } from "@/pages/settings";
 
 import AdminLayout from "@/layouts/admin";
@@ -107,7 +99,7 @@ const LoginRoute = () => {
   useEffect(() => {
     if (authenticated) {
       // 使用 React Router 导航，避免无限跳转
-      navigate('/dashboard', { replace: true });
+      navigate('/control-center', { replace: true });
     }
   }, [authenticated, navigate]);
   
@@ -158,38 +150,17 @@ function App() {
           </ProtectedRoute>
         } 
       />
-      <Route 
-        path="/dashboard" 
-        element={
-          <ProtectedRoute>
-            <DashboardPage />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/forward" 
-        element={
-          <ProtectedRoute>
-            <ForwardPage />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/tunnel" 
-        element={
-          <ProtectedRoute>
-            <TunnelPage />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/node" 
-        element={
-          <ProtectedRoute>
-            <NodePage />
-          </ProtectedRoute>
-        } 
-      />
+      {["/dashboard", "/forward", "/tunnel", "/node", "/user", "/profile", "/limit", "/config"].map(path => (
+        <Route
+          key={path}
+          path={path}
+          element={
+            <ProtectedRoute>
+              <Navigate to="/control-center" replace />
+            </ProtectedRoute>
+          }
+        />
+      ))}
       <Route
         path="/control-center"
         element={
@@ -197,38 +168,6 @@ function App() {
             <ControlCenterPage />
           </ProtectedRoute>
         }
-      />
-      <Route
-        path="/user" 
-        element={
-          <ProtectedRoute useSimpleLayout={true}>
-            <UserPage />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/profile" 
-        element={
-          <ProtectedRoute>
-            <ProfilePage />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/limit" 
-        element={
-          <ProtectedRoute useSimpleLayout={true}>
-            <LimitPage />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/config" 
-        element={
-          <ProtectedRoute useSimpleLayout={true}>
-            <ConfigPage />
-          </ProtectedRoute>
-        } 
       />
       <Route 
         path="/settings" 

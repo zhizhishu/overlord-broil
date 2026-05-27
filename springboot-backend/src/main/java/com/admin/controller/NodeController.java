@@ -58,8 +58,7 @@ public class NodeController extends BaseController {
     @RequireRole
     @PostMapping("/install")
     public R getInstallCommand(@RequestBody Map<String, Object> params) {
-        Long id = Long.valueOf(params.get("id").toString());
-        return nodeService.getInstallCommand(id);
+        return R.err(410, "legacy node install is disabled; use /api/v1/control-server/install-command join-token flow");
     }
 
 }

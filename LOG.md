@@ -54,3 +54,14 @@
 - Completed: deleted the remaining old engineering console code from the control-center page, including runtime-provider state blocks, state-sync UI, diagnostic cards, raw inbound payload preview and the unused advanced inbound modal.
 - Completed: kept the product surface focused on the 8 modules and the necessary product modals for server join, node creation, routing, forwarding, certificates and settings logs.
 - Validation: frontend `npm run build`, `git diff --check` and product-surface keyword scan passed.
+
+## 2026-05-27 Product Entry And Join Cleanup
+
+- Completed: ran parallel read-only audits for frontend product fit and backend/API/scripts/docs product boundaries.
+- Completed: made `/control-center` the logged-in product entry and redirected old visible routes back to the Overlord Broil control center.
+- Completed: reduced desktop and mobile navigation to the single Overlord Broil product entry.
+- Completed: simplified server registration, protocol-node creation and one-click deployment by moving advanced runtime, key and routing fields behind advanced switches.
+- Completed: disabled the old `/api/v1/node/install` long-lived-token install route with a 410 response that points to the join-token flow.
+- Docs: updated README, README.zh-CN, operations docs, release notes and Pages text around the 8-module product surface and node-core wording.
+- Validation: frontend `npm run build`, shell syntax, master port contract, agent mock, SQLite schema, product-surface keyword scan and `git diff --check` passed.
+- Note: Docker Maven package on the Windows bind mount was attempted, but javac produced no output for about 10 minutes; the test container was stopped and cleaned up.

@@ -620,7 +620,7 @@ const MasterRiskNotice = ({ context }: { context: string }) => {
 
   return (
     <div className="rounded-small border border-warning-300 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
-      <span className="font-semibold">{t("主控高风险：")}</span>{t("{context}会作用在控制面服务器上，建议确认 API、Xray 运行时以及证书任务不会影响现有部署。", { context: t(context) })}
+      <span className="font-semibold">{t("主控高风险：")}</span>{t("{context}会作用在控制面服务器上，建议确认节点内核、协议节点以及证书任务不会影响现有部署。", { context: t(context) })}
     </div>
   );
 };
@@ -646,6 +646,8 @@ export default function ControlCenterPage() {
   const [deploymentPlanModalOpen, setDeploymentPlanModalOpen] = useState(false);
   const [scriptModalOpen, setScriptModalOpen] = useState(false);
   const [xraySettingModalOpen, setXraySettingModalOpen] = useState(false);
+  const [protocolAdvancedOpen, setProtocolAdvancedOpen] = useState(false);
+  const [deploymentAdvancedOpen, setDeploymentAdvancedOpen] = useState(false);
   const [scriptTitle, setScriptTitle] = useState("");
   const [scriptText, setScriptText] = useState("");
   const [pendingUiConfirmation, setPendingUiConfirmation] = useState<PendingUiConfirmation | null>(null);
@@ -825,6 +827,7 @@ export default function ControlCenterPage() {
     const protocol = (node?.protocol || "vless") as ProtocolNodeForm["protocol"];
     const engine = (node?.engine || (protocol === "snell" ? "snell" : "xray")) as ProtocolNodeForm["engine"];
     const savedConfig = safeJsonParse(node?.configJson);
+    setProtocolAdvancedOpen(Boolean(node?.id));
     setProtocolNodeForm(withGeneratedProtocolNodeSecrets({
       ...blankProtocolNodeForm,
       id: node?.id,
@@ -908,6 +911,7 @@ export default function ControlCenterPage() {
       certificateDomain: host.includes(".") ? host : "",
       webBasePath: firstServer?.id ? `ob-${firstServer.id}` : "ob-control"
     });
+    setDeploymentAdvancedOpen(false);
     setDeploymentPlanModalOpen(true);
   };
 
@@ -1211,11 +1215,11 @@ export default function ControlCenterPage() {
       return;
     }
     if (selectedDeploymentPlanCriticalNanoServers.length > 0 && selectedDeploymentPlanUsesFullXrayRuntimeStack) {
-      toast.error(t("Nano 被控内存低于 200MB，不支持完整 Xray 部署；请关闭 Xray 相关选项，仅保留 Snell 或端口转发。"));
+      toast.error(t("Nano 被控内存低于 200MB，不支持完整节点内核部署；请关闭 Xray 相关选项，仅保留 Snell 或端口转发。"));
       return;
     }
     const ports = [
-      ["Xray Runtime", deploymentPlanForm.runtimePort, true],
+      [t("节点内核"), deploymentPlanForm.runtimePort, true],
       ["VLESS Reality", deploymentPlanForm.vlessPort, deploymentPlanForm.createVlessReality],
       ["VMess WS", deploymentPlanForm.vmessPort, deploymentPlanForm.createVmessWs],
       ["Trojan TLS", deploymentPlanForm.trojanPort, deploymentPlanForm.createTrojanTls],
@@ -1253,7 +1257,7 @@ export default function ControlCenterPage() {
 
     const failed = results.find(res => res.code !== 0);
     if (!failed) {
-      toast.success(t("已生成 {count} 个一键部署任务，等待副控 agent 自动领取", { count: results.length }));
+      toast.success(t("已生成 {count} 个一键部署任务，等待被控 Agent 自动领取", { count: results.length }));
       setDeploymentPlanModalOpen(false);
       setScriptTitle(t("一键部署任务"));
       setScriptText(results.map(res => `# Task ${res.data.id} / ${res.data.serverName || res.data.serverId}\n${res.data.script || ""}`).join("\n\n"));
@@ -1847,22 +1851,14 @@ export default function ControlCenterPage() {
               <Input label={t("名称")} value={serverForm.name} onChange={e => setServerForm(prev => ({ ...prev, name: e.target.value }))} variant="bordered" />
               <Select label={t("角色")} selectedKeys={[serverForm.role]} onSelectionChange={keys => setServerForm(prev => ({ ...prev, role: Array.from(keys)[0] as string }))} variant="bordered">
                 <SelectItem key="master">{t("主控")}</SelectItem>
-                <SelectItem key="agent">{t("副控")}</SelectItem>
+                <SelectItem key="agent">{t("被控")}</SelectItem>
               </Select>
               <Input label={t("主机")} value={serverForm.host} onChange={e => setServerForm(prev => ({ ...prev, host: e.target.value }))} variant="bordered" />
               <Input label="SSH 端口" type="number" value={serverForm.sshPort.toString()} onChange={e => setServerForm(prev => ({ ...prev, sshPort: Number(e.target.value) || 22 }))} variant="bordered" />
               <Input label="SSH 用户" value={serverForm.sshUser} onChange={e => setServerForm(prev => ({ ...prev, sshUser: e.target.value }))} variant="bordered" />
-              <Input label={t("副控 API")} value={serverForm.endpoint} onChange={e => setServerForm(prev => ({ ...prev, endpoint: e.target.value }))} variant="bordered" />
-              <Input label={t("Xray Runtime 地址")} value={serverForm.xrayRuntimeEndpoint} onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeEndpoint: e.target.value }))} variant="bordered" placeholder="https://1.2.3.4:5168" />
-              <Input label={t("Xray Runtime Base Path")} value={serverForm.xrayRuntimeBasePath} onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeBasePath: e.target.value }))} variant="bordered" placeholder="/secret-path" />
-              <Input label={t("Xray Runtime API Token")} value={serverForm.xrayRuntimeApiToken} onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeApiToken: e.target.value }))} variant="bordered" />
-              <Input label={t("Xray Runtime 用户名")} value={serverForm.xrayRuntimeUsername} onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeUsername: e.target.value }))} variant="bordered" />
-              <Input label={t("Xray Runtime 密码")} type="password" value={serverForm.xrayRuntimePassword} onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimePassword: e.target.value }))} variant="bordered" />
-              <Input label={t("Xray Runtime 2FA")} value={serverForm.xrayRuntimeTwoFactorCode} onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeTwoFactorCode: e.target.value }))} variant="bordered" />
-              <Select label={t("Xray Runtime TLS 校验")} selectedKeys={[serverForm.xrayRuntimeAllowInsecure.toString()]} onSelectionChange={keys => setServerForm(prev => ({ ...prev, xrayRuntimeAllowInsecure: Number(Array.from(keys)[0]) }))} variant="bordered">
-                <SelectItem key="0">{t("校验证书")}</SelectItem>
-                <SelectItem key="1">{t("允许自签名")}</SelectItem>
-              </Select>
+              <div className="md:col-span-2 rounded-small border border-default-200 bg-default-50/60 p-3 text-xs leading-5 text-gray-600 dark:bg-default-50/5 dark:text-gray-300">
+                {t("保存后在服务器卡片点击“加入命令”，到被控服务器执行一条命令即可接入。被控 Agent 主动回连主控，不需要开放管理端口。")}
+              </div>
             </div>
             {serverForm.role === "master" && (
               <MasterRiskNotice context="保存 role=master" />
@@ -1901,7 +1897,7 @@ export default function ControlCenterPage() {
           <ModalHeader>{protocolNodeForm.id ? t("编辑协议节点") : t("新增协议节点")}</ModalHeader>
           <ModalBody>
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Select label={t("目标服务器")} selectedKeys={protocolNodeForm.serverId ? [protocolNodeForm.serverId.toString()] : []} onSelectionChange={keys => patchProtocolNodeForm({ serverId: Number(Array.from(keys)[0]) })} variant="bordered">
                   {renderServerOptions()}
                 </Select>
@@ -1913,18 +1909,14 @@ export default function ControlCenterPage() {
                   <SelectItem key="shadowsocks">Shadowsocks</SelectItem>
                   <SelectItem key="snell">Snell</SelectItem>
                 </Select>
-                <Input label={t("监听地址")} value={protocolNodeForm.listen} onChange={e => patchProtocolNodeForm({ listen: e.target.value })} variant="bordered" placeholder={protocolNodeForm.protocol === "snell" ? "::0" : t("留空监听全部")} />
                 <Input label={t("端口")} type="number" value={protocolNodeForm.port.toString()} onChange={e => patchProtocolNodeForm({ port: Number(e.target.value) || 0 })} variant="bordered" />
-                <Select label={t("传输")} selectedKeys={[protocolNodeForm.transport]} onSelectionChange={keys => patchProtocolNodeForm({ transport: Array.from(keys)[0] as ProtocolNodeForm["transport"] })} variant="bordered" isDisabled={protocolNodeForm.protocol === "snell"}>
-                  <SelectItem key="tcp">TCP</SelectItem>
-                  <SelectItem key="ws">WebSocket</SelectItem>
-                </Select>
-                <Select label={t("安全")} selectedKeys={[protocolNodeForm.security]} onSelectionChange={keys => patchProtocolNodeForm({ security: Array.from(keys)[0] as ProtocolNodeForm["security"] })} variant="bordered" isDisabled={protocolNodeForm.protocol === "snell"}>
-                  <SelectItem key="none">None</SelectItem>
-                  <SelectItem key="tls">TLS</SelectItem>
-                  <SelectItem key="reality">Reality</SelectItem>
-                  <SelectItem key="psk">PSK</SelectItem>
-                </Select>
+              </div>
+              <div className="flex items-center justify-between rounded-small border border-default-200 bg-default-50/60 px-3 py-2 dark:bg-default-50/5">
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{t("自动生成密钥")}</p>
+                  <p className="text-xs text-gray-500">{t("默认只填服务器、协议和端口；UUID、Reality 密钥、Snell PSK 会自动生成。")}</p>
+                </div>
+                <Switch size="sm" isSelected={protocolAdvancedOpen} onValueChange={setProtocolAdvancedOpen}>{t("高级")}</Switch>
               </div>
               {selectedProtocolServer?.role === "master" && (
                 <MasterRiskNotice context="保存该协议节点" />
@@ -1932,17 +1924,39 @@ export default function ControlCenterPage() {
 
               {protocolNodeForm.protocol === "snell" ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {protocolAdvancedOpen && (
+                    <Input label={t("监听地址")} value={protocolNodeForm.listen} onChange={e => patchProtocolNodeForm({ listen: e.target.value })} variant="bordered" placeholder="::0" />
+                  )}
                   <div className="space-y-2">
                     <Input label="Snell PSK" value={protocolNodeForm.snellPsk} onChange={e => patchProtocolNodeForm({ snellPsk: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
                     <Button size="sm" variant="flat" onPress={() => patchProtocolNodeForm({ snellPsk: randomToken(32) })}>{t("生成 PSK")}</Button>
                   </div>
-                  <Input label={t("Snell 版本")} value={protocolNodeForm.snellVersion} onChange={e => patchProtocolNodeForm({ snellVersion: e.target.value })} variant="bordered" />
+                  {protocolAdvancedOpen && (
+                    <Input label={t("Snell 版本")} value={protocolNodeForm.snellVersion} onChange={e => patchProtocolNodeForm({ snellVersion: e.target.value })} variant="bordered" />
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Input label={t("SNI / 域名")} value={protocolNodeForm.sni} onChange={e => patchProtocolNodeForm({ sni: e.target.value })} variant="bordered" />
+                    <Input label={t("流量限制 GB")} type="number" value={protocolNodeForm.totalGb.toString()} onChange={e => patchProtocolNodeForm({ totalGb: Number(e.target.value) || 0 })} variant="bordered" />
+                    <Input label={t("有效期天数")} type="number" value={protocolNodeForm.expiryDays.toString()} onChange={e => patchProtocolNodeForm({ expiryDays: Number(e.target.value) || 0 })} variant="bordered" />
+                  </div>
+                  {protocolAdvancedOpen && (
+                    <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Input label={t("监听地址")} value={protocolNodeForm.listen} onChange={e => patchProtocolNodeForm({ listen: e.target.value })} variant="bordered" placeholder={t("留空监听全部")} />
+                    <Select label={t("传输")} selectedKeys={[protocolNodeForm.transport]} onSelectionChange={keys => patchProtocolNodeForm({ transport: Array.from(keys)[0] as ProtocolNodeForm["transport"] })} variant="bordered">
+                      <SelectItem key="tcp">TCP</SelectItem>
+                      <SelectItem key="ws">WebSocket</SelectItem>
+                    </Select>
+                    <Select label={t("安全")} selectedKeys={[protocolNodeForm.security]} onSelectionChange={keys => patchProtocolNodeForm({ security: Array.from(keys)[0] as ProtocolNodeForm["security"] })} variant="bordered">
+                      <SelectItem key="none">None</SelectItem>
+                      <SelectItem key="tls">TLS</SelectItem>
+                      <SelectItem key="reality">Reality</SelectItem>
+                    </Select>
                     <Input label={t("客户端 Email")} value={protocolNodeForm.clientEmail} onChange={e => patchProtocolNodeForm({ clientEmail: e.target.value })} variant="bordered" />
-                    {protocolNodeForm.protocol !== "trojan" && protocolNodeForm.protocol !== "shadowsocks" && (
+                      {protocolNodeForm.protocol !== "trojan" && protocolNodeForm.protocol !== "shadowsocks" && (
                       <div className="space-y-2">
                         <Input label={t("客户端 UUID")} value={protocolNodeForm.clientId} onChange={e => patchProtocolNodeForm({ clientId: e.target.value })} variant="bordered" />
                         <Button size="sm" variant="flat" onPress={() => patchProtocolNodeForm({ clientId: randomUuid() })}>{t("生成 UUID")}</Button>
@@ -1954,11 +1968,8 @@ export default function ControlCenterPage() {
                     {protocolNodeForm.protocol === "vless" && (
                       <Input label="Flow" value={protocolNodeForm.flow} onChange={e => patchProtocolNodeForm({ flow: e.target.value })} variant="bordered" />
                     )}
-                    <Input label={t("流量限制 GB")} type="number" value={protocolNodeForm.totalGb.toString()} onChange={e => patchProtocolNodeForm({ totalGb: Number(e.target.value) || 0 })} variant="bordered" />
-                    <Input label={t("有效期天数")} type="number" value={protocolNodeForm.expiryDays.toString()} onChange={e => patchProtocolNodeForm({ expiryDays: Number(e.target.value) || 0 })} variant="bordered" />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Input label="SNI / Host" value={protocolNodeForm.sni} onChange={e => patchProtocolNodeForm({ sni: e.target.value })} variant="bordered" />
                     {protocolNodeForm.protocol === "vless" && protocolNodeForm.security === "reality" && (
                       <>
                         <Input label="Reality Dest" value={protocolNodeForm.realityDest} onChange={e => patchProtocolNodeForm({ realityDest: e.target.value })} variant="bordered" />
@@ -1983,6 +1994,8 @@ export default function ControlCenterPage() {
                     <Input label="Outbound Tag" value={protocolNodeForm.outboundTag} onChange={e => patchProtocolNodeForm({ outboundTag: e.target.value })} variant="bordered" placeholder={t("留空使用默认路由")} />
                     {renderOutboundTagButtons(tag => patchProtocolNodeForm({ outboundTag: tag }))}
                   </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -2056,7 +2069,7 @@ export default function ControlCenterPage() {
 
       <Modal isOpen={deploymentPlanModalOpen} onOpenChange={setDeploymentPlanModalOpen} size="5xl" scrollBehavior="inside">
         <ModalContent>
-          <ModalHeader>{t("一键部署 Xray / Snell")}</ModalHeader>
+          <ModalHeader>{t("一键部署节点")}</ModalHeader>
           <ModalBody>
             <div className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2081,11 +2094,18 @@ export default function ControlCenterPage() {
                   {renderServerOptions()}
                 </Select>
                 <Input label={t("公网主机")} value={deploymentPlanForm.publicHost} onChange={e => patchDeploymentPlanForm({ publicHost: e.target.value })} variant="bordered" />
-                <Input label={t("Xray Runtime 版本")} value={deploymentPlanForm.xrayRuntimeVersion} onChange={e => patchDeploymentPlanForm({ xrayRuntimeVersion: e.target.value })} variant="bordered" placeholder={t("留空使用最新版")} />
+                <Input label={t("节点内核版本")} value={deploymentPlanForm.xrayRuntimeVersion} onChange={e => patchDeploymentPlanForm({ xrayRuntimeVersion: e.target.value })} variant="bordered" placeholder={t("留空使用最新版")} />
               </div>
               {selectedDeploymentPlanHasMaster && (
                 <MasterRiskNotice context="生成一键部署任务" />
               )}
+              <div className="flex items-center justify-between rounded-small border border-default-200 bg-default-50/60 px-3 py-2 dark:bg-default-50/5">
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{t("默认套餐部署")}</p>
+                  <p className="text-xs text-gray-500">{t("选择服务器和协议即可生成任务；账号、密码、PSK 和密钥默认自动生成。")}</p>
+                </div>
+                <Switch size="sm" isSelected={deploymentAdvancedOpen} onValueChange={setDeploymentAdvancedOpen}>{t("高级")}</Switch>
+              </div>
               {selectedDeploymentPlanLowMemoryServers.length > 0 && (
                 <div className={`rounded-small border px-3 py-2 text-xs leading-5 ${
                   selectedDeploymentPlanCriticalNanoServers.length > 0
@@ -2093,33 +2113,35 @@ export default function ControlCenterPage() {
                     : "border-warning-300 bg-warning-50 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300"
                 }`}>
                   <span className="font-semibold">{t("Nano 被控风险：")}</span>
-                  {t("已选择 {count} 台低内存服务器。低于 200MB 时主控会阻止完整 Xray 部署；建议只保留 Snell 或端口转发，并先开启 swap。", {
+                  {t("已选择 {count} 台低内存服务器。低于 200MB 时主控会阻止完整节点内核部署；建议只保留 Snell 或端口转发，并先开启 swap。", {
                     count: selectedDeploymentPlanLowMemoryServers.length
                   })}
                 </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-small border border-default-200 p-4">
-                <Switch isSelected={deploymentPlanForm.installXrayRuntime} onValueChange={value => patchDeploymentPlanForm({ installXrayRuntime: value })}>{t("安装 Xray Runtime")}</Switch>
-                <Switch isSelected={deploymentPlanForm.configureRuntime} onValueChange={value => patchDeploymentPlanForm({ configureRuntime: value })}>{t("配置 Xray Runtime")}</Switch>
+                <Switch isSelected={deploymentPlanForm.installXrayRuntime} onValueChange={value => patchDeploymentPlanForm({ installXrayRuntime: value })}>{t("安装节点内核")}</Switch>
+                <Switch isSelected={deploymentPlanForm.configureRuntime} onValueChange={value => patchDeploymentPlanForm({ configureRuntime: value })}>{t("配置节点内核")}</Switch>
                 <Switch isSelected={deploymentPlanForm.installSnell} onValueChange={value => patchDeploymentPlanForm({ installSnell: value })}>{t("安装 Snell")}</Switch>
                 <Switch isSelected={deploymentPlanForm.createVlessReality || deploymentPlanForm.createVmessWs || deploymentPlanForm.createTrojanTls || deploymentPlanForm.createShadowsocks} isReadOnly>{t("创建节点")}</Switch>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input label={t("Xray Runtime 端口")} type="number" value={deploymentPlanForm.runtimePort.toString()} onChange={e => patchDeploymentPlanForm({ runtimePort: Number(e.target.value) || 5168 })} variant="bordered" />
-                <Input label={t("Xray Runtime 用户名")} value={deploymentPlanForm.runtimeUsername} onChange={e => patchDeploymentPlanForm({ runtimeUsername: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
-                <Input label={t("Xray Runtime 密码")} type="password" value={deploymentPlanForm.runtimePassword} onChange={e => patchDeploymentPlanForm({ runtimePassword: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
-                <Input label="Web Base Path" value={deploymentPlanForm.webBasePath} onChange={e => patchDeploymentPlanForm({ webBasePath: e.target.value })} variant="bordered" />
-                <Input label={t("监听 IP")} value={deploymentPlanForm.listenIp} onChange={e => patchDeploymentPlanForm({ listenIp: e.target.value })} variant="bordered" />
-                <Select label={t("证书模式")} selectedKeys={[deploymentPlanForm.certificateMode]} onSelectionChange={keys => patchDeploymentPlanForm({ certificateMode: Array.from(keys)[0] as DeploymentPlanForm["certificateMode"] })} variant="bordered">
-                  <SelectItem key="self-signed">{t("自签名")}</SelectItem>
-                  <SelectItem key="acme-http">ACME HTTP</SelectItem>
-                  <SelectItem key="none">{t("不配置")}</SelectItem>
-                </Select>
-                <Input label={t("证书域名")} value={deploymentPlanForm.certificateDomain} onChange={e => patchDeploymentPlanForm({ certificateDomain: e.target.value })} variant="bordered" />
-                <Input label={t("ACME 邮箱")} value={deploymentPlanForm.acmeEmail} onChange={e => patchDeploymentPlanForm({ acmeEmail: e.target.value })} variant="bordered" />
-              </div>
+              {deploymentAdvancedOpen && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Input label={t("节点内核端口")} type="number" value={deploymentPlanForm.runtimePort.toString()} onChange={e => patchDeploymentPlanForm({ runtimePort: Number(e.target.value) || 5168 })} variant="bordered" />
+                  <Input label={t("节点内核用户")} value={deploymentPlanForm.runtimeUsername} onChange={e => patchDeploymentPlanForm({ runtimeUsername: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
+                  <Input label={t("节点内核密码")} type="password" value={deploymentPlanForm.runtimePassword} onChange={e => patchDeploymentPlanForm({ runtimePassword: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
+                  <Input label={t("访问路径")} value={deploymentPlanForm.webBasePath} onChange={e => patchDeploymentPlanForm({ webBasePath: e.target.value })} variant="bordered" />
+                  <Input label={t("监听 IP")} value={deploymentPlanForm.listenIp} onChange={e => patchDeploymentPlanForm({ listenIp: e.target.value })} variant="bordered" />
+                  <Select label={t("证书模式")} selectedKeys={[deploymentPlanForm.certificateMode]} onSelectionChange={keys => patchDeploymentPlanForm({ certificateMode: Array.from(keys)[0] as DeploymentPlanForm["certificateMode"] })} variant="bordered">
+                    <SelectItem key="self-signed">{t("自签名")}</SelectItem>
+                    <SelectItem key="acme-http">ACME HTTP</SelectItem>
+                    <SelectItem key="none">{t("不配置")}</SelectItem>
+                  </Select>
+                  <Input label={t("证书域名")} value={deploymentPlanForm.certificateDomain} onChange={e => patchDeploymentPlanForm({ certificateDomain: e.target.value })} variant="bordered" />
+                  <Input label={t("ACME 邮箱")} value={deploymentPlanForm.acmeEmail} onChange={e => patchDeploymentPlanForm({ acmeEmail: e.target.value })} variant="bordered" />
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 rounded-small border border-default-200 p-4">
                 <div className="space-y-3">
@@ -2172,10 +2194,10 @@ export default function ControlCenterPage() {
                 <Chip size="sm" variant="flat" color="primary">IPv4 / IPv6</Chip>
                 <Chip size="sm" variant="flat" color="primary">{t("规则优先")}</Chip>
               </div>
-              {t("这里保存完整 Xray 配置，包含 outbounds、routing.rules、domainStrategy、DNS 和 IPv4/IPv6 相关策略；规则匹配顺序以 JSON 中的数组顺序为准。")}
+              {t("这里保存完整路由配置，包含 outbounds、routing.rules、domainStrategy、DNS 和 IPv4/IPv6 相关策略；规则匹配顺序以 JSON 中的数组顺序为准。")}
             </div>
             <Textarea
-              label={t("完整 Xray 配置 JSON")}
+              label={t("完整路由配置 JSON")}
               minRows={22}
               value={xraySettingText}
               onChange={e => setXraySettingText(e.target.value)}

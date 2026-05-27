@@ -38,12 +38,12 @@
         </div>
       </section>
       <section id="runtime" class="section">
-        <div class="section-header"><h2>统一运行时</h2><p>Overlord Broil 不把 Snell 硬塞进 Xray 内核, 而是在主控层把它抽象成统一协议节点, 由 Agent 在被控服务器上部署独立服务.</p></div>
+        <div class="section-header"><h2>统一节点管理</h2><p>Overlord Broil 不把 Snell 硬塞进 Xray 内核, 而是在主控层把它抽象成统一协议节点, 由 Agent 在被控服务器上部署独立服务.</p></div>
         <div class="feature-grid">
-          <article class="feature-card"><span>Xray Runtime</span><p>统一管理 inbound, outbound, Reality, 路由规则, IPv4/IPv6 策略, 流量同步和 Xray restart.</p></article>
+          <article class="feature-card"><span>协议节点</span><p>统一管理 inbound, outbound, Reality, 路由规则, IPv4/IPv6 策略, 流量同步和服务重启.</p></article>
           <article class="feature-card"><span>Snell</span><p>统一显示在协议节点列表里, 底层由 systemd/OpenRC 管理 Snell 服务.</p></article>
-          <article class="feature-card"><span>Forward</span><p>把远端端口转发记录到规则中心, 由 Agent 创建 socat 服务并回报状态.</p></article>
-          <article class="feature-card"><span>State Sync</span><p>汇总服务器心跳, 证书, 流量, 服务状态, 任务结果和操作审计.</p></article>
+          <article class="feature-card"><span>转发/隧道</span><p>把远端端口转发记录到规则中心, 由 Agent 创建 socat 服务并回报状态.</p></article>
+          <article class="feature-card"><span>状态日志</span><p>汇总服务器心跳, 证书, 流量, 服务状态, 任务结果和操作记录.</p></article>
         </div>
       </section>
       <section id="ports" class="section">

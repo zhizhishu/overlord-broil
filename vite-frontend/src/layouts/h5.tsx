@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { Logo } from '@/components/icons';
@@ -23,7 +23,6 @@ export default function H5Layout({
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useLanguage();
-  const [isAdmin, setIsAdmin] = useState(false);
 
   // Tabbar配置
   const tabItems: TabItem[] = [
@@ -38,14 +37,13 @@ export default function H5Layout({
     },
     {
       path: '/control-center',
-      label: t('主控'),
+      label: 'Overlord',
       icon: (
         <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M3 4a2 2 0 012-2h10a2 2 0 012 2v5a2 2 0 01-2 2h-3v2h2a1 1 0 110 2H6a1 1 0 110-2h2v-2H5a2 2 0 01-2-2V4zm2 0v5h10V4H5zm5 7v2h0v-2z" clipRule="evenodd" />
           <path d="M4 17a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z" />
         </svg>
-      ),
-      adminOnly: true
+      )
     },
     {
       path: '/forward',
@@ -87,30 +85,13 @@ export default function H5Layout({
     }
   ];
 
-  useEffect(() => {
-
-    // 缺少 admin 字段时按 role_id 推断
-    let adminFlag = localStorage.getItem('admin') === 'true';
-    if (localStorage.getItem('admin') === null) {
-      const roleId = parseInt(localStorage.getItem('role_id') || '1', 10);
-      adminFlag = roleId === 0;
-      // 回写 admin 字段，避免下次再次判断
-      localStorage.setItem('admin', adminFlag.toString());
-    }
-    
-
-    setIsAdmin(adminFlag);
-  }, []);
-
   // Tab点击处理
   const handleTabClick = (path: string) => {
     navigate(path);
   };
 
   // 过滤tab项（根据权限）
-  const filteredTabItems = tabItems.filter(item => 
-    !item.adminOnly || isAdmin
-  );
+  const filteredTabItems = tabItems.filter(item => item.path === '/control-center');
 
   // 路由切换时回到页面顶部，避免上一页的滚动位置遗留
   useEffect(() => {

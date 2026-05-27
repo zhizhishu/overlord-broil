@@ -25,7 +25,7 @@ The master is the only public control entry by default. Backend debug, MySQL and
 | `5166/tcp` | Master Web UI, API and agent callback | Public |
 | `6365/tcp` | Backend debug alias | Off, only with `OB_EXPOSE_BACKEND=1` |
 | `3306/tcp` | MySQL | Docker network only |
-| `5168/tcp` | Optional controlled-host Xray Runtime UI/API | Only when you choose to expose it |
+| `5168/tcp` | Optional controlled-host node-core UI/API | Only when you choose to expose it |
 | `80/tcp` | ACME HTTP validation | Only when selected |
 | custom | Xray, Snell and remote-forward business ports | Operator-defined |
 
@@ -91,17 +91,17 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scrip
   | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_JOIN_TOKEN="paste-join-token-here" bash -s -- doctor
 ```
 
-## Runtime Providers
+## Product Modules
 
-| Provider | Runtime boundary | Executor |
+| Module | Runtime boundary | Executor |
 | --- | --- | --- |
-| `xrayRuntime` | Xray Runtime, Reality, inbounds, outbounds, routing, IPv4/IPv6 strategy and traffic | master API + agent task |
-| `snell` | Snell node services | agent task |
-| `forward` | TCP/UDP remote forwarding | agent task |
-| `certificate` | self-signed, ACME and certificate diagnostics | agent task |
-| `firewall` | local firewall diagnostics and runtime port handling | agent task |
+| Inbound nodes | VLESS Reality, VMess, Trojan, Shadowsocks and Snell | master API + agent task |
+| Outbound and routing | outbounds, routing, IPv4/IPv6 strategy and traffic | master API + agent task |
+| Forwarding and tunnels | TCP/UDP remote forwarding | agent task |
+| Certificates | self-signed certificates, ACME and expiry state | agent task |
+| Settings logs | task, agent and operation lifecycle | master API + agent task |
 
-The Runtime Provider catalog is the supported maintenance-action contract. State Sync buttons, server-card actions and backend validation use the same catalog.
+Server-card actions, task results and backend validation use the same normalized status model.
 
 Dangerous actions, including agent uninstall and runtime-port closure, require explicit confirmation in the UI and a matching backend confirmation payload.
 
@@ -112,8 +112,8 @@ Dangerous actions, including agent uninstall and runtime-port closure, require e
 3. Install the controlled agent with the generated join command.
 4. Wait for heartbeat.
 5. Select one or more servers.
-6. Run deployments for Xray Runtime, Xray starter nodes, Snell, certificates, firewall checks or remote forwarding.
-7. Use State Sync, task cards and operation audit to verify status.
+6. Run deployments for node core, starter nodes, Snell, certificates, firewall checks or remote forwarding.
+7. Use server cards, task cards and operation logs to verify status.
 
 Snell is unified as a product-layer protocol node, but it remains an independent service on the controlled host.
 
@@ -121,11 +121,11 @@ Snell is unified as a product-layer protocol node, but it remains an independent
 
 | Memory | Policy |
 | --- | --- |
-| `< 200 MB` | Nano critical. Block full Xray Runtime deployment and Xray node creation; prefer Snell or remote forwarding. |
+| `< 200 MB` | Nano critical. Block full node-core deployment and Xray node creation; prefer Snell or remote forwarding. |
 | `< 256 MB` | Nano. Show strong warnings; keep workloads tiny. |
 | `< 512 MB` | Small. Xray can work only with careful swap and low concurrency. |
 
-Alpine/OpenRC can run the agent, Snell and forwarding tasks. Full Xray Runtime install/configure deployment is intended for systemd hosts.
+Alpine/OpenRC can run the agent, Snell and forwarding tasks. Full node-core install/configure deployment is intended for systemd hosts.
 
 ## Verification
 
@@ -159,10 +159,10 @@ docker run --rm \
   mvn -B -DskipTests package
 ```
 
-Optional real Xray Runtime contract:
+Optional real node-core contract:
 
 ```bash
-export XRAY_RUNTIME_E2E_URL="https://xray-runtime.example.com:5168"
+export XRAY_RUNTIME_E2E_URL="https://node-core.example.com:5168"
 export XRAY_RUNTIME_E2E_TOKEN="YOUR_XRAY_RUNTIME_API_TOKEN"
 bash scripts/test-xray-runtime-e2e.sh
 ```
@@ -187,6 +187,6 @@ Use `install-master.sh backup` before upgrades. SQLite backups stop the master b
 
 ## Security Notes
 
-- Keep `.env`, `SECRET_ENCRYPTION_KEY`, agent tokens, Xray Runtime API tokens, passwords, 2FA codes, Snell PSK values and private keys out of logs and issues.
+- Keep `.env`, `SECRET_ENCRYPTION_KEY`, agent tokens, node-core API tokens, passwords, 2FA codes, Snell PSK values and private keys out of logs and issues.
 - Cloud firewall/security groups are outside local firewall automation and must be checked separately.
 - Use only infrastructure you own or are authorized to administer.

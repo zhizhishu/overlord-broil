@@ -10,12 +10,12 @@ This release closes the product surface around Overlord Broil as one master imag
 - The master installer includes non-destructive `doctor`, backup, restore, upgrade and uninstall commands.
 - SQLite mode is available through `OB_DB_MODE=sqlite` for small labs; MySQL remains the default production path.
 - Controlled agents use systemd or OpenRC, poll the master, execute tasks locally and report results without opening an inbound management port.
-- Runtime Providers now cover `xrayRuntime`, `snell`, `forward`, `certificate` and `firewall`.
-- Deployment plans can install or reuse Xray Runtime, create starter Xray protocols, deploy Snell, run certificate/firewall checks and return runtime metadata.
-- Xray Runtime management includes inbound/client flows, config/outbound reads, traffic sync and Xray restart.
+- Product modules now cover inbound nodes, outbound/routing, Snell, forwarding/tunnels, certificates, traffic and settings logs.
+- Deployment plans can install or reuse the node core, create starter Xray protocols, deploy Snell, run certificate/firewall checks and return runtime metadata.
+- Node-core management includes inbound/client flows, config/outbound reads, traffic sync and service restart.
 - Snell is represented as a normal product node while remaining an independent systemd/OpenRC service on the controlled host.
 - Remote forwarding uses controlled-agent tasks to create, restart and remove `socat` services.
-- State Sync aggregates latest runtime state plus heartbeat fields into a server-by-provider view.
+- Status sync aggregates latest runtime state plus heartbeat fields into the server cards and logs.
 - Operation Audit records master task creation, rejection, state changes, retries, deletes, agent claims and agent reports.
 - Agent maintenance includes diagnostics, logs, restart, upgrade, delayed uninstall, install checks, certificate checks, firewall checks and repair tasks.
 - Dangerous actions require explicit UI confirmation and backend confirmation metadata before the agent can execute them.
@@ -30,13 +30,13 @@ This release closes the product surface around Overlord Broil as one master imag
 | Master install | One-command installer, preflight doctor and GHCR/source-build fallback. |
 | Master runtime | Single `overlord-master` image on `5166/tcp`; optional SQLite mode. |
 | Agent install | systemd/OpenRC service plus preflight doctor and runtime doctor. |
-| Xray Runtime | API fixture in CI plus recorded `isrco-hk` real container write smoke. |
+| Node core | API fixture in CI plus recorded `isrco-hk` real container write smoke. |
 | Snell | Product-level protocol node backed by generated systemd/OpenRC services. |
 | Remote forwarding | Auditable controlled-agent tasks for TCP/UDP forwarding. |
-| State Sync | Runtime-state aggregation by server and provider. |
+| Status sync | Runtime-state aggregation by server and module. |
 | Operation Audit | Task and agent lifecycle audit in `operation_audit_log`. |
 | Safety | Protected master ports, encrypted secrets, task audit, dangerous-action confirmation and nano-host blocking. |
-| Verification | Shell syntax, agent mock, SQLite schema, Xray Runtime fixture, optional real Xray Runtime E2E, master port contract, frontend build, backend Maven build, install matrix and Compose smoke. |
+| Verification | Shell syntax, agent mock, SQLite schema, node-core fixture, optional real node-core E2E, master port contract, frontend build, backend Maven build, install matrix and Compose smoke. |
 
 ### Ports
 
@@ -52,14 +52,14 @@ This release closes the product surface around Overlord Broil as one master imag
 ### Validation Notes
 
 - `isrco-hk` passed the single-container SQLite master smoke on `5166/tcp`.
-- `isrco-hk` passed a real Xray Runtime add/toggle/delete contract against temporary high ports.
+- `isrco-hk` passed a real node-core add/toggle/delete contract against temporary high ports.
 - The live Snell smoke script can create and delete a temporary Snell node and verify service shutdown plus closed listen port after cleanup.
 - Docker/CI install matrix is useful for packaging confidence, but a wider real-VPS matrix is still required before a `1.0` claim.
 
 ### Honest Boundaries
 
 - The Linux matrix is Docker/CI preflight coverage, not a full real-VPS matrix with public DNS, cloud firewall, ACME HTTP validation and real service managers.
-- Xray Runtime has one recorded real-host container smoke; more providers and VPS images are still needed.
+- Node core has one recorded real-host container smoke; more providers and VPS images are still needed.
 - Snell remains a separate runtime service managed by the Overlord agent rather than a native Xray protocol.
 - Sub-200 MB hosts should stay on Snell or forwarding unless swap and real-host testing prove otherwise.
 - Enterprise governance is future work: RBAC, audit export/retention, key-rotation migration, agent token expiry/revocation and broader dangerous-operation policy.
