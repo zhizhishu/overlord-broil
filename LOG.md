@@ -40,3 +40,11 @@
 - Completed: replaced verbose request/response logging with sanitized logging that masks tokens, passwords, PSK, private keys, scripts and response data.
 - Docs: updated README, README.zh-CN, operations docs and Pages copy for the join-command flow.
 - Validation: frontend build, Docker Maven package, shell syntax, agent mock, SQLite schema, install matrix for Debian/Ubuntu/Alpine/Rocky/Oracle Linux and `git diff --check` passed.
+
+## 2026-05-27 Broil 8-Module Surface
+
+- Completed: simplified the control center into 8 product modules: dashboard, servers, inbound nodes, outbound/routing, forwarding/tunnels, traffic, certificates and settings.
+- Completed: removed the old visible engineering console sections from the control-center JSX and kept detailed task/alert/audit information under the Settings log block.
+- Completed: kept server joining simple with the existing join-command action and kept Snell as a first-class inbound-node protocol beside VLESS Reality, VMess, Trojan and Shadowsocks.
+- Validation: frontend `npm run build` passed after the rewrite.
+- Note: Browser preview was attempted through the in-app Browser plugin, but the protected route requires a real login/local storage state; visual smoke should be done against a running master session.

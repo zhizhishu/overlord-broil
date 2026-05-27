@@ -2691,6 +2691,42 @@ export default function ControlCenterPage() {
     return `${server.certificateStatus}${domain}`;
   };
 
+  void runtimeProviderActionColor;
+  void runtimeProviderDiagnosticAction;
+  void runtimeProviderRepairAction;
+  void ServerActionGroup;
+  void RuntimeStateBlock;
+  void DiagnosticSummaryBlock;
+  void RemoteLogsBlock;
+  void AgentUpgradeBlock;
+  void setRuleSearch;
+  void setRuleKindFilter;
+  void setRuleServerFilter;
+  void setRuleHealthFilter;
+  void runningTasks;
+  void serverAgentActions;
+  void runtimeProviderTaskCounts;
+  void runtimeProviderActiveTasks;
+  void recentRuntimeStateItems;
+  void filteredRuleRows;
+  void ruleHealthCounts;
+  void ruleServerOptions;
+  void showServerRuleOverview;
+  void createAgentMaintenance;
+  void showServerToken;
+  void showTaskScript;
+  void showTaskResult;
+  void testXrayRuntime;
+  void showXrayRuntimeInbounds;
+  void showXrayRuntimeConfig;
+  void syncRuntimeTraffic;
+  void showTrafficSnapshots;
+  void openXrayRuntimeInboundModal;
+  void copyRuleData;
+  void acknowledgeAlert;
+  void retryTask;
+  void certificateText;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -2704,672 +2740,176 @@ export default function ControlCenterPage() {
       <div className="p-4 md:p-6 space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between" data-testid="control-center-header">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("主控中心")}</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("服务器部署、统一协议节点、Snell / Xray 运维")}</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Overlord Broil</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("服务器、节点、转发、流量和证书统一管理")}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button color="primary" data-testid="open-deployment-plan" onPress={() => openDeploymentPlanModal()}>{t("一键部署")}</Button>
             <Button color="primary" variant="flat" data-testid="open-protocol-node" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
-            <Button color="primary" data-testid="open-deploy-task" onPress={() => openDeployModal()}>{t("新建部署")}</Button>
             <Button variant="flat" data-testid="open-server-modal" onPress={() => openServerModal()}>{t("添加服务器")}</Button>
-            <Button variant="flat" data-testid="open-profile-modal" onPress={() => openProfileModal()}>{t("添加模板")}</Button>
+            <Button variant="light" onPress={loadData}>{t("刷新")}</Button>
           </div>
         </div>
 
-        <section data-testid="controlled-server-status">
-          <Card radius="sm" className="border border-default-200 bg-white dark:bg-default-50/5">
-            <CardHeader className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("被控端状态")}</h2>
-                <p className="mt-1 text-xs text-gray-500">
-                  {t("主控直接汇总被控心跳、Xray、Snell、证书和任务状态；异常会在这里先露出。")}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Chip size="sm" variant="flat" color="success">{t("{count} 台在线", { count: onlineServers })}</Chip>
-                <Chip size="sm" variant="flat" color={failedTasks > 0 ? "danger" : "default"}>{t("{count} 个失败任务", { count: failedTasks })}</Chip>
-                <Chip size="sm" variant="flat" color={criticalAlerts > 0 ? "danger" : "default"}>{t("{count} 条严重告警", { count: criticalAlerts })}</Chip>
-                <Button size="sm" variant="light" onPress={loadData}>{t("刷新")}</Button>
-              </div>
-            </CardHeader>
-            <CardBody>
-              {servers.length === 0 ? (
-                <div className="rounded-small border border-dashed border-default-300 p-5 text-center">
-                  <p className="font-medium text-gray-900 dark:text-white">{t("还没有被控端")}</p>
-                  <p className="mt-1 text-sm text-gray-500">{t("添加服务器后，心跳、服务状态和规则同步状态会在这里显示。")}</p>
-                  <Button size="sm" color="primary" variant="flat" className="mt-4" onPress={() => openServerModal()}>{t("添加服务器")}</Button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-                  {servers.slice(0, 6).map(server => (
-                    <div key={`status-${server.id}`} className="rounded-small border border-default-200 bg-default-50/60 p-3 dark:bg-default-100/5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-gray-900 dark:text-white">{server.name}</p>
-                          <p className="truncate text-xs text-gray-500">{server.host}:{server.sshPort || 22}</p>
-                        </div>
-                        <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-                          <Chip size="sm" variant="flat" color={server.role === "master" ? "warning" : "default"}>{server.role === "master" ? t("主控") : t("副控")}</Chip>
-                          <Chip size="sm" variant="flat" color={heartbeatColor(server) as any}>{heartbeatText(server)}</Chip>
-                        </div>
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                        <div className="rounded-small bg-white px-2 py-1.5 dark:bg-default-50/5">
-                          <p className="text-gray-500">Xray</p>
-                          <p className="truncate font-medium text-gray-900 dark:text-white">{server.xrayServiceStatus || "-"}</p>
-                        </div>
-                        <div className="rounded-small bg-white px-2 py-1.5 dark:bg-default-50/5">
-                          <p className="text-gray-500">Snell</p>
-                          <p className="truncate font-medium text-gray-900 dark:text-white">{server.snellServiceStatus || "-"}</p>
-                        </div>
-                        <div className="rounded-small bg-white px-2 py-1.5 dark:bg-default-50/5">
-                          <p className="text-gray-500">Runtime API</p>
-                          <p className="truncate font-medium text-gray-900 dark:text-white">{server.xrayRuntimeServiceStatus || (server.xrayRuntimeEndpoint ? t("已配置") : "-")}</p>
-                        </div>
-                        <div className="rounded-small bg-white px-2 py-1.5 dark:bg-default-50/5">
-                          <p className="text-gray-500">{t("内存")}</p>
-                          <p className="truncate font-medium text-gray-900 dark:text-white">{server.memoryTotalMb ? `${server.memoryTotalMb} MB` : "-"}</p>
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        <Chip size="sm" variant="flat">{t("心跳：{time}", { time: formatTime(server.lastHeartbeat) })}</Chip>
-                        <Chip size="sm" variant="flat">{t("规则同步：{time}", { time: formatTime(server.xrayRuntimeLastSync) })}</Chip>
-                        {server.lastError && <Chip size="sm" variant="flat" color="danger">{server.lastError}</Chip>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {servers.length > 6 && (
-                <p className="mt-3 text-xs text-gray-500">{t("下方服务器列表保留全部 {count} 台被控端。", { count: servers.length })}</p>
-              )}
-            </CardBody>
-          </Card>
-        </section>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card radius="sm">
-            <CardBody>
-              <p className="text-sm text-gray-500">{t("服务器")}</p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">{servers.length}</p>
-              <p className="text-xs text-gray-500 mt-1">{t("{count} 台在线", { count: onlineServers })}</p>
-            </CardBody>
-          </Card>
-          <Card radius="sm">
-            <CardBody>
-              <p className="text-sm text-gray-500">{t("协议节点")}</p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">{protocolNodes.length}</p>
-              <p className="text-xs text-gray-500 mt-1">Xray {xrayNodes} / Snell {snellNodes}</p>
-            </CardBody>
-          </Card>
-          <Card radius="sm">
-            <CardBody>
-              <p className="text-sm text-gray-500">{t("部署任务")}</p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">{tasks.length}</p>
-              <p className="text-xs text-gray-500 mt-1">{t("{running} 个等待/运行，{failed} 个失败", { running: runningTasks, failed: failedTasks })}</p>
-            </CardBody>
-          </Card>
-          <Card radius="sm">
-            <CardBody>
-              <p className="text-sm text-gray-500">{t("远端转发")}</p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">{forwardRules.length}</p>
-              <p className="text-xs text-gray-500 mt-1">{t("{active} 条 active，{snapshots} 条快照，流量 {traffic}", { active: activeForwardRules, snapshots: trafficSnapshots.length, traffic: formatBytes(totalRemoteTraffic) })}</p>
-            </CardBody>
-          </Card>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
+          {[
+            ["dashboard", t("仪表盘")],
+            ["servers", t("服务器")],
+            ["inbounds", t("入站节点")],
+            ["routes", t("出站与路由")],
+            ["tunnels", t("转发/隧道")],
+            ["traffic", t("流量")],
+            ["certificates", t("证书")],
+            ["settings", t("设置")]
+          ].map(([id, label]) => (
+            <a
+              key={id}
+              href={`#${id}`}
+              className="rounded-small border border-default-200 bg-white px-3 py-2 text-center text-sm font-medium text-gray-700 shadow-sm transition hover:border-primary hover:text-primary dark:bg-default-50/5 dark:text-gray-200"
+            >
+              {label}
+            </a>
+          ))}
         </div>
 
-        <section data-testid="state-sync">
-          <Card radius="sm">
-            <CardHeader className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <section id="dashboard" data-testid="broil-dashboard">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Card radius="sm" className="border border-default-200">
+              <CardBody>
+                <p className="text-sm text-gray-500">{t("在线服务器")}</p>
+                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{onlineServers}/{servers.length}</p>
+                <p className="mt-1 text-xs text-gray-500">{criticalAlerts > 0 ? t("{count} 条异常待处理", { count: criticalAlerts }) : t("当前无严重告警")}</p>
+              </CardBody>
+            </Card>
+            <Card radius="sm" className="border border-default-200">
+              <CardBody>
+                <p className="text-sm text-gray-500">{t("入站节点")}</p>
+                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{protocolNodes.length}</p>
+                <p className="mt-1 text-xs text-gray-500">Xray {xrayNodes} / Snell {snellNodes}</p>
+              </CardBody>
+            </Card>
+            <Card radius="sm" className="border border-default-200">
+              <CardBody>
+                <p className="text-sm text-gray-500">{t("转发/隧道")}</p>
+                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{activeForwardRules}/{forwardRules.length}</p>
+                <p className="mt-1 text-xs text-gray-500">{t("活跃规则 / 全部规则")}</p>
+              </CardBody>
+            </Card>
+            <Card radius="sm" className="border border-default-200">
+              <CardBody>
+                <p className="text-sm text-gray-500">{t("总流量")}</p>
+                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{formatBytes(totalRemoteTraffic)}</p>
+                <p className="mt-1 text-xs text-gray-500">{t("{count} 条流量快照", { count: trafficSnapshots.length })}</p>
+              </CardBody>
+            </Card>
+          </div>
+          <Card radius="sm" className="mt-4 border border-default-200">
+            <CardHeader className="flex flex-col items-start gap-2 md:flex-row md:items-center md:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("State Sync 状态同步")}</h2>
-                <p className="text-xs text-gray-500 mt-1">
-                  {t("按服务器和 Runtime Provider 聚合 agent 心跳、任务结果、服务、节点、证书和诊断状态。")}
-                </p>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("状态总览")}</h2>
+                <p className="text-xs text-gray-500">{t("只看在线、异常、服务和证书状态, 详细信息进入日志。")}</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Chip size="sm" variant="flat" color="success">{t("{count} 健康", { count: runtimeStateOverview?.healthy || 0 })}</Chip>
-                <Chip size="sm" variant="flat" color="warning">{t("{count} 观察", { count: runtimeStateOverview?.warning || 0 })}</Chip>
-                <Chip size="sm" variant="flat" color="danger">{t("{count} 异常", { count: runtimeStateOverview?.failed || 0 })}</Chip>
-                <Chip size="sm" variant="flat">{t("{count} 未知", { count: runtimeStateOverview?.unknown || 0 })}</Chip>
-                <Button size="sm" variant="light" onPress={loadData}>{t("刷新")}</Button>
-              </div>
-            </CardHeader>
-            <CardBody className="space-y-3">
-              {!runtimeStateOverview || runtimeStateItems.length === 0 ? (
-                <div className="rounded-small border border-dashed border-default-300 p-5 text-center">
-                  <p className="font-medium text-gray-900 dark:text-white">{t("暂无运行时状态")}</p>
-                  <p className="text-sm text-gray-500 mt-1">{t("Agent 回报和服务器心跳会在这里聚合。")}</p>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                    <div className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
-                      <p className="text-xs text-gray-500">{t("服务器")}</p>
-                      <p className="text-xl font-semibold text-gray-900 dark:text-white">{runtimeStateOverview.servers}</p>
-                    </div>
-                    <div className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
-                      <p className="text-xs text-gray-500">{t("运行时")}</p>
-                      <p className="text-xl font-semibold text-gray-900 dark:text-white">{runtimeStateOverview.providers}</p>
-                    </div>
-                    <div className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
-                      <p className="text-xs text-gray-500">{t("聚合项")}</p>
-                      <p className="text-xl font-semibold text-gray-900 dark:text-white">{runtimeStateItems.length}</p>
-                    </div>
-                    <div className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
-                      <p className="text-xs text-gray-500">{t("生成时间")}</p>
-                      <p className="truncate text-sm font-medium text-gray-900 dark:text-white">{formatTime(runtimeStateOverview.generatedAt)}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    {recentRuntimeStateItems.map(item => {
-                      const targetServer = servers.find(server => server.id === item.serverId);
-                      const serviceEntries = Object.entries(item.serviceStatuses || {}).filter(([, value]) => value);
-                      const diagnostic = item.diagnosticSummary;
-                      const sourceLabel = item.source === "task" ? t("任务结果") : t("服务器心跳");
-                      const diagnosticAction = runtimeProviderDiagnosticAction(item, agentMaintenanceActions);
-                      const repairAction = runtimeProviderRepairAction(item, agentMaintenanceActions);
-                      const stateSyncMeta = {
-                        trigger: "state-sync",
-                        runtimeProvider: item.providerKey,
-                        providerName: item.providerName,
-                        runtimeStatus: item.status,
-                        statusSource: item.statusSource,
-                        sourceTaskId: item.taskId,
-                        taskState: item.taskState
-                      };
-                      const detailParts = [
-                        item.protocol && item.action ? `${item.protocol} / ${item.action}` : null,
-                        item.nodeCount !== undefined ? t("{count} 个节点", { count: item.nodeCount }) : null,
-                        item.forwardRuleCount !== undefined ? t("{count} 条转发", { count: item.forwardRuleCount }) : null,
-                        item.certificateStatus ? [item.certificateStatus, item.certificateDomain].filter(Boolean).join(" ") : null
-                      ].filter(Boolean);
-
-                      return (
-                        <div key={`${item.serverId}-${item.providerKey}-${item.taskId || item.source || "state"}`} className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
-                          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1.2fr)_minmax(180px,.8fr)_minmax(260px,1.3fr)_auto] lg:items-center">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Chip size="sm" variant="flat" color={runtimeProviderColor(item.providerKey) as any}>{item.providerKey}</Chip>
-                                <Chip size="sm" variant="flat" color={runtimeStateColor(item.status) as any}>{item.status || "-"}</Chip>
-                                <Chip size="sm" variant="flat">{sourceLabel}</Chip>
-                              </div>
-                              <p className="mt-2 truncate font-semibold text-gray-900 dark:text-white">{item.serverName || `#${item.serverId}`}</p>
-                              <p className="truncate text-xs text-gray-500">{item.providerName || item.providerKey}</p>
-                            </div>
-                            <div className="text-sm">
-                              <p className="text-xs text-gray-500">{t("来源")}</p>
-                              <p className="truncate text-gray-900 dark:text-white">{item.statusSource || "-"}</p>
-                              <p className="text-xs text-gray-500">{formatTime(item.stateUpdatedAt || item.taskUpdatedAt || item.lastHeartbeat)}</p>
-                            </div>
-                            <div className="min-w-0">
-                              <p className="truncate text-sm text-gray-900 dark:text-white">{detailParts.length > 0 ? detailParts.join(" · ") : t("等待 Agent 回报")}</p>
-                              <div className="mt-2 flex flex-wrap gap-1.5">
-                                {item.taskId && <Chip size="sm" variant="flat">{t("任务 #{id}", { id: item.taskId })}</Chip>}
-                                {item.resourceType && (
-                                  <Chip size="sm" variant="flat">
-                                    {[item.resourceType, item.resourceId].filter(Boolean).join(" #")}
-                                  </Chip>
-                                )}
-                                {item.danger && <Chip size="sm" variant="flat" color="danger">{t("危险动作")}</Chip>}
-                                {serviceEntries.map(([name, status]) => (
-                                  <Chip key={name} size="sm" variant="flat" color={runtimeStateColor(status) as any}>{name} {status}</Chip>
-                                ))}
-                                {diagnostic && (
-                                  <Chip size="sm" variant="flat" color={(diagnostic.fail || 0) > 0 ? "danger" : (diagnostic.warning || 0) > 0 ? "warning" : "success"}>
-                                    {t("诊断 {fail}/{warning}/{ok}", {
-                                      fail: diagnostic.fail || 0,
-                                      warning: diagnostic.warning || 0,
-                                      ok: diagnostic.ok || 0
-                                    })}
-                                  </Chip>
-                                )}
-                              </div>
-                              {item.lastError && <p className="mt-1 truncate text-xs text-danger">{item.lastError}</p>}
-                            </div>
-                            <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
-                              <Chip size="sm" variant="flat">{item.taskState || item.source || "-"}</Chip>
-                              <Button
-                                size="sm"
-                                variant="flat"
-                                isDisabled={!targetServer || submitting}
-                                onPress={() => targetServer ? createAgentMaintenance(targetServer, diagnosticAction, stateSyncMeta) : toast.error(t("缺少服务器"))}
-                              >
-                                {t(diagnosticAction.label || "运行时诊断")}
-                              </Button>
-                              {repairAction && (
-                                <Button
-                                  size="sm"
-                                  color={runtimeProviderActionColor(repairAction) as any}
-                                  variant="flat"
-                                  isDisabled={!targetServer || submitting}
-                                  onPress={() => targetServer ? createAgentMaintenance(targetServer, repairAction, stateSyncMeta) : toast.error(t("缺少服务器"))}
-                                >
-                                  {t(repairAction.label || "运行时修复")}
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {runtimeStateItems.length > recentRuntimeStateItems.length && (
-                    <p className="text-xs text-gray-500">
-                      {t("仅显示最近 {shown} 条，后端已聚合 {total} 条运行时状态。", { shown: recentRuntimeStateItems.length, total: runtimeStateItems.length })}
-                    </p>
-                  )}
-                </>
-              )}
-            </CardBody>
-          </Card>
-        </section>
-
-        <section data-testid="runtime-provider">
-          <Card radius="sm">
-            <CardHeader className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("Runtime Provider 层")}</h2>
-                <p className="text-xs text-gray-500 mt-1">
-                  {t("主控按运行时边界分派任务：Xray 入站/出站、Snell、转发、证书和防火墙统一进入 agent 执行链。")}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Chip size="sm" variant="flat" color="primary">{t("{count} 个运行时", { count: runtimeProviders.length })}</Chip>
-                <Chip size="sm" variant="flat">{t("{count} 个活跃任务", { count: Object.values(runtimeProviderActiveTasks).reduce((sum, count) => sum + count, 0) })}</Chip>
+                <Chip size="sm" variant="flat" color="success">{t("健康 {count}", { count: runtimeStateOverview?.healthy || 0 })}</Chip>
+                <Chip size="sm" variant="flat" color="warning">{t("观察 {count}", { count: runtimeStateOverview?.warning || 0 })}</Chip>
+                <Chip size="sm" variant="flat" color="danger">{t("异常 {count}", { count: runtimeStateOverview?.failed || failedTasks })}</Chip>
               </div>
             </CardHeader>
             <CardBody>
-              {runtimeProviders.length === 0 ? (
-                <div className="rounded-small border border-dashed border-default-300 p-5 text-center">
-                  <p className="font-medium text-gray-900 dark:text-white">{t("Runtime Provider 尚未加载")}</p>
-                  <p className="text-sm text-gray-500 mt-1">{t("刷新后会显示 Xray、Snell、转发、证书和防火墙运行时注册表。")}</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-                  {runtimeProviders.map(provider => (
-                    <div key={provider.key} className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{provider.name}</p>
-                          <p className="mt-1 truncate text-[11px] text-gray-500">{provider.runtimeType}</p>
-                        </div>
-                        <Chip size="sm" variant="flat" color={runtimeProviderColor(provider.key) as any}>{provider.key}</Chip>
-                      </div>
-                      <p className="mt-3 min-h-14 text-xs leading-5 text-gray-500">{provider.summary}</p>
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <p className="text-gray-500">{t("执行器")}</p>
-                          <p className="truncate text-gray-900 dark:text-white">{provider.executor}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500">{t("任务")}</p>
-                          <p className="text-gray-900 dark:text-white">{runtimeProviderTaskCounts[provider.key] || 0} / {runtimeProviderActiveTasks[provider.key] || 0}</p>
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {provider.agentRequired && <Chip size="sm" variant="flat">{t("Agent 执行")}</Chip>}
-                        {provider.masterApiSupported && <Chip size="sm" variant="flat" color="primary">{t("主控 API")}</Chip>}
-                        {provider.nanoSupported && <Chip size="sm" variant="flat" color="success">{t("Nano 支持")}</Chip>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardBody>
-          </Card>
-        </section>
-
-        <section data-testid="monitor-alerts">
-          <Card radius="sm">
-            <CardHeader className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("监控告警")}</h2>
-                <p className="text-xs text-gray-500 mt-1">
-                  {t("{active} 条待确认，{critical} 条严重，来自 agent 心跳、证书、服务状态、任务和流量异常", { active: activeAlerts, critical: criticalAlerts })}
-                </p>
-              </div>
-              <Button size="sm" variant="light" onPress={loadData}>{t("刷新")}</Button>
-            </CardHeader>
-            <CardBody className="space-y-3">
-              {monitorAlerts.length === 0 && (
-                <div className="rounded-small border border-dashed border-default-300 p-5 text-center">
-                  <p className="font-medium text-gray-900 dark:text-white">{t("当前没有待确认告警")}</p>
-                  <p className="text-sm text-gray-500 mt-1">{t("副控心跳、证书、Xray、Snell、任务失败和流量异常会在这里汇总。")}</p>
-                </div>
-              )}
-              {recentAlerts.map(alert => (
-                <div key={alert.id} className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Chip size="sm" variant="flat" color={alertSeverityColor(alert.severity) as any}>{alert.severity}</Chip>
-                        <Chip size="sm" variant="flat">{alert.alertType}</Chip>
-                        <span className="text-xs text-gray-500">{alert.serverName || `#${alert.serverId}`} / {alert.source}</span>
-                      </div>
-                      <p className="mt-2 truncate font-semibold text-gray-900 dark:text-white">{alert.message}</p>
-                      <p className="text-xs text-gray-500">{t("首次 {first}，最近 {last}", { first: formatTime(alert.firstSeenAt), last: formatTime(alert.lastSeenAt) })}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2 lg:justify-end">
-                      {alert.detailJson && <Button size="sm" variant="flat" onPress={() => showXrayRuntimeResult(t("告警详情"), alert.detailJson)}>{t("详情")}</Button>}
-                      <Button size="sm" color="primary" variant="flat" onPress={() => acknowledgeAlert(alert)}>{t("确认")}</Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {monitorAlerts.length > recentAlerts.length && (
-                <p className="text-xs text-gray-500">{t("仅显示最近 {shown} 条，后端已保留 {total} 条待确认告警。", { shown: recentAlerts.length, total: monitorAlerts.length })}</p>
-              )}
-            </CardBody>
-          </Card>
-        </section>
-
-        <section data-testid="operation-audit">
-          <Card radius="sm">
-            <CardHeader className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("操作审计")}</h2>
-                <p className="text-xs text-gray-500 mt-1">
-                  {t("记录主控创建/拒绝/改状态/重试/删除任务、agent 领取任务和执行回报，方便追踪多服务器运维链路。")}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Chip size="sm" variant="flat">{t("{count} 条记录", { count: operationAuditLogs.length })}</Chip>
-                <Button size="sm" variant="light" onPress={loadData}>{t("刷新")}</Button>
-              </div>
-            </CardHeader>
-            <CardBody className="space-y-3">
-              {operationAuditLogs.length === 0 && (
-                <div className="rounded-small border border-dashed border-default-300 p-5 text-center">
-                  <p className="font-medium text-gray-900 dark:text-white">{t("暂无操作审计")}</p>
-                  <p className="text-sm text-gray-500 mt-1">{t("创建部署任务或 agent 回报结果后，这里会显示最近审计事件。")}</p>
-                </div>
-              )}
-              {recentAuditLogs.map(log => (
-                <div key={log.id} className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
-                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1.2fr)_minmax(220px,1fr)_minmax(260px,1.3fr)_auto] lg:items-center">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Chip size="sm" variant="flat" color={auditOutcomeColor(log.outcome) as any}>{auditOutcomeLabel(log.outcome)}</Chip>
-                        <Chip size="sm" variant="flat">{log.eventType}</Chip>
-                        {log.danger === 1 && <Chip size="sm" variant="flat" color="danger">{t("危险动作")}</Chip>}
-                      </div>
-                      <p className="mt-2 truncate font-semibold text-gray-900 dark:text-white">{log.summary || log.eventType}</p>
-                      <p className="truncate text-xs text-gray-500">{formatTime(log.createdTime)}</p>
-                    </div>
-                    <div className="text-sm">
-                      <p className="text-xs text-gray-500">{t("执行者")}</p>
-                      <p className="truncate text-gray-900 dark:text-white">{log.actorName || log.actorId || log.actorType}</p>
-                      <p className="truncate text-xs text-gray-500">{log.actorType}</p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs text-gray-500">{t("资源")}</p>
-                      <p className="truncate text-sm text-gray-900 dark:text-white">
-                        {[log.serverName || (log.serverId ? `#${log.serverId}` : null), log.providerKey, log.action].filter(Boolean).join(" · ") || "-"}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {log.resourceType && <Chip size="sm" variant="flat">{log.resourceType}</Chip>}
-                        {log.resourceId && <Chip size="sm" variant="flat">#{log.resourceId}</Chip>}
-                        {log.providerKey && <Chip size="sm" variant="flat" color={runtimeProviderColor(log.providerKey) as any}>{log.providerKey}</Chip>}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
-                      {log.detailJson && <Button size="sm" variant="flat" onPress={() => showXrayRuntimeResult(t("审计详情"), log.detailJson || "")}>{t("详情")}</Button>}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {operationAuditLogs.length > recentAuditLogs.length && (
-                <p className="text-xs text-gray-500">{t("仅显示最近 {shown} 条，后端已保留 {total} 条审计记录。", { shown: recentAuditLogs.length, total: operationAuditLogs.length })}</p>
-              )}
-            </CardBody>
-          </Card>
-        </section>
-
-        <section data-testid="unified-rule-center">
-          <Card radius="sm">
-            <CardHeader className="flex flex-col items-stretch gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("统一规则中心")}</h2>
-                <p className="text-xs text-gray-500 mt-1">
-                  {t("当前显示 {filtered} / {total} 条，健康 {healthy}，观察 {warning}，异常 {error}", { filtered: filteredRuleRows.length, total: unifiedRuleRows.length, healthy: ruleHealthCounts.healthy, warning: ruleHealthCounts.warning, error: ruleHealthCounts.error })}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
-                <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal()}>{t("新增转发")}</Button>
-                <Button size="sm" variant="light" onPress={loadData}>{t("刷新")}</Button>
-              </div>
-            </CardHeader>
-            <CardBody className="space-y-4">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                <Input aria-label={t("搜索规则")} placeholder={t("搜索名称、服务器、端口、目标")} value={ruleSearch} onChange={event => setRuleSearch(event.target.value)} variant="bordered" size="sm" />
-                <Select aria-label={t("规则类型")} selectedKeys={[ruleKindFilter]} onSelectionChange={keys => setRuleKindFilter(Array.from(keys)[0] as RuleKindFilter)} variant="bordered" size="sm">
-                  <SelectItem key="all">{t("全部类型")}</SelectItem>
-                  <SelectItem key="protocol">{t("协议节点")}</SelectItem>
-                  <SelectItem key="forward">{t("远端转发")}</SelectItem>
-                  <SelectItem key="xrayRuntime">{t("入站视图")}</SelectItem>
-                </Select>
-                <Select aria-label={t("规则服务器")} selectedKeys={[ruleServerFilter]} onSelectionChange={keys => setRuleServerFilter(Array.from(keys)[0] as string)} variant="bordered" size="sm">
-                  {ruleServerOptions.map(option => <SelectItem key={option.id}>{option.name}</SelectItem>)}
-                </Select>
-                <Select aria-label={t("规则健康状态")} selectedKeys={[ruleHealthFilter]} onSelectionChange={keys => setRuleHealthFilter(Array.from(keys)[0] as RuleHealthFilter)} variant="bordered" size="sm">
-                  <SelectItem key="all">{t("全部状态")}</SelectItem>
-                  <SelectItem key="healthy">{t("健康")}</SelectItem>
-                  <SelectItem key="warning">{t("观察")}</SelectItem>
-                  <SelectItem key="error">{t("异常")}</SelectItem>
-                </Select>
-              </div>
-
-              {unifiedRuleRows.length === 0 && (
-                <div className="rounded-small border border-dashed border-default-300 p-6 text-center">
-                  <p className="font-medium text-gray-900 dark:text-white">{t("还没有规则")}</p>
-                  <p className="text-sm text-gray-500 mt-1">{t("创建协议节点、添加远端转发或同步远端流量后，这里会汇总展示。")}</p>
-                  <div className="mt-4 flex justify-center gap-2">
-                    <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
-                    <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal()}>{t("新增转发")}</Button>
-                  </div>
-                </div>
-              )}
-
-              {unifiedRuleRows.length > 0 && filteredRuleRows.length === 0 && (
-                <div className="rounded-small border border-dashed border-default-300 p-6 text-center">
-                  <p className="font-medium text-gray-900 dark:text-white">{t("没有匹配的规则")}</p>
-                  <p className="text-sm text-gray-500 mt-1">{t("清空搜索或放宽类型、服务器、状态筛选。")}</p>
-                  <Button size="sm" variant="flat" className="mt-4" onPress={() => {
-                    setRuleSearch("");
-                    setRuleKindFilter("all");
-                    setRuleServerFilter("all");
-                    setRuleHealthFilter("all");
-                  }}>
-                    {t("重置筛选")}
-                  </Button>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                {filteredRuleRows.map(row => (
-                  <div key={row.id} className="rounded-small border border-default-200 bg-white/70 p-3 dark:bg-default-50/5">
-                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(220px,1.3fr)_minmax(180px,1fr)_minmax(220px,1.2fr)_minmax(160px,.8fr)_auto] xl:items-center">
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                {servers.slice(0, 6).map(server => (
+                  <div key={`dashboard-server-${server.id}`} className="rounded-small border border-default-200 bg-default-50/60 p-3 dark:bg-default-50/5">
+                    <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Chip size="sm" variant="flat" color={row.kind === "protocol" ? "primary" : row.kind === "forward" ? "secondary" : "success"}>{row.kind === "protocol" ? t("节点") : row.kind === "forward" ? t("转发") : t("入站")}</Chip>
-                          <Chip size="sm" variant="flat" color={row.health === "healthy" ? "success" : row.health === "warning" ? "warning" : "danger"}>{row.status}</Chip>
-                        </div>
-                        <p className="mt-2 truncate font-semibold text-gray-900 dark:text-white">{row.title}</p>
-                        <p className="truncate text-xs text-gray-500">{row.serverName} / {row.detail}</p>
+                        <p className="truncate font-semibold text-gray-900 dark:text-white">{server.name}</p>
+                        <p className="truncate text-xs text-gray-500">{server.host || server.endpoint || "-"}</p>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div><p className="text-xs text-gray-500">{t("协议")}</p><p className="truncate">{row.protocol || "-"}</p></div>
-                        <div><p className="text-xs text-gray-500">{t("流量")}</p><p>{formatBytes(row.traffic)}</p></div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="min-w-0"><p className="text-xs text-gray-500">{t("监听 / 入站")}</p><p className="truncate">{row.endpoint}</p></div>
-                        <div className="min-w-0"><p className="text-xs text-gray-500">{t("目标 / 客户端")}</p><p className="truncate">{row.target}</p></div>
-                      </div>
-                      <div className="text-sm">
-                        <p className="text-xs text-gray-500">{t("最近同步")}</p>
-                        <p>{formatTime(row.syncedAt)}</p>
-                        {row.error && <p className="mt-1 truncate text-xs text-danger">{row.error}</p>}
-                      </div>
-                      <div className="flex flex-wrap gap-2 xl:justify-end">
-                        <Button size="sm" variant="flat" onPress={() => copyRuleData(row)}>{t("复制")}</Button>
-                        {row.node && (
-                          <>
-                            <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(undefined, row.node!)}>{t("编辑")}</Button>
-                            <Button size="sm" variant="flat" onPress={() => restartNode(row.node!)}>{t("重启")}</Button>
-                            <Button size="sm" variant="light" color="danger" onPress={() => removeProtocolNode(row.node!)}>{t("删除")}</Button>
-                          </>
-                        )}
-                        {row.rule && (
-                          <>
-                            <Button size="sm" variant="flat" onPress={() => openServerForwardModal(undefined, row.rule!)}>{t("编辑")}</Button>
-                            <Button size="sm" variant="flat" onPress={() => restartForwardRule(row.rule!)}>{t("重启")}</Button>
-                            <Button size="sm" variant="light" color="danger" onPress={() => removeServerForwardRule(row.rule!)}>{t("删除")}</Button>
-                          </>
-                        )}
-                      </div>
+                      <Chip size="sm" variant="flat" color={heartbeatColor(server) as any}>{heartbeatText(server)}</Chip>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                      <div><p className="text-gray-500">CPU</p><p>{server.cpuUsage == null ? "-" : `${server.cpuUsage.toFixed(1)}%`}</p></div>
+                      <div><p className="text-gray-500">{t("内存")}</p><p>{server.memoryUsage == null ? "-" : `${server.memoryUsage.toFixed(1)}%`}</p></div>
+                      <div><p className="text-gray-500">{t("证书")}</p><p className="truncate">{server.certificateStatus || "-"}</p></div>
                     </div>
                   </div>
                 ))}
+                {servers.length === 0 && (
+                  <div className="rounded-small border border-dashed border-default-300 p-5 text-center lg:col-span-3">
+                    <p className="font-medium text-gray-900 dark:text-white">{t("还没有服务器")}</p>
+                    <Button size="sm" color="primary" variant="flat" className="mt-3" onPress={() => openServerModal()}>{t("添加服务器")}</Button>
+                  </div>
+                )}
               </div>
             </CardBody>
           </Card>
         </section>
 
-        <section data-testid="server-list">
-          <div className="flex items-center justify-between mb-3">
+        <section id="servers" data-testid="broil-servers">
+          <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("服务器")}</h2>
-            <Button size="sm" variant="light" onPress={loadData}>{t("刷新")}</Button>
+            <Button size="sm" color="primary" variant="flat" onPress={() => openServerModal()}>{t("添加服务器")}</Button>
           </div>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             {servers.map(server => (
-              <Card key={server.id} radius="sm" data-testid={`server-card-${server.id}`}>
-                <CardHeader className="flex justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">{server.name}</p>
-                    <p className="text-xs text-gray-500">{server.host}:{server.sshPort || 22}</p>
-                  </div>
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <Chip color={server.role === "master" ? "warning" : "default"} variant="flat" size="sm">
-                      {server.role === "master" ? t("主控") : t("副控")}
-                    </Chip>
-                    {isLowMemoryServer(server) && (
-                      <Chip color={isNanoCriticalServer(server) ? "danger" : "warning"} variant="flat" size="sm">
-                        {t("Nano 被控")}
-                      </Chip>
-                    )}
-                    <Chip color={heartbeatColor(server) as any} variant="flat" size="sm">{heartbeatText(server)}</Chip>
-                  </div>
-                </CardHeader>
+              <Card key={`broil-server-${server.id}`} radius="sm" className="border border-default-200">
                 <CardBody className="space-y-4">
-                  {server.role === "master" && (
-                    <MasterRiskNotice context="在该卡片执行一键部署、入站/出站保存或重启" />
-                  )}
-                  {isLowMemoryServer(server) && (
-                    <div className="rounded-small border border-warning-300 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
-                      <span className="font-semibold">{t("超小内存提示：")}</span>
-                      {t("该被控总内存约 {memory} MB，完整 Xray 部署可能 OOM；优先使用 Snell、远端端口转发或先开启 swap。", {
-                        memory: server.memoryTotalMb || "-"
-                      })}
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold text-gray-900 dark:text-white">{server.name}</p>
+                      <p className="truncate text-xs text-gray-500">{server.host}:{server.sshPort || 22}</p>
                     </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <p className="text-gray-500">{t("入口")}</p>
-                      <p className="truncate">{server.endpoint || "-"}</p>
+                    <div className="flex flex-wrap gap-2 md:justify-end">
+                      <Chip size="sm" variant="flat" color={heartbeatColor(server) as any}>{heartbeatText(server)}</Chip>
+                      {server.role === "master" && <Chip size="sm" variant="flat" color="warning">{t("主控")}</Chip>}
+                      {isLowMemoryServer(server) && <Chip size="sm" variant="flat" color="warning">Nano</Chip>}
                     </div>
-                    <div>
-                      <p className="text-gray-500">{t("Xray Runtime 入口")}</p>
-                      <p className="truncate">{server.xrayRuntimeEndpoint || "-"}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">Agent</p>
-                      <p>{server.agentVersion || "-"}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">Xray</p>
-                      <p>{server.xrayVersion || "-"}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">Snell</p>
-                      <p>{server.snellVersion || "-"}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">CPU</p>
-                      <p>{server.cpuUsage == null ? "-" : `${server.cpuUsage.toFixed(1)}%`}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">{t("内存")}</p>
-                      <p>
-                        {server.memoryUsage == null ? "-" : `${server.memoryUsage.toFixed(1)}%`}
-                        {server.memoryTotalMb ? ` / ${server.memoryTotalMb} MB` : ""}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">{t("上传")}</p>
-                      <p>{formatBytes(server.uploadTraffic)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">{t("下载")}</p>
-                      <p>{formatBytes(server.downloadTraffic)}</p>
-                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+                    <div><p className="text-xs text-gray-500">CPU</p><p>{server.cpuUsage == null ? "-" : `${server.cpuUsage.toFixed(1)}%`}</p></div>
+                    <div><p className="text-xs text-gray-500">{t("内存")}</p><p>{server.memoryUsage == null ? "-" : `${server.memoryUsage.toFixed(1)}%`}{server.memoryTotalMb ? ` / ${server.memoryTotalMb} MB` : ""}</p></div>
+                    <div><p className="text-xs text-gray-500">Xray</p><p>{server.xrayServiceStatus || "-"}</p></div>
+                    <div><p className="text-xs text-gray-500">Snell</p><p>{server.snellServiceStatus || "-"}</p></div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Chip size="sm" variant="flat" color={serviceColor(server.xrayRuntimeServiceStatus) as any}>Runtime {server.xrayRuntimeServiceStatus || "-"}</Chip>
-                    <Chip size="sm" variant="flat" color={serviceColor(server.xrayServiceStatus) as any}>Xray {server.xrayServiceStatus || "-"}</Chip>
-                    <Chip size="sm" variant="flat" color={serviceColor(server.snellServiceStatus) as any}>Snell {server.snellServiceStatus || "-"}</Chip>
-                    <Chip size="sm" variant="flat" color={serviceColor(server.certificateStatus) as any}>{certificateText(server)}</Chip>
+                    <Button size="sm" color="primary" variant="flat" onPress={() => showServerInstallCommand(server)}>{t("加入命令")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(server)}>{t("新增节点")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => openServerForwardModal(server)}>{t("新增转发")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => syncServerProtocolNodes(server)}>{t("同步节点")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => openServerModal(server)}>{t("编辑")}</Button>
                   </div>
-                  <p className="text-xs text-gray-500">{t("心跳：{time}", { time: formatTime(server.lastHeartbeat) })}</p>
-                  <p className="text-xs text-gray-500">{t("规则同步：{time}", { time: formatTime(server.xrayRuntimeLastSync) })}</p>
-                  {server.certificateExpireAt && <p className="text-xs text-gray-500">{t("证书到期：{time}", { time: formatTime(server.certificateExpireAt) })}</p>}
-                  {server.lastError && <p className="text-xs text-danger">{t("最近错误：{error}", { error: server.lastError })}</p>}
-                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                    <ServerActionGroup title="部署计划">
-                      <Button size="sm" color="primary" variant="flat" onPress={() => openDeploymentPlanModal(server)}>{t("一键部署")}</Button>
-                      <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal(server)}>{t("新增节点")}</Button>
-                      <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal(server)}>{t("新增转发")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => openDeployModal(server)}>{t("部署")}</Button>
-                    </ServerActionGroup>
-                    <ServerActionGroup title="规则流量">
-                      <Button size="sm" variant="flat" onPress={() => showServerRuleOverview(server)}>{t("规则总览")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => syncServerProtocolNodes(server)}>{t("同步节点")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => syncRuntimeTraffic(server)}>{t("同步流量")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => showTrafficSnapshots(server)}>{t("流量快照")}</Button>
-                    </ServerActionGroup>
-                    <ServerActionGroup title={t("入站/出站")} testId={`xray-runtime-actions-${server.id}`}>
-                      <Button size="sm" variant="flat" onPress={() => testXrayRuntime(server)}>{t("连接测试")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => showXrayRuntimeInbounds(server)}>{t("入站")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => openXrayRuntimeInboundModal(server)}>{t("入站操作")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => showXrayRuntimeConfig(server)}>{t("Xray 配置")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => showXrayRuntimeOutbounds(server)}>{t("出站")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => showXrayRuntimeOutboundTraffic(server)}>{t("出站流量")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => openXraySettingModal(server)}>{t("路由/出站")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => restartXray(server)}>{t("重启 Xray")}</Button>
-                    </ServerActionGroup>
-                    <ServerActionGroup title="Agent" testId={`agent-actions-${server.id}`}>
-                      {serverAgentActions.map(action => (
-                        <Button
-                          key={action.key}
-                          size="sm"
-                          variant={action.danger ? "light" : "flat"}
-                          color={runtimeProviderActionColor(action) as any}
-                          onPress={() => createAgentMaintenance(server, action)}
-                        >
-                          {t(action.label || action.key)}
-                        </Button>
-                      ))}
-                    </ServerActionGroup>
-                    <ServerActionGroup title="管理">
-                      <Button size="sm" variant="flat" onPress={() => openServerModal(server)}>{t("编辑")}</Button>
-                      <Button size="sm" color="primary" variant="flat" onPress={() => showServerInstallCommand(server)}>{t("加入命令")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => showServerToken(server)}>Token</Button>
-                      <Button size="sm" variant="flat" color="warning" onPress={() => showServerToken(server, true)}>{t("轮换")}</Button>
-                      <Button size="sm" variant="light" color="danger" onPress={() => removeServer(server)}>{t("删除")}</Button>
-                    </ServerActionGroup>
+                  {server.lastError && <p className="text-xs text-danger">{server.lastError}</p>}
+                </CardBody>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        <section id="inbounds" data-testid="broil-inbounds">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("入站节点")}</h2>
+            <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {protocolNodes.map(node => (
+              <Card key={`broil-node-${node.id}`} radius="sm" className="border border-default-200">
+                <CardBody className="space-y-3">
+                  <div className="flex justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-gray-900 dark:text-white">{node.name}</p>
+                      <p className="text-xs text-gray-500">{node.serverName || node.serverId} / {node.direction || "inbound"}</p>
+                    </div>
+                    <Chip size="sm" variant="flat" color={serviceColor(node.state) as any}>{node.state || "-"}</Chip>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div><p className="text-xs text-gray-500">{t("协议")}</p><p>{node.protocol}</p></div>
+                    <div><p className="text-xs text-gray-500">{t("端口")}</p><p>{node.listen || "*"}:{node.port || "-"}</p></div>
+                    <div><p className="text-xs text-gray-500">{t("类型")}</p><p>{node.engine === "snell" ? "Snell" : [node.transport, node.security].filter(Boolean).join(" / ")}</p></div>
+                    <div><p className="text-xs text-gray-500">{t("流量")}</p><p>{formatBytes(node.total || ((node.up || 0) + (node.down || 0)))}</p></div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(undefined, node)}>{t("编辑")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => restartNode(node)}>{t("重启")}</Button>
+                    <Button size="sm" variant="light" color="danger" onPress={() => removeProtocolNode(node)}>{t("删除")}</Button>
                   </div>
                 </CardBody>
               </Card>
@@ -3377,106 +2917,50 @@ export default function ControlCenterPage() {
           </div>
         </section>
 
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("协议节点")}</h2>
-            <Button size="sm" variant="light" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
+        <section id="routes" data-testid="broil-routes">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("出站与路由")}</h2>
+            <Chip size="sm" variant="flat">IPv4 / IPv6</Chip>
           </div>
-          {protocolNodes.length === 0 ? (
-            <div className="rounded-small border border-dashed border-default-300 bg-white/60 px-4 py-6 dark:bg-default-50/5">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{t("还没有协议节点")}</p>
-                  <p className="mt-1 max-w-2xl text-sm text-gray-500">{t("先新增一个结构化节点，或用一键部署批量创建 Xray/Snell 节点。")}</p>
+          <Card radius="sm" className="border border-default-200">
+            <CardBody className="space-y-3">
+              {servers.map(server => (
+                <div key={`broil-route-${server.id}`} className="grid grid-cols-1 gap-3 rounded-small border border-default-200 bg-default-50/60 p-3 md:grid-cols-[1fr_auto] md:items-center dark:bg-default-50/5">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-gray-900 dark:text-white">{server.name}</p>
+                    <p className="truncate text-xs text-gray-500">{t("出站, 路由规则, IPv4/IPv6 优先级统一在这里调整。")}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 md:justify-end">
+                    <Button size="sm" variant="flat" onPress={() => showXrayRuntimeOutbounds(server)}>{t("查看出站")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => openXraySettingModal(server)}>{t("路由规则")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => showXrayRuntimeOutboundTraffic(server)}>{t("出站流量")}</Button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" color="primary" variant="flat" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
-                  <Button size="sm" variant="flat" onPress={() => openDeploymentPlanModal()}>{t("一键部署")}</Button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {protocolNodes.map(node => (
-                <Card key={node.id} radius="sm">
-                  <CardBody className="space-y-3">
-                    <div className="flex justify-between gap-2">
-                      <div>
-                        <p className="font-semibold text-gray-900 dark:text-white">{node.name}</p>
-                        <p className="text-xs text-gray-500">{node.serverName || node.serverId} / {node.direction || "inbound"}</p>
-                      </div>
-                      <Chip size="sm" variant="flat" color={serviceColor(node.state) as any}>{node.state || "-"}</Chip>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <p className="text-gray-500">{t("引擎")}</p>
-                        <p>{node.engine}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">{t("协议")}</p>
-                        <p>{node.protocol}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">{t("端口")}</p>
-                        <p>{node.listen || "*"}:{node.port || "-"}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">{t("流量")}</p>
-                        <p>{formatBytes(node.total || ((node.up || 0) + (node.down || 0)))}</p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500">{t("远端：{value}", { value: node.remoteId || node.serviceName || "-" })}</p>
-                    <p className="text-xs text-gray-500">{t("同步：{time}", { time: formatTime(node.lastSync) })}</p>
-                    {node.lastError && <p className="text-xs text-danger">{t("错误：{error}", { error: node.lastError })}</p>}
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(undefined, node)}>{t("编辑")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => restartNode(node)}>{t("重启")}</Button>
-                      <Button size="sm" variant="light" color="danger" onPress={() => removeProtocolNode(node)}>{t("删除")}</Button>
-                    </div>
-                  </CardBody>
-                </Card>
               ))}
-            </div>
-          )}
+            </CardBody>
+          </Card>
         </section>
 
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("远端端口转发")}</h2>
-            <Button size="sm" variant="light" onPress={() => openServerForwardModal()}>{t("新增转发")}</Button>
+        <section id="tunnels" data-testid="broil-tunnels">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("转发/隧道")}</h2>
+            <Button size="sm" color="primary" variant="flat" onPress={() => openServerForwardModal()}>{t("新增转发")}</Button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {forwardRules.map(rule => (
-              <Card key={rule.id} radius="sm">
+              <Card key={`broil-forward-${rule.id}`} radius="sm" className="border border-default-200">
                 <CardBody className="space-y-3">
                   <div className="flex justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-gray-900 dark:text-white">{rule.name}</p>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-gray-900 dark:text-white">{rule.name}</p>
                       <p className="text-xs text-gray-500">{rule.serverName || rule.serverId} / {rule.protocol || "tcp"}</p>
                     </div>
                     <Chip size="sm" variant="flat" color={serviceColor(rule.state) as any}>{rule.state || "-"}</Chip>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <p className="text-gray-500">{t("监听")}</p>
-                      <p>{rule.listenHost || "0.0.0.0"}:{rule.listenPort}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">{t("目标")}</p>
-                      <p className="truncate">{rule.targetHost}:{rule.targetPort}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">{t("引擎")}</p>
-                      <p>{rule.engine || "socat"}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">{t("流量")}</p>
-                      <p>{formatBytes((rule.up || 0) + (rule.down || 0))}</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500">{t("服务：{value}", { value: rule.serviceName || "-" })}</p>
-                  <p className="text-xs text-gray-500">{t("同步：{time}", { time: formatTime(rule.lastSync) })}</p>
-                  {rule.lastError && <p className="text-xs text-danger">{t("错误：{error}", { error: rule.lastError })}</p>}
+                  <p className="text-sm">
+                    {rule.listenHost || "0.0.0.0"}:{rule.listenPort} {"->"} {rule.targetHost}:{rule.targetPort}
+                  </p>
+                  <p className="text-xs text-gray-500">{t("流量")} {formatBytes((rule.up || 0) + (rule.down || 0))}</p>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="flat" onPress={() => openServerForwardModal(undefined, rule)}>{t("编辑")}</Button>
                     <Button size="sm" variant="flat" onPress={() => restartForwardRule(rule)}>{t("重启")}</Button>
@@ -3488,87 +2972,108 @@ export default function ControlCenterPage() {
           </div>
         </section>
 
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("协议模板")}</h2>
-            <Button size="sm" variant="light" onPress={() => openProfileModal()}>{t("新增节点")}</Button>
+        <section id="traffic" data-testid="broil-traffic">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("流量")}</h2>
+            <Button size="sm" variant="flat" onPress={loadData}>{t("刷新")}</Button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {profiles.map(profile => (
-              <Card key={profile.id} radius="sm">
-                <CardBody className="space-y-3">
-                  <div className="flex justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-gray-900 dark:text-white">{profile.name}</p>
-                      <p className="text-xs text-gray-500">{profile.protocol} / {profile.transport || "tcp"}</p>
+          <Card radius="sm" className="border border-default-200">
+            <CardBody className="space-y-2">
+              {trafficSnapshots.slice(0, 12).map(snapshot => (
+                <div key={`broil-traffic-${snapshot.id}`} className="grid grid-cols-1 gap-2 rounded-small border border-default-200 bg-default-50/60 p-3 text-sm md:grid-cols-4 dark:bg-default-50/5">
+                  <p className="font-medium text-gray-900 dark:text-white">{snapshot.serverName || snapshot.serverId}</p>
+                  <p>{snapshot.inboundRemark || snapshot.email || snapshot.tag || snapshot.sourceType}</p>
+                  <p>{formatBytes(snapshot.total || ((snapshot.up || 0) + (snapshot.down || 0)))}</p>
+                  <p className="text-xs text-gray-500">{formatTime(snapshot.syncedTime)}</p>
+                </div>
+              ))}
+              {trafficSnapshots.length === 0 && <p className="text-sm text-gray-500">{t("暂无流量快照。")}</p>}
+            </CardBody>
+          </Card>
+        </section>
+
+        <section id="certificates" data-testid="broil-certificates">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("证书")}</h2>
+            <Button size="sm" variant="flat" onPress={() => openDeploymentPlanModal()}>{t("申请/续期")}</Button>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {servers.map(server => (
+              <Card key={`broil-cert-${server.id}`} radius="sm" className="border border-default-200">
+                <CardBody className="space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-gray-900 dark:text-white">{server.name}</p>
+                      <p className="truncate text-xs text-gray-500">{server.certificateDomain || server.host || "-"}</p>
                     </div>
-                    <Chip size="sm" variant="flat">{profile.versionFamily || "xray"}</Chip>
+                    <Chip size="sm" variant="flat" color={serviceColor(server.certificateStatus) as any}>{server.certificateStatus || "-"}</Chip>
                   </div>
-                  <p className="text-sm text-gray-500 min-h-10">{profile.remark || "-"}</p>
-                  <p className="text-sm">{t("端口")}：{profile.listenPort || "-"}</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="flat" onPress={() => openProfileModal(profile)}>{t("编辑")}</Button>
-                    <Button size="sm" variant="light" color="danger" onPress={() => removeProfile(profile)}>{t("删除")}</Button>
-                  </div>
+                  <p className="text-xs text-gray-500">{t("到期：{time}", { time: formatTime(server.certificateExpireAt) })}</p>
                 </CardBody>
               </Card>
             ))}
           </div>
         </section>
 
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("部署任务")}</h2>
-            <Button size="sm" variant="light" onPress={() => openDeployModal()}>{t("生成")}</Button>
+        <section id="settings" data-testid="broil-settings">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("设置")}</h2>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="flat" onPress={() => openProfileModal()}>{t("节点模板")}</Button>
+              <Button size="sm" variant="flat" onPress={() => openDeployModal()}>{t("手动任务")}</Button>
+            </div>
           </div>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {tasks.map(task => (
-              <Card key={task.id} radius="sm">
-                <CardBody className="space-y-3">
-                  <div className="flex justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-gray-900 dark:text-white">#{task.id} {task.serverName || task.serverId}</p>
-                      <p className="text-xs text-gray-500">{task.protocol} / {task.action}</p>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,.8fr)]">
+            <Card radius="sm" className="border border-default-200">
+              <CardHeader>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("系统")}</h3>
+              </CardHeader>
+              <CardBody className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+                <div><p className="text-xs text-gray-500">{t("用户")}</p><p>{t("已启用")}</p></div>
+                <div><p className="text-xs text-gray-500">{t("安全")}</p><p>{t("Token 已隐藏")}</p></div>
+                <div><p className="text-xs text-gray-500">{t("备份")}</p><p>{t("使用数据库备份")}</p></div>
+                <div><p className="text-xs text-gray-500">{t("更新")}</p><p>{tasks.filter(task => ["generated", "claimed", "running"].includes(task.state)).length} {t("个任务")}</p></div>
+              </CardBody>
+            </Card>
+            <Card radius="sm" className="border border-default-200">
+              <CardHeader className="flex justify-between gap-3">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("日志")}</h3>
+                <Chip size="sm" variant="flat">{activeAlerts + failedTasks}</Chip>
+              </CardHeader>
+              <CardBody className="space-y-2">
+                {recentAlerts.map(alert => (
+                  <div key={`broil-alert-${alert.id}`} className="rounded-small border border-default-200 bg-default-50/60 p-2 text-xs dark:bg-default-50/5">
+                    <div className="flex justify-between gap-2">
+                      <span className="font-medium text-gray-900 dark:text-white">{alert.message || alert.alertType}</span>
+                      <Chip size="sm" variant="flat" color={alertSeverityColor(alert.severity) as any}>{alert.severity || "-"}</Chip>
                     </div>
-                    <div className="flex flex-wrap justify-end gap-2">
-                      {task.runtimeProvider && (
-                        <Chip size="sm" variant="flat" color={runtimeProviderColor(task.runtimeProvider.key) as any}>
-                          {task.runtimeProvider.key}
-                        </Chip>
-                      )}
-                      <Chip size="sm" variant="flat" color={task.state === "succeeded" ? "success" : task.state === "failed" ? "danger" : "primary"}>
-                        {task.state}
-                      </Chip>
-                    </div>
+                    <p className="mt-1 text-gray-500">{alert.serverName || alert.serverId || "-"} · {formatTime(alert.createdTime)}</p>
                   </div>
-                  {task.runtimeProvider && (
-                    <div className="rounded-small border border-default-200 bg-default-50/60 px-3 py-2 text-xs dark:bg-default-50/5">
-                      <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                        <span className="font-medium text-gray-900 dark:text-white">{task.runtimeProvider.name}</span>
-                        <span className="text-gray-500">{task.runtimeProvider.executor} / {task.runtimeProvider.stateSource}</span>
-                      </div>
+                ))}
+                {tasks.slice(0, 5).map(task => (
+                  <div key={`broil-task-log-${task.id}`} className="rounded-small border border-default-200 bg-default-50/60 p-2 text-xs dark:bg-default-50/5">
+                    <div className="flex justify-between gap-2">
+                      <span className="font-medium text-gray-900 dark:text-white">#{task.id} {task.serverName || task.serverId}</span>
+                      <Chip size="sm" variant="flat" color={task.state === "succeeded" ? "success" : task.state === "failed" ? "danger" : "primary"}>{task.state}</Chip>
                     </div>
-                  )}
-                  <p className="text-xs text-gray-500">{t("创建：{time}", { time: formatTime(task.createdTime) })}</p>
-                  <RuntimeStateBlock task={task} />
-                  <DiagnosticSummaryBlock task={task} onShowResult={showTaskResult} />
-                  <AgentUpgradeBlock task={task} onShowResult={showTaskResult} />
-                  <RemoteLogsBlock task={task} onShowResult={showTaskResult} />
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="flat" onPress={() => showTaskScript(task)}>{t("脚本")}</Button>
-                    {task.resultJson && (
-                      <Button size="sm" variant="flat" onPress={() => showTaskResult(task)}>{t("原始结果")}</Button>
-                    )}
-                    {["failed", "timeout"].includes(task.state) && (
-                      <Button size="sm" variant="flat" color="warning" onPress={() => retryTask(task)}>{t("重试")}</Button>
-                    )}
-                    <Button size="sm" variant="light" color="danger" onPress={() => removeTask(task)}>{t("删除")}</Button>
+                    <p className="mt-1 text-gray-500">{task.protocol} / {task.action} · {formatTime(task.createdTime)}</p>
                   </div>
-                </CardBody>
-              </Card>
-            ))}
+                ))}
+                {recentAuditLogs.slice(0, 4).map(log => (
+                  <div key={`broil-audit-${log.id}`} className="rounded-small border border-default-200 bg-default-50/60 p-2 text-xs dark:bg-default-50/5">
+                    <div className="flex justify-between gap-2">
+                      <span className="font-medium text-gray-900 dark:text-white">{log.action || log.resourceType || "-"}</span>
+                      <Chip size="sm" variant="flat" color={auditOutcomeColor(log.outcome) as any}>{auditOutcomeLabel(log.outcome)}</Chip>
+                    </div>
+                    <p className="mt-1 text-gray-500">{log.serverName || log.serverId || "-"} · {formatTime(log.createdTime)}</p>
+                  </div>
+                ))}
+                {recentAlerts.length === 0 && tasks.length === 0 && recentAuditLogs.length === 0 && <p className="text-sm text-gray-500">{t("暂无日志。")}</p>}
+              </CardBody>
+            </Card>
           </div>
         </section>
+
       </div>
 
       <Modal isOpen={serverModalOpen} onOpenChange={setServerModalOpen} size="4xl">

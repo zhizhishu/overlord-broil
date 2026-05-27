@@ -19,6 +19,9 @@ Close the Broil product flow for urgent use: simpler controlled-agent joining, e
 - Kept Snell in the same protocol-node creation flow, backed by the existing agent task execution and status report path.
 - Replaced request/response logging with a sanitized logger that masks tokens, passwords, PSK, private keys, scripts, stdout/stderr and response data.
 - Updated README, Chinese README, operations docs and GitHub Pages text for the generated join-command flow.
+- Simplified the control center surface into 8 product modules: dashboard, servers, inbound nodes, outbound/routing, forwarding/tunnels, traffic, certificates and settings.
+- Removed the old visible engineering console sections from the control-center page; detailed events now surface through the Settings log block.
+- Kept Snell as a first-class inbound-node option beside VLESS Reality, VMess, Trojan and Shadowsocks.
 
 ## Validation Status
 
@@ -29,12 +32,14 @@ Close the Broil product flow for urgent use: simpler controlled-agent joining, e
 - Passed: `bash scripts/test-sqlite-schema.sh`.
 - Passed: `bash scripts/test-install-matrix.sh` across Debian 12, Ubuntu 24.04, Alpine 3.20, Rocky Linux 9 and Oracle Linux 9 userspaces.
 - Passed: `git diff --check`.
+- Passed again after the 8-module control-center rewrite: `npm run build` in `vite-frontend`.
+- Browser preview was attempted through the in-app Browser plugin; the protected route needs a real login/local storage state, so visual proof is deferred to a live master session.
 
 ## Remaining
 
 1. Commit and push the current changes to GitHub.
 2. Let GitHub Actions build the public image.
-3. Pull the new image on `isrco-hk` and run a browser/HK smoke if the user wants another real-host proof cycle.
+3. Pull the new image on `isrco-hk` and run a browser/HK smoke with a real master login.
 
 ## Risks
 
