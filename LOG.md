@@ -19,3 +19,11 @@
 - Completed: renamed frontend task-detail blocks to `*Block` to keep the Overlord product surface closed.
 - Validation: public product-surface scan returned no matches for old upstream identity, legacy-route wording, split-layer product wording or stitched-product wording.
 - Validation: frontend `npm run build` passed.
+
+## 2026-05-27 HK Database Recovery
+
+- Completed: restored `isrco-hk` MySQL service after the master was running without its database dependency.
+- Completed: repaired the retained HK schema by adding missing Runtime columns and the traffic snapshot table, then restarted `overlord-master`.
+- Completed: generalized backend startup schema repair with `OverlordSchemaInitializer` so old MySQL/SQLite installs can add missing product tables and columns during upgrade.
+- Validation: public frontend and captcha check both returned `200`; HK compose reported `overlord-master` and `overlord-mysql` healthy.
+- Validation: Docker Maven backend package build passed with tests skipped.
