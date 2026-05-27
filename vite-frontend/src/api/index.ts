@@ -42,14 +42,14 @@ export const deleteControlServer = (id: number) => Network.post("/control-server
 export const getControlServerToken = (id: number) => Network.post("/control-server/token", { id });
 export const rotateControlServerToken = (id: number) => Network.post("/control-server/rotate-token", { id });
 
-// 3x-ui / Snell 协议模板
+// Xray Panel / Snell 协议模板
 export const createProtocolProfile = (data: any) => Network.post("/protocol-profile/create", data);
 export const getProtocolProfileList = () => Network.post("/protocol-profile/list");
 export const updateProtocolProfile = (data: any) => Network.post("/protocol-profile/update", data);
 export const deleteProtocolProfile = (id: number) => Network.post("/protocol-profile/delete", { id });
 export const ensureDefaultProtocolProfiles = () => Network.post("/protocol-profile/ensure-defaults");
 
-// 统一协议节点：Xray/3x-ui inbound 与 Snell 节点
+// 统一协议节点：Xray/Xray Panel inbound 与 Snell 节点
 export const createProtocolNode = (data: any) => Network.post("/protocol-node/create", data);
 export const getProtocolNodeList = (data: any = {}) => Network.post("/protocol-node/list", data);
 export const updateProtocolNode = (data: any) => Network.post("/protocol-node/update", data);
@@ -75,7 +75,7 @@ export const updateDeployTaskState = (data: any) => Network.post("/deploy-task/s
 export const retryDeployTask = (id: number) => Network.post("/deploy-task/retry", { id });
 export const deleteDeployTask = (id: number) => Network.post("/deploy-task/delete", { id });
 
-// Runtime Provider 注册表：XUI / Snell / Forward / Certificate / Firewall
+// Runtime Provider 注册表：Xray Panel / Snell / Forward / Certificate / Firewall
 export const getRuntimeProviderList = () => Network.post("/runtime-provider/list");
 export const resolveRuntimeProvider = (data: { protocol?: string; action?: string }) => Network.post("/runtime-provider/resolve", data);
 
@@ -86,24 +86,24 @@ export const acknowledgeMonitorAlert = (id: number) => Network.post("/monitor-al
 // 主控操作审计
 export const listOperationAuditLogs = (data: any = {}) => Network.post("/operation-audit/list", data);
 
-// 3x-ui 远端面板出入站管理
-export const testThreeXuiConnection = (serverId: number) => Network.post("/three-xui/test", { serverId });
-export const listThreeXuiInbounds = (serverId: number) => Network.post("/three-xui/inbounds/list", { serverId });
-export const addThreeXuiInbound = (data: any) => Network.post("/three-xui/inbounds/add", data);
-export const updateThreeXuiInbound = (data: any) => Network.post("/three-xui/inbounds/update", data);
-export const deleteThreeXuiInbound = (data: any) => Network.post("/three-xui/inbounds/delete", data);
-export const setThreeXuiInboundEnable = (data: any) => Network.post("/three-xui/inbounds/set-enable", data);
-export const addThreeXuiClient = (data: any) => Network.post("/three-xui/clients/add", data);
-export const updateThreeXuiClient = (data: any) => Network.post("/three-xui/clients/update", data);
-export const deleteThreeXuiClient = (data: any) => Network.post("/three-xui/clients/delete", data);
-export const resetThreeXuiClientTraffic = (data: any) => Network.post("/three-xui/clients/reset-traffic", data);
-export const getThreeXuiConfig = (serverId: number) => Network.post("/three-xui/config", { serverId });
-export const getThreeXuiOutbounds = (serverId: number) => Network.post("/three-xui/outbounds", { serverId });
-export const getThreeXuiOutboundTraffic = (serverId: number) => Network.post("/three-xui/outbounds/traffic", { serverId });
-export const syncThreeXuiTraffic = (serverId: number) => Network.post("/three-xui/traffic/sync", { serverId });
-export const listThreeXuiTraffic = (data: any) => Network.post("/three-xui/traffic/list", data);
-export const saveThreeXuiOutbounds = (data: any) => Network.post("/three-xui/outbounds/save", data);
-export const restartThreeXuiXray = (serverId: number) => Network.post("/three-xui/restart-xray", { serverId });
+// Xray Panel 远端面板出入站管理
+export const testXrayPanelConnection = (serverId: number) => Network.post("/xray-panel/test", { serverId });
+export const listXrayPanelInbounds = (serverId: number) => Network.post("/xray-panel/inbounds/list", { serverId });
+export const addXrayPanelInbound = (data: any) => Network.post("/xray-panel/inbounds/add", data);
+export const updateXrayPanelInbound = (data: any) => Network.post("/xray-panel/inbounds/update", data);
+export const deleteXrayPanelInbound = (data: any) => Network.post("/xray-panel/inbounds/delete", data);
+export const setXrayPanelInboundEnable = (data: any) => Network.post("/xray-panel/inbounds/set-enable", data);
+export const addXrayPanelClient = (data: any) => Network.post("/xray-panel/clients/add", data);
+export const updateXrayPanelClient = (data: any) => Network.post("/xray-panel/clients/update", data);
+export const deleteXrayPanelClient = (data: any) => Network.post("/xray-panel/clients/delete", data);
+export const resetXrayPanelClientTraffic = (data: any) => Network.post("/xray-panel/clients/reset-traffic", data);
+export const getXrayPanelConfig = (serverId: number) => Network.post("/xray-panel/config", { serverId });
+export const getXrayPanelOutbounds = (serverId: number) => Network.post("/xray-panel/outbounds", { serverId });
+export const getXrayPanelOutboundTraffic = (serverId: number) => Network.post("/xray-panel/outbounds/traffic", { serverId });
+export const syncXrayPanelTraffic = (serverId: number) => Network.post("/xray-panel/traffic/sync", { serverId });
+export const listXrayPanelTraffic = (data: any) => Network.post("/xray-panel/traffic/list", data);
+export const saveXrayPanelOutbounds = (data: any) => Network.post("/xray-panel/outbounds/save", data);
+export const restartXrayPanelXray = (serverId: number) => Network.post("/xray-panel/restart-xray", { serverId });
 
 // 隧道CRUD操作 - 全部使用POST请求
 export const createTunnel = (data: any) => Network.post("/tunnel/create", data);

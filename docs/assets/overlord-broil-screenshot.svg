@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 960" role="img" aria-labelledby="title desc">
   <title id="title">Overlord Broil dashboard preview</title>
-  <desc id="desc">An Overlord-style operations dashboard preview for multi-server 3x-ui, Snell, Xray, traffic, certificate and forwarding management.</desc>
+  <desc id="desc">An Overlord-style operations dashboard preview for multi-server Xray Panel, Snell, Xray, traffic, certificate and forwarding management.</desc>
   <defs>
     <style>
       .bg { fill: #eef2f5; }
@@ -39,7 +39,7 @@
   <rect x="48" y="44" width="238" height="872" rx="18" class="sidebar"/>
   <rect x="268" y="44" width="18" height="872" fill="#101820"/>
   <text x="84" y="102" class="inverse" font-size="27" font-weight="700">Overlord</text>
-  <text x="150" y="102" class="thin" font-size="17">3x-ui control</text>
+  <text x="150" y="102" class="thin" font-size="17">Xray Panel control</text>
   <rect x="82" y="142" width="166" height="36" rx="8" class="nav-active"/>
   <text x="110" y="166" class="ink" font-size="15" font-weight="700">Orchestrator</text>
   <rect x="82" y="194" width="166" height="36" rx="8" class="nav"/>
@@ -55,7 +55,7 @@
   <text x="105" y="842" class="thin" font-size="13">claim/report healthy</text>
 
   <text x="328" y="98" class="ink" font-size="29" font-weight="750">Master control center</text>
-  <text x="328" y="128" class="muted" font-size="15">One place for 3x-ui, Snell, Xray, Reality, traffic, certificates and remote forwards.</text>
+  <text x="328" y="128" class="muted" font-size="15">One place for Xray Panel, Snell, Xray, Reality, traffic, certificates and remote forwards.</text>
   <rect x="1232" y="76" width="122" height="40" rx="8" class="blue"/>
   <text x="1262" y="101" class="inverse" font-size="14" font-weight="700">Orchestrate</text>
   <rect x="1366" y="76" width="116" height="40" rx="8" class="green-soft"/>
@@ -89,13 +89,13 @@
   <g>
     <rect x="328" y="302" width="720" height="286" rx="8" class="card"/>
     <text x="354" y="338" class="ink" font-size="19" font-weight="750">Controlled servers</text>
-    <text x="354" y="365" class="muted" font-size="13">Select one or many servers, then install 3x-ui, create protocols or run agent maintenance.</text>
+    <text x="354" y="365" class="muted" font-size="13">Select one or many servers, then install Xray Panel, create protocols or run agent maintenance.</text>
 
     <rect x="354" y="394" width="318" height="158" rx="8" class="panel"/>
     <text x="378" y="426" class="ink" font-size="17" font-weight="750">oracle-sg-01</text>
     <rect x="544" y="407" width="60" height="23" rx="11" class="green-soft"/>
     <text x="561" y="423" class="green" font-size="12" font-weight="700">agent</text>
-    <text x="378" y="458" class="muted" font-size="13">3x-ui active / Xray active / Snell active</text>
+    <text x="378" y="458" class="muted" font-size="13">Xray Panel active / Xray active / Snell active</text>
     <text x="378" y="484" class="mono" font-size="13">443 reality  8443 vmess-ws  6153 snell</text>
     <rect x="378" y="510" width="82" height="28" rx="7" class="blue-soft"/>
     <text x="397" y="529" class="blue" font-size="12" font-weight="700">Inbound</text>
@@ -108,7 +108,7 @@
     <text x="724" y="426" class="ink" font-size="17" font-weight="750">debian-la-02</text>
     <rect x="876" y="407" width="78" height="23" rx="11" class="amber-soft"/>
     <text x="895" y="423" class="amber" font-size="12" font-weight="700">warning</text>
-    <text x="724" y="458" class="muted" font-size="13">3x-ui active / Xray active / cert renew soon</text>
+    <text x="724" y="458" class="muted" font-size="13">Xray Panel active / Xray active / cert renew soon</text>
     <text x="724" y="484" class="mono" font-size="13">2053 trojan  30080 forward  6200 snell</text>
     <rect x="724" y="510" width="94" height="28" rx="7" class="blue-soft"/>
     <text x="744" y="529" class="blue" font-size="12" font-weight="700">Rules</text>
@@ -123,7 +123,7 @@
     <text x="1102" y="338" class="ink" font-size="19" font-weight="750">One-click orchestration</text>
     <text x="1102" y="365" class="muted" font-size="13">Task bundle generated for selected agents.</text>
     <rect x="1102" y="396" width="354" height="42" rx="8" class="panel"/>
-    <text x="1124" y="422" class="ink" font-size="14" font-weight="700">Install and configure 3x-ui</text>
+    <text x="1124" y="422" class="ink" font-size="14" font-weight="700">Install and configure Xray Panel</text>
     <rect x="1410" y="407" width="22" height="22" rx="6" class="green"/>
     <rect x="1102" y="450" width="354" height="42" rx="8" class="panel"/>
     <text x="1124" y="476" class="ink" font-size="14" font-weight="700">Create VLESS Reality / VMess / Trojan</text>
@@ -136,7 +136,7 @@
   <g>
     <rect x="328" y="624" width="1154" height="238" rx="8" class="card"/>
     <text x="354" y="660" class="ink" font-size="19" font-weight="750">Unified rule view</text>
-    <text x="354" y="687" class="muted" font-size="13">3x-ui inbound/outbound, Snell nodes and remote port forwards are shown as one operations table.</text>
+    <text x="354" y="687" class="muted" font-size="13">Xray Panel inbound/outbound, Snell nodes and remote port forwards are shown as one operations table.</text>
     <line x1="354" y1="716" x2="1456" y2="716" class="line"/>
     <text x="370" y="747" class="muted" font-size="12" font-weight="700">TYPE</text>
     <text x="520" y="747" class="muted" font-size="12" font-weight="700">SERVER</text>
@@ -147,7 +147,7 @@
     <line x1="354" y1="764" x2="1456" y2="764" class="line"/>
 
     <rect x="370" y="786" width="78" height="24" rx="12" class="blue-soft"/>
-    <text x="390" y="803" class="blue" font-size="12" font-weight="700">3x-ui</text>
+    <text x="390" y="803" class="blue" font-size="12" font-weight="700">Xray Panel</text>
     <text x="520" y="804" class="ink" font-size="14">oracle-sg-01</text>
     <text x="718" y="804" class="mono" font-size="13">vless://443 reality</text>
     <text x="990" y="804" class="ink" font-size="14">128.4 GB</text>

@@ -3,19 +3,19 @@ package com.admin.service.impl;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
-import com.admin.common.dto.ThreeXuiInboundDto;
-import com.admin.common.dto.ThreeXuiServerDto;
-import com.admin.common.dto.ThreeXuiTrafficQueryDto;
-import com.admin.common.dto.ThreeXuiXraySettingDto;
+import com.admin.common.dto.XrayPanelInboundDto;
+import com.admin.common.dto.XrayPanelServerDto;
+import com.admin.common.dto.XrayPanelTrafficQueryDto;
+import com.admin.common.dto.XrayPanelXraySettingDto;
 import com.admin.common.lang.R;
 import com.admin.common.utils.MasterSelfProtectionUtils;
 import com.admin.common.utils.SecretCryptoUtils;
 import com.admin.config.RestTemplateConfig;
 import com.admin.entity.ControlServer;
-import com.admin.entity.ThreeXuiTrafficSnapshot;
-import com.admin.mapper.ThreeXuiTrafficSnapshotMapper;
+import com.admin.entity.XrayPanelTrafficSnapshot;
+import com.admin.mapper.XrayPanelTrafficSnapshotMapper;
 import com.admin.service.ControlServerService;
-import com.admin.service.ThreeXuiService;
+import com.admin.service.XrayPanelService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -30,7 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 @Service
-public class ThreeXuiServiceImpl implements ThreeXuiService {
+public class XrayPanelServiceImpl implements XrayPanelService {
 
     private static final String DEFAULT_OUTBOUND_TEST_URL = "https://www.google.com/generate_204";
 
@@ -41,25 +41,25 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     private ControlServerService controlServerService;
 
     @Resource
-    private ThreeXuiTrafficSnapshotMapper trafficSnapshotMapper;
+    private XrayPanelTrafficSnapshotMapper trafficSnapshotMapper;
 
     @Resource
     private SecretCryptoUtils secretCryptoUtils;
 
     @Override
-    public R testConnection(ThreeXuiServerDto dto) {
+    public R testConnection(XrayPanelServerDto dto) {
         return apiGet(resolveServer(dto.getServerId()), "/panel/api/server/status", true);
     }
 
     @Override
-    public R listInbounds(ThreeXuiServerDto dto) {
+    public R listInbounds(XrayPanelServerDto dto) {
         R result = apiGet(resolveServer(dto.getServerId()), "/panel/api/inbounds/list", true);
         markSynced(dto.getServerId(), result);
         return result;
     }
 
     @Override
-    public R addInbound(ThreeXuiInboundDto dto) {
+    public R addInbound(XrayPanelInboundDto dto) {
         ControlServer server = resolveServer(dto.getServerId());
         String guard = guardInboundPort(server, dto.getPayload());
         if (guard != null) {
@@ -69,7 +69,7 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     }
 
     @Override
-    public R updateInbound(ThreeXuiInboundDto dto) {
+    public R updateInbound(XrayPanelInboundDto dto) {
         if (dto.getInboundId() == null) {
             return R.err("inbound id is required");
         }
@@ -84,7 +84,7 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     }
 
     @Override
-    public R deleteInbound(ThreeXuiInboundDto dto) {
+    public R deleteInbound(XrayPanelInboundDto dto) {
         if (dto.getInboundId() == null) {
             return R.err("inbound id is required");
         }
@@ -92,7 +92,7 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     }
 
     @Override
-    public R setInboundEnable(ThreeXuiInboundDto dto) {
+    public R setInboundEnable(XrayPanelInboundDto dto) {
         if (dto.getInboundId() == null || dto.getEnable() == null) {
             return R.err("inbound id and enable are required");
         }
@@ -102,7 +102,7 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     }
 
     @Override
-    public R addClient(ThreeXuiInboundDto dto) {
+    public R addClient(XrayPanelInboundDto dto) {
         if (dto.getInboundId() == null || isBlank(dto.getSettingsJson())) {
             return R.err("inbound id and settingsJson are required");
         }
@@ -113,7 +113,7 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     }
 
     @Override
-    public R updateClient(ThreeXuiInboundDto dto) {
+    public R updateClient(XrayPanelInboundDto dto) {
         if (dto.getInboundId() == null || isBlank(dto.getClientId()) || isBlank(dto.getSettingsJson())) {
             return R.err("inbound id, client id and settingsJson are required");
         }
@@ -124,7 +124,7 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     }
 
     @Override
-    public R deleteClient(ThreeXuiInboundDto dto) {
+    public R deleteClient(XrayPanelInboundDto dto) {
         if (dto.getInboundId() == null || isBlank(dto.getClientId())) {
             return R.err("inbound id and client id are required");
         }
@@ -133,7 +133,7 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     }
 
     @Override
-    public R resetClientTraffic(ThreeXuiInboundDto dto) {
+    public R resetClientTraffic(XrayPanelInboundDto dto) {
         if (dto.getInboundId() == null || isBlank(dto.getEmail())) {
             return R.err("inbound id and email are required");
         }
@@ -142,12 +142,12 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     }
 
     @Override
-    public R getConfig(ThreeXuiServerDto dto) {
+    public R getConfig(XrayPanelServerDto dto) {
         return apiGet(resolveServer(dto.getServerId()), "/panel/api/server/getConfigJson", true);
     }
 
     @Override
-    public R getOutbounds(ThreeXuiServerDto dto) {
+    public R getOutbounds(XrayPanelServerDto dto) {
         R configResult = getConfig(dto);
         if (configResult.getCode() != 0) {
             return configResult;
@@ -163,9 +163,9 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     }
 
     @Override
-    public R getOutboundsTraffic(ThreeXuiServerDto dto) {
+    public R getOutboundsTraffic(XrayPanelServerDto dto) {
         ControlServer server = resolveServer(dto.getServerId());
-        XuiSession session = loginSession(server);
+        XrayPanelSession session = loginSession(server);
         if (!session.isReady()) {
             return R.err(session.error);
         }
@@ -173,19 +173,19 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     }
 
     @Override
-    public R syncTraffic(ThreeXuiServerDto dto) {
+    public R syncTraffic(XrayPanelServerDto dto) {
         ControlServer server = resolveServer(dto.getServerId());
         if (server == null) {
             return R.err("server not found");
         }
 
         long now = System.currentTimeMillis();
-        List<ThreeXuiTrafficSnapshot> snapshots = new ArrayList<>();
+        List<XrayPanelTrafficSnapshot> snapshots = new ArrayList<>();
         TrafficTotals totals = new TrafficTotals();
 
         R inboundResult = apiGet(server, "/panel/api/inbounds/list", true);
         if (inboundResult.getCode() != 0 || !isSuccessEnvelope(inboundResult.getData())) {
-            return inboundResult.getCode() != 0 ? inboundResult : R.err("3x-ui inbound traffic sync failed");
+            return inboundResult.getCode() != 0 ? inboundResult : R.err("Xray Panel inbound traffic sync failed");
         }
         syncInboundSnapshots(server, toJsonArray(unwrapObj(inboundResult.getData())), now, snapshots, totals);
 
@@ -196,11 +196,11 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
         } else {
             outboundError = outboundResult.getMsg();
             if (outboundError == null || outboundError.isEmpty()) {
-                outboundError = "3x-ui outbound traffic sync skipped";
+                outboundError = "Xray Panel outbound traffic sync skipped";
             }
         }
 
-        for (ThreeXuiTrafficSnapshot snapshot : snapshots) {
+        for (XrayPanelTrafficSnapshot snapshot : snapshots) {
             trafficSnapshotMapper.insert(snapshot);
         }
         markTrafficSynced(server, now, totals);
@@ -222,9 +222,9 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     }
 
     @Override
-    public R listTrafficSnapshots(ThreeXuiTrafficQueryDto dto) {
+    public R listTrafficSnapshots(XrayPanelTrafficQueryDto dto) {
         int limit = dto.getLimit() == null ? 200 : Math.max(1, Math.min(dto.getLimit(), 500));
-        QueryWrapper<ThreeXuiTrafficSnapshot> query = new QueryWrapper<>();
+        QueryWrapper<XrayPanelTrafficSnapshot> query = new QueryWrapper<>();
         if (dto.getServerId() != null) {
             query.eq("server_id", dto.getServerId());
         }
@@ -236,9 +236,9 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     }
 
     @Override
-    public R saveXraySetting(ThreeXuiXraySettingDto dto) {
+    public R saveXraySetting(XrayPanelXraySettingDto dto) {
         ControlServer server = resolveServer(dto.getServerId());
-        XuiSession session = loginSession(server);
+        XrayPanelSession session = loginSession(server);
         if (!session.isReady()) {
             return R.err(session.error);
         }
@@ -253,7 +253,7 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     }
 
     @Override
-    public R restartXray(ThreeXuiServerDto dto) {
+    public R restartXray(XrayPanelServerDto dto) {
         return apiPostForm(resolveServer(dto.getServerId()), "/panel/api/server/restartXrayService", new LinkedMultiValueMap<>(), true);
     }
 
@@ -272,38 +272,38 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
         if (server == null) {
             return R.err("server not found");
         }
-        if (bearerRequired && isBlank(server.getXuiApiToken())) {
-            return R.err("3x-ui api token is required for this action");
+        if (bearerRequired && isBlank(server.getXrayPanelApiToken())) {
+            return R.err("Xray Panel api token is required for this action");
         }
-        if (isBlank(server.getXuiEndpoint())) {
-            return R.err("3x-ui endpoint is required");
+        if (isBlank(server.getXrayPanelEndpoint())) {
+            return R.err("Xray Panel endpoint is required");
         }
 
         try {
             ResponseEntity<String> response = clientFor(server).exchange(buildUrl(server, path), method, entity, String.class);
             return normalizeResponse(response.getBody());
         } catch (RestClientException e) {
-            return R.err("3x-ui request failed: " + e.getMessage());
+            return R.err("Xray Panel request failed: " + e.getMessage());
         } catch (Exception e) {
-            return R.err("3x-ui client error: " + e.getMessage());
+            return R.err("Xray Panel client error: " + e.getMessage());
         }
     }
 
     private HttpHeaders apiHeaders(ControlServer server, boolean bearerRequired) {
         HttpHeaders headers = new HttpHeaders();
         headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-        if (server != null && !isBlank(server.getXuiApiToken())) {
-            headers.setBearerAuth(server.getXuiApiToken().trim());
+        if (server != null && !isBlank(server.getXrayPanelApiToken())) {
+            headers.setBearerAuth(server.getXrayPanelApiToken().trim());
         }
         return headers;
     }
 
-    private XuiSession loginSession(ControlServer server) {
+    private XrayPanelSession loginSession(ControlServer server) {
         if (server == null) {
-            return XuiSession.error("server not found");
+            return XrayPanelSession.error("server not found");
         }
-        if (isBlank(server.getXuiUsername()) || isBlank(server.getXuiPassword())) {
-            return XuiSession.error("3x-ui username and password are required for outbound save");
+        if (isBlank(server.getXrayPanelUsername()) || isBlank(server.getXrayPanelPassword())) {
+            return XrayPanelSession.error("Xray Panel username and password are required for outbound save");
         }
         try {
             RestTemplate client = clientFor(server);
@@ -311,14 +311,14 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
             String csrf = extractObjString(csrfResp.getBody());
             List<String> cookies = new ArrayList<>(csrfResp.getHeaders().getOrEmpty(HttpHeaders.SET_COOKIE));
             if (isBlank(csrf)) {
-                return XuiSession.error("3x-ui csrf token missing");
+                return XrayPanelSession.error("Xray Panel csrf token missing");
             }
 
             MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-            form.add("username", server.getXuiUsername());
-            form.add("password", server.getXuiPassword());
-            if (!isBlank(server.getXuiTwoFactorCode())) {
-                form.add("twoFactorCode", server.getXuiTwoFactorCode());
+            form.add("username", server.getXrayPanelUsername());
+            form.add("password", server.getXrayPanelPassword());
+            if (!isBlank(server.getXrayPanelTwoFactorCode())) {
+                form.add("twoFactorCode", server.getXrayPanelTwoFactorCode());
             }
 
             HttpHeaders loginHeaders = new HttpHeaders();
@@ -331,19 +331,19 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
             cookies.addAll(loginResp.getHeaders().getOrEmpty(HttpHeaders.SET_COOKIE));
             R loginResult = normalizeResponse(loginResp.getBody());
             if (loginResult.getCode() != 0 || !isSuccessEnvelope(loginResult.getData())) {
-                return XuiSession.error("3x-ui login failed");
+                return XrayPanelSession.error("Xray Panel login failed");
             }
 
-            return new XuiSession(csrf, joinCookies(cookies), null);
+            return new XrayPanelSession(csrf, joinCookies(cookies), null);
         } catch (Exception e) {
-            return XuiSession.error("3x-ui login request failed: " + e.getMessage());
+            return XrayPanelSession.error("Xray Panel login request failed: " + e.getMessage());
         }
     }
 
     private RestTemplate clientFor(ControlServer server) throws Exception {
-        Integer xuiAllowInsecure = server.getXuiAllowInsecure();
-        boolean allowInsecure = (xuiAllowInsecure != null ? xuiAllowInsecure : server.getAllowInsecure()) != null
-                && (xuiAllowInsecure != null ? xuiAllowInsecure : server.getAllowInsecure()) == 1;
+        Integer xrayPanelAllowInsecure = server.getXrayPanelAllowInsecure();
+        boolean allowInsecure = (xrayPanelAllowInsecure != null ? xrayPanelAllowInsecure : server.getAllowInsecure()) != null
+                && (xrayPanelAllowInsecure != null ? xrayPanelAllowInsecure : server.getAllowInsecure()) == 1;
         return allowInsecure ? new RestTemplate(RestTemplateConfig.generateHttpRequestFactory()) : restTemplate;
     }
 
@@ -356,7 +356,7 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
 
     private String guardInboundPort(ControlServer server, Map<String, Object> payload) {
         Integer port = payloadPort(payload);
-        return MasterSelfProtectionUtils.validateListenPort(server, port, "3x-ui inbound 端口");
+        return MasterSelfProtectionUtils.validateListenPort(server, port, "Xray Panel inbound 端口");
     }
 
     private Integer payloadPort(Map<String, Object> payload) {
@@ -378,9 +378,9 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
         if (server == null) {
             return null;
         }
-        server.setXuiApiToken(secretCryptoUtils.decryptIfNeeded(server.getXuiApiToken()));
-        server.setXuiPassword(secretCryptoUtils.decryptIfNeeded(server.getXuiPassword()));
-        server.setXuiTwoFactorCode(secretCryptoUtils.decryptIfNeeded(server.getXuiTwoFactorCode()));
+        server.setXrayPanelApiToken(secretCryptoUtils.decryptIfNeeded(server.getXrayPanelApiToken()));
+        server.setXrayPanelPassword(secretCryptoUtils.decryptIfNeeded(server.getXrayPanelPassword()));
+        server.setXrayPanelTwoFactorCode(secretCryptoUtils.decryptIfNeeded(server.getXrayPanelTwoFactorCode()));
         return server;
     }
 
@@ -390,7 +390,7 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
         }
         ControlServer update = new ControlServer();
         update.setId(serverId);
-        update.setXuiLastSync(System.currentTimeMillis());
+        update.setXrayPanelLastSync(System.currentTimeMillis());
         update.setUpdatedTime(System.currentTimeMillis());
         controlServerService.updateById(update);
     }
@@ -398,7 +398,7 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     private void markTrafficSynced(ControlServer server, long syncedTime, TrafficTotals totals) {
         ControlServer update = new ControlServer();
         update.setId(server.getId());
-        update.setXuiLastSync(syncedTime);
+        update.setXrayPanelLastSync(syncedTime);
         update.setUploadTraffic(totals.up);
         update.setDownloadTraffic(totals.down);
         update.setUpdatedTime(syncedTime);
@@ -406,7 +406,7 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     }
 
     private void syncInboundSnapshots(ControlServer server, JSONArray inbounds, long now,
-                                      List<ThreeXuiTrafficSnapshot> snapshots, TrafficTotals totals) {
+                                      List<XrayPanelTrafficSnapshot> snapshots, TrafficTotals totals) {
         for (Object item : inbounds) {
             JSONObject inbound = toJsonObject(item);
             if (inbound == null) {
@@ -417,7 +417,7 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
             String tag = inbound.getString("tag");
             String protocol = inbound.getString("protocol");
 
-            ThreeXuiTrafficSnapshot inboundSnapshot = baseSnapshot(server, "inbound", now);
+            XrayPanelTrafficSnapshot inboundSnapshot = baseSnapshot(server, "inbound", now);
             inboundSnapshot.setInboundId(inboundId);
             inboundSnapshot.setInboundRemark(remark);
             inboundSnapshot.setProtocol(protocol);
@@ -437,7 +437,7 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
                 if (client == null) {
                     continue;
                 }
-                ThreeXuiTrafficSnapshot clientSnapshot = baseSnapshot(server, "client", now);
+                XrayPanelTrafficSnapshot clientSnapshot = baseSnapshot(server, "client", now);
                 clientSnapshot.setInboundId(firstInt(client.getInteger("inboundId"), client.getInteger("inbound_id"), inboundId));
                 clientSnapshot.setInboundRemark(remark);
                 clientSnapshot.setProtocol(protocol);
@@ -456,13 +456,13 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     }
 
     private void syncOutboundSnapshots(ControlServer server, JSONArray outbounds, long now,
-                                       List<ThreeXuiTrafficSnapshot> snapshots, TrafficTotals totals) {
+                                       List<XrayPanelTrafficSnapshot> snapshots, TrafficTotals totals) {
         for (Object item : outbounds) {
             JSONObject outbound = toJsonObject(item);
             if (outbound == null) {
                 continue;
             }
-            ThreeXuiTrafficSnapshot snapshot = baseSnapshot(server, "outbound", now);
+            XrayPanelTrafficSnapshot snapshot = baseSnapshot(server, "outbound", now);
             snapshot.setTag(outbound.getString("tag"));
             snapshot.setUp(longValue(outbound, "up"));
             snapshot.setDown(longValue(outbound, "down"));
@@ -472,8 +472,8 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
         }
     }
 
-    private ThreeXuiTrafficSnapshot baseSnapshot(ControlServer server, String sourceType, long now) {
-        ThreeXuiTrafficSnapshot snapshot = new ThreeXuiTrafficSnapshot();
+    private XrayPanelTrafficSnapshot baseSnapshot(ControlServer server, String sourceType, long now) {
+        XrayPanelTrafficSnapshot snapshot = new XrayPanelTrafficSnapshot();
         snapshot.setServerId(server.getId());
         snapshot.setServerName(server.getName());
         snapshot.setSourceType(sourceType);
@@ -484,9 +484,9 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
         return snapshot;
     }
 
-    private int countType(List<ThreeXuiTrafficSnapshot> snapshots, String sourceType) {
+    private int countType(List<XrayPanelTrafficSnapshot> snapshots, String sourceType) {
         int count = 0;
-        for (ThreeXuiTrafficSnapshot snapshot : snapshots) {
+        for (XrayPanelTrafficSnapshot snapshot : snapshots) {
             if (sourceType.equals(snapshot.getSourceType())) {
                 count++;
             }
@@ -495,8 +495,8 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
     }
 
     private String buildUrl(ControlServer server, String path) {
-        String endpoint = trimTrailingSlash(server.getXuiEndpoint().trim());
-        String basePath = normalizeBasePath(server.getXuiBasePath());
+        String endpoint = trimTrailingSlash(server.getXrayPanelEndpoint().trim());
+        String basePath = normalizeBasePath(server.getXrayPanelBasePath());
         String cleanPath = path.startsWith("/") ? path : "/" + path;
         return endpoint + basePath + cleanPath;
     }
@@ -709,19 +709,19 @@ public class ThreeXuiServiceImpl implements ThreeXuiService {
         }
     }
 
-    private static class XuiSession {
+    private static class XrayPanelSession {
         private final String csrf;
         private final String cookie;
         private final String error;
 
-        private XuiSession(String csrf, String cookie, String error) {
+        private XrayPanelSession(String csrf, String cookie, String error) {
             this.csrf = csrf;
             this.cookie = cookie;
             this.error = error;
         }
 
-        private static XuiSession error(String error) {
-            return new XuiSession(null, null, error);
+        private static XrayPanelSession error(String error) {
+            return new XrayPanelSession(null, null, error);
         }
 
         private boolean isReady() {

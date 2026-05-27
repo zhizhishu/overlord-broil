@@ -24,8 +24,8 @@ import {
   deleteProtocolNode,
   deleteProtocolProfile,
   deleteServerForwardRule,
-  addThreeXuiInbound,
-  deleteThreeXuiInbound,
+  addXrayPanelInbound,
+  deleteXrayPanelInbound,
   ensureDefaultProtocolProfiles,
   getControlServerList,
   getControlServerToken,
@@ -39,40 +39,40 @@ import {
   getProtocolProfileList,
   getServerForwardRuleList,
   getServerRuleOverview,
-  getThreeXuiConfig,
-  getThreeXuiOutboundTraffic,
-  getThreeXuiOutbounds,
-  listThreeXuiTraffic,
-  listThreeXuiInbounds,
+  getXrayPanelConfig,
+  getXrayPanelOutboundTraffic,
+  getXrayPanelOutbounds,
+  listXrayPanelTraffic,
+  listXrayPanelInbounds,
   rotateControlServerToken,
   restartProtocolNode,
   restartServerForwardRule,
-  restartThreeXuiXray,
+  restartXrayPanelXray,
   retryDeployTask,
-  saveThreeXuiOutbounds,
-  syncThreeXuiTraffic,
+  saveXrayPanelOutbounds,
+  syncXrayPanelTraffic,
   syncProtocolNodes,
-  testThreeXuiConnection,
-  updateThreeXuiInbound,
+  testXrayPanelConnection,
+  updateXrayPanelInbound,
   updateControlServer,
   updateProtocolNode,
   updateProtocolProfile,
   updateServerForwardRule
 } from "@/api";
-import type { ControlServer, DeployTask, MonitorAlert, OperationAuditLog, ProtocolNode, ProtocolProfile, RuntimeProviderAction, RuntimeProviderDescriptor, RuntimeState, RuntimeStateOverview, RuntimeStateOverviewItem, ServerForwardRule, ThreeXuiTrafficSnapshot } from "@/types";
+import type { ControlServer, DeployTask, MonitorAlert, OperationAuditLog, ProtocolNode, ProtocolProfile, RuntimeProviderAction, RuntimeProviderDescriptor, RuntimeState, RuntimeStateOverview, RuntimeStateOverviewItem, ServerForwardRule, XrayPanelTrafficSnapshot } from "@/types";
 
 interface ServerForm {
   id?: number;
   name: string;
   role: string;
   endpoint: string;
-  xuiEndpoint: string;
-  xuiBasePath: string;
-  xuiApiToken: string;
-  xuiUsername: string;
-  xuiPassword: string;
-  xuiTwoFactorCode: string;
-  xuiAllowInsecure: number;
+  xrayPanelEndpoint: string;
+  xrayPanelBasePath: string;
+  xrayPanelApiToken: string;
+  xrayPanelUsername: string;
+  xrayPanelPassword: string;
+  xrayPanelTwoFactorCode: string;
+  xrayPanelAllowInsecure: number;
   host: string;
   sshPort: number;
   sshUser: string;
@@ -104,9 +104,9 @@ interface DeployForm {
 interface OrchestrationForm {
   serverId: number | null;
   serverIds: number[];
-  installXui: boolean;
+  installXrayPanel: boolean;
   configurePanel: boolean;
-  xuiVersion: string;
+  xrayPanelVersion: string;
   panelPort: number;
   panelUsername: string;
   panelPassword: string;
@@ -133,7 +133,7 @@ interface OrchestrationForm {
   snellPsk: string;
 }
 
-interface ThreeXuiInboundForm {
+interface XrayPanelInboundForm {
   serverId: number | null;
   inboundId: string;
   mode: "add" | "update" | "delete";
@@ -198,7 +198,7 @@ interface ServerForwardRuleForm {
   targetPort: number;
 }
 
-type RuleKindFilter = "all" | "protocol" | "forward" | "xui";
+type RuleKindFilter = "all" | "protocol" | "forward" | "xrayPanel";
 type RuleHealthFilter = "all" | "healthy" | "warning" | "error";
 type RuleHealth = Exclude<RuleHealthFilter, "all">;
 type FormCheckState = "ok" | "warning" | "missing";
@@ -244,20 +244,20 @@ const fallbackAction = (
 });
 
 const FALLBACK_AGENT_MAINTENANCE_ACTIONS: RuntimeProviderAction[] = [
-  fallbackAction("doctor", "诊断", "diagnostic", "xui", false, true, false),
-  fallbackAction("status", "状态", "diagnostic", "xui", false, false, false),
-  fallbackAction("logs", "日志", "diagnostic", "xui", false, true, false),
-  fallbackAction("install-diagnose", "安装诊断", "diagnostic", "xui", false, true, true),
+  fallbackAction("doctor", "诊断", "diagnostic", "xrayPanel", false, true, false),
+  fallbackAction("status", "状态", "diagnostic", "xrayPanel", false, false, false),
+  fallbackAction("logs", "日志", "diagnostic", "xrayPanel", false, true, false),
+  fallbackAction("install-diagnose", "安装诊断", "diagnostic", "xrayPanel", false, true, true),
   fallbackAction("cert-diagnose", "证书诊断", "diagnostic", "certificate", false, true, true),
   fallbackAction("firewall-diagnose", "防火墙诊断", "diagnostic", "firewall", false, true, true),
   fallbackAction("firewall-diagnose", "防火墙诊断", "diagnostic", "forward", false, true, true),
-  fallbackAction("repair-all", "一键修复", "repair", "xui", false, true, false),
-  fallbackAction("repair-xui", "修复 Xray 面板", "repair", "xui", false, true, true),
-  fallbackAction("repair-xray", "修复 Xray", "repair", "xui", false, true, true),
+  fallbackAction("repair-all", "一键修复", "repair", "xrayPanel", false, true, false),
+  fallbackAction("repair-xrayPanel", "修复 Xray 面板", "repair", "xrayPanel", false, true, true),
+  fallbackAction("repair-xray", "修复 Xray", "repair", "xrayPanel", false, true, true),
   fallbackAction("repair-snell", "修复 Snell", "repair", "snell", false, true, true),
-  fallbackAction("restart-agent", "重启 agent", "maintenance", "xui"),
-  fallbackAction("upgrade-agent", "升级 agent", "maintenance", "xui"),
-  fallbackAction("uninstall-agent", "卸载 agent", "danger", "xui", true, false, false)
+  fallbackAction("restart-agent", "重启 agent", "maintenance", "xrayPanel"),
+  fallbackAction("upgrade-agent", "升级 agent", "maintenance", "xrayPanel"),
+  fallbackAction("uninstall-agent", "卸载 agent", "danger", "xrayPanel", true, false, false)
 ];
 
 const AGENT_ACTION_ORDER = [
@@ -267,7 +267,7 @@ const AGENT_ACTION_ORDER = [
   "cert-diagnose",
   "firewall-diagnose",
   "repair-all",
-  "repair-xui",
+  "repair-xrayPanel",
   "repair-xray",
   "repair-snell",
   "restart-agent",
@@ -311,7 +311,7 @@ const mergeProviderActions = (runtimeProviders: RuntimeProviderDescriptor[]) => 
 const dedupeActionsByKey = (actions: RuntimeProviderAction[]) => {
   const byKey = new Map<string, RuntimeProviderAction>();
   for (const action of actions) {
-    if (!byKey.has(action.key) || action.providerKey !== "xui") {
+    if (!byKey.has(action.key) || action.providerKey !== "xrayPanel") {
       byKey.set(action.key, action);
     }
   }
@@ -340,7 +340,7 @@ const findProviderAction = (actions: RuntimeProviderAction[], providerKey: strin
 
 const runtimeProviderDiagnosticAction = (item: RuntimeStateOverviewItem | undefined, actions: RuntimeProviderAction[]): RuntimeProviderAction => {
   const providerKey = item?.providerKey;
-  if (providerKey === "xui") {
+  if (providerKey === "xrayPanel") {
     return findProviderAction(actions, providerKey, "install-diagnose")
       || findProviderAction(actions, providerKey, "doctor")
       || FALLBACK_AGENT_MAINTENANCE_ACTIONS[0];
@@ -356,10 +356,10 @@ const runtimeProviderDiagnosticAction = (item: RuntimeStateOverviewItem | undefi
 };
 
 const runtimeProviderRepairAction = (item: RuntimeStateOverviewItem | undefined, actions: RuntimeProviderAction[]): RuntimeProviderAction | null => {
-  if (item?.providerKey === "xui") {
+  if (item?.providerKey === "xrayPanel") {
     return runtimeProviderStatusNeedsRepair(item.serviceStatuses?.xray)
       ? findProviderAction(actions, item.providerKey, "repair-xray") || null
-      : findProviderAction(actions, item.providerKey, "repair-xui") || null;
+      : findProviderAction(actions, item.providerKey, "repair-xrayPanel") || null;
   }
   return actions.find(action =>
     action.providerKey === item?.providerKey &&
@@ -386,7 +386,7 @@ interface UnifiedRuleRow {
   error?: string;
   node?: ProtocolNode;
   rule?: ServerForwardRule;
-  snapshot?: ThreeXuiTrafficSnapshot;
+  snapshot?: XrayPanelTrafficSnapshot;
 }
 
 interface FormCheck {
@@ -440,13 +440,13 @@ const blankServerForm: ServerForm = {
   name: "",
   role: "agent",
   endpoint: "",
-  xuiEndpoint: "",
-  xuiBasePath: "",
-  xuiApiToken: "",
-  xuiUsername: "",
-  xuiPassword: "",
-  xuiTwoFactorCode: "",
-  xuiAllowInsecure: 0,
+  xrayPanelEndpoint: "",
+  xrayPanelBasePath: "",
+  xrayPanelApiToken: "",
+  xrayPanelUsername: "",
+  xrayPanelPassword: "",
+  xrayPanelTwoFactorCode: "",
+  xrayPanelAllowInsecure: 0,
   host: "",
   sshPort: 22,
   sshUser: "root",
@@ -477,9 +477,9 @@ const blankDeployForm: DeployForm = {
 const blankOrchestrationForm: OrchestrationForm = {
   serverId: null,
   serverIds: [],
-  installXui: true,
+  installXrayPanel: true,
   configurePanel: true,
-  xuiVersion: "",
+  xrayPanelVersion: "",
   panelPort: 5168,
   panelUsername: "",
   panelPassword: "",
@@ -521,7 +521,7 @@ const defaultInboundPayload = {
   sniffing: "{\"enabled\":true,\"destOverride\":[\"http\",\"tls\",\"quic\",\"fakedns\"]}"
 };
 
-const blankThreeXuiInboundForm: ThreeXuiInboundForm = {
+const blankXrayPanelInboundForm: XrayPanelInboundForm = {
   serverId: null,
   inboundId: "",
   mode: "add",
@@ -801,8 +801,8 @@ const isNanoCriticalServer = (server?: ControlServer) => {
   return Boolean(server?.memoryTotalMb && server.memoryTotalMb > 0 && server.memoryTotalMb < NANO_CRITICAL_MEMORY_MB);
 };
 
-const orchestrationUsesFullXuiStack = (form: OrchestrationForm) => {
-  return form.installXui
+const orchestrationUsesFullXrayPanelStack = (form: OrchestrationForm) => {
+  return form.installXrayPanel
     || form.configurePanel
     || form.createVlessReality
     || form.createVmessWs
@@ -848,7 +848,7 @@ const runtimeStateColor = (status?: string): StatusColor => {
 };
 
 const runtimeProviderColor = (key?: string) => {
-  if (key === "xui") return "primary";
+  if (key === "xrayPanel") return "primary";
   if (key === "snell") return "secondary";
   if (key === "forward") return "success";
   if (key === "certificate") return "warning";
@@ -1084,7 +1084,7 @@ const asTrafficLimit = (gb: number) => {
   return Math.round(gb * GB);
 };
 
-const clientBase = (form: ThreeXuiInboundForm) => ({
+const clientBase = (form: XrayPanelInboundForm) => ({
   email: form.clientEmail.trim(),
   limitIp: 0,
   totalGB: asTrafficLimit(form.totalGb),
@@ -1096,7 +1096,7 @@ const clientBase = (form: ThreeXuiInboundForm) => ({
   reset: 0
 });
 
-const buildInboundPayloadFromForm = (form: ThreeXuiInboundForm) => {
+const buildInboundPayloadFromForm = (form: XrayPanelInboundForm) => {
   const protocol = form.protocol;
   const sniffing = {
     enabled: true,
@@ -1204,10 +1204,10 @@ const buildInboundPayloadFromForm = (form: ThreeXuiInboundForm) => {
   };
 };
 
-const inboundPayloadPreview = (form: ThreeXuiInboundForm) => JSON.stringify(buildInboundPayloadFromForm(form), null, 2);
+const inboundPayloadPreview = (form: XrayPanelInboundForm) => JSON.stringify(buildInboundPayloadFromForm(form), null, 2);
 
-const inboundFormFromNodeForm = (form: ProtocolNodeForm): ThreeXuiInboundForm => ({
-  ...blankThreeXuiInboundForm,
+const inboundFormFromNodeForm = (form: ProtocolNodeForm): XrayPanelInboundForm => ({
+  ...blankXrayPanelInboundForm,
   serverId: form.serverId,
   remark: form.name,
   listen: form.listen,
@@ -1240,7 +1240,7 @@ export default function OrchestratorPage() {
   const [tasks, setTasks] = useState<DeployTask[]>([]);
   const [runtimeProviders, setRuntimeProviders] = useState<RuntimeProviderDescriptor[]>([]);
   const [runtimeStateOverview, setRuntimeStateOverview] = useState<RuntimeStateOverview | null>(null);
-  const [trafficSnapshots, setTrafficSnapshots] = useState<ThreeXuiTrafficSnapshot[]>([]);
+  const [trafficSnapshots, setTrafficSnapshots] = useState<XrayPanelTrafficSnapshot[]>([]);
   const [monitorAlerts, setMonitorAlerts] = useState<MonitorAlert[]>([]);
   const [operationAuditLogs, setOperationAuditLogs] = useState<OperationAuditLog[]>([]);
   const [serverModalOpen, setServerModalOpen] = useState(false);
@@ -1250,7 +1250,7 @@ export default function OrchestratorPage() {
   const [deployModalOpen, setDeployModalOpen] = useState(false);
   const [orchestrationModalOpen, setOrchestrationModalOpen] = useState(false);
   const [scriptModalOpen, setScriptModalOpen] = useState(false);
-  const [threeXuiInboundModalOpen, setThreeXuiInboundModalOpen] = useState(false);
+  const [xrayPanelInboundModalOpen, setXrayPanelInboundModalOpen] = useState(false);
   const [xraySettingModalOpen, setXraySettingModalOpen] = useState(false);
   const [scriptTitle, setScriptTitle] = useState("");
   const [scriptText, setScriptText] = useState("");
@@ -1267,7 +1267,7 @@ export default function OrchestratorPage() {
   const [serverForwardRuleForm, setServerForwardRuleForm] = useState<ServerForwardRuleForm>(blankServerForwardRuleForm);
   const [deployForm, setDeployForm] = useState<DeployForm>(blankDeployForm);
   const [orchestrationForm, setOrchestrationForm] = useState<OrchestrationForm>(blankOrchestrationForm);
-  const [threeXuiInboundForm, setThreeXuiInboundForm] = useState<ThreeXuiInboundForm>(blankThreeXuiInboundForm);
+  const [xrayPanelInboundForm, setXrayPanelInboundForm] = useState<XrayPanelInboundForm>(blankXrayPanelInboundForm);
   const [ruleSearch, setRuleSearch] = useState("");
   const [ruleKindFilter, setRuleKindFilter] = useState<RuleKindFilter>("all");
   const [ruleServerFilter, setRuleServerFilter] = useState("all");
@@ -1501,11 +1501,11 @@ export default function OrchestratorPage() {
   const selectedOrchestrationHasMaster = selectedOrchestrationServers.some(server => server.role === "master");
   const selectedOrchestrationLowMemoryServers = selectedOrchestrationServers.filter(isLowMemoryServer);
   const selectedOrchestrationCriticalNanoServers = selectedOrchestrationServers.filter(isNanoCriticalServer);
-  const selectedOrchestrationUsesFullXuiStack = orchestrationUsesFullXuiStack(orchestrationForm);
+  const selectedOrchestrationUsesFullXrayPanelStack = orchestrationUsesFullXrayPanelStack(orchestrationForm);
 
   const selectedInboundServer = useMemo(() => {
-    return servers.find(server => server.id === threeXuiInboundForm.serverId);
-  }, [servers, threeXuiInboundForm.serverId]);
+    return servers.find(server => server.id === xrayPanelInboundForm.serverId);
+  }, [servers, xrayPanelInboundForm.serverId]);
 
   const rememberOutboundTags = (source: any) => {
     const tags = collectOutboundTags(source);
@@ -1582,9 +1582,9 @@ export default function OrchestratorPage() {
       rule
     }));
 
-    const xuiRows = trafficSnapshots.map(snapshot => ({
-      id: `xui-${snapshot.id}`,
-      kind: "xui" as const,
+    const xrayPanelRows = trafficSnapshots.map(snapshot => ({
+      id: `xrayPanel-${snapshot.id}`,
+      kind: "xrayPanel" as const,
       title: snapshot.inboundRemark || snapshot.email || snapshot.tag || `${snapshot.sourceType} #${snapshot.inboundId || snapshot.id}`,
       serverId: snapshot.serverId,
       serverName: serverName(snapshot.serverId, snapshot.serverName),
@@ -1599,7 +1599,7 @@ export default function OrchestratorPage() {
       snapshot
     }));
 
-    return [...nodeRows, ...forwardRows, ...xuiRows];
+    return [...nodeRows, ...forwardRows, ...xrayPanelRows];
   }, [forwardRules, protocolNodes, servers, t, trafficSnapshots]);
 
   const filteredRuleRows = useMemo(() => {
@@ -1671,13 +1671,13 @@ export default function OrchestratorPage() {
       name: server.name,
       role: server.role || "agent",
       endpoint: server.endpoint || "",
-      xuiEndpoint: server.xuiEndpoint || "",
-      xuiBasePath: server.xuiBasePath || "",
-      xuiApiToken: server.xuiApiToken || "",
-      xuiUsername: server.xuiUsername || "",
-      xuiPassword: server.xuiPassword || "",
-      xuiTwoFactorCode: server.xuiTwoFactorCode || "",
-      xuiAllowInsecure: server.xuiAllowInsecure || 0,
+      xrayPanelEndpoint: server.xrayPanelEndpoint || "",
+      xrayPanelBasePath: server.xrayPanelBasePath || "",
+      xrayPanelApiToken: server.xrayPanelApiToken || "",
+      xrayPanelUsername: server.xrayPanelUsername || "",
+      xrayPanelPassword: server.xrayPanelPassword || "",
+      xrayPanelTwoFactorCode: server.xrayPanelTwoFactorCode || "",
+      xrayPanelAllowInsecure: server.xrayPanelAllowInsecure || 0,
       host: server.host || "",
       sshPort: server.sshPort || 22,
       sshUser: server.sshUser || "root",
@@ -2050,7 +2050,7 @@ export default function OrchestratorPage() {
   const showServerRuleOverview = async (server: ControlServer) => {
     const res = await getServerRuleOverview(server.id);
     if (res.code === 0) {
-      showThreeXuiResult(t("{name} 出入站与转发规则", { name: server.name }), res.data);
+      showXrayPanelResult(t("{name} 出入站与转发规则", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || t("读取服务器规则失败"));
     }
@@ -2150,7 +2150,7 @@ export default function OrchestratorPage() {
       toast.error(t("ACME 证书模式需要填写域名"));
       return;
     }
-    if (selectedOrchestrationCriticalNanoServers.length > 0 && selectedOrchestrationUsesFullXuiStack) {
+    if (selectedOrchestrationCriticalNanoServers.length > 0 && selectedOrchestrationUsesFullXrayPanelStack) {
       toast.error(t("Nano 被控内存低于 200MB，不支持完整 Xray 编排；请关闭 Xray 相关选项，仅保留 Snell 或端口转发。"));
       return;
     }
@@ -2234,67 +2234,67 @@ export default function OrchestratorPage() {
     setScriptModalOpen(true);
   };
 
-  const isThreeXuiSuccess = (res: any) => res.code === 0 && (!res.data || res.data.success !== false);
+  const isXrayPanelSuccess = (res: any) => res.code === 0 && (!res.data || res.data.success !== false);
 
-  const showThreeXuiResult = (title: string, data: any) => {
+  const showXrayPanelResult = (title: string, data: any) => {
     setScriptTitle(title);
     setScriptText(typeof data === "string" ? data : JSON.stringify(data, null, 2));
     setScriptModalOpen(true);
   };
 
-  const testXui = async (server: ControlServer) => {
-    const res = await testThreeXuiConnection(server.id);
-    if (isThreeXuiSuccess(res)) {
+  const testXrayPanel = async (server: ControlServer) => {
+    const res = await testXrayPanelConnection(server.id);
+    if (isXrayPanelSuccess(res)) {
       toast.success(t("兼容 API 连接正常"));
-      showThreeXuiResult(t("{name} 运行时状态", { name: server.name }), res.data);
+      showXrayPanelResult(t("{name} 运行时状态", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("兼容 API 连接失败"));
     }
   };
 
-  const showThreeXuiInbounds = async (server: ControlServer) => {
-    const res = await listThreeXuiInbounds(server.id);
-    if (isThreeXuiSuccess(res)) {
-      showThreeXuiResult(t("{name} 入站列表", { name: server.name }), res.data);
+  const showXrayPanelInbounds = async (server: ControlServer) => {
+    const res = await listXrayPanelInbounds(server.id);
+    if (isXrayPanelSuccess(res)) {
+      showXrayPanelResult(t("{name} 入站列表", { name: server.name }), res.data);
       loadData();
     } else {
       toast.error(res.msg || res.data?.msg || t("读取入站失败"));
     }
   };
 
-  const showThreeXuiConfig = async (server: ControlServer) => {
-    const res = await getThreeXuiConfig(server.id);
-    if (isThreeXuiSuccess(res)) {
-      showThreeXuiResult(t("{name} Xray 配置", { name: server.name }), res.data);
+  const showXrayPanelConfig = async (server: ControlServer) => {
+    const res = await getXrayPanelConfig(server.id);
+    if (isXrayPanelSuccess(res)) {
+      showXrayPanelResult(t("{name} Xray 配置", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("读取配置失败"));
     }
   };
 
-  const showThreeXuiOutbounds = async (server: ControlServer) => {
-    const res = await getThreeXuiOutbounds(server.id);
-    if (isThreeXuiSuccess(res)) {
+  const showXrayPanelOutbounds = async (server: ControlServer) => {
+    const res = await getXrayPanelOutbounds(server.id);
+    if (isXrayPanelSuccess(res)) {
       rememberOutboundTags(res.data);
-      showThreeXuiResult(t("{name} 出站配置", { name: server.name }), res.data);
+      showXrayPanelResult(t("{name} 出站配置", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("读取出站失败"));
     }
   };
 
-  const showThreeXuiOutboundTraffic = async (server: ControlServer) => {
-    const res = await getThreeXuiOutboundTraffic(server.id);
-    if (isThreeXuiSuccess(res)) {
-      showThreeXuiResult(t("{name} 出站流量", { name: server.name }), res.data);
+  const showXrayPanelOutboundTraffic = async (server: ControlServer) => {
+    const res = await getXrayPanelOutboundTraffic(server.id);
+    if (isXrayPanelSuccess(res)) {
+      showXrayPanelResult(t("{name} 出站流量", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("读取出站流量失败"));
     }
   };
 
-  const syncXuiTraffic = async (server: ControlServer) => {
-    const res = await syncThreeXuiTraffic(server.id);
-    if (isThreeXuiSuccess(res)) {
+  const syncPanelTraffic = async (server: ControlServer) => {
+    const res = await syncXrayPanelTraffic(server.id);
+    if (isXrayPanelSuccess(res)) {
       toast.success(t("远端流量已同步入库"));
-      showThreeXuiResult(t("{name} 流量同步结果", { name: server.name }), res.data);
+      showXrayPanelResult(t("{name} 流量同步结果", { name: server.name }), res.data);
       loadData();
     } else {
       toast.error(res.msg || res.data?.msg || t("同步流量失败"));
@@ -2302,27 +2302,27 @@ export default function OrchestratorPage() {
   };
 
   const showTrafficSnapshots = async (server: ControlServer) => {
-    const res = await listThreeXuiTraffic({ serverId: server.id, limit: 120 });
+    const res = await listXrayPanelTraffic({ serverId: server.id, limit: 120 });
     if (res.code === 0) {
       const snapshots = res.data || [];
       setTrafficSnapshots(snapshots);
-      showThreeXuiResult(t("{name} 本地流量快照", { name: server.name }), snapshots);
+      showXrayPanelResult(t("{name} 本地流量快照", { name: server.name }), snapshots);
     } else {
       toast.error(res.msg || t("读取本地流量快照失败"));
     }
   };
 
-  const openThreeXuiInboundModal = (server: ControlServer) => {
-    setThreeXuiInboundForm({
-      ...blankThreeXuiInboundForm,
+  const openXrayPanelInboundModal = (server: ControlServer) => {
+    setXrayPanelInboundForm({
+      ...blankXrayPanelInboundForm,
       serverId: server.id,
-      payloadJson: inboundPayloadPreview({ ...blankThreeXuiInboundForm, serverId: server.id })
+      payloadJson: inboundPayloadPreview({ ...blankXrayPanelInboundForm, serverId: server.id })
     });
-    setThreeXuiInboundModalOpen(true);
+    setXrayPanelInboundModalOpen(true);
   };
 
-  const patchThreeXuiInboundForm = (patch: Partial<ThreeXuiInboundForm>) => {
-    setThreeXuiInboundForm(prev => {
+  const patchXrayPanelInboundForm = (patch: Partial<XrayPanelInboundForm>) => {
+    setXrayPanelInboundForm(prev => {
       const next = { ...prev, ...patch };
       return {
         ...next,
@@ -2331,34 +2331,34 @@ export default function OrchestratorPage() {
     });
   };
 
-  const updateInboundProtocol = (protocol: ThreeXuiInboundForm["protocol"]) => {
-    const defaults: Record<ThreeXuiInboundForm["protocol"], Partial<ThreeXuiInboundForm>> = {
+  const updateInboundProtocol = (protocol: XrayPanelInboundForm["protocol"]) => {
+    const defaults: Record<XrayPanelInboundForm["protocol"], Partial<XrayPanelInboundForm>> = {
       vless: { protocol, remark: "ob-vless", port: 443, network: "tcp", security: "reality", flow: "xtls-rprx-vision" },
       vmess: { protocol, remark: "ob-vmess", port: 2086, network: "ws", security: "none", flow: "" },
       trojan: { protocol, remark: "ob-trojan", port: 443, network: "tcp", security: "tls", flow: "" },
       shadowsocks: { protocol, remark: "ob-shadowsocks", port: 8388, network: "tcp", security: "none", flow: "" }
     };
-    patchThreeXuiInboundForm(defaults[protocol]);
+    patchXrayPanelInboundForm(defaults[protocol]);
   };
 
-  const saveThreeXuiInbound = async (confirmed = false) => {
-    if (!threeXuiInboundForm.serverId) {
+  const saveXrayPanelInbound = async (confirmed = false) => {
+    if (!xrayPanelInboundForm.serverId) {
       toast.error(t("请选择服务器"));
       return;
     }
-    if (threeXuiInboundForm.mode !== "add" && !threeXuiInboundForm.inboundId.trim()) {
+    if (xrayPanelInboundForm.mode !== "add" && !xrayPanelInboundForm.inboundId.trim()) {
       toast.error(t("更新或删除入站时必须填写 inbound id"));
       return;
     }
-    if (threeXuiInboundForm.mode === "delete" && !confirmed) {
+    if (xrayPanelInboundForm.mode === "delete" && !confirmed) {
       requestUiConfirmation({
         title: t("确认删除入站"),
-        message: t("确定删除入站 #{id}?", { id: threeXuiInboundForm.inboundId || "-" }),
+        message: t("确定删除入站 #{id}?", { id: xrayPanelInboundForm.inboundId || "-" }),
         detail: t("该操作会直接修改远端 Xray 入站配置。"),
         confirmText: t("确认删除"),
         color: "danger",
         testId: "confirm-delete-xray-inbound",
-        onConfirm: () => saveThreeXuiInbound(true)
+        onConfirm: () => saveXrayPanelInbound(true)
       });
       return;
     }
@@ -2366,36 +2366,36 @@ export default function OrchestratorPage() {
     setSubmitting(true);
     let res: any;
     try {
-      const inboundId = threeXuiInboundForm.inboundId ? Number(threeXuiInboundForm.inboundId) : undefined;
-      if (threeXuiInboundForm.mode === "delete") {
-        res = await deleteThreeXuiInbound({ serverId: threeXuiInboundForm.serverId, inboundId });
+      const inboundId = xrayPanelInboundForm.inboundId ? Number(xrayPanelInboundForm.inboundId) : undefined;
+      if (xrayPanelInboundForm.mode === "delete") {
+        res = await deleteXrayPanelInbound({ serverId: xrayPanelInboundForm.serverId, inboundId });
       } else {
-        const payload = threeXuiInboundForm.editMode === "json"
-          ? JSON.parse(threeXuiInboundForm.payloadJson)
-          : buildInboundPayloadFromForm(threeXuiInboundForm);
-        res = threeXuiInboundForm.mode === "add"
-          ? await addThreeXuiInbound({ serverId: threeXuiInboundForm.serverId, payload })
-          : await updateThreeXuiInbound({ serverId: threeXuiInboundForm.serverId, inboundId, payload });
+        const payload = xrayPanelInboundForm.editMode === "json"
+          ? JSON.parse(xrayPanelInboundForm.payloadJson)
+          : buildInboundPayloadFromForm(xrayPanelInboundForm);
+        res = xrayPanelInboundForm.mode === "add"
+          ? await addXrayPanelInbound({ serverId: xrayPanelInboundForm.serverId, payload })
+          : await updateXrayPanelInbound({ serverId: xrayPanelInboundForm.serverId, inboundId, payload });
       }
     } catch (error) {
       setSubmitting(false);
-      toast.error(threeXuiInboundForm.editMode === "json" ? t("入站 JSON 格式不正确") : t("入站表单内容不完整"));
+      toast.error(xrayPanelInboundForm.editMode === "json" ? t("入站 JSON 格式不正确") : t("入站表单内容不完整"));
       return;
     }
     setSubmitting(false);
 
-    if (isThreeXuiSuccess(res)) {
+    if (isXrayPanelSuccess(res)) {
       toast.success(t("入站操作已提交"));
-      setThreeXuiInboundModalOpen(false);
-      showThreeXuiResult(t("入站操作结果"), res.data);
+      setXrayPanelInboundModalOpen(false);
+      showXrayPanelResult(t("入站操作结果"), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("入站操作失败"));
     }
   };
 
   const openXraySettingModal = async (server: ControlServer) => {
-    const res = await getThreeXuiConfig(server.id);
-    if (!isThreeXuiSuccess(res)) {
+    const res = await getXrayPanelConfig(server.id);
+    if (!isXrayPanelSuccess(res)) {
       toast.error(res.msg || res.data?.msg || t("读取 Xray 配置失败"));
       return;
     }
@@ -2433,17 +2433,17 @@ export default function OrchestratorPage() {
     }
 
     setSubmitting(true);
-    const res = await saveThreeXuiOutbounds({
+    const res = await saveXrayPanelOutbounds({
       serverId: xraySettingServerId,
       xraySetting: xraySettingText,
       outboundTestUrl
     });
     setSubmitting(false);
 
-    if (isThreeXuiSuccess(res)) {
+    if (isXrayPanelSuccess(res)) {
       toast.success(t("出站配置已保存"));
       setXraySettingModalOpen(false);
-      showThreeXuiResult(t("出站保存结果"), res.data);
+      showXrayPanelResult(t("出站保存结果"), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("保存出站配置失败"));
     }
@@ -2462,10 +2462,10 @@ export default function OrchestratorPage() {
       });
       return;
     }
-    const res = await restartThreeXuiXray(server.id);
-    if (isThreeXuiSuccess(res)) {
+    const res = await restartXrayPanelXray(server.id);
+    if (isXrayPanelSuccess(res)) {
       toast.success(t("已请求重启 Xray"));
-      showThreeXuiResult(t("{name} Xray 重启结果", { name: server.name }), res.data);
+      showXrayPanelResult(t("{name} Xray 重启结果", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("重启 Xray 失败"));
     }
@@ -2725,7 +2725,7 @@ export default function OrchestratorPage() {
                         </div>
                         <div className="rounded-small bg-white px-2 py-1.5 dark:bg-default-50/5">
                           <p className="text-gray-500">{t("兼容 API")}</p>
-                          <p className="truncate font-medium text-gray-900 dark:text-white">{server.xuiServiceStatus || (server.xuiEndpoint ? t("已配置") : "-")}</p>
+                          <p className="truncate font-medium text-gray-900 dark:text-white">{server.xrayPanelServiceStatus || (server.xrayPanelEndpoint ? t("已配置") : "-")}</p>
                         </div>
                         <div className="rounded-small bg-white px-2 py-1.5 dark:bg-default-50/5">
                           <p className="text-gray-500">{t("内存")}</p>
@@ -2734,7 +2734,7 @@ export default function OrchestratorPage() {
                       </div>
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         <Chip size="sm" variant="flat">{t("心跳：{time}", { time: formatTime(server.lastHeartbeat) })}</Chip>
-                        <Chip size="sm" variant="flat">{t("规则同步：{time}", { time: formatTime(server.xuiLastSync) })}</Chip>
+                        <Chip size="sm" variant="flat">{t("规则同步：{time}", { time: formatTime(server.xrayPanelLastSync) })}</Chip>
                         {server.lastError && <Chip size="sm" variant="flat" color="danger">{server.lastError}</Chip>}
                       </div>
                     </div>
@@ -3014,7 +3014,7 @@ export default function OrchestratorPage() {
                       <p className="text-xs text-gray-500">{t("首次 {first}，最近 {last}", { first: formatTime(alert.firstSeenAt), last: formatTime(alert.lastSeenAt) })}</p>
                     </div>
                     <div className="flex flex-wrap gap-2 lg:justify-end">
-                      {alert.detailJson && <Button size="sm" variant="flat" onPress={() => showThreeXuiResult(t("告警详情"), alert.detailJson)}>{t("详情")}</Button>}
+                      {alert.detailJson && <Button size="sm" variant="flat" onPress={() => showXrayPanelResult(t("告警详情"), alert.detailJson)}>{t("详情")}</Button>}
                       <Button size="sm" color="primary" variant="flat" onPress={() => acknowledgeAlert(alert)}>{t("确认")}</Button>
                     </div>
                   </div>
@@ -3077,7 +3077,7 @@ export default function OrchestratorPage() {
                       </div>
                     </div>
                     <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
-                      {log.detailJson && <Button size="sm" variant="flat" onPress={() => showThreeXuiResult(t("审计详情"), log.detailJson || "")}>{t("详情")}</Button>}
+                      {log.detailJson && <Button size="sm" variant="flat" onPress={() => showXrayPanelResult(t("审计详情"), log.detailJson || "")}>{t("详情")}</Button>}
                     </div>
                   </div>
                 </div>
@@ -3111,7 +3111,7 @@ export default function OrchestratorPage() {
                   <SelectItem key="all">{t("全部类型")}</SelectItem>
                   <SelectItem key="protocol">{t("协议节点")}</SelectItem>
                   <SelectItem key="forward">{t("远端转发")}</SelectItem>
-                  <SelectItem key="xui">{t("入站视图")}</SelectItem>
+                  <SelectItem key="xrayPanel">{t("入站视图")}</SelectItem>
                 </Select>
                 <Select aria-label={t("规则服务器")} selectedKeys={[ruleServerFilter]} onSelectionChange={keys => setRuleServerFilter(Array.from(keys)[0] as string)} variant="bordered" size="sm">
                   {ruleServerOptions.map(option => <SelectItem key={option.id}>{option.name}</SelectItem>)}
@@ -3244,7 +3244,7 @@ export default function OrchestratorPage() {
                     </div>
                     <div>
                       <p className="text-gray-500">{t("面板入口")}</p>
-                      <p className="truncate">{server.xuiEndpoint || "-"}</p>
+                      <p className="truncate">{server.xrayPanelEndpoint || "-"}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">Agent</p>
@@ -3279,13 +3279,13 @@ export default function OrchestratorPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Chip size="sm" variant="flat" color={serviceColor(server.xuiServiceStatus) as any}>{t("面板")} {server.xuiServiceStatus || "-"}</Chip>
+                    <Chip size="sm" variant="flat" color={serviceColor(server.xrayPanelServiceStatus) as any}>{t("面板")} {server.xrayPanelServiceStatus || "-"}</Chip>
                     <Chip size="sm" variant="flat" color={serviceColor(server.xrayServiceStatus) as any}>Xray {server.xrayServiceStatus || "-"}</Chip>
                     <Chip size="sm" variant="flat" color={serviceColor(server.snellServiceStatus) as any}>Snell {server.snellServiceStatus || "-"}</Chip>
                     <Chip size="sm" variant="flat" color={serviceColor(server.certificateStatus) as any}>{certificateText(server)}</Chip>
                   </div>
                   <p className="text-xs text-gray-500">{t("心跳：{time}", { time: formatTime(server.lastHeartbeat) })}</p>
-                  <p className="text-xs text-gray-500">{t("规则同步：{time}", { time: formatTime(server.xuiLastSync) })}</p>
+                  <p className="text-xs text-gray-500">{t("规则同步：{time}", { time: formatTime(server.xrayPanelLastSync) })}</p>
                   {server.certificateExpireAt && <p className="text-xs text-gray-500">{t("证书到期：{time}", { time: formatTime(server.certificateExpireAt) })}</p>}
                   {server.lastError && <p className="text-xs text-danger">{t("最近错误：{error}", { error: server.lastError })}</p>}
                   <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -3298,16 +3298,16 @@ export default function OrchestratorPage() {
                     <ServerActionGroup title="规则流量">
                       <Button size="sm" variant="flat" onPress={() => showServerRuleOverview(server)}>{t("规则总览")}</Button>
                       <Button size="sm" variant="flat" onPress={() => syncServerProtocolNodes(server)}>{t("同步节点")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => syncXuiTraffic(server)}>{t("同步流量")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => syncPanelTraffic(server)}>{t("同步流量")}</Button>
                       <Button size="sm" variant="flat" onPress={() => showTrafficSnapshots(server)}>{t("流量快照")}</Button>
                     </ServerActionGroup>
                     <ServerActionGroup title={t("入站/出站")} testId={`xray-runtime-actions-${server.id}`}>
-                      <Button size="sm" variant="flat" onPress={() => testXui(server)}>{t("连接测试")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => showThreeXuiInbounds(server)}>{t("入站")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => openThreeXuiInboundModal(server)}>{t("入站操作")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => showThreeXuiConfig(server)}>{t("Xray 配置")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => showThreeXuiOutbounds(server)}>{t("出站")}</Button>
-                      <Button size="sm" variant="flat" onPress={() => showThreeXuiOutboundTraffic(server)}>{t("出站流量")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => testXrayPanel(server)}>{t("连接测试")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => showXrayPanelInbounds(server)}>{t("入站")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => openXrayPanelInboundModal(server)}>{t("入站操作")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => showXrayPanelConfig(server)}>{t("Xray 配置")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => showXrayPanelOutbounds(server)}>{t("出站")}</Button>
+                      <Button size="sm" variant="flat" onPress={() => showXrayPanelOutboundTraffic(server)}>{t("出站流量")}</Button>
                       <Button size="sm" variant="flat" onPress={() => openXraySettingModal(server)}>{t("路由/出站")}</Button>
                       <Button size="sm" variant="flat" onPress={() => restartXray(server)}>{t("重启 Xray")}</Button>
                     </ServerActionGroup>
@@ -3545,13 +3545,13 @@ export default function OrchestratorPage() {
               <Input label="SSH 端口" type="number" value={serverForm.sshPort.toString()} onChange={e => setServerForm(prev => ({ ...prev, sshPort: Number(e.target.value) || 22 }))} variant="bordered" />
               <Input label="SSH 用户" value={serverForm.sshUser} onChange={e => setServerForm(prev => ({ ...prev, sshUser: e.target.value }))} variant="bordered" />
               <Input label={t("副控 API")} value={serverForm.endpoint} onChange={e => setServerForm(prev => ({ ...prev, endpoint: e.target.value }))} variant="bordered" />
-              <Input label={t("面板地址")} value={serverForm.xuiEndpoint} onChange={e => setServerForm(prev => ({ ...prev, xuiEndpoint: e.target.value }))} variant="bordered" placeholder="https://1.2.3.4:5168" />
-              <Input label={t("面板 Base Path")} value={serverForm.xuiBasePath} onChange={e => setServerForm(prev => ({ ...prev, xuiBasePath: e.target.value }))} variant="bordered" placeholder="/secret-path" />
-              <Input label={t("面板 API Token")} value={serverForm.xuiApiToken} onChange={e => setServerForm(prev => ({ ...prev, xuiApiToken: e.target.value }))} variant="bordered" />
-              <Input label={t("面板用户名")} value={serverForm.xuiUsername} onChange={e => setServerForm(prev => ({ ...prev, xuiUsername: e.target.value }))} variant="bordered" />
-              <Input label={t("面板密码")} type="password" value={serverForm.xuiPassword} onChange={e => setServerForm(prev => ({ ...prev, xuiPassword: e.target.value }))} variant="bordered" />
-              <Input label={t("面板 2FA")} value={serverForm.xuiTwoFactorCode} onChange={e => setServerForm(prev => ({ ...prev, xuiTwoFactorCode: e.target.value }))} variant="bordered" />
-              <Select label={t("面板 TLS 校验")} selectedKeys={[serverForm.xuiAllowInsecure.toString()]} onSelectionChange={keys => setServerForm(prev => ({ ...prev, xuiAllowInsecure: Number(Array.from(keys)[0]) }))} variant="bordered">
+              <Input label={t("面板地址")} value={serverForm.xrayPanelEndpoint} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelEndpoint: e.target.value }))} variant="bordered" placeholder="https://1.2.3.4:5168" />
+              <Input label={t("面板 Base Path")} value={serverForm.xrayPanelBasePath} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelBasePath: e.target.value }))} variant="bordered" placeholder="/secret-path" />
+              <Input label={t("面板 API Token")} value={serverForm.xrayPanelApiToken} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelApiToken: e.target.value }))} variant="bordered" />
+              <Input label={t("面板用户名")} value={serverForm.xrayPanelUsername} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelUsername: e.target.value }))} variant="bordered" />
+              <Input label={t("面板密码")} type="password" value={serverForm.xrayPanelPassword} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelPassword: e.target.value }))} variant="bordered" />
+              <Input label={t("面板 2FA")} value={serverForm.xrayPanelTwoFactorCode} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelTwoFactorCode: e.target.value }))} variant="bordered" />
+              <Select label={t("面板 TLS 校验")} selectedKeys={[serverForm.xrayPanelAllowInsecure.toString()]} onSelectionChange={keys => setServerForm(prev => ({ ...prev, xrayPanelAllowInsecure: Number(Array.from(keys)[0]) }))} variant="bordered">
                 <SelectItem key="0">{t("校验证书")}</SelectItem>
                 <SelectItem key="1">{t("允许自签名")}</SelectItem>
               </Select>
@@ -3826,7 +3826,7 @@ export default function OrchestratorPage() {
                   {renderServerOptions()}
                 </Select>
                 <Input label={t("公网主机")} value={orchestrationForm.publicHost} onChange={e => patchOrchestrationForm({ publicHost: e.target.value })} variant="bordered" />
-                <Input label={t("面板版本")} value={orchestrationForm.xuiVersion} onChange={e => patchOrchestrationForm({ xuiVersion: e.target.value })} variant="bordered" placeholder={t("留空使用最新版")} />
+                <Input label={t("面板版本")} value={orchestrationForm.xrayPanelVersion} onChange={e => patchOrchestrationForm({ xrayPanelVersion: e.target.value })} variant="bordered" placeholder={t("留空使用最新版")} />
               </div>
               {selectedOrchestrationHasMaster && (
                 <MasterRiskNotice context="生成一键编排任务" />
@@ -3845,7 +3845,7 @@ export default function OrchestratorPage() {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-small border border-default-200 p-4">
-                <Switch isSelected={orchestrationForm.installXui} onValueChange={value => patchOrchestrationForm({ installXui: value })}>{t("安装面板运行时")}</Switch>
+                <Switch isSelected={orchestrationForm.installXrayPanel} onValueChange={value => patchOrchestrationForm({ installXrayPanel: value })}>{t("安装面板运行时")}</Switch>
                 <Switch isSelected={orchestrationForm.configurePanel} onValueChange={value => patchOrchestrationForm({ configurePanel: value })}>{t("配置面板")}</Switch>
                 <Switch isSelected={orchestrationForm.installSnell} onValueChange={value => patchOrchestrationForm({ installSnell: value })}>{t("安装 Snell")}</Switch>
                 <Switch isSelected={orchestrationForm.createVlessReality || orchestrationForm.createVmessWs || orchestrationForm.createTrojanTls || orchestrationForm.createShadowsocks} isReadOnly>{t("创建节点")}</Switch>
@@ -3905,40 +3905,40 @@ export default function OrchestratorPage() {
         </ModalContent>
       </Modal>
 
-      <Modal isOpen={threeXuiInboundModalOpen} onOpenChange={setThreeXuiInboundModalOpen} size="5xl" scrollBehavior="inside">
+      <Modal isOpen={xrayPanelInboundModalOpen} onOpenChange={setXrayPanelInboundModalOpen} size="5xl" scrollBehavior="inside">
         <ModalContent>
           <ModalHeader>{t("入站操作")}</ModalHeader>
           <ModalBody>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Select label={t("动作")} selectedKeys={[threeXuiInboundForm.mode]} onSelectionChange={keys => patchThreeXuiInboundForm({ mode: Array.from(keys)[0] as ThreeXuiInboundForm["mode"] })} variant="bordered">
+              <Select label={t("动作")} selectedKeys={[xrayPanelInboundForm.mode]} onSelectionChange={keys => patchXrayPanelInboundForm({ mode: Array.from(keys)[0] as XrayPanelInboundForm["mode"] })} variant="bordered">
                 <SelectItem key="add">{t("新增 inbound")}</SelectItem>
                 <SelectItem key="update">{t("更新 inbound")}</SelectItem>
                 <SelectItem key="delete">{t("删除 inbound")}</SelectItem>
               </Select>
-              <Select label={t("编辑方式")} selectedKeys={[threeXuiInboundForm.editMode]} onSelectionChange={keys => patchThreeXuiInboundForm({ editMode: Array.from(keys)[0] as ThreeXuiInboundForm["editMode"] })} variant="bordered">
+              <Select label={t("编辑方式")} selectedKeys={[xrayPanelInboundForm.editMode]} onSelectionChange={keys => patchXrayPanelInboundForm({ editMode: Array.from(keys)[0] as XrayPanelInboundForm["editMode"] })} variant="bordered">
                 <SelectItem key="form">{t("结构化表单")}</SelectItem>
                 <SelectItem key="json">{t("高级 JSON")}</SelectItem>
               </Select>
-              <Input label={t("服务器 ID")} value={threeXuiInboundForm.serverId?.toString() || ""} isReadOnly variant="bordered" />
-              <Input label="Inbound ID" value={threeXuiInboundForm.inboundId} onChange={e => patchThreeXuiInboundForm({ inboundId: e.target.value })} variant="bordered" />
-              <Input label={t("备注")} value={threeXuiInboundForm.remark} onChange={e => patchThreeXuiInboundForm({ remark: e.target.value })} variant="bordered" />
-              <Select label={t("启用")} selectedKeys={[threeXuiInboundForm.enable.toString()]} onSelectionChange={keys => patchThreeXuiInboundForm({ enable: Number(Array.from(keys)[0]) })} variant="bordered">
+              <Input label={t("服务器 ID")} value={xrayPanelInboundForm.serverId?.toString() || ""} isReadOnly variant="bordered" />
+              <Input label="Inbound ID" value={xrayPanelInboundForm.inboundId} onChange={e => patchXrayPanelInboundForm({ inboundId: e.target.value })} variant="bordered" />
+              <Input label={t("备注")} value={xrayPanelInboundForm.remark} onChange={e => patchXrayPanelInboundForm({ remark: e.target.value })} variant="bordered" />
+              <Select label={t("启用")} selectedKeys={[xrayPanelInboundForm.enable.toString()]} onSelectionChange={keys => patchXrayPanelInboundForm({ enable: Number(Array.from(keys)[0]) })} variant="bordered">
                 <SelectItem key="1">{t("启用")}</SelectItem>
                 <SelectItem key="0">{t("停用")}</SelectItem>
               </Select>
-              <Input label={t("监听地址")} value={threeXuiInboundForm.listen} onChange={e => patchThreeXuiInboundForm({ listen: e.target.value })} variant="bordered" placeholder={t("留空监听所有地址")} />
-              <Input label={t("端口")} type="number" value={threeXuiInboundForm.port.toString()} onChange={e => patchThreeXuiInboundForm({ port: Number(e.target.value) || 0 })} variant="bordered" />
-              <Select label={t("协议")} selectedKeys={[threeXuiInboundForm.protocol]} onSelectionChange={keys => updateInboundProtocol(Array.from(keys)[0] as ThreeXuiInboundForm["protocol"])} variant="bordered">
+              <Input label={t("监听地址")} value={xrayPanelInboundForm.listen} onChange={e => patchXrayPanelInboundForm({ listen: e.target.value })} variant="bordered" placeholder={t("留空监听所有地址")} />
+              <Input label={t("端口")} type="number" value={xrayPanelInboundForm.port.toString()} onChange={e => patchXrayPanelInboundForm({ port: Number(e.target.value) || 0 })} variant="bordered" />
+              <Select label={t("协议")} selectedKeys={[xrayPanelInboundForm.protocol]} onSelectionChange={keys => updateInboundProtocol(Array.from(keys)[0] as XrayPanelInboundForm["protocol"])} variant="bordered">
                 <SelectItem key="vless">VLESS</SelectItem>
                 <SelectItem key="vmess">VMess</SelectItem>
                 <SelectItem key="trojan">Trojan</SelectItem>
                 <SelectItem key="shadowsocks">Shadowsocks</SelectItem>
               </Select>
-              <Select label={t("传输")} selectedKeys={[threeXuiInboundForm.network]} onSelectionChange={keys => patchThreeXuiInboundForm({ network: Array.from(keys)[0] as ThreeXuiInboundForm["network"] })} variant="bordered">
+              <Select label={t("传输")} selectedKeys={[xrayPanelInboundForm.network]} onSelectionChange={keys => patchXrayPanelInboundForm({ network: Array.from(keys)[0] as XrayPanelInboundForm["network"] })} variant="bordered">
                 <SelectItem key="tcp">TCP</SelectItem>
                 <SelectItem key="ws">WebSocket</SelectItem>
               </Select>
-              <Select label={t("安全")} selectedKeys={[threeXuiInboundForm.security]} onSelectionChange={keys => patchThreeXuiInboundForm({ security: Array.from(keys)[0] as ThreeXuiInboundForm["security"] })} variant="bordered">
+              <Select label={t("安全")} selectedKeys={[xrayPanelInboundForm.security]} onSelectionChange={keys => patchXrayPanelInboundForm({ security: Array.from(keys)[0] as XrayPanelInboundForm["security"] })} variant="bordered">
                 <SelectItem key="none">None</SelectItem>
                 <SelectItem key="tls">TLS</SelectItem>
                 <SelectItem key="reality">Reality</SelectItem>
@@ -3948,66 +3948,66 @@ export default function OrchestratorPage() {
               <MasterRiskNotice context="提交入站操作" />
             )}
 
-            {threeXuiInboundForm.mode !== "delete" && threeXuiInboundForm.editMode === "form" && (
+            {xrayPanelInboundForm.mode !== "delete" && xrayPanelInboundForm.editMode === "form" && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Input label={t("客户端 Email")} value={threeXuiInboundForm.clientEmail} onChange={e => patchThreeXuiInboundForm({ clientEmail: e.target.value })} variant="bordered" />
-                  {threeXuiInboundForm.protocol !== "trojan" && threeXuiInboundForm.protocol !== "shadowsocks" && (
+                  <Input label={t("客户端 Email")} value={xrayPanelInboundForm.clientEmail} onChange={e => patchXrayPanelInboundForm({ clientEmail: e.target.value })} variant="bordered" />
+                  {xrayPanelInboundForm.protocol !== "trojan" && xrayPanelInboundForm.protocol !== "shadowsocks" && (
                     <div className="space-y-2">
-                      <Input label={t("客户端 UUID")} value={threeXuiInboundForm.clientId} onChange={e => patchThreeXuiInboundForm({ clientId: e.target.value })} variant="bordered" />
-                      <Button size="sm" variant="flat" onPress={() => patchThreeXuiInboundForm({ clientId: randomUuid() })}>{t("生成 UUID")}</Button>
+                      <Input label={t("客户端 UUID")} value={xrayPanelInboundForm.clientId} onChange={e => patchXrayPanelInboundForm({ clientId: e.target.value })} variant="bordered" />
+                      <Button size="sm" variant="flat" onPress={() => patchXrayPanelInboundForm({ clientId: randomUuid() })}>{t("生成 UUID")}</Button>
                     </div>
                   )}
-                  {(threeXuiInboundForm.protocol === "trojan" || threeXuiInboundForm.protocol === "shadowsocks") && (
-                    <Input label={t("客户端密码 / PSK")} value={threeXuiInboundForm.clientPassword} onChange={e => patchThreeXuiInboundForm({ clientPassword: e.target.value })} variant="bordered" />
+                  {(xrayPanelInboundForm.protocol === "trojan" || xrayPanelInboundForm.protocol === "shadowsocks") && (
+                    <Input label={t("客户端密码 / PSK")} value={xrayPanelInboundForm.clientPassword} onChange={e => patchXrayPanelInboundForm({ clientPassword: e.target.value })} variant="bordered" />
                   )}
-                  {threeXuiInboundForm.protocol === "vless" && (
-                    <Input label="Flow" value={threeXuiInboundForm.flow} onChange={e => patchThreeXuiInboundForm({ flow: e.target.value })} variant="bordered" />
+                  {xrayPanelInboundForm.protocol === "vless" && (
+                    <Input label="Flow" value={xrayPanelInboundForm.flow} onChange={e => patchXrayPanelInboundForm({ flow: e.target.value })} variant="bordered" />
                   )}
-                  <Input label={t("流量限制 GB")} type="number" value={threeXuiInboundForm.totalGb.toString()} onChange={e => patchThreeXuiInboundForm({ totalGb: Number(e.target.value) || 0 })} variant="bordered" />
-                  <Input label={t("有效期天数")} type="number" value={threeXuiInboundForm.expiryDays.toString()} onChange={e => patchThreeXuiInboundForm({ expiryDays: Number(e.target.value) || 0 })} variant="bordered" />
+                  <Input label={t("流量限制 GB")} type="number" value={xrayPanelInboundForm.totalGb.toString()} onChange={e => patchXrayPanelInboundForm({ totalGb: Number(e.target.value) || 0 })} variant="bordered" />
+                  <Input label={t("有效期天数")} type="number" value={xrayPanelInboundForm.expiryDays.toString()} onChange={e => patchXrayPanelInboundForm({ expiryDays: Number(e.target.value) || 0 })} variant="bordered" />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Input label="SNI / Host" value={threeXuiInboundForm.sni} onChange={e => patchThreeXuiInboundForm({ sni: e.target.value })} variant="bordered" />
-                  {threeXuiInboundForm.protocol === "vless" && threeXuiInboundForm.security === "reality" && (
+                  <Input label="SNI / Host" value={xrayPanelInboundForm.sni} onChange={e => patchXrayPanelInboundForm({ sni: e.target.value })} variant="bordered" />
+                  {xrayPanelInboundForm.protocol === "vless" && xrayPanelInboundForm.security === "reality" && (
                     <>
-                        <Input label="Reality Dest" value={threeXuiInboundForm.realityDest} onChange={e => patchThreeXuiInboundForm({ realityDest: e.target.value })} variant="bordered" />
+                        <Input label="Reality Dest" value={xrayPanelInboundForm.realityDest} onChange={e => patchXrayPanelInboundForm({ realityDest: e.target.value })} variant="bordered" />
                         <div className="space-y-2">
-                          <Input label="Reality Private Key" value={threeXuiInboundForm.realityPrivateKey} onChange={e => patchThreeXuiInboundForm({ realityPrivateKey: e.target.value })} variant="bordered" />
-                        <Button size="sm" variant="flat" onPress={() => patchThreeXuiInboundForm({ realityPrivateKey: randomRealityPrivateKey() })}>{t("生成私钥")}</Button>
+                          <Input label="Reality Private Key" value={xrayPanelInboundForm.realityPrivateKey} onChange={e => patchXrayPanelInboundForm({ realityPrivateKey: e.target.value })} variant="bordered" />
+                        <Button size="sm" variant="flat" onPress={() => patchXrayPanelInboundForm({ realityPrivateKey: randomRealityPrivateKey() })}>{t("生成私钥")}</Button>
                       </div>
                       <div className="space-y-2">
-                        <Input label="Reality Short ID" value={threeXuiInboundForm.realityShortId} onChange={e => patchThreeXuiInboundForm({ realityShortId: e.target.value })} variant="bordered" />
-                        <Button size="sm" variant="flat" onPress={() => patchThreeXuiInboundForm({ realityShortId: randomHex(8) })}>{t("生成 Short ID")}</Button>
+                        <Input label="Reality Short ID" value={xrayPanelInboundForm.realityShortId} onChange={e => patchXrayPanelInboundForm({ realityShortId: e.target.value })} variant="bordered" />
+                        <Button size="sm" variant="flat" onPress={() => patchXrayPanelInboundForm({ realityShortId: randomHex(8) })}>{t("生成 Short ID")}</Button>
                       </div>
                     </>
                   )}
-                  {threeXuiInboundForm.protocol === "vmess" && (
-                    <Input label="WebSocket Path" value={threeXuiInboundForm.wsPath} onChange={e => patchThreeXuiInboundForm({ wsPath: e.target.value })} variant="bordered" />
+                  {xrayPanelInboundForm.protocol === "vmess" && (
+                    <Input label="WebSocket Path" value={xrayPanelInboundForm.wsPath} onChange={e => patchXrayPanelInboundForm({ wsPath: e.target.value })} variant="bordered" />
                   )}
-                  {threeXuiInboundForm.protocol === "shadowsocks" && (
-                    <Input label={t("加密方法")} value={threeXuiInboundForm.ssMethod} onChange={e => patchThreeXuiInboundForm({ ssMethod: e.target.value })} variant="bordered" />
+                  {xrayPanelInboundForm.protocol === "shadowsocks" && (
+                    <Input label={t("加密方法")} value={xrayPanelInboundForm.ssMethod} onChange={e => patchXrayPanelInboundForm({ ssMethod: e.target.value })} variant="bordered" />
                   )}
                 </div>
               </div>
             )}
 
-            {threeXuiInboundForm.mode !== "delete" && (
+            {xrayPanelInboundForm.mode !== "delete" && (
               <Textarea
-                label={threeXuiInboundForm.editMode === "json" ? "Inbound Payload JSON" : t("生成的 Payload 预览")}
+                label={xrayPanelInboundForm.editMode === "json" ? "Inbound Payload JSON" : t("生成的 Payload 预览")}
                 minRows={14}
-                value={threeXuiInboundForm.editMode === "json" ? threeXuiInboundForm.payloadJson : inboundPayloadPreview(threeXuiInboundForm)}
-                onChange={e => patchThreeXuiInboundForm({ payloadJson: e.target.value })}
-                readOnly={threeXuiInboundForm.editMode === "form"}
+                value={xrayPanelInboundForm.editMode === "json" ? xrayPanelInboundForm.payloadJson : inboundPayloadPreview(xrayPanelInboundForm)}
+                onChange={e => patchXrayPanelInboundForm({ payloadJson: e.target.value })}
+                readOnly={xrayPanelInboundForm.editMode === "form"}
                 variant="bordered"
                 classNames={{ input: "font-mono text-xs" }}
               />
             )}
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setThreeXuiInboundModalOpen(false)}>{t("取消")}</Button>
-            <Button color={threeXuiInboundForm.mode === "delete" ? "danger" : "primary"} isLoading={submitting} onPress={() => saveThreeXuiInbound()}>{t("提交")}</Button>
+            <Button variant="light" onPress={() => setXrayPanelInboundModalOpen(false)}>{t("取消")}</Button>
+            <Button color={xrayPanelInboundForm.mode === "delete" ? "danger" : "primary"} isLoading={submitting} onPress={() => saveXrayPanelInbound()}>{t("提交")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

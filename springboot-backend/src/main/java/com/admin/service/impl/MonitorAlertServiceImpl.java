@@ -80,7 +80,7 @@ public class MonitorAlertServiceImpl extends ServiceImpl<MonitorAlertMapper, Mon
         if (previous == null || dto == null) {
             return;
         }
-        checkService(previous, "xui_service_failure", "x-ui", dto.getXuiServiceStatus(), now);
+        checkService(previous, "xrayPanel_service_failure", "Xray Panel", dto.getXrayPanelServiceStatus(), now);
         checkService(previous, "xray_service_failure", "xray", dto.getXrayServiceStatus(), now);
         checkService(previous, "snell_service_failure", "snell", dto.getSnellServiceStatus(), now);
         checkCertificate(previous, dto, now);
@@ -213,7 +213,7 @@ public class MonitorAlertServiceImpl extends ServiceImpl<MonitorAlertMapper, Mon
                 : "warning";
         String message = memoryTotalMb == null || memoryTotalMb <= 0
                 ? "Server is marked as low-memory Nano mode"
-                : "Server memory is " + memoryTotalMb + " MB; avoid full 3x-ui/Xray orchestration";
+                : "Server memory is " + memoryTotalMb + " MB; avoid full Xray Panel/Xray orchestration";
         raise(server.getId(), server.getName(), "low_memory_server", severity, "heartbeat", message, detail, now);
     }
 

@@ -37,7 +37,7 @@ Runtime Providers are the product boundary between the master task engine and co
 
 | Provider | Scope | Executor | Nano hosts |
 | --- | --- | --- | --- |
-| `xui` | Xray, Reality, inbounds, outbounds, routing rules, IPv4/IPv6 strategy, traffic | master API + agent task | not recommended |
+| `xrayPanel` | Xray, Reality, inbounds, outbounds, routing rules, IPv4/IPv6 strategy, traffic | master API + agent task | not recommended |
 | `snell` | Snell node services | agent task | supported |
 | `forward` | TCP/UDP remote forwarding | agent task | supported |
 | `certificate` | self-signed, ACME and certificate diagnostics | agent task | task-dependent |
@@ -65,7 +65,7 @@ Agent task history redacts panel secrets before storage. Installation/orchestrat
 
 Firewall maintenance is also executable from the same provider contract. `open-runtime-ports` and `close-runtime-ports` parse requested runtime ports from task `requestJson`, apply local `ufw`, `firewalld` or `iptables` rules when available, and then return structured diagnostics. Cloud security groups still need operator confirmation.
 
-Remote log collection also uses the same `agent-maintenance` path. A `logs` action returns structured `logs.items` for the Overlord agent runner, x-ui/Xray services, Snell node services, forwarding/task logs and related service managers, and the control-center task card renders a compact remote-log summary before operators open raw output.
+Remote log collection also uses the same `agent-maintenance` path. A `logs` action returns structured `logs.items` for the Overlord agent runner, Xray Panel/Xray services, Snell node services, forwarding/task logs and related service managers, and the control-center task card renders a compact remote-log summary before operators open raw output.
 
 Agent upgrade now uses the same controlled task loop with a safer lifecycle: the agent binary reports `--version`, the upgrade task downloads to a temporary file, verifies Bash syntax, calculates SHA-256, backs up the previous binary, installs the new file, schedules a service restart, and returns structured `maintenance.upgrade` metadata for the master task card.
 
@@ -195,7 +195,7 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scrip
 ```
 
 The agent runs through systemd or OpenRC, claims tasks from the master, executes them locally and reports results back.
-Claimed tasks include their Runtime Provider assignment, so task history can be audited by `xui`, `snell`, `forward`, `certificate` or `firewall`.
+Claimed tasks include their Runtime Provider assignment, so task history can be audited by `xrayPanel`, `snell`, `forward`, `certificate` or `firewall`.
 
 ## Operator Flow
 
@@ -270,9 +270,9 @@ POST /api/v1/agent-task/report
 ```
 
 Agent reports store both `resultJson.runtimeProvider` and `resultJson.runtimeState`, so task history can be audited by runtime owner, source task, target server, resource type and resolved service/node/diagnostic status.
-`agent-maintenance` log reports additionally store structured `logs.items`, covering Overlord agent, x-ui/Xray, Snell, forwarding and task-log sources for task-card summaries.
+`agent-maintenance` log reports additionally store structured `logs.items`, covering Overlord agent, Xray Panel/Xray, Snell, forwarding and task-log sources for task-card summaries.
 
-Profiles, nodes, forwarding and 3x-ui:
+Profiles, nodes, forwarding and Xray Panel:
 
 ```text
 POST /api/v1/protocol-profile/create
@@ -286,10 +286,10 @@ POST /api/v1/protocol-node/sync
 POST /api/v1/server-forward/create
 POST /api/v1/server-forward/list
 POST /api/v1/server-rule/overview
-POST /api/v1/three-xui/inbounds/list
-POST /api/v1/three-xui/outbounds
-POST /api/v1/three-xui/traffic/sync
-POST /api/v1/three-xui/restart-xray
+POST /api/v1/xray-panel/inbounds/list
+POST /api/v1/xray-panel/outbounds
+POST /api/v1/xray-panel/traffic/sync
+POST /api/v1/xray-panel/restart-xray
 ```
 
 ## Verification
@@ -318,28 +318,28 @@ Common smoke checks:
 
 ```bash
 bash scripts/test-agent-mock.sh
-bash scripts/test-three-xui-fixture.sh
+bash scripts/test-xray-panel-fixture.sh
 bash scripts/test-snell-real-smoke.sh
-bash scripts/test-three-xui-e2e.sh
+bash scripts/test-xray-panel-e2e.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
 bash scripts/test-compose-smoke.sh --build-local
 ```
 
-Real 3x-ui contract smoke is optional and skips unless a target endpoint and API token are provided:
+Real Xray Panel contract smoke is optional and skips unless a target endpoint and API token are provided:
 
 ```bash
-export THREE_XUI_E2E_URL="https://xui.example.com:5168"
-export THREE_XUI_E2E_TOKEN="YOUR_3XUI_API_TOKEN"
-bash scripts/test-three-xui-e2e.sh
+export XRAY_PANEL_E2E_URL="https://panel.example.com:5168"
+export XRAY_PANEL_E2E_TOKEN="YOUR_XRAY_PANEL_API_TOKEN"
+bash scripts/test-xray-panel-e2e.sh
 ```
 
-To create, toggle and delete a temporary VLESS inbound on the real 3x-ui host, opt in explicitly:
+To create, toggle and delete a temporary VLESS inbound on the real Xray Panel host, opt in explicitly:
 
 ```bash
-THREE_XUI_E2E_WRITE=1 THREE_XUI_E2E_PORT=42123 bash scripts/test-three-xui-e2e.sh
+XRAY_PANEL_E2E_WRITE=1 XRAY_PANEL_E2E_PORT=42123 bash scripts/test-xray-panel-e2e.sh
 ```
 
-Live validation note: on `isrco-hk`, `ghcr.io/mhsanaei/3x-ui:latest` (`3x-ui 3.1.0`) passed the direct real 3x-ui E2E write contract and the Overlord master API inbound add/toggle/delete path. The temporary ports `42123` and `42124` were cleaned after the run.
+Live validation note: on `isrco-hk`, `authorized disposable Xray Panel runtime image` (`Xray Panel 3.1.0`) passed the direct real Xray Panel E2E write contract and the Overlord master API inbound add/toggle/delete path. The temporary ports `42123` and `42124` were cleaned after the run.
 
 Real Snell smoke runs against a live master/agent host. It logs in to the master, creates a temporary Snell protocol node, lets the controlled agent claim the task, checks the service and listen port, then deletes the temporary node by default. The delete phase also verifies that the service is inactive, the listen port is closed and the protocol-node state is no longer active:
 
@@ -350,7 +350,7 @@ OB_MASTER_URL="http://127.0.0.1:5166" OB_SNELL_PORT=18390 bash scripts/test-snel
 ## Remaining Work Before 1.0
 
 - Real VPS matrix: Debian, Ubuntu, Rocky Linux, Oracle Linux and Alpine.
-- Extend the recorded real 3x-ui E2E beyond the current `isrco-hk` container run to more VPS/provider targets.
+- Extend the recorded real Xray Panel E2E beyond the current `isrco-hk` container run to more VPS/provider targets.
 - Better certificate, firewall and cloud-security-group diagnostics.
 - RBAC, audit retention/export, agent token expiry/revocation and key-rotation migration.
 - Mobile layout, loading/error states and task-detail polish.
@@ -360,7 +360,7 @@ OB_MASTER_URL="http://127.0.0.1:5166" OB_SNELL_PORT=18390 bash scripts/test-snel
 This is an independent project, not an official release of the projects below. It deliberately studies and builds on ideas from:
 
 - [Flux Panel](https://github.com/zhizhishu/flux-panel): UI style, forwarding-panel foundation and original operational surface.
-- [3x-ui](https://github.com/MHSanaei/3x-ui): Xray/3x-ui protocol-management model and remote panel API behavior.
+- Xray-compatible panel APIs: inbound/outbound, routing, traffic and runtime-management behavior used as compatibility targets.
 - [snell.sh](https://github.com/jinqians/snell.sh): Snell installation flow and deployment-script behavior.
 - [Komari Monitor](https://github.com/komari-monitor/komari): master/agent monitoring and multi-server operations ideas.
 

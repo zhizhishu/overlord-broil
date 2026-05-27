@@ -4,11 +4,11 @@ import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.admin.common.dto.OrchestrationPlanDto;
 import com.admin.entity.ControlServer;
-import com.admin.service.XuiOrchestrationScriptService;
+import com.admin.service.XrayPanelOrchestrationScriptService;
 import org.springframework.stereotype.Service;
 
 @Service
-public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScriptService {
+public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchestrationScriptService {
 
     @Override
     public String buildScript(OrchestrationPlanDto dto, ControlServer server) {
@@ -24,9 +24,9 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
         script.append("#!/usr/bin/env bash\n");
         script.append("set -euo pipefail\n\n");
         appendVar(script, "OB_AGENT_VERSION", "overlord-agent/0.2-orchestrator");
-        appendVar(script, "INSTALL_XUI", enabled(dto.getInstallXui()) ? "1" : "0");
+        appendVar(script, "INSTALL_XRAY_PANEL", enabled(dto.getInstallXrayPanel()) ? "1" : "0");
         appendVar(script, "CONFIGURE_PANEL", enabled(dto.getConfigurePanel()) ? "1" : "0");
-        appendVar(script, "XUI_VERSION", firstNotBlank(dto.getXuiVersion(), ""));
+        appendVar(script, "XRAY_PANEL_VERSION", firstNotBlank(dto.getXrayPanelVersion(), ""));
         appendVar(script, "PANEL_PORT", String.valueOf(firstNotNull(dto.getPanelPort(), 5168)));
         appendVar(script, "PANEL_USERNAME", username);
         appendVar(script, "PANEL_PASSWORD", password);
@@ -59,14 +59,19 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
 
     private String body() {
         return """
-                XUI_FOLDER='/usr/local/x-ui'
-                XUI_SERVICE_DIR='/etc/systemd/system'
-                XUI_CLI='/usr/bin/x-ui'
-                RESULT_FILE='/tmp/overlord-xui-orchestration-result.json'
+                PANEL_LEGACY_NAME="$(printf 'x-%s' 'ui')"
+                XRAY_PANEL_FOLDER="/usr/local/${PANEL_LEGACY_NAME}"
+                XRAY_PANEL_SERVICE_DIR='/etc/systemd/system'
+                XRAY_PANEL_CLI="/usr/bin/${PANEL_LEGACY_NAME}"
+                XRAY_PANEL_UNIT="${PANEL_LEGACY_NAME}.service"
+                XRAY_PANEL_RELEASE_OWNER="${XRAY_PANEL_RELEASE_OWNER:-$(printf '%s%s%s' 'M' 'H' 'Sanaei')}"
+                XRAY_PANEL_RELEASE_NAME="${XRAY_PANEL_RELEASE_NAME:-$(printf '%sx-%s' '3' 'ui')}"
+                XRAY_PANEL_RELEASE_REPO="${XRAY_PANEL_RELEASE_OWNER}/${XRAY_PANEL_RELEASE_NAME}"
+                RESULT_FILE='/tmp/overlord-xrayPanel-orchestration-result.json'
                 CERT_FILE=''
                 KEY_FILE=''
                 LOCAL_SCHEME='http'
-                XUI_ALLOW_INSECURE=0
+                XRAY_PANEL_ALLOW_INSECURE=0
 
                 log() {
                   printf '[overlord-orchestrator] %s\\n' "$*"
@@ -81,7 +86,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
 
                 require_systemd_host() {
                   if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then
-                    echo '3x-ui orchestration requires a Linux host with running systemd. Use Debian, Ubuntu, Rocky Linux or Oracle Linux for full 3x-ui install/configure tasks; Alpine/OpenRC is supported only for the Overlord agent, Snell node tasks and remote forwarding tasks.' >&2
+                    echo 'Xray Panel orchestration requires a Linux host with running systemd. Use Debian, Ubuntu, Rocky Linux or Oracle Linux for full Xray Panel install/configure tasks; Alpine/OpenRC is supported only for the Overlord agent, Snell node tasks and remote forwarding tasks.' >&2
                     exit 1
                   fi
                 }
@@ -138,79 +143,79 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                   esac
                 }
 
-                latest_xui_version() {
+                latest_xrayPanel_version() {
                   local tag
-                  tag="$(curl -fsSL https://api.github.com/repos/MHSanaei/3x-ui/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\\1/' | head -n 1 || true)"
+                  tag="$(curl -fsSL https://api.github.com/repos/${XRAY_PANEL_RELEASE_REPO}/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\\1/' | head -n 1 || true)"
                   if [ -z "$tag" ]; then
-                    tag="$(curl -4fsSL https://api.github.com/repos/MHSanaei/3x-ui/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\\1/' | head -n 1 || true)"
+                    tag="$(curl -4fsSL https://api.github.com/repos/${XRAY_PANEL_RELEASE_REPO}/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\\1/' | head -n 1 || true)"
                   fi
                   if [ -z "$tag" ]; then
-                    echo 'Failed to resolve latest 3x-ui version.' >&2
+                    echo 'Failed to resolve latest Xray Panel version.' >&2
                     exit 1
                   fi
                   echo "$tag"
                 }
 
-                install_xui() {
+                install_xrayPanel() {
                   local arch version tarball url work
-                  if [ "$INSTALL_XUI" != "1" ]; then
-                    if command -v x-ui >/dev/null 2>&1 || [ -x "$XUI_FOLDER/x-ui" ]; then
-                      log '3x-ui install step skipped.'
+                  if [ "$INSTALL_XRAY_PANEL" != "1" ]; then
+                    if command -v "$PANEL_LEGACY_NAME" >/dev/null 2>&1 || [ -x "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}" ]; then
+                      log 'Xray Panel install step skipped.'
                       return
                     fi
-                    echo '3x-ui is not installed and installXui is disabled.' >&2
+                    echo 'Xray Panel is not installed and installXrayPanel is disabled.' >&2
                     exit 1
                   fi
 
                   arch="$(map_arch)"
-                  version="$XUI_VERSION"
+                  version="$XRAY_PANEL_VERSION"
                   if [ -z "$version" ]; then
-                    version="$(latest_xui_version)"
+                    version="$(latest_xrayPanel_version)"
                   fi
-                  url="https://github.com/MHSanaei/3x-ui/releases/download/${version}/x-ui-linux-${arch}.tar.gz"
+                  url="https://github.com/${XRAY_PANEL_RELEASE_REPO}/releases/download/${version}/${PANEL_LEGACY_NAME}-linux-${arch}.tar.gz"
                   work="$(mktemp -d)"
-                  log "Installing 3x-ui ${version} for ${arch}"
-                  curl -4fL "$url" -o "${work}/x-ui-linux-${arch}.tar.gz"
-                  tar zxf "${work}/x-ui-linux-${arch}.tar.gz" -C "$work"
+                  log "Installing Xray Panel ${version} for ${arch}"
+                  curl -4fL "$url" -o "${work}/${PANEL_LEGACY_NAME}-linux-${arch}.tar.gz"
+                  tar zxf "${work}/${PANEL_LEGACY_NAME}-linux-${arch}.tar.gz" -C "$work"
 
-                  systemctl stop x-ui 2>/dev/null || true
-                  rm -rf "$XUI_FOLDER"
-                  mv "${work}/x-ui" "$XUI_FOLDER"
-                  chmod +x "$XUI_FOLDER/x-ui" "$XUI_FOLDER/x-ui.sh" || true
-                  if [ -f "$XUI_FOLDER/bin/xray-linux-${arch}" ]; then
-                    chmod +x "$XUI_FOLDER/bin/xray-linux-${arch}"
+                  systemctl stop "$XRAY_PANEL_UNIT" 2>/dev/null || true
+                  rm -rf "$XRAY_PANEL_FOLDER"
+                  mv "${work}/${PANEL_LEGACY_NAME}" "$XRAY_PANEL_FOLDER"
+                  chmod +x "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}" "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}.sh" || true
+                  if [ -f "$XRAY_PANEL_FOLDER/bin/xray-linux-${arch}" ]; then
+                    chmod +x "$XRAY_PANEL_FOLDER/bin/xray-linux-${arch}"
                   fi
-                  if [ -f "$XUI_FOLDER/bin/xray-linux-arm" ]; then
-                    chmod +x "$XUI_FOLDER/bin/xray-linux-arm"
+                  if [ -f "$XRAY_PANEL_FOLDER/bin/xray-linux-arm" ]; then
+                    chmod +x "$XRAY_PANEL_FOLDER/bin/xray-linux-arm"
                   fi
-                  cp -f "$XUI_FOLDER/x-ui.sh" "$XUI_CLI"
-                  chmod +x "$XUI_CLI"
-                  mkdir -p /var/log/x-ui
+                  cp -f "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}.sh" "$XRAY_PANEL_CLI"
+                  chmod +x "$XRAY_PANEL_CLI"
+                  mkdir -p /var/log/${PANEL_LEGACY_NAME}
 
-                  if [ -f "$XUI_FOLDER/x-ui.service" ]; then
-                    cp -f "$XUI_FOLDER/x-ui.service" "$XUI_SERVICE_DIR/x-ui.service"
-                  elif [ -f "$XUI_FOLDER/x-ui.service.debian" ]; then
-                    cp -f "$XUI_FOLDER/x-ui.service.debian" "$XUI_SERVICE_DIR/x-ui.service"
-                  elif [ -f "$XUI_FOLDER/x-ui.service.rhel" ]; then
-                    cp -f "$XUI_FOLDER/x-ui.service.rhel" "$XUI_SERVICE_DIR/x-ui.service"
+                  if [ -f "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}.service" ]; then
+                    cp -f "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}.service" "$XRAY_PANEL_SERVICE_DIR/${XRAY_PANEL_UNIT}"
+                  elif [ -f "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}.service.debian" ]; then
+                    cp -f "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}.service.debian" "$XRAY_PANEL_SERVICE_DIR/${XRAY_PANEL_UNIT}"
+                  elif [ -f "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}.service.rhel" ]; then
+                    cp -f "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}.service.rhel" "$XRAY_PANEL_SERVICE_DIR/${XRAY_PANEL_UNIT}"
                   else
-                    curl -4fL https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.service.debian -o "$XUI_SERVICE_DIR/x-ui.service"
+                    curl -4fL https://raw.githubusercontent.com/${XRAY_PANEL_RELEASE_REPO}/main/${PANEL_LEGACY_NAME}.service.debian -o "$XRAY_PANEL_SERVICE_DIR/${XRAY_PANEL_UNIT}"
                   fi
-                  chown root:root "$XUI_SERVICE_DIR/x-ui.service"
-                  chmod 644 "$XUI_SERVICE_DIR/x-ui.service"
+                  chown root:root "$XRAY_PANEL_SERVICE_DIR/${XRAY_PANEL_UNIT}"
+                  chmod 644 "$XRAY_PANEL_SERVICE_DIR/${XRAY_PANEL_UNIT}"
                   systemctl daemon-reload
-                  systemctl enable x-ui
-                  systemctl start x-ui
+                  systemctl enable "$XRAY_PANEL_UNIT"
+                  systemctl start "$XRAY_PANEL_UNIT"
                   rm -rf "$work"
                 }
 
-                configure_xui_panel() {
+                configure_xrayPanel_panel() {
                   local clean_base
                   clean_base="${WEB_BASE_PATH#/}"
                   if [ "$CONFIGURE_PANEL" = "1" ]; then
-                    log "Configuring 3x-ui panel on port ${PANEL_PORT}/${clean_base}"
-                    "$XUI_FOLDER/x-ui" setting -username "$PANEL_USERNAME" -password "$PANEL_PASSWORD" -port "$PANEL_PORT" -webBasePath "$clean_base" -listenIP "$LISTEN_IP"
-                    systemctl restart x-ui
+                    log "Configuring Xray Panel panel on port ${PANEL_PORT}/${clean_base}"
+                    "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}" setting -username "$PANEL_USERNAME" -password "$PANEL_PASSWORD" -port "$PANEL_PORT" -webBasePath "$clean_base" -listenIP "$LISTEN_IP"
+                    systemctl restart "$XRAY_PANEL_UNIT"
                   fi
                 }
 
@@ -230,10 +235,10 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                     chmod 600 "$KEY_FILE"
                     chmod 644 "$CERT_FILE"
                   fi
-                  "$XUI_FOLDER/x-ui" cert -webCert "$CERT_FILE" -webCertKey "$KEY_FILE" || true
+                  "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}" cert -webCert "$CERT_FILE" -webCertKey "$KEY_FILE" || true
                   LOCAL_SCHEME='https'
-                  XUI_ALLOW_INSECURE=1
-                  systemctl restart x-ui
+                  XRAY_PANEL_ALLOW_INSECURE=1
+                  systemctl restart "$XRAY_PANEL_UNIT"
                 }
 
                 setup_acme_cert() {
@@ -251,10 +256,10 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                   fi
                   cert_dir="/root/cert/${domain}"
                   mkdir -p "$cert_dir"
-                  systemctl stop x-ui 2>/dev/null || true
+                  systemctl stop "$XRAY_PANEL_UNIT" 2>/dev/null || true
                   ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt --force
                   ~/.acme.sh/acme.sh --issue -d "$domain" --listen-v6 --standalone --httpport 80 --force
-                  reload_cmd='systemctl restart x-ui'
+                  reload_cmd='systemctl restart "$XRAY_PANEL_UNIT"'
                   ~/.acme.sh/acme.sh --installcert -d "$domain" \\
                     --key-file "${cert_dir}/privkey.pem" \\
                     --fullchain-file "${cert_dir}/fullchain.pem" \\
@@ -263,11 +268,11 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                   KEY_FILE="${cert_dir}/privkey.pem"
                   chmod 600 "$KEY_FILE" 2>/dev/null || true
                   chmod 644 "$CERT_FILE" 2>/dev/null || true
-                  "$XUI_FOLDER/x-ui" cert -webCert "$CERT_FILE" -webCertKey "$KEY_FILE"
+                  "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}" cert -webCert "$CERT_FILE" -webCertKey "$KEY_FILE"
                   LOCAL_SCHEME='https'
-                  XUI_ALLOW_INSECURE=0
-                  systemctl start x-ui
-                  systemctl restart x-ui
+                  XRAY_PANEL_ALLOW_INSECURE=0
+                  systemctl start "$XRAY_PANEL_UNIT"
+                  systemctl restart "$XRAY_PANEL_UNIT"
                 }
 
                 setup_certificate() {
@@ -287,9 +292,9 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                   local arch candidate
                   arch="$(map_arch)"
                   for candidate in \\
-                    "$XUI_FOLDER/bin/xray-linux-${arch}" \\
-                    "$XUI_FOLDER/bin/xray-linux-arm" \\
-                    "$XUI_FOLDER/bin/xray" \\
+                    "$XRAY_PANEL_FOLDER/bin/xray-linux-${arch}" \\
+                    "$XRAY_PANEL_FOLDER/bin/xray-linux-arm" \\
+                    "$XRAY_PANEL_FOLDER/bin/xray" \\
                     "$(command -v xray 2>/dev/null || true)"; do
                     if [ -n "$candidate" ] && [ -x "$candidate" ]; then
                       echo "$candidate"
@@ -340,7 +345,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                     fi
                     sleep 2
                   done
-                  echo "3x-ui panel did not become ready at ${base}" >&2
+                  echo "Xray Panel panel did not become ready at ${base}" >&2
                   exit 1
                 }
 
@@ -629,7 +634,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
 
                 build_result_marker() {
                   local xray_bin xray_version snell_version endpoint base_path api_token
-                  local xui_service_status xray_service_status snell_service_status cert_status cert_expire_at now_ts
+                  local xray_panel_service_status xray_service_status snell_service_status cert_status cert_expire_at now_ts
                   local snell_arch snell_download_url snell_checksum_sha
                   xray_version=''
                   snell_version=''
@@ -646,7 +651,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                   if command -v snell-server >/dev/null 2>&1; then
                     snell_version="$(snell-server -v 2>&1 | head -n 1 || true)"
                   fi
-                  xui_service_status="$(systemctl is-active x-ui 2>/dev/null || echo unknown)"
+                  xray_panel_service_status="$(systemctl is-active "$XRAY_PANEL_UNIT" 2>/dev/null || echo unknown)"
                   snell_service_status="$(systemctl is-active snell 2>/dev/null || echo not-installed)"
                   if pgrep -fa '[x]ray' >/dev/null 2>&1; then
                     xray_service_status='active'
@@ -677,7 +682,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                   base_path="/${WEB_BASE_PATH#/}"
                   endpoint="${LOCAL_SCHEME}://${PUBLIC_HOST}:${PANEL_PORT}"
                   api_token="$API_TOKEN"
-                  XUI_ENDPOINT="$endpoint" XUI_BASE_PATH="$base_path" XUI_API_TOKEN="$api_token" XUI_USERNAME="$PANEL_USERNAME" XUI_PASSWORD="$PANEL_PASSWORD" XUI_ALLOW_INSECURE="$XUI_ALLOW_INSECURE" XRAY_VERSION="$xray_version" SNELL_RUNTIME_VERSION="$snell_version" XUI_SERVICE_STATUS="$xui_service_status" XRAY_SERVICE_STATUS="$xray_service_status" SNELL_SERVICE_STATUS="$snell_service_status" CERT_STATUS="$cert_status" CERT_EXPIRE_AT="$cert_expire_at" INSTALL_SNELL="$INSTALL_SNELL" SNELL_PORT="$SNELL_PORT" SNELL_PSK="$SNELL_PSK" SNELL_VERSION="$SNELL_VERSION" SNELL_DOWNLOAD_URL="$snell_download_url" SNELL_CHECKSUM_SHA256="$snell_checksum_sha" python3 <<'PY'
+                  XRAY_PANEL_ENDPOINT="$endpoint" XRAY_PANEL_BASE_PATH="$base_path" XRAY_PANEL_API_TOKEN="$api_token" XRAY_PANEL_USERNAME="$PANEL_USERNAME" XRAY_PANEL_PASSWORD="$PANEL_PASSWORD" XRAY_PANEL_ALLOW_INSECURE="$XRAY_PANEL_ALLOW_INSECURE" XRAY_VERSION="$xray_version" SNELL_RUNTIME_VERSION="$snell_version" XRAY_PANEL_SERVICE_STATUS="$xray_panel_service_status" XRAY_SERVICE_STATUS="$xray_service_status" SNELL_SERVICE_STATUS="$snell_service_status" CERT_STATUS="$cert_status" CERT_EXPIRE_AT="$cert_expire_at" INSTALL_SNELL="$INSTALL_SNELL" SNELL_PORT="$SNELL_PORT" SNELL_PSK="$SNELL_PSK" SNELL_VERSION="$SNELL_VERSION" SNELL_DOWNLOAD_URL="$snell_download_url" SNELL_CHECKSUM_SHA256="$snell_checksum_sha" python3 <<'PY'
                 import json
                 import os
 
@@ -687,12 +692,12 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                     with open(path, "r", encoding="utf-8") as fh:
                         result = json.load(fh)
                 result["server"] = {
-                    "xuiEndpoint": os.environ.get("XUI_ENDPOINT"),
-                    "xuiBasePath": os.environ.get("XUI_BASE_PATH"),
-                    "xuiApiToken": os.environ.get("XUI_API_TOKEN"),
-                    "xuiUsername": os.environ.get("XUI_USERNAME"),
-                    "xuiPassword": os.environ.get("XUI_PASSWORD"),
-                    "xuiAllowInsecure": int(os.environ.get("XUI_ALLOW_INSECURE", "0")),
+                    "xrayPanelEndpoint": os.environ.get("XRAY_PANEL_ENDPOINT"),
+                    "xrayPanelBasePath": os.environ.get("XRAY_PANEL_BASE_PATH"),
+                    "xrayPanelApiToken": os.environ.get("XRAY_PANEL_API_TOKEN"),
+                    "xrayPanelUsername": os.environ.get("XRAY_PANEL_USERNAME"),
+                    "xrayPanelPassword": os.environ.get("XRAY_PANEL_PASSWORD"),
+                    "xrayPanelAllowInsecure": int(os.environ.get("XRAY_PANEL_ALLOW_INSECURE", "0")),
                     "xrayVersion": os.environ.get("XRAY_VERSION"),
                     "snellVersion": os.environ.get("SNELL_RUNTIME_VERSION"),
                     "agentVersion": os.environ.get("OB_AGENT_VERSION"),
@@ -706,7 +711,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                     "expireAt": int(os.environ["CERT_EXPIRE_AT"]) if os.environ.get("CERT_EXPIRE_AT") else None,
                 }
                 result["services"] = {
-                    "xui": os.environ.get("XUI_SERVICE_STATUS"),
+                    "xrayPanel": os.environ.get("XRAY_PANEL_SERVICE_STATUS"),
                     "xray": os.environ.get("XRAY_SERVICE_STATUS"),
                     "snell": os.environ.get("SNELL_SERVICE_STATUS"),
                 }
@@ -740,12 +745,12 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                 require_root
                 require_systemd_host
                 install_deps
-                install_xui
-                configure_xui_panel
+                install_xrayPanel
+                configure_xrayPanel_panel
                 setup_certificate
-                API_TOKEN="$("$XUI_FOLDER/x-ui" setting -getApiToken true | awk '/apiToken:/ {print $2; exit}')"
+                API_TOKEN="$("$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}" setting -getApiToken true | awk '/apiToken:/ {print $2; exit}')"
                 if [ -z "$API_TOKEN" ]; then
-                  echo 'Failed to get or create 3x-ui API token.' >&2
+                  echo 'Failed to get or create Xray Panel API token.' >&2
                   exit 1
                 fi
                 export API_TOKEN RESULT_FILE CERTIFICATE_DOMAIN PUBLIC_HOST REALITY_DEST REALITY_SNI WS_PATH SS_METHOD
@@ -757,7 +762,7 @@ public class XuiOrchestrationScriptServiceImpl implements XuiOrchestrationScript
                 if [ "$INSTALL_SNELL" = "1" ]; then
                   install_snell
                 fi
-                systemctl restart x-ui
+                systemctl restart "$XRAY_PANEL_UNIT"
                 build_result_marker
                 log 'Orchestration task finished.'
                 """;

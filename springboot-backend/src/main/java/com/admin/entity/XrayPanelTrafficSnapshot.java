@@ -5,7 +5,7 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class ThreeXuiTrafficSnapshot extends BaseEntity {
+public class XrayPanelTrafficSnapshot extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 

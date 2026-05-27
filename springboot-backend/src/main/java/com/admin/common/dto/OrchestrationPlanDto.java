@@ -12,11 +12,11 @@ public class OrchestrationPlanDto {
     @NotNull(message = "server id is required")
     private Long serverId;
 
-    private Boolean installXui = true;
+    private Boolean installXrayPanel = true;
 
     private Boolean configurePanel = true;
 
-    private String xuiVersion;
+    private String xrayPanelVersion;
 
     @Min(value = 1, message = "panel port must be greater than 0")
     @Max(value = 65535, message = "panel port must be less than 65536")

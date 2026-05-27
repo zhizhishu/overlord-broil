@@ -15,8 +15,8 @@ Default checks:
   - shell syntax
   - agent mock test
   - SQLite schema smoke test
-  - tokenized 3x-ui fixture test
-  - optional real 3x-ui E2E contract when THREE_XUI_E2E_URL/TOKEN are set
+  - tokenized Xray Panel fixture test
+  - optional real Xray Panel E2E contract when XRAY_PANEL_E2E_URL/TOKEN are set
   - single-image compose config validation
   - frontend install and production build in Docker Node 22
   - git whitespace check
@@ -97,11 +97,11 @@ bash scripts/test-agent-mock.sh
 step "Run SQLite schema smoke test"
 bash scripts/test-sqlite-schema.sh
 
-step "Run tokenized 3x-ui fixture tests"
-bash scripts/test-three-xui-fixture.sh
+step "Run tokenized Xray Panel fixture tests"
+bash scripts/test-xray-panel-fixture.sh
 
-step "Run optional real 3x-ui E2E contract"
-bash scripts/test-three-xui-e2e.sh
+step "Run optional real Xray Panel E2E contract"
+bash scripts/test-xray-panel-e2e.sh
 
 step "Validate compose files"
 docker compose -f docker-compose.yml config --quiet
@@ -115,7 +115,7 @@ bash scripts/test-master-port-contract.sh
 step "Build frontend with Docker Node 22"
 docker run --rm \
   -v "${PROJECT_ROOT}:/workspace" \
-  -v ob_3xui_frontend_node_modules:/workspace/vite-frontend/node_modules \
+  -v ob_xray-panel_frontend_node_modules:/workspace/vite-frontend/node_modules \
   -w /workspace/vite-frontend \
   node:22-bookworm \
   bash -lc "npm install --legacy-peer-deps --no-audit --no-fund && npm run build"

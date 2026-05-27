@@ -1,0 +1,47 @@
+name: Real Xray Panel E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Optional Xray Panel endpoint URL. Falls back to secret XRAY_PANEL_E2E_URL."
+        required: false
+        type: string
+      base_path:
+        description: "Optional custom base path before /panel. Falls back to secret XRAY_PANEL_E2E_BASE_PATH."
+        required: false
+        type: string
+      write:
+        description: "Create, toggle and delete a temporary VLESS inbound."
+        required: true
+        default: false
+        type: boolean
+      port:
+        description: "Required when write=true. Use an unused high port on the target Xray Panel host."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  real-xray-panel-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run real Xray Panel contract smoke
+        env:
+          INPUT_XRAY_PANEL_E2E_URL: ${{ inputs.url }}
+          SECRET_XRAY_PANEL_E2E_URL: ${{ secrets.XRAY_PANEL_E2E_URL }}
+          XRAY_PANEL_E2E_TOKEN: ${{ secrets.XRAY_PANEL_E2E_TOKEN }}
+          INPUT_XRAY_PANEL_E2E_BASE_PATH: ${{ inputs.base_path }}
+          SECRET_XRAY_PANEL_E2E_BASE_PATH: ${{ secrets.XRAY_PANEL_E2E_BASE_PATH }}
+          XRAY_PANEL_E2E_WRITE: ${{ inputs.write }}
+          XRAY_PANEL_E2E_PORT: ${{ inputs.port }}
+        run: |
+          export XRAY_PANEL_E2E_URL="${INPUT_XRAY_PANEL_E2E_URL:-$SECRET_XRAY_PANEL_E2E_URL}"
+          export XRAY_PANEL_E2E_BASE_PATH="${INPUT_XRAY_PANEL_E2E_BASE_PATH:-$SECRET_XRAY_PANEL_E2E_BASE_PATH}"
+          bash scripts/test-xray-panel-e2e.sh

@@ -82,14 +82,14 @@ export interface ControlServer {
   name: string;
   role: 'master' | 'agent' | string;
   endpoint?: string;
-  xuiEndpoint?: string;
-  xuiBasePath?: string;
-  xuiApiToken?: string;
-  xuiUsername?: string;
-  xuiPassword?: string;
-  xuiTwoFactorCode?: string;
-  xuiAllowInsecure?: number;
-  xuiLastSync?: number;
+  xrayPanelEndpoint?: string;
+  xrayPanelBasePath?: string;
+  xrayPanelApiToken?: string;
+  xrayPanelUsername?: string;
+  xrayPanelPassword?: string;
+  xrayPanelTwoFactorCode?: string;
+  xrayPanelAllowInsecure?: number;
+  xrayPanelLastSync?: number;
   host: string;
   sshPort?: number;
   sshUser?: string;
@@ -98,7 +98,7 @@ export interface ControlServer {
   agentVersion?: string;
   xrayVersion?: string;
   snellVersion?: string;
-  xuiServiceStatus?: string;
+  xrayPanelServiceStatus?: string;
   xrayServiceStatus?: string;
   snellServiceStatus?: string;
   certificateMode?: string;
@@ -181,8 +181,8 @@ export interface ServerRuleOverview {
   server?: ControlServer;
   protocolNodes?: ProtocolNode[];
   forwardRules?: ServerForwardRule[];
-  xuiInbounds?: any;
-  xuiOutbounds?: any;
+  xrayPanelInbounds?: any;
+  xrayPanelOutbounds?: any;
 }
 
 export interface RuntimeProviderAction {
@@ -315,7 +315,7 @@ export interface DeployTask {
   status: number;
 }
 
-export interface ThreeXuiTrafficSnapshot {
+export interface XrayPanelTrafficSnapshot {
   id: number;
   serverId: number;
   serverName?: string;

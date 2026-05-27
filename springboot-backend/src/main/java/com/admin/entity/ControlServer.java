@@ -17,21 +17,21 @@ public class ControlServer extends BaseEntity {
 
     private String host;
 
-    private String xuiEndpoint;
+    private String xrayPanelEndpoint;
 
-    private String xuiBasePath;
+    private String xrayPanelBasePath;
 
-    private String xuiApiToken;
+    private String xrayPanelApiToken;
 
-    private String xuiUsername;
+    private String xrayPanelUsername;
 
-    private String xuiPassword;
+    private String xrayPanelPassword;
 
-    private String xuiTwoFactorCode;
+    private String xrayPanelTwoFactorCode;
 
-    private Integer xuiAllowInsecure;
+    private Integer xrayPanelAllowInsecure;
 
-    private Long xuiLastSync;
+    private Long xrayPanelLastSync;
 
     private Integer sshPort;
 
@@ -47,7 +47,7 @@ public class ControlServer extends BaseEntity {
 
     private String snellVersion;
 
-    private String xuiServiceStatus;
+    private String xrayPanelServiceStatus;
 
     private String xrayServiceStatus;
 

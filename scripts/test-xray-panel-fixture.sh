@@ -19,7 +19,7 @@ detect_python() {
     fi
   done
 
-  echo "python3 or python is required for 3x-ui fixture tests." >&2
+  echo "python3 or python is required for Xray Panel fixture tests." >&2
   exit 2
 }
 
@@ -95,7 +95,7 @@ start_fixture() {
   local label="${2:-fixture}"
   local ready_file="${TMP_DIR}/ready-${label}.txt"
   local log_file="${TMP_DIR}/${label}.log"
-  local args=("${SCRIPT_DIR}/three-xui-fixture.py" --host 127.0.0.1 --port 0 --ready-file "$ready_file")
+  local args=("${SCRIPT_DIR}/xray-panel-fixture.py" --host 127.0.0.1 --port 0 --ready-file "$ready_file")
 
   stop_fixture
   if [ -n "$token" ]; then
@@ -111,7 +111,7 @@ start_fixture() {
   done
 
   if [ ! -f "$ready_file" ]; then
-    echo "3x-ui fixture did not become ready." >&2
+    echo "Xray Panel fixture did not become ready." >&2
     cat "$log_file" >&2 || true
     exit 1
   fi
@@ -206,7 +206,7 @@ run_core_flow() {
 }
 
 detect_python
-command -v curl >/dev/null 2>&1 || { echo "curl is required for 3x-ui fixture tests." >&2; exit 2; }
+command -v curl >/dev/null 2>&1 || { echo "curl is required for Xray Panel fixture tests." >&2; exit 2; }
 
 TMP_DIR="$(mktemp -d)"
 fixture_pid=""
@@ -236,10 +236,10 @@ assert_json 'data["success"] is False and "token" in data["msg"]'
 set_auth "fixture-token"
 run_core_flow
 
-THREE_XUI_E2E_URL="${BASE_URL}" \
-  THREE_XUI_E2E_TOKEN="fixture-token" \
-  THREE_XUI_E2E_WRITE=1 \
-  THREE_XUI_E2E_PORT=12101 \
-  bash "${SCRIPT_DIR}/test-three-xui-e2e.sh"
+XRAY_PANEL_E2E_URL="${BASE_URL}" \
+  XRAY_PANEL_E2E_TOKEN="fixture-token" \
+  XRAY_PANEL_E2E_WRITE=1 \
+  XRAY_PANEL_E2E_PORT=12101 \
+  bash "${SCRIPT_DIR}/test-xray-panel-e2e.sh"
 
-echo "3x-ui fixture tests passed at ${BASE_URL}"
+echo "Xray Panel fixture tests passed at ${BASE_URL}"

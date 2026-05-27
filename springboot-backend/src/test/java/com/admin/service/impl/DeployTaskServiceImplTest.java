@@ -69,8 +69,8 @@ class DeployTaskServiceImplTest {
         String resultJson = attach("{\"runtimeProvider\":{\"key\":\"custom-agent\"}}", task);
         JSONObject result = JSON.parseObject(resultJson);
 
-        assertEquals("xui", result.getJSONObject("runtimeProvider").getString("key"));
-        assertEquals("xui", result.getJSONObject("runtimeState").getString("providerKey"));
+        assertEquals("xrayPanel", result.getJSONObject("runtimeProvider").getString("key"));
+        assertEquals("xrayPanel", result.getJSONObject("runtimeState").getString("providerKey"));
     }
 
     @Test
@@ -78,7 +78,7 @@ class DeployTaskServiceImplTest {
         DeployTask task = new DeployTask();
         task.setId(202L);
         task.setServerId(9L);
-        task.setServerName("edge-xui");
+        task.setServerName("edge-xrayPanel");
         task.setProtocol("vless");
         task.setAction("present");
 
@@ -105,15 +105,15 @@ class DeployTaskServiceImplTest {
 
         JSONObject runtimeState = JSON.parseObject(resultJson).getJSONObject("runtimeState");
 
-        assertEquals("xui", runtimeState.getString("providerKey"));
-        assertEquals("3x-ui / Xray Runtime", runtimeState.getString("providerName"));
+        assertEquals("xrayPanel", runtimeState.getString("providerKey"));
+        assertEquals("Xray Panel / Xray Runtime", runtimeState.getString("providerName"));
         assertEquals("vless", runtimeState.getString("protocol"));
         assertEquals("present", runtimeState.getString("action"));
         assertEquals("succeeded", runtimeState.getString("taskState"));
         assertEquals("task", runtimeState.getString("source"));
         assertEquals(202L, runtimeState.getLongValue("sourceTaskId"));
         assertEquals(9L, runtimeState.getLongValue("serverId"));
-        assertEquals("edge-xui", runtimeState.getString("serverName"));
+        assertEquals("edge-xrayPanel", runtimeState.getString("serverName"));
         assertEquals("protocol-node", runtimeState.getString("resourceType"));
         assertNull(runtimeState.get("resourceId"));
         assertEquals(false, runtimeState.getBooleanValue("danger"));
@@ -141,13 +141,13 @@ class DeployTaskServiceImplTest {
         String sanitized = ReflectionTestUtils.invokeMethod(service, "sanitizeAgentResultJson", """
                 {
                   "server": {
-                    "xuiEndpoint": "http://127.0.0.1:5168",
-                    "xuiApiToken": "token-123",
-                    "xuiPassword": "password-123",
-                    "xuiTwoFactorCode": "654321"
+                    "xrayPanelEndpoint": "http://127.0.0.1:5168",
+                    "xrayPanelApiToken": "token-123",
+                    "xrayPanelPassword": "password-123",
+                    "xrayPanelTwoFactorCode": "654321"
                   },
                   "serverSecrets": {
-                    "xuiApiToken": "token-456"
+                    "xrayPanelApiToken": "token-456"
                   }
                 }
                 """);
@@ -155,13 +155,13 @@ class DeployTaskServiceImplTest {
         JSONObject result = JSON.parseObject(sanitized);
         JSONObject server = result.getJSONObject("server");
 
-        assertEquals("http://127.0.0.1:5168", server.getString("xuiEndpoint"));
-        assertNull(server.getString("xuiApiToken"));
-        assertNull(server.getString("xuiPassword"));
-        assertNull(server.getString("xuiTwoFactorCode"));
-        assertTrue(server.getBooleanValue("xuiApiTokenConfigured"));
-        assertTrue(server.getBooleanValue("xuiPasswordConfigured"));
-        assertTrue(server.getBooleanValue("xuiTwoFactorConfigured"));
+        assertEquals("http://127.0.0.1:5168", server.getString("xrayPanelEndpoint"));
+        assertNull(server.getString("xrayPanelApiToken"));
+        assertNull(server.getString("xrayPanelPassword"));
+        assertNull(server.getString("xrayPanelTwoFactorCode"));
+        assertTrue(server.getBooleanValue("xrayPanelApiTokenConfigured"));
+        assertTrue(server.getBooleanValue("xrayPanelPasswordConfigured"));
+        assertTrue(server.getBooleanValue("xrayPanelTwoFactorConfigured"));
         assertNull(result.getJSONObject("serverSecrets"));
     }
 
@@ -237,7 +237,7 @@ class DeployTaskServiceImplTest {
         assertEquals("snell", items.getJSONObject(0).getString("runtime"));
         assertEquals("journalctl:snell.service", items.getJSONObject(0).getString("source"));
         assertEquals("line1\nline2", items.getJSONObject(0).getString("content"));
-        assertEquals("xui", result.getJSONObject("runtimeProvider").getString("key"));
+        assertEquals("xrayPanel", result.getJSONObject("runtimeProvider").getString("key"));
         assertNotNull(result.getJSONObject("runtimeState"));
     }
 
@@ -259,7 +259,7 @@ class DeployTaskServiceImplTest {
         assertTrue(script.contains("LOG_LINES=\"${OB_MAINTENANCE_LOG_LINES:-160}\""));
         assertTrue(script.contains("LOG_FILE=\"${TMPDIR:-/tmp}/overlord-maintenance-logs-$$.jsonl\""));
         assertTrue(script.contains("capture_journal_log \"agent\" \"overlord-agent.service\""));
-        assertTrue(script.contains("capture_journal_log \"xui\" \"$unit\""));
+        assertTrue(script.contains("capture_journal_log \"xrayPanel\" \"$unit\""));
         assertTrue(script.contains("capture_file_log \"snell\""));
         assertTrue(script.contains("capture_file_log \"agent-task\""));
         assertTrue(script.contains("def load_logs(path):"));
@@ -315,21 +315,21 @@ class DeployTaskServiceImplTest {
         server.setId(7L);
         server.setName("edge-xray");
         server.setHost("203.0.113.7");
-        server.setXuiEndpoint("http://127.0.0.1:5168");
-        server.setXuiBasePath("/ob");
-        server.setXuiApiToken("token-123");
+        server.setXrayPanelEndpoint("http://127.0.0.1:5168");
+        server.setXrayPanelBasePath("/ob");
+        server.setXrayPanelApiToken("token-123");
 
         String script = ReflectionTestUtils.invokeMethod(service, "buildXrayAgentPayload", dto, profile, server);
 
         assertNotNull(script);
         assertTrue(script.contains("OB_XRAY_TASK="));
-        assertTrue(script.contains("XUI_API_TOKEN='token-123'"));
+        assertTrue(script.contains("XRAY_PANEL_API_TOKEN='token-123'"));
         assertTrue(script.contains("/panel/api/inbounds/add"));
         assertTrue(script.contains("OB_AGENT_RESULT_JSON="));
         assertTrue(script.contains("\"inbounds\": []"));
         assertTrue(script.contains("runtimeState") || script.contains("services"));
         assertTrue(script.contains("\"tokenConfigured\": bool(token)"));
-        assertTrue(!script.contains("\"xuiApiToken\": token"));
+        assertTrue(!script.contains("\"xrayPanelApiToken\": token"));
         assertTrue(!script.contains("next integration step"));
         assertBashSyntaxValid(script);
     }
@@ -552,7 +552,7 @@ class DeployTaskServiceImplTest {
         server.setId(9L);
         server.setName("oracle-nano");
         server.setLastHeartbeat(System.currentTimeMillis());
-        server.setXuiServiceStatus("active");
+        server.setXrayPanelServiceStatus("active");
         server.setXrayServiceStatus("running");
         server.setSnellServiceStatus("not-installed");
         server.setCertificateStatus("expiring");
@@ -561,7 +561,7 @@ class DeployTaskServiceImplTest {
         Map<String, Map<String, Object>> items = new LinkedHashMap<>();
         ReflectionTestUtils.invokeMethod(service, "seedServerProviderRuntimeStates", items, server, System.currentTimeMillis());
 
-        assertEquals("running", items.get("9:xui").get("status"));
+        assertEquals("running", items.get("9:xrayPanel").get("status"));
         assertEquals("not-installed", items.get("9:snell").get("status"));
         assertEquals("expiring", items.get("9:certificate").get("status"));
 

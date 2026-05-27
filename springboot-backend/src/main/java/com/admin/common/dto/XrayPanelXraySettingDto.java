@@ -6,7 +6,7 @@ import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 
 @Data
-public class ThreeXuiXraySettingDto {
+public class XrayPanelXraySettingDto {
 
     @NotNull(message = "server id is required")
     private Long serverId;

@@ -2,7 +2,7 @@
 
 ## Current Goal
 
-Polish the control-console UI into an Overlord Broil product surface while preserving the Xray/3x-ui-compatible inbound, outbound, routing, traffic and Snell capabilities.
+Polish the control-console UI into an Overlord Broil product surface while preserving the Xray/Xray Panel-compatible inbound, outbound, routing, traffic and Snell capabilities.
 
 ## Authorization
 
@@ -10,7 +10,7 @@ Polish the control-console UI into an Overlord Broil product surface while prese
 - Browser MCP is allowed for real console UI operation and screenshots.
 - Serena Pool, ACE and subagents are allowed for parallel audit.
 - Local Docker and GitHub Actions may be used for validation.
-- Do not expose tokens, cookies, private keys, 3x-ui secrets, Snell PSK values or generated agent tokens in logs, docs or final replies.
+- Do not expose tokens, cookies, private keys, Xray Panel secrets, Snell PSK values or generated agent tokens in logs, docs or final replies.
 
 ## Current Baseline
 
@@ -27,12 +27,26 @@ Polish the control-console UI into an Overlord Broil product surface while prese
 
 ## Completed This Round
 
-- Parallel audits completed for CI/Docker gates, UI routes/screenshots and 3x-ui/Snell/VPS runtime paths.
+- Removed upstream panel naming from the current source surface:
+  - Java classes, DTOs, service names and REST routes now use `XrayPanel` / `/api/v1/xray-panel`.
+  - fixture and optional real E2E scripts/workflows now use `xray-panel` names and `XRAY_PANEL_E2E_*` secrets.
+  - traffic snapshot schema/table names now use `xray_panel_*`.
+  - README, docs, release notes, screenshots and project context no longer keep upstream panel identifiers as compatibility notes.
+  - generated scripts still call the compatible runtime service/path through runtime variables, so functionality is preserved without keeping the upstream literal in source.
+- Local validation for the rename pass passed:
+  - upstream naming scan returned no hits
+  - `bash -n scripts/*.sh`
+  - `bash scripts/test-xray-panel-fixture.sh`
+  - `bash scripts/test-sqlite-schema.sh`
+  - frontend `npm run build`
+  - Docker Maven Java 21 `mvn -B -DskipTests package`
+  - `git diff --check`
+- Parallel audits completed for CI/Docker gates, UI routes/screenshots and Xray Panel/Snell/VPS runtime paths.
 - Local validation passed:
   - shell syntax for `scripts/*.sh`
   - bootstrap syntax
   - `scripts/test-agent-mock.sh`
-  - `scripts/test-three-xui-fixture.sh`
+  - `scripts/test-xray-panel-fixture.sh`
   - `scripts/test-master-port-contract.sh`
   - `scripts/test-sqlite-schema.sh`
   - frontend `npm run build`
@@ -45,7 +59,7 @@ Polish the control-console UI into an Overlord Broil product surface while prese
 - Cleaned temporary failed Snell smoke artifacts on `isrco-hk`.
 - Found and fixed the live blank-console root cause: `vite-frontend/toFile.mjs` removed `type="module"` script tags after build, so the served HTML loaded CSS but no app JavaScript.
 - UI polish:
-  - added stable `data-testid` hooks for the control center, key panels, server cards and 3x-ui/Agent action groups.
+  - added stable `data-testid` hooks for the control center, key panels, server cards and Xray Panel/Agent action groups.
   - replaced native `window.confirm` dangerous-action prompts with an in-app confirmation modal.
 - Current hardening pass:
   - Snell delete scripts now fail if the service remains active or the listen port stays open.
@@ -64,7 +78,7 @@ Polish the control-console UI into an Overlord Broil product surface while prese
 
 ## In Progress
 
-- Pending commit and push for the latest Overlord product UI pass.
+- Pending commit and push for the latest full-source Xray Panel rename pass.
 - Real UI screenshots in `docs/assets/` still show the previous live console and should be recaptured after GitHub image deployment if visual proof is required for this exact pass.
 
 ## Remaining
@@ -75,6 +89,6 @@ Polish the control-console UI into an Overlord Broil product surface while prese
 
 ## Risks
 
-- `isrco-hk` is a real server. Any temporary Snell/3x-ui node must use high test ports and be cleaned after validation.
-- Snell and 3x-ui real tests may download upstream binaries or mutate service state.
+- `isrco-hk` is a real server. Any temporary Snell/Xray Panel node must use high test ports and be cleaned after validation.
+- Snell and Xray Panel real tests may download upstream binaries or mutate service state.
 - Screenshots must not include secrets, tokens or PSK values.

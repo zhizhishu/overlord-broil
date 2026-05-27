@@ -6,7 +6,7 @@ import javax.validation.constraints.NotNull;
 import java.util.Map;
 
 @Data
-public class ThreeXuiInboundDto {
+public class XrayPanelInboundDto {
 
     @NotNull(message = "server id is required")
     private Long serverId;

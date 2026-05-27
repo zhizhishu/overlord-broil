@@ -3,7 +3,7 @@ package com.admin.common.dto;
 import lombok.Data;
 
 @Data
-public class ThreeXuiTrafficQueryDto {
+public class XrayPanelTrafficQueryDto {
 
     private Long serverId;
 

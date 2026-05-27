@@ -63,22 +63,22 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         ControlServer server = new ControlServer();
         BeanUtils.copyProperties(dto, server);
         server.setApiToken(null);
-        preserveMaskedXuiSecrets(dto, exists, server);
+        preserveMaskedXrayPanelSecrets(dto, exists, server);
         server.setUpdatedTime(System.currentTimeMillis());
         encryptSecrets(server);
 
         return this.updateById(server) ? R.ok("server updated") : R.err("server update failed");
     }
 
-    private void preserveMaskedXuiSecrets(ControlServerUpdateDto dto, ControlServer exists, ControlServer server) {
-        if (dto.getXuiApiToken() != null && dto.getXuiApiToken().contains("****")) {
-            server.setXuiApiToken(exists.getXuiApiToken());
+    private void preserveMaskedXrayPanelSecrets(ControlServerUpdateDto dto, ControlServer exists, ControlServer server) {
+        if (dto.getXrayPanelApiToken() != null && dto.getXrayPanelApiToken().contains("****")) {
+            server.setXrayPanelApiToken(exists.getXrayPanelApiToken());
         }
-        if ("********".equals(dto.getXuiPassword())) {
-            server.setXuiPassword(exists.getXuiPassword());
+        if ("********".equals(dto.getXrayPanelPassword())) {
+            server.setXrayPanelPassword(exists.getXrayPanelPassword());
         }
-        if ("******".equals(dto.getXuiTwoFactorCode())) {
-            server.setXuiTwoFactorCode(exists.getXuiTwoFactorCode());
+        if ("******".equals(dto.getXrayPanelTwoFactorCode())) {
+            server.setXrayPanelTwoFactorCode(exists.getXrayPanelTwoFactorCode());
         }
     }
 
@@ -124,7 +124,7 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         update.setAgentVersion(dto.getAgentVersion());
         update.setXrayVersion(dto.getXrayVersion());
         update.setSnellVersion(dto.getSnellVersion());
-        update.setXuiServiceStatus(dto.getXuiServiceStatus());
+        update.setXrayPanelServiceStatus(dto.getXrayPanelServiceStatus());
         update.setXrayServiceStatus(dto.getXrayServiceStatus());
         update.setSnellServiceStatus(dto.getSnellServiceStatus());
         update.setCertificateMode(dto.getCertificateMode());
@@ -176,12 +176,12 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         BeanUtils.copyProperties(server, copy);
         decryptSecrets(copy);
         copy.setApiToken(maskSecret(copy.getApiToken(), "****"));
-        copy.setXuiApiToken(maskSecret(copy.getXuiApiToken(), "****"));
-        if (copy.getXuiPassword() != null && !copy.getXuiPassword().isEmpty()) {
-            copy.setXuiPassword("********");
+        copy.setXrayPanelApiToken(maskSecret(copy.getXrayPanelApiToken(), "****"));
+        if (copy.getXrayPanelPassword() != null && !copy.getXrayPanelPassword().isEmpty()) {
+            copy.setXrayPanelPassword("********");
         }
-        if (copy.getXuiTwoFactorCode() != null && !copy.getXuiTwoFactorCode().isEmpty()) {
-            copy.setXuiTwoFactorCode("******");
+        if (copy.getXrayPanelTwoFactorCode() != null && !copy.getXrayPanelTwoFactorCode().isEmpty()) {
+            copy.setXrayPanelTwoFactorCode("******");
         }
         return copy;
     }
@@ -201,9 +201,9 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
             return;
         }
         server.setApiToken(secretCryptoUtils.encryptIfNeeded(server.getApiToken()));
-        server.setXuiApiToken(secretCryptoUtils.encryptIfNeeded(server.getXuiApiToken()));
-        server.setXuiPassword(secretCryptoUtils.encryptIfNeeded(server.getXuiPassword()));
-        server.setXuiTwoFactorCode(secretCryptoUtils.encryptIfNeeded(server.getXuiTwoFactorCode()));
+        server.setXrayPanelApiToken(secretCryptoUtils.encryptIfNeeded(server.getXrayPanelApiToken()));
+        server.setXrayPanelPassword(secretCryptoUtils.encryptIfNeeded(server.getXrayPanelPassword()));
+        server.setXrayPanelTwoFactorCode(secretCryptoUtils.encryptIfNeeded(server.getXrayPanelTwoFactorCode()));
     }
 
     private void decryptSecrets(ControlServer server) {
@@ -211,8 +211,8 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
             return;
         }
         server.setApiToken(secretCryptoUtils.decryptIfNeeded(server.getApiToken()));
-        server.setXuiApiToken(secretCryptoUtils.decryptIfNeeded(server.getXuiApiToken()));
-        server.setXuiPassword(secretCryptoUtils.decryptIfNeeded(server.getXuiPassword()));
-        server.setXuiTwoFactorCode(secretCryptoUtils.decryptIfNeeded(server.getXuiTwoFactorCode()));
+        server.setXrayPanelApiToken(secretCryptoUtils.decryptIfNeeded(server.getXrayPanelApiToken()));
+        server.setXrayPanelPassword(secretCryptoUtils.decryptIfNeeded(server.getXrayPanelPassword()));
+        server.setXrayPanelTwoFactorCode(secretCryptoUtils.decryptIfNeeded(server.getXrayPanelTwoFactorCode()));
     }
 }

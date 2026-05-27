@@ -5,8 +5,8 @@ import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.admin.common.dto.ProtocolNodeDto;
 import com.admin.common.dto.ProtocolNodeQueryDto;
-import com.admin.common.dto.ThreeXuiInboundDto;
-import com.admin.common.dto.ThreeXuiServerDto;
+import com.admin.common.dto.XrayPanelInboundDto;
+import com.admin.common.dto.XrayPanelServerDto;
 import com.admin.common.lang.R;
 import com.admin.common.utils.LowMemoryPolicyUtils;
 import com.admin.common.utils.MasterSelfProtectionUtils;
@@ -19,7 +19,7 @@ import com.admin.mapper.ProtocolNodeMapper;
 import com.admin.service.ControlServerService;
 import com.admin.service.ProtocolNodeService;
 import com.admin.service.SnellTemplateService;
-import com.admin.service.ThreeXuiService;
+import com.admin.service.XrayPanelService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
@@ -41,7 +41,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
     private ControlServerService controlServerService;
 
     @Resource
-    private ThreeXuiService threeXuiService;
+    private XrayPanelService xrayPanelService;
 
     @Resource
     private SnellTemplateService snellTemplateService;
@@ -115,12 +115,12 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         if (validation != null) {
             return R.err(validation);
         }
-        ThreeXuiInboundDto inboundDto = new ThreeXuiInboundDto();
+        XrayPanelInboundDto inboundDto = new XrayPanelInboundDto();
         inboundDto.setServerId(server.getId());
         inboundDto.setPayload(payload);
-        R remote = threeXuiService.addInbound(inboundDto);
+        R remote = xrayPanelService.addInbound(inboundDto);
         if (!isRemoteSuccess(remote)) {
-            return R.err(remoteError(remote, "3x-ui inbound create failed"));
+            return R.err(remoteError(remote, "Xray Panel inbound create failed"));
         }
 
         node.setRemoteId(firstNotBlank(node.getRemoteId(), extractRemoteId(remote.getData())));
@@ -188,13 +188,13 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
             if (validation != null) {
                 return R.err(validation);
             }
-            ThreeXuiInboundDto inboundDto = new ThreeXuiInboundDto();
+            XrayPanelInboundDto inboundDto = new XrayPanelInboundDto();
             inboundDto.setServerId(server.getId());
             inboundDto.setInboundId(parseInt(exists.getRemoteId()));
             inboundDto.setPayload(payload);
-            R remote = threeXuiService.updateInbound(inboundDto);
+            R remote = xrayPanelService.updateInbound(inboundDto);
             if (!isRemoteSuccess(remote)) {
-                return R.err(remoteError(remote, "3x-ui inbound update failed"));
+                return R.err(remoteError(remote, "Xray Panel inbound update failed"));
             }
             exists.setConfigJson(JSON.toJSONString(payload));
             exists.setState("active");
@@ -254,12 +254,12 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         }
 
         if (!isBlank(node.getRemoteId())) {
-            ThreeXuiInboundDto inboundDto = new ThreeXuiInboundDto();
+            XrayPanelInboundDto inboundDto = new XrayPanelInboundDto();
             inboundDto.setServerId(server.getId());
             inboundDto.setInboundId(parseInt(node.getRemoteId()));
-            R remote = threeXuiService.deleteInbound(inboundDto);
+            R remote = xrayPanelService.deleteInbound(inboundDto);
             if (!isRemoteSuccess(remote)) {
-                return R.err(remoteError(remote, "3x-ui inbound delete failed"));
+                return R.err(remoteError(remote, "Xray Panel inbound delete failed"));
             }
         }
         return this.removeById(node.getId()) ? R.ok("protocol node deleted") : R.err("protocol node delete failed");
@@ -289,7 +289,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
             this.updateById(node);
             return R.ok(result(node, task));
         }
-        return threeXuiService.restartXray(serverDto(server.getId()));
+        return xrayPanelService.restartXray(serverDto(server.getId()));
     }
 
     @Override
@@ -301,9 +301,9 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         if (server == null) {
             return R.err("server not found");
         }
-        R remote = threeXuiService.listInbounds(serverDto(server.getId()));
+        R remote = xrayPanelService.listInbounds(serverDto(server.getId()));
         if (!isRemoteSuccess(remote)) {
-            return R.err(remoteError(remote, "3x-ui inbound sync failed"));
+            return R.err(remoteError(remote, "Xray Panel inbound sync failed"));
         }
 
         long now = System.currentTimeMillis();
@@ -697,8 +697,8 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         return data;
     }
 
-    private ThreeXuiServerDto serverDto(Long serverId) {
-        ThreeXuiServerDto dto = new ThreeXuiServerDto();
+    private XrayPanelServerDto serverDto(Long serverId) {
+        XrayPanelServerDto dto = new XrayPanelServerDto();
         dto.setServerId(serverId);
         return dto;
     }
