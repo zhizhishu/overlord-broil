@@ -22,6 +22,7 @@ Close the Broil product flow for urgent use: simpler controlled-agent joining, e
 - Simplified the control center surface into 8 product modules: dashboard, servers, inbound nodes, outbound/routing, forwarding/tunnels, traffic, certificates and settings.
 - Removed the old visible engineering console sections from the control-center page; detailed events now surface through the Settings log block.
 - Kept Snell as a first-class inbound-node option beside VLESS Reality, VMess, Trojan and Shadowsocks.
+- Removed the remaining old engineering console code paths from the control-center page, including runtime-provider state blocks, diagnostic cards, raw inbound payload preview and hidden advanced inbound modal.
 
 ## Validation Status
 
@@ -33,6 +34,7 @@ Close the Broil product flow for urgent use: simpler controlled-agent joining, e
 - Passed: `bash scripts/test-install-matrix.sh` across Debian 12, Ubuntu 24.04, Alpine 3.20, Rocky Linux 9 and Oracle Linux 9 userspaces.
 - Passed: `git diff --check`.
 - Passed again after the 8-module control-center rewrite: `npm run build` in `vite-frontend`.
+- Passed after deleting old engineering console remnants: `npm run build`, `git diff --check`, and product-surface keyword scan.
 - Browser preview was attempted through the in-app Browser plugin; the protected route needs a real login/local storage state, so visual proof is deferred to a live master session.
 
 ## Remaining

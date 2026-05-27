@@ -48,3 +48,9 @@
 - Completed: kept server joining simple with the existing join-command action and kept Snell as a first-class inbound-node protocol beside VLESS Reality, VMess, Trojan and Shadowsocks.
 - Validation: frontend `npm run build` passed after the rewrite.
 - Note: Browser preview was attempted through the in-app Browser plugin, but the protected route requires a real login/local storage state; visual smoke should be done against a running master session.
+
+## 2026-05-27 Control Center Cleanup
+
+- Completed: deleted the remaining old engineering console code from the control-center page, including runtime-provider state blocks, state-sync UI, diagnostic cards, raw inbound payload preview and the unused advanced inbound modal.
+- Completed: kept the product surface focused on the 8 modules and the necessary product modals for server join, node creation, routing, forwarding, certificates and settings logs.
+- Validation: frontend `npm run build`, `git diff --check` and product-surface keyword scan passed.
