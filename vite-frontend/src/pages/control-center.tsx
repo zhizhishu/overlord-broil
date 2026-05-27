@@ -862,7 +862,7 @@ const diagnosticLabel = (state: DiagnosticState, t: (message: string, params?: R
   return t("提醒");
 };
 
-const RuntimeStatePanel = ({ task }: { task: DeployTask }) => {
+const RuntimeStateBlock = ({ task }: { task: DeployTask }) => {
   const { t } = useLanguage();
   const state = taskRuntimeState(task);
   if (!state) return null;
@@ -927,7 +927,7 @@ const RuntimeStatePanel = ({ task }: { task: DeployTask }) => {
   );
 };
 
-const DiagnosticSummaryPanel = ({ task, onShowResult }: { task: DeployTask; onShowResult: (task: DeployTask) => void }) => {
+const DiagnosticSummaryBlock = ({ task, onShowResult }: { task: DeployTask; onShowResult: (task: DeployTask) => void }) => {
   const { t } = useLanguage();
   const diagnostics = taskDiagnostics(task);
   if (!diagnostics.length) return null;
@@ -975,7 +975,7 @@ const DiagnosticSummaryPanel = ({ task, onShowResult }: { task: DeployTask; onSh
   );
 };
 
-const RemoteLogsPanel = ({ task, onShowResult }: { task: DeployTask; onShowResult: (task: DeployTask) => void }) => {
+const RemoteLogsBlock = ({ task, onShowResult }: { task: DeployTask; onShowResult: (task: DeployTask) => void }) => {
   const { t } = useLanguage();
   const logs = taskRemoteLogs(task);
   if (!logs.length) return null;
@@ -1025,7 +1025,7 @@ const RemoteLogsPanel = ({ task, onShowResult }: { task: DeployTask; onShowResul
   );
 };
 
-const AgentUpgradePanel = ({ task, onShowResult }: { task: DeployTask; onShowResult: (task: DeployTask) => void }) => {
+const AgentUpgradeBlock = ({ task, onShowResult }: { task: DeployTask; onShowResult: (task: DeployTask) => void }) => {
   const { t } = useLanguage();
   const upgrade = taskAgentUpgrade(task);
   if (!upgrade) return null;
@@ -3510,10 +3510,10 @@ export default function ControlCenterPage() {
                     </div>
                   )}
                   <p className="text-xs text-gray-500">{t("创建：{time}", { time: formatTime(task.createdTime) })}</p>
-                  <RuntimeStatePanel task={task} />
-                  <DiagnosticSummaryPanel task={task} onShowResult={showTaskResult} />
-                  <AgentUpgradePanel task={task} onShowResult={showTaskResult} />
-                  <RemoteLogsPanel task={task} onShowResult={showTaskResult} />
+                  <RuntimeStateBlock task={task} />
+                  <DiagnosticSummaryBlock task={task} onShowResult={showTaskResult} />
+                  <AgentUpgradeBlock task={task} onShowResult={showTaskResult} />
+                  <RemoteLogsBlock task={task} onShowResult={showTaskResult} />
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="flat" onPress={() => showTaskScript(task)}>{t("脚本")}</Button>
                     {task.resultJson && (

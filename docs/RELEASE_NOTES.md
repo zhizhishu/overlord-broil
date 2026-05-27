@@ -2,7 +2,7 @@
 
 ## 0.6.0 - reliability gate
 
-This release closes the product surface around Overlord Broil as one master image, one public master port and one controlled-agent execution loop. It is still below a `1.0` compatibility promise, but the installer, agent and CI checks now catch more real-world setup problems before users send tasks to live servers.
+This release closes the product surface around Overlord Broil as one master image, one public master port and one controlled-agent execution loop. It is still below a `1.0` long-running stability promise, but the installer, agent and CI checks now catch more real-world setup problems before users send tasks to live servers.
 
 ### Highlights
 

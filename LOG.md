@@ -12,3 +12,10 @@
 - Completed: deleted the old combined task-history file and kept `TASK.md` / `LOG.md` as the short current handoff.
 - Validation: shell syntax, master port contract, agent mock, Xray Runtime fixture, SQLite schema, frontend build, Docker Maven targeted tests, MySQL/SQLite Compose dry-run, install matrix doctor, residual naming scan and `git diff --check` passed.
 - Pending: commit and push `main` plus `future`, then confirm GitHub Actions and Pages.
+
+## 2026-05-27 Product Surface Tightening
+
+- Completed: removed the remaining old surface / generic fallback wording from README, Pages SVG assets and frontend source naming.
+- Completed: renamed frontend task-detail blocks to `*Block` to keep the Overlord product surface closed.
+- Validation: public product-surface scan returned no matches for old upstream identity, legacy-route wording, split-layer product wording or stitched-product wording.
+- Validation: frontend `npm run build` passed.

@@ -4,7 +4,7 @@
 
 Overlord Broil is an independent master/agent operations console for dense multi-server node deployment. It unifies Xray/Reality, Snell, remote port forwarding, certificates, firewall checks, traffic sync and agent maintenance behind one control-plane workflow.
 
-Current release: `0.6.0`, a public-trial / release-candidate build. It is suitable for self-hosted testing and small authorized deployments, but it is not a broad `1.0` long-term compatibility promise yet.
+Current release: `0.6.0`, a public-trial / release-candidate build. It is suitable for self-hosted testing and small authorized deployments, but it is not a broad `1.0` long-running stability promise yet.
 
 Project site:
 

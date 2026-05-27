@@ -19,25 +19,17 @@ Close the repository into a single Overlord Broil product surface and push the i
 - Controlled agents poll the master URL and do not require an inbound management port.
 - Snell is managed as a product-level protocol node and remains an independent service on the controlled host.
 - Low-memory hosts below `200 MB` are protected from full Xray deployment.
+- Public product-surface wording was narrowed further: no old upstream names, legacy-route wording or split-layer product wording in README, Pages docs, install scripts or frontend source surfaces.
+- Frontend internal blocks and Pages SVG assets use neutral Overlord wording instead of old surface naming.
 
 ## In Progress
 
-- Commit and push the verified closeout patch.
+- Commit and push the final wording closeout patch.
 
 ## Remaining
 
-1. Finish residual naming scan and cleanup.
-2. Run validation:
-   - shell syntax and bootstrap syntax
-   - `scripts/test-master-port-contract.sh`
-   - `scripts/test-agent-mock.sh`
-   - `scripts/test-xray-runtime-fixture.sh`
-   - `scripts/test-sqlite-schema.sh`
-   - frontend `npm run build`
-   - targeted Docker Maven tests
-   - `git diff --check`
-3. Commit and push to `origin/main` and `origin/future`.
-4. Check GitHub Actions and Pages after push.
+1. Commit and push to `origin/main` and `origin/future`.
+2. Check GitHub Actions and Pages after push.
 
 ## Validation Status
 
@@ -51,7 +43,9 @@ Close the repository into a single Overlord Broil product surface and push the i
 - Passed: MySQL and SQLite Compose dry-run smoke.
 - Passed: install matrix doctor for Debian 12, Ubuntu 24.04, Alpine 3.20, Rocky Linux 9 and Oracle Linux 9-slim.
 - Passed: residual naming scan. Only `npm install --legacy-peer-deps` remains, as a dependency install flag.
+- Passed: public product-surface scan for old identity, legacy-route wording and split-layer product wording.
 - Passed: `git diff --check`.
+- Passed: frontend `npm run build` after the final wording closeout patch.
 
 ## Risks
 
