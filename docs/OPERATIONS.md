@@ -25,7 +25,7 @@ The master is the only public control entry by default. Backend debug, MySQL and
 | `5166/tcp` | Master Web UI, API and agent callback | Public |
 | `6365/tcp` | Backend debug alias | Off, only with `OB_EXPOSE_BACKEND=1` |
 | `3306/tcp` | MySQL | Docker network only |
-| `5168/tcp` | Optional controlled-host node-core UI/API | Only when you choose to expose it |
+| `5168/tcp` | Optional controlled-host node service UI/API | Only when you choose to expose it |
 | `80/tcp` | ACME HTTP validation | Only when selected |
 | custom | Xray, Snell and remote-forward business ports | Operator-defined |
 
@@ -112,7 +112,7 @@ Dangerous actions, including agent uninstall and runtime-port closure, require e
 3. Install the controlled agent with the generated join command.
 4. Wait for heartbeat.
 5. Select one or more servers.
-6. Run deployments for node core, starter nodes, Snell, certificates, firewall checks or remote forwarding.
+6. Run deployments for node service, starter nodes, Snell, certificates, firewall checks or remote forwarding.
 7. Use server cards, task cards and operation logs to verify status.
 
 Snell is unified as a product-layer protocol node, but it remains an independent service on the controlled host.
@@ -121,11 +121,11 @@ Snell is unified as a product-layer protocol node, but it remains an independent
 
 | Memory | Policy |
 | --- | --- |
-| `< 200 MB` | Nano critical. Block full node-core deployment and Xray node creation; prefer Snell or remote forwarding. |
+| `< 200 MB` | Nano critical. Block full node-service deployment and heavy protocol nodes; prefer Snell or remote forwarding. |
 | `< 256 MB` | Nano. Show strong warnings; keep workloads tiny. |
 | `< 512 MB` | Small. Xray can work only with careful swap and low concurrency. |
 
-Alpine/OpenRC can run the agent, Snell and forwarding tasks. Full node-core install/configure deployment is intended for systemd hosts.
+Alpine/OpenRC can run the agent, Snell and forwarding tasks. Full node-service install/configure deployment is intended for systemd hosts.
 
 ## Verification
 
@@ -159,18 +159,18 @@ docker run --rm \
   mvn -B -DskipTests package
 ```
 
-Optional real node-core contract:
+Optional real controlled-node smoke:
 
 ```bash
-export XRAY_RUNTIME_E2E_URL="https://node-core.example.com:5168"
-export XRAY_RUNTIME_E2E_TOKEN="YOUR_XRAY_RUNTIME_API_TOKEN"
+export OB_NODE_E2E_URL="https://node.example.com:5168"
+export OB_NODE_E2E_TOKEN="YOUR_NODE_API_TOKEN"
 bash scripts/test-xray-runtime-e2e.sh
 ```
 
 Optional write-mode contract, using an unused high port:
 
 ```bash
-XRAY_RUNTIME_E2E_WRITE=1 XRAY_RUNTIME_E2E_PORT=42123 bash scripts/test-xray-runtime-e2e.sh
+OB_NODE_E2E_WRITE=1 OB_NODE_E2E_PORT=42123 bash scripts/test-xray-runtime-e2e.sh
 ```
 
 Optional live Snell smoke on an authorized host:
@@ -187,6 +187,6 @@ Use `install-master.sh backup` before upgrades. SQLite backups stop the master b
 
 ## Security Notes
 
-- Keep `.env`, `SECRET_ENCRYPTION_KEY`, agent tokens, node-core API tokens, passwords, 2FA codes, Snell PSK values and private keys out of logs and issues.
+- Keep `.env`, `SECRET_ENCRYPTION_KEY`, agent tokens, node-service API tokens, passwords, 2FA codes, Snell PSK values and private keys out of logs and issues.
 - Cloud firewall/security groups are outside local firewall automation and must be checked separately.
 - Use only infrastructure you own or are authorized to administer.

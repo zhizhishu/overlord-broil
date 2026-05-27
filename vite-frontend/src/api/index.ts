@@ -43,14 +43,14 @@ export const getControlServerToken = (id: number) => Network.post("/control-serv
 export const getControlServerInstallCommand = (id: number) => Network.post("/control-server/install-command", { id });
 export const rotateControlServerToken = (id: number) => Network.post("/control-server/rotate-token", { id });
 
-// Xray Runtime / Snell 协议模板
+// 协议模板
 export const createProtocolProfile = (data: any) => Network.post("/protocol-profile/create", data);
 export const getProtocolProfileList = () => Network.post("/protocol-profile/list");
 export const updateProtocolProfile = (data: any) => Network.post("/protocol-profile/update", data);
 export const deleteProtocolProfile = (id: number) => Network.post("/protocol-profile/delete", { id });
 export const ensureDefaultProtocolProfiles = () => Network.post("/protocol-profile/ensure-defaults");
 
-// 统一协议节点：Xray/Xray Runtime inbound 与 Snell 节点
+// 统一协议节点
 export const createProtocolNode = (data: any) => Network.post("/protocol-node/create", data);
 export const getProtocolNodeList = (data: any = {}) => Network.post("/protocol-node/list", data);
 export const updateProtocolNode = (data: any) => Network.post("/protocol-node/update", data);
@@ -76,10 +76,6 @@ export const updateDeployTaskState = (data: any) => Network.post("/deploy-task/s
 export const retryDeployTask = (id: number) => Network.post("/deploy-task/retry", { id });
 export const deleteDeployTask = (id: number) => Network.post("/deploy-task/delete", { id });
 
-// Runtime Provider 注册表：Xray Runtime / Snell / Forward / Certificate / Firewall
-export const getRuntimeProviderList = () => Network.post("/runtime-provider/list");
-export const resolveRuntimeProvider = (data: { protocol?: string; action?: string }) => Network.post("/runtime-provider/resolve", data);
-
 // 主控监控告警
 export const listMonitorAlerts = (data: any = {}) => Network.post("/monitor-alert/list", data);
 export const acknowledgeMonitorAlert = (id: number) => Network.post("/monitor-alert/ack", { id });
@@ -87,24 +83,24 @@ export const acknowledgeMonitorAlert = (id: number) => Network.post("/monitor-al
 // 主控操作审计
 export const listOperationAuditLogs = (data: any = {}) => Network.post("/operation-audit/list", data);
 
-// Xray Runtime 远端出入站管理
-export const testXrayRuntimeConnection = (serverId: number) => Network.post("/runtimes/xray/test", { serverId });
-export const listXrayRuntimeInbounds = (serverId: number) => Network.post("/runtimes/xray/inbounds/list", { serverId });
-export const addXrayRuntimeInbound = (data: any) => Network.post("/runtimes/xray/inbounds/add", data);
-export const updateXrayRuntimeInbound = (data: any) => Network.post("/runtimes/xray/inbounds/update", data);
-export const deleteXrayRuntimeInbound = (data: any) => Network.post("/runtimes/xray/inbounds/delete", data);
-export const setXrayRuntimeInboundEnable = (data: any) => Network.post("/runtimes/xray/inbounds/set-enable", data);
-export const addXrayRuntimeClient = (data: any) => Network.post("/runtimes/xray/clients/add", data);
-export const updateXrayRuntimeClient = (data: any) => Network.post("/runtimes/xray/clients/update", data);
-export const deleteXrayRuntimeClient = (data: any) => Network.post("/runtimes/xray/clients/delete", data);
-export const resetXrayRuntimeClientTraffic = (data: any) => Network.post("/runtimes/xray/clients/reset-traffic", data);
-export const getXrayRuntimeConfig = (serverId: number) => Network.post("/runtimes/xray/config", { serverId });
-export const getXrayRuntimeOutbounds = (serverId: number) => Network.post("/runtimes/xray/outbounds", { serverId });
-export const getXrayRuntimeOutboundTraffic = (serverId: number) => Network.post("/runtimes/xray/outbounds/traffic", { serverId });
-export const syncXrayRuntimeTraffic = (serverId: number) => Network.post("/runtimes/xray/traffic/sync", { serverId });
-export const listXrayRuntimeTraffic = (data: any) => Network.post("/runtimes/xray/traffic/list", data);
-export const saveXrayRuntimeOutbounds = (data: any) => Network.post("/runtimes/xray/outbounds/save", data);
-export const restartXrayRuntimeXray = (serverId: number) => Network.post("/runtimes/xray/restart-xray", { serverId });
+// 节点内核远端出入站管理
+export const testNodeCoreConnection = (serverId: number) => Network.post("/runtimes/xray/test", { serverId });
+export const listNodeCoreInbounds = (serverId: number) => Network.post("/runtimes/xray/inbounds/list", { serverId });
+export const addNodeCoreInbound = (data: any) => Network.post("/runtimes/xray/inbounds/add", data);
+export const updateNodeCoreInbound = (data: any) => Network.post("/runtimes/xray/inbounds/update", data);
+export const deleteNodeCoreInbound = (data: any) => Network.post("/runtimes/xray/inbounds/delete", data);
+export const setNodeCoreInboundEnable = (data: any) => Network.post("/runtimes/xray/inbounds/set-enable", data);
+export const addNodeCoreClient = (data: any) => Network.post("/runtimes/xray/clients/add", data);
+export const updateNodeCoreClient = (data: any) => Network.post("/runtimes/xray/clients/update", data);
+export const deleteNodeCoreClient = (data: any) => Network.post("/runtimes/xray/clients/delete", data);
+export const resetNodeCoreClientTraffic = (data: any) => Network.post("/runtimes/xray/clients/reset-traffic", data);
+export const getNodeCoreConfig = (serverId: number) => Network.post("/runtimes/xray/config", { serverId });
+export const getNodeCoreOutbounds = (serverId: number) => Network.post("/runtimes/xray/outbounds", { serverId });
+export const getNodeCoreOutboundTraffic = (serverId: number) => Network.post("/runtimes/xray/outbounds/traffic", { serverId });
+export const syncNodeCoreTraffic = (serverId: number) => Network.post("/runtimes/xray/traffic/sync", { serverId });
+export const listNodeCoreTraffic = (data: any) => Network.post("/runtimes/xray/traffic/list", data);
+export const saveNodeCoreOutbounds = (data: any) => Network.post("/runtimes/xray/outbounds/save", data);
+export const restartNodeCoreService = (serverId: number) => Network.post("/runtimes/xray/restart-xray", { serverId });
 
 // 隧道CRUD操作 - 全部使用POST请求
 export const createTunnel = (data: any) => Network.post("/tunnel/create", data);

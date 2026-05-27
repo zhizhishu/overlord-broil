@@ -163,15 +163,13 @@ POST /api/v1/control-server/install-command
 POST /api/v1/protocol-node/create
 POST /api/v1/server-forward/create
 POST /api/v1/server-rule/overview
-POST /api/v1/runtimes/xray/inbounds/list
-POST /api/v1/runtimes/xray/outbounds
-POST /api/v1/runtimes/xray/traffic/sync
-POST /api/v1/runtimes/xray/restart-xray
 POST /api/v1/deploy-task/create
 POST /api/v1/deploy-task/plans
 POST /api/v1/agent-task/claim
 POST /api/v1/agent-task/report
 ```
+
+底层连接器接口只作为主控 UI 和 CI fixture 的内部兼容合同保留；新集成优先使用上面的产品接口。
 
 ## 低内存服务器
 
@@ -216,8 +214,8 @@ docker run --rm \
 真实节点内核合同烟测是可选项. 没有配置真实地址和 API token 时会自动跳过:
 
 ```bash
-export XRAY_RUNTIME_E2E_URL="https://node-core.example.com:5168"
-export XRAY_RUNTIME_E2E_TOKEN="YOUR_XRAY_RUNTIME_API_TOKEN"
+export OB_NODE_E2E_URL="https://node.example.com:5168"
+export OB_NODE_E2E_TOKEN="YOUR_NODE_API_TOKEN"
 bash scripts/test-xray-runtime-e2e.sh
 ```
 

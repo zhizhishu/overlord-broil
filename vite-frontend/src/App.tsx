@@ -171,7 +171,11 @@ function App() {
       />
       <Route 
         path="/settings" 
-        element={<SettingsPage />}
+        element={
+          <ProtectedRoute useSimpleLayout={true}>
+            <SettingsPage />
+          </ProtectedRoute>
+        }
       />
     </Routes>
   );

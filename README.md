@@ -81,7 +81,7 @@ The master exposes one public entry by default:
 | SQLite | Optional local master DB file | no network port |
 | phpMyAdmin | temporary maintenance | no, only with `OB_PHPMYADMIN_PORT` |
 
-During install or upgrade, the script removes old split-stack containers and optional phpMyAdmin helpers so previous `80/6365/8066` exposures do not survive the move to the single `overlord-master` entry. In SQLite mode it also stops the obsolete `gost-mysql` container while keeping its Docker volumes and old install files untouched for manual recovery.
+During install or upgrade, the script removes old split-stack containers and optional phpMyAdmin helpers so previous `80/6365/8066` exposures do not survive the move to the single `overlord-master` entry. In SQLite mode it also stops the obsolete MySQL container while keeping its Docker volumes and old install files untouched for manual recovery.
 
 Controlled agents do not need an inbound management port. They call the same master URL users open in the browser:
 
@@ -89,7 +89,7 @@ Controlled agents do not need an inbound management port. They call the same mas
 http://MASTER_IP:5166
 ```
 
-Controlled hosts expose only the business ports you choose: optional node-core port `5168`, Xray/Reality inbound ports, Snell listen ports, remote-forward listen ports and ACME HTTP `80/tcp` when selected.
+Controlled hosts expose only the business ports you choose: optional node-service port `5168`, Xray/Reality inbound ports, Snell listen ports, remote-forward listen ports and ACME HTTP `80/tcp` when selected.
 
 ## Quick Start
 
@@ -163,7 +163,7 @@ The agent runs through systemd or OpenRC, claims tasks from the master, executes
 4. Install the agent with the generated join command.
 5. Wait for heartbeat.
 6. Select one or more servers and create deployment plans:
-   - install or reuse the node core
+   - install or reuse the node service
    - create VLESS Reality, VMess WebSocket, Trojan TLS or Shadowsocks nodes
    - deploy Snell nodes
    - issue or bind certificates
@@ -189,7 +189,7 @@ Agent heartbeat reports total memory. The master classifies tiny hosts:
 | Agent service | systemd | systemd | OpenRC |
 | Snell node tasks | systemd | systemd | OpenRC |
 | Remote forwarding tasks | systemd + `socat` | systemd + `socat` | OpenRC + `socat` |
-| Full node-core install/configure | supported | supported | not supported in `0.6.0` |
+| Full node-service install/configure | supported | supported | not supported in `0.6.0` |
 
 ## Docker And GHCR
 
@@ -205,14 +205,7 @@ Supported deployments use the single `overlord-master` image. Backend and fronte
 
 ## API Summary
 
-Product system APIs:
-
-```text
-POST /api/v1/runtime-provider/list
-POST /api/v1/runtime-provider/resolve
-```
-
-Core task flow:
+Product task flow:
 
 ```text
 POST /api/v1/control-server/create
@@ -228,7 +221,7 @@ POST /api/v1/agent-task/claim
 POST /api/v1/agent-task/report
 ```
 
-Profiles, nodes, forwarding and node-core routes:
+Profiles, nodes, forwarding and unified rule routes:
 
 ```text
 POST /api/v1/protocol-profile/create
@@ -242,11 +235,9 @@ POST /api/v1/protocol-node/sync
 POST /api/v1/server-forward/create
 POST /api/v1/server-forward/list
 POST /api/v1/server-rule/overview
-POST /api/v1/runtimes/xray/inbounds/list
-POST /api/v1/runtimes/xray/outbounds
-POST /api/v1/runtimes/xray/traffic/sync
-POST /api/v1/runtimes/xray/restart-xray
 ```
+
+Low-level connector routes remain internal compatibility contracts for the master UI and CI fixtures; new integrations should prefer the product routes above.
 
 ## Verification
 
@@ -259,7 +250,7 @@ bash scripts/release-check.sh --full
 Backend with Docker Maven:
 
 ```bash
-docker run --rm -v "$PWD:/workspace" -v overlord-broil-m2:/root/.m2 -w /workspace/springboot-backend maven:3.9.9-eclipse-temurin-21 mvn -B "-Dtest=RuntimeProviderServiceTest,DeployTaskServiceImplTest,XrayRuntimeRouteContractTest" test
+docker run --rm -v "$PWD:/workspace" -v overlord-broil-m2:/root/.m2 -w /workspace/springboot-backend maven:3.9.9-eclipse-temurin-21 mvn -B -DskipTests package
 ```
 
 Frontend:
@@ -280,21 +271,21 @@ bash scripts/test-xray-runtime-e2e.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
 ```
 
-Real node-core contract smoke is optional and skips unless a target endpoint and API token are provided:
+Real controlled-node smoke is optional and skips unless a target endpoint and API token are provided:
 
 ```bash
-export XRAY_RUNTIME_E2E_URL="https://node-core.example.com:5168"
-export XRAY_RUNTIME_E2E_TOKEN="YOUR_XRAY_RUNTIME_API_TOKEN"
+export OB_NODE_E2E_URL="https://node.example.com:5168"
+export OB_NODE_E2E_TOKEN="YOUR_NODE_API_TOKEN"
 bash scripts/test-xray-runtime-e2e.sh
 ```
 
-To create, toggle and delete a temporary VLESS inbound on the real node-core host, opt in explicitly:
+To create, toggle and delete a temporary VLESS inbound on the real controlled node, opt in explicitly:
 
 ```bash
-XRAY_RUNTIME_E2E_WRITE=1 XRAY_RUNTIME_E2E_PORT=42123 bash scripts/test-xray-runtime-e2e.sh
+OB_NODE_E2E_WRITE=1 OB_NODE_E2E_PORT=42123 bash scripts/test-xray-runtime-e2e.sh
 ```
 
-Live validation note: on `isrco-hk`, an authorized disposable node-core container passed the direct E2E write contract and the Overlord master API inbound add/toggle/delete path. The temporary ports `42123` and `42124` were cleaned after the run.
+Live validation note: on `isrco-hk`, an authorized disposable controlled-node container passed the direct E2E write contract and the Overlord master API inbound add/toggle/delete path. The temporary ports `42123` and `42124` were cleaned after the run.
 
 Real Snell smoke runs against a live master/agent host. It logs in to the master, creates a temporary Snell protocol node, lets the controlled agent claim the task, checks the service and listen port, then deletes the temporary node by default:
 
@@ -305,7 +296,7 @@ OB_MASTER_URL="http://127.0.0.1:5166" OB_SNELL_PORT=18390 bash scripts/test-snel
 ## Remaining Work Before 1.0
 
 - Real VPS matrix: Debian, Ubuntu, Rocky Linux, Oracle Linux and Alpine.
-- Extend the recorded real node-core E2E beyond the current `isrco-hk` container run to more VPS/provider targets.
+- Extend the recorded real controlled-node E2E beyond the current `isrco-hk` container run to more VPS/provider targets.
 - Better certificate, firewall and cloud-security-group diagnostics.
 - RBAC, audit retention/export, agent token expiry/revocation and key-rotation migration.
 - Mobile layout, loading/error states and task-detail polish.

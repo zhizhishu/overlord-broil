@@ -11,7 +11,7 @@ This release closes the product surface around Overlord Broil as one master imag
 - SQLite mode is available through `OB_DB_MODE=sqlite` for small labs; MySQL remains the default production path.
 - Controlled agents use systemd or OpenRC, poll the master, execute tasks locally and report results without opening an inbound management port.
 - Product modules now cover inbound nodes, outbound/routing, Snell, forwarding/tunnels, certificates, traffic and settings logs.
-- Deployment plans can install or reuse the node core, create starter Xray protocols, deploy Snell, run certificate/firewall checks and return runtime metadata.
+- Deployment plans can install or reuse the node service, create starter protocol nodes, deploy Snell, run certificate/firewall checks and return service metadata.
 - Node-core management includes inbound/client flows, config/outbound reads, traffic sync and service restart.
 - Snell is represented as a normal product node while remaining an independent systemd/OpenRC service on the controlled host.
 - Remote forwarding uses controlled-agent tasks to create, restart and remove `socat` services.
@@ -36,7 +36,7 @@ This release closes the product surface around Overlord Broil as one master imag
 | Status sync | Runtime-state aggregation by server and module. |
 | Operation Audit | Task and agent lifecycle audit in `operation_audit_log`. |
 | Safety | Protected master ports, encrypted secrets, task audit, dangerous-action confirmation and nano-host blocking. |
-| Verification | Shell syntax, agent mock, SQLite schema, node-core fixture, optional real node-core E2E, master port contract, frontend build, backend Maven build, install matrix and Compose smoke. |
+| Verification | Shell syntax, agent mock, SQLite schema, controlled-node fixture, optional real controlled-node E2E, master port contract, frontend build, backend Maven build, install matrix and Compose smoke. |
 
 ### Ports
 
@@ -52,7 +52,7 @@ This release closes the product surface around Overlord Broil as one master imag
 ### Validation Notes
 
 - `isrco-hk` passed the single-container SQLite master smoke on `5166/tcp`.
-- `isrco-hk` passed a real node-core add/toggle/delete contract against temporary high ports.
+- `isrco-hk` passed a real controlled-node add/toggle/delete contract against temporary high ports.
 - The live Snell smoke script can create and delete a temporary Snell node and verify service shutdown plus closed listen port after cleanup.
 - Docker/CI install matrix is useful for packaging confidence, but a wider real-VPS matrix is still required before a `1.0` claim.
 

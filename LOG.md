@@ -65,3 +65,11 @@
 - Docs: updated README, README.zh-CN, operations docs, release notes and Pages text around the 8-module product surface and node-core wording.
 - Validation: frontend `npm run build`, shell syntax, master port contract, agent mock, SQLite schema, product-surface keyword scan and `git diff --check` passed.
 - Note: Docker Maven package on the Windows bind mount was attempted, but javac produced no output for about 10 minutes; the test container was stopped and cleaned up.
+
+## 2026-05-27 Public Product Surface Closure
+
+- Completed: persisted the default project startup receipt in `PROJECT_ID.md` and `AGENTS.md` so future work starts inside `C:\Users\echo\Downloads\claude\overlord-broil` without repeating the boundary by hand.
+- Completed: protected `/settings`, removed unused frontend runtime-provider API exports and removed old Runtime API / runtime registry i18n strings from the frontend bundle.
+- Completed: renamed deployment-plan frontend state to node-service product fields while keeping the backend compatibility DTO mapping at submit time.
+- Completed: cleaned README, Chinese README, operations docs, release notes, Pages copy and screenshot text so public docs describe Overlord Broil as one product surface.
+- Validation: frontend `npm run build`, shell syntax, master port contract, agent mock, SQLite schema, product-surface keyword scan across source and built dist, and `git diff --check` passed.

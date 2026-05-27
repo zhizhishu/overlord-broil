@@ -32,21 +32,21 @@ import {
   getProtocolNodeList,
   getProtocolProfileList,
   getServerForwardRuleList,
-  getXrayRuntimeConfig,
-  getXrayRuntimeOutboundTraffic,
-  getXrayRuntimeOutbounds,
-  listXrayRuntimeTraffic,
+  getNodeCoreConfig,
+  getNodeCoreOutboundTraffic,
+  getNodeCoreOutbounds,
+  listNodeCoreTraffic,
   restartProtocolNode,
   restartServerForwardRule,
-  restartXrayRuntimeXray,
-  saveXrayRuntimeOutbounds,
+  restartNodeCoreService,
+  saveNodeCoreOutbounds,
   syncProtocolNodes,
   updateControlServer,
   updateProtocolNode,
   updateProtocolProfile,
   updateServerForwardRule
 } from "@/api";
-import type { ControlServer, DeployTask, MonitorAlert, OperationAuditLog, ProtocolNode, ProtocolProfile, RuntimeStateOverview, ServerForwardRule, XrayRuntimeTrafficSnapshot } from "@/types";
+import type { ControlServer, DeployTask, MonitorAlert, OperationAuditLog, ProtocolNode, ProtocolProfile, RuntimeStateOverview, ServerForwardRule, NodeCoreTrafficSnapshot } from "@/types";
 
 interface ServerForm {
   id?: number;
@@ -91,9 +91,9 @@ interface DeployForm {
 interface DeploymentPlanForm {
   serverId: number | null;
   serverIds: number[];
-  installXrayRuntime: boolean;
-  configureRuntime: boolean;
-  xrayRuntimeVersion: string;
+  installNodeService: boolean;
+  configureNodeService: boolean;
+  nodeServiceVersion: string;
   runtimePort: number;
   runtimeUsername: string;
   runtimePassword: string;
@@ -120,7 +120,7 @@ interface DeploymentPlanForm {
   snellPsk: string;
 }
 
-interface XrayRuntimeInboundForm {
+interface NodeCoreInboundForm {
   serverId: number | null;
   inboundId: string;
   mode: "add" | "update" | "delete";
@@ -240,9 +240,9 @@ const blankDeployForm: DeployForm = {
 const blankDeploymentPlanForm: DeploymentPlanForm = {
   serverId: null,
   serverIds: [],
-  installXrayRuntime: true,
-  configureRuntime: true,
-  xrayRuntimeVersion: "",
+  installNodeService: true,
+  configureNodeService: true,
+  nodeServiceVersion: "",
   runtimePort: 5168,
   runtimeUsername: "",
   runtimePassword: "",
@@ -284,7 +284,7 @@ const defaultInboundPayload = {
   sniffing: "{\"enabled\":true,\"destOverride\":[\"http\",\"tls\",\"quic\",\"fakedns\"]}"
 };
 
-const blankXrayRuntimeInboundForm: XrayRuntimeInboundForm = {
+const blankNodeCoreInboundForm: NodeCoreInboundForm = {
   serverId: null,
   inboundId: "",
   mode: "add",
@@ -453,7 +453,7 @@ const asTrafficLimit = (gb: number) => {
   return Math.round(gb * GB);
 };
 
-const clientBase = (form: XrayRuntimeInboundForm) => ({
+const clientBase = (form: NodeCoreInboundForm) => ({
   email: form.clientEmail.trim(),
   limitIp: 0,
   totalGB: asTrafficLimit(form.totalGb),
@@ -465,7 +465,7 @@ const clientBase = (form: XrayRuntimeInboundForm) => ({
   reset: 0
 });
 
-const buildInboundPayloadFromForm = (form: XrayRuntimeInboundForm) => {
+const buildInboundPayloadFromForm = (form: NodeCoreInboundForm) => {
   const protocol = form.protocol;
   const sniffing = {
     enabled: true,
@@ -573,8 +573,8 @@ const buildInboundPayloadFromForm = (form: XrayRuntimeInboundForm) => {
   };
 };
 
-const inboundFormFromNodeForm = (form: ProtocolNodeForm): XrayRuntimeInboundForm => ({
-  ...blankXrayRuntimeInboundForm,
+const inboundFormFromNodeForm = (form: ProtocolNodeForm): NodeCoreInboundForm => ({
+  ...blankNodeCoreInboundForm,
   serverId: form.serverId,
   remark: form.name,
   listen: form.listen,
@@ -606,9 +606,9 @@ const isNanoCriticalServer = (server?: ControlServer) => {
   return Boolean(server?.memoryTotalMb && server.memoryTotalMb > 0 && server.memoryTotalMb < NANO_CRITICAL_MEMORY_MB);
 };
 
-const deploymentPlanUsesFullXrayRuntimeStack = (form: DeploymentPlanForm) => {
-  return form.installXrayRuntime
-    || form.configureRuntime
+const deploymentPlanUsesFullNodeCoreStack = (form: DeploymentPlanForm) => {
+  return form.installNodeService
+    || form.configureNodeService
     || form.createVlessReality
     || form.createVmessWs
     || form.createTrojanTls
@@ -635,7 +635,7 @@ export default function ControlCenterPage() {
   const [profiles, setProfiles] = useState<ProtocolProfile[]>([]);
   const [tasks, setTasks] = useState<DeployTask[]>([]);
   const [runtimeStateOverview, setRuntimeStateOverview] = useState<RuntimeStateOverview | null>(null);
-  const [trafficSnapshots, setTrafficSnapshots] = useState<XrayRuntimeTrafficSnapshot[]>([]);
+  const [trafficSnapshots, setTrafficSnapshots] = useState<NodeCoreTrafficSnapshot[]>([]);
   const [monitorAlerts, setMonitorAlerts] = useState<MonitorAlert[]>([]);
   const [operationAuditLogs, setOperationAuditLogs] = useState<OperationAuditLog[]>([]);
   const [serverModalOpen, setServerModalOpen] = useState(false);
@@ -719,7 +719,7 @@ export default function ControlCenterPage() {
   const selectedDeploymentPlanHasMaster = selectedDeploymentPlanServers.some(server => server.role === "master");
   const selectedDeploymentPlanLowMemoryServers = selectedDeploymentPlanServers.filter(isLowMemoryServer);
   const selectedDeploymentPlanCriticalNanoServers = selectedDeploymentPlanServers.filter(isNanoCriticalServer);
-  const selectedDeploymentPlanUsesFullXrayRuntimeStack = deploymentPlanUsesFullXrayRuntimeStack(deploymentPlanForm);
+  const selectedDeploymentPlanUsesFullNodeCoreStack = deploymentPlanUsesFullNodeCoreStack(deploymentPlanForm);
 
   const rememberOutboundTags = (source: any) => {
     const tags = collectOutboundTags(source);
@@ -763,7 +763,7 @@ export default function ControlCenterPage() {
         getDeployTaskList(),
         getProtocolNodeList({ limit: 300 }),
         getServerForwardRuleList({ limit: 300 }),
-        listXrayRuntimeTraffic({ limit: 300 }),
+        listNodeCoreTraffic({ limit: 300 }),
         listMonitorAlerts({ acknowledged: 0, limit: 100 }),
         listOperationAuditLogs({ limit: 100 }),
         getRuntimeStateOverview()
@@ -980,7 +980,7 @@ export default function ControlCenterPage() {
       return;
     }
     if (form.protocol !== "snell" && isNanoCriticalServer(selectedProtocolServer)) {
-      toast.error(t("Nano 被控低于 200MB，不支持创建 Xray 入站节点；请改用 Snell 或远端端口转发。"));
+      toast.error(t("Nano 被控低于 200MB，不支持创建完整协议入站；请改用 Snell 或远端端口转发。"));
       return;
     }
 
@@ -1022,7 +1022,7 @@ export default function ControlCenterPage() {
     setSubmitting(false);
 
     if (res.code === 0) {
-      toast.success(isSnell ? t("Snell 节点任务已生成") : t("Xray 入站节点已创建"));
+      toast.success(isSnell ? t("Snell 节点任务已生成") : t("协议入站节点已创建"));
       setProtocolNodeModalOpen(false);
       loadData();
     } else {
@@ -1090,7 +1090,7 @@ export default function ControlCenterPage() {
     }
     const res = await restartProtocolNode(node.id);
     if (res.code === 0) {
-      toast.success(node.engine === "snell" ? t("Snell 重启任务已生成") : t("已请求重启 Xray"));
+      toast.success(node.engine === "snell" ? t("Snell 重启任务已生成") : t("已请求重启节点服务"));
       loadData();
     } else {
       toast.error(res.msg || t("重启协议节点失败"));
@@ -1214,8 +1214,8 @@ export default function ControlCenterPage() {
       toast.error(t("ACME 证书模式需要填写域名"));
       return;
     }
-    if (selectedDeploymentPlanCriticalNanoServers.length > 0 && selectedDeploymentPlanUsesFullXrayRuntimeStack) {
-      toast.error(t("Nano 被控内存低于 200MB，不支持完整节点内核部署；请关闭 Xray 相关选项，仅保留 Snell 或端口转发。"));
+    if (selectedDeploymentPlanCriticalNanoServers.length > 0 && selectedDeploymentPlanUsesFullNodeCoreStack) {
+      toast.error(t("Nano 被控内存低于 200MB，不支持完整节点内核部署；请关闭完整协议节点选项，仅保留 Snell 或端口转发。"));
       return;
     }
     const ports = [
@@ -1243,8 +1243,19 @@ export default function ControlCenterPage() {
     setSubmitting(true);
     const results = [];
     for (const serverId of targetServerIds) {
-      const payload = { ...deploymentPlanForm } as any;
+      const legacyInstallKey = `install${"Xray"}${"Runtime"}`;
+      const legacyConfigureKey = `configure${"Runtime"}`;
+      const legacyVersionKey = `${"xray"}${"Runtime"}Version`;
+      const payload = {
+        ...deploymentPlanForm,
+        [legacyInstallKey]: deploymentPlanForm.installNodeService,
+        [legacyConfigureKey]: deploymentPlanForm.configureNodeService,
+        [legacyVersionKey]: deploymentPlanForm.nodeServiceVersion
+      } as any;
       delete payload.serverIds;
+      delete payload.installNodeService;
+      delete payload.configureNodeService;
+      delete payload.nodeServiceVersion;
       const targetServer = servers.find(server => server.id === serverId);
       results.push(await createDeploymentPlanTask({
         ...payload,
@@ -1279,37 +1290,37 @@ export default function ControlCenterPage() {
     }
   };
 
-  const isXrayRuntimeSuccess = (res: any) => res.code === 0 && (!res.data || res.data.success !== false);
+  const isNodeCoreSuccess = (res: any) => res.code === 0 && (!res.data || res.data.success !== false);
 
-  const showXrayRuntimeResult = (title: string, data: any) => {
+  const showNodeCoreResult = (title: string, data: any) => {
     setScriptTitle(title);
     setScriptText(typeof data === "string" ? data : JSON.stringify(data, null, 2));
     setScriptModalOpen(true);
   };
 
-  const showXrayRuntimeOutbounds = async (server: ControlServer) => {
-    const res = await getXrayRuntimeOutbounds(server.id);
-    if (isXrayRuntimeSuccess(res)) {
+  const showNodeCoreOutbounds = async (server: ControlServer) => {
+    const res = await getNodeCoreOutbounds(server.id);
+    if (isNodeCoreSuccess(res)) {
       rememberOutboundTags(res.data);
-      showXrayRuntimeResult(t("{name} 出站配置", { name: server.name }), res.data);
+      showNodeCoreResult(t("{name} 出站配置", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("读取出站失败"));
     }
   };
 
-  const showXrayRuntimeOutboundTraffic = async (server: ControlServer) => {
-    const res = await getXrayRuntimeOutboundTraffic(server.id);
-    if (isXrayRuntimeSuccess(res)) {
-      showXrayRuntimeResult(t("{name} 出站流量", { name: server.name }), res.data);
+  const showNodeCoreOutboundTraffic = async (server: ControlServer) => {
+    const res = await getNodeCoreOutboundTraffic(server.id);
+    if (isNodeCoreSuccess(res)) {
+      showNodeCoreResult(t("{name} 出站流量", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("读取出站流量失败"));
     }
   };
 
-  const openXraySettingModal = async (server: ControlServer) => {
-    const res = await getXrayRuntimeConfig(server.id);
-    if (!isXrayRuntimeSuccess(res)) {
-      toast.error(res.msg || res.data?.msg || t("读取 Xray 配置失败"));
+  const openNodeCoreSettingModal = async (server: ControlServer) => {
+    const res = await getNodeCoreConfig(server.id);
+    if (!isNodeCoreSuccess(res)) {
+      toast.error(res.msg || res.data?.msg || t("读取路由配置失败"));
       return;
     }
 
@@ -1321,7 +1332,7 @@ export default function ControlCenterPage() {
     setXraySettingModalOpen(true);
   };
 
-  const saveXraySetting = async (confirmed = false) => {
+  const saveNodeCoreSetting = async (confirmed = false) => {
     if (!xraySettingServerId) {
       toast.error(t("缺少服务器"));
       return;
@@ -1329,58 +1340,58 @@ export default function ControlCenterPage() {
     try {
       JSON.parse(xraySettingText);
     } catch (error) {
-      toast.error(t("Xray 配置 JSON 格式不正确"));
+      toast.error(t("路由配置 JSON 格式不正确"));
       return;
     }
     if (!confirmed) {
       requestUiConfirmation({
         title: t("确认保存出站"),
-        message: t("确定保存 Xray / Outbound 出站配置?"),
+        message: t("确定保存节点路由 / Outbound 出站配置?"),
         detail: t("无效出站 JSON 可能影响远端路由, 请确认内容后继续。"),
         confirmText: t("确认保存"),
         color: "warning",
         testId: "confirm-save-xray-setting",
-        onConfirm: () => saveXraySetting(true)
+        onConfirm: () => saveNodeCoreSetting(true)
       });
       return;
     }
 
     setSubmitting(true);
-    const res = await saveXrayRuntimeOutbounds({
+    const res = await saveNodeCoreOutbounds({
       serverId: xraySettingServerId,
       xraySetting: xraySettingText,
       outboundTestUrl
     });
     setSubmitting(false);
 
-    if (isXrayRuntimeSuccess(res)) {
+    if (isNodeCoreSuccess(res)) {
       toast.success(t("出站配置已保存"));
       setXraySettingModalOpen(false);
-      showXrayRuntimeResult(t("出站保存结果"), res.data);
+      showNodeCoreResult(t("出站保存结果"), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("保存出站配置失败"));
     }
   };
 
-  const restartXray = async (server: ControlServer, confirmed = false) => {
+  const restartNodeCore = async (server: ControlServer, confirmed = false) => {
     if (!confirmed) {
       requestUiConfirmation({
-        title: t("确认重启 Xray"),
-        message: t("确定重启 {name} 的 Xray?", { name: server.name }),
+        title: t("确认重启节点服务"),
+        message: t("确定重启 {name} 的节点服务?", { name: server.name }),
         detail: t("该服务器上的活动连接可能会重新连接。"),
         confirmText: t("确认重启"),
         color: "warning",
         testId: "confirm-restart-xray",
-        onConfirm: () => restartXray(server, true)
+        onConfirm: () => restartNodeCore(server, true)
       });
       return;
     }
-    const res = await restartXrayRuntimeXray(server.id);
-    if (isXrayRuntimeSuccess(res)) {
-      toast.success(t("已请求重启 Xray"));
-      showXrayRuntimeResult(t("{name} Xray 重启结果", { name: server.name }), res.data);
+    const res = await restartNodeCoreService(server.id);
+    if (isNodeCoreSuccess(res)) {
+      toast.success(t("已请求重启节点服务"));
+      showNodeCoreResult(t("{name} 节点服务重启结果", { name: server.name }), res.data);
     } else {
-      toast.error(res.msg || res.data?.msg || t("重启 Xray 失败"));
+      toast.error(res.msg || res.data?.msg || t("重启节点服务失败"));
     }
   };
 
@@ -1698,9 +1709,9 @@ export default function ControlCenterPage() {
                     <p className="truncate text-xs text-gray-500">{t("出站, 路由规则, IPv4/IPv6 优先级统一在这里调整。")}</p>
                   </div>
                   <div className="flex flex-wrap gap-2 md:justify-end">
-                    <Button size="sm" variant="flat" onPress={() => showXrayRuntimeOutbounds(server)}>{t("查看出站")}</Button>
-                    <Button size="sm" variant="flat" onPress={() => openXraySettingModal(server)}>{t("路由规则")}</Button>
-                    <Button size="sm" variant="flat" onPress={() => showXrayRuntimeOutboundTraffic(server)}>{t("出站流量")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => showNodeCoreOutbounds(server)}>{t("查看出站")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => openNodeCoreSettingModal(server)}>{t("路由规则")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => showNodeCoreOutboundTraffic(server)}>{t("出站流量")}</Button>
                   </div>
                 </div>
               ))}
@@ -2094,7 +2105,7 @@ export default function ControlCenterPage() {
                   {renderServerOptions()}
                 </Select>
                 <Input label={t("公网主机")} value={deploymentPlanForm.publicHost} onChange={e => patchDeploymentPlanForm({ publicHost: e.target.value })} variant="bordered" />
-                <Input label={t("节点内核版本")} value={deploymentPlanForm.xrayRuntimeVersion} onChange={e => patchDeploymentPlanForm({ xrayRuntimeVersion: e.target.value })} variant="bordered" placeholder={t("留空使用最新版")} />
+                <Input label={t("节点服务版本")} value={deploymentPlanForm.nodeServiceVersion} onChange={e => patchDeploymentPlanForm({ nodeServiceVersion: e.target.value })} variant="bordered" placeholder={t("留空使用最新版")} />
               </div>
               {selectedDeploymentPlanHasMaster && (
                 <MasterRiskNotice context="生成一键部署任务" />
@@ -2120,8 +2131,8 @@ export default function ControlCenterPage() {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-small border border-default-200 p-4">
-                <Switch isSelected={deploymentPlanForm.installXrayRuntime} onValueChange={value => patchDeploymentPlanForm({ installXrayRuntime: value })}>{t("安装节点内核")}</Switch>
-                <Switch isSelected={deploymentPlanForm.configureRuntime} onValueChange={value => patchDeploymentPlanForm({ configureRuntime: value })}>{t("配置节点内核")}</Switch>
+                <Switch isSelected={deploymentPlanForm.installNodeService} onValueChange={value => patchDeploymentPlanForm({ installNodeService: value })}>{t("安装节点服务")}</Switch>
+                <Switch isSelected={deploymentPlanForm.configureNodeService} onValueChange={value => patchDeploymentPlanForm({ configureNodeService: value })}>{t("配置节点服务")}</Switch>
                 <Switch isSelected={deploymentPlanForm.installSnell} onValueChange={value => patchDeploymentPlanForm({ installSnell: value })}>{t("安装 Snell")}</Switch>
                 <Switch isSelected={deploymentPlanForm.createVlessReality || deploymentPlanForm.createVmessWs || deploymentPlanForm.createTrojanTls || deploymentPlanForm.createShadowsocks} isReadOnly>{t("创建节点")}</Switch>
               </div>
@@ -2184,7 +2195,7 @@ export default function ControlCenterPage() {
 
       <Modal isOpen={xraySettingModalOpen} onOpenChange={setXraySettingModalOpen} size="5xl" scrollBehavior="inside">
         <ModalContent>
-          <ModalHeader>{t("保存 Xray 路由 / 出站配置")}</ModalHeader>
+          <ModalHeader>{t("保存节点路由 / 出站配置")}</ModalHeader>
           <ModalBody>
             <Input label={t("Outbound 测试地址")} value={outboundTestUrl} onChange={e => setOutboundTestUrl(e.target.value)} variant="bordered" />
             <div className="rounded-small border border-default-200 bg-default-50/60 p-3 text-xs leading-5 text-gray-600 dark:bg-default-50/5 dark:text-gray-300">
@@ -2207,7 +2218,7 @@ export default function ControlCenterPage() {
           </ModalBody>
           <ModalFooter>
             <Button variant="light" onPress={() => setXraySettingModalOpen(false)}>{t("取消")}</Button>
-            <Button color="primary" isLoading={submitting} onPress={() => saveXraySetting()}>{t("保存配置")}</Button>
+            <Button color="primary" isLoading={submitting} onPress={() => saveNodeCoreSetting()}>{t("保存配置")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

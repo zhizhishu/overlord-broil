@@ -315,7 +315,7 @@ export interface DeployTask {
   status: number;
 }
 
-export interface XrayRuntimeTrafficSnapshot {
+export interface NodeCoreTrafficSnapshot {
   id: number;
   serverId: number;
   serverName?: string;
