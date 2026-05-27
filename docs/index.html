@@ -32,8 +32,8 @@
           <article class="card"><h3>安装主控</h3><p>安装脚本会创建 <code>/opt/overlord-broil/.env</code>, 下载 compose 和 <code>overlord.sql</code>, 然后拉取或构建 <code>overlord-master</code> 单体镜像.</p><pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh | sudo bash</code></pre></article>
           <article class="card"><h3>SQLite 轻量模式</h3><p>小规模烟测可跳过 MySQL sidecar. 迁移旧分离栈时, 脚本会停掉旧容器, SQLite 模式也会停掉旧 <code>gost-mysql</code> 容器, 但保留卷和旧文件.</p><pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh \
   | sudo env OB_DB_MODE="sqlite" OB_FRONTEND_PORT="5166" bash</code></pre></article>
-          <article class="card"><h3>安装被控 Agent</h3><p>先在主控创建服务器并复制 token. Agent 无需开放管理端口, 它会主动轮询主控并执行任务.</p><pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent.sh \
-  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash</code></pre></article>
+          <article class="card"><h3>安装被控 Agent</h3><p>先在主控创建服务器并点击加入命令. Agent 使用一条 join token 命令加入, 无需开放管理端口.</p><pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent-bootstrap.sh \
+  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_JOIN_TOKEN="paste-join-token-here" sh</code></pre></article>
           <article class="card"><h3>迁移旧部署</h3><p>安装 / 升级会移除 <code>vite-frontend</code>, <code>springboot-backend</code>, <code>gost-phpmyadmin</code> 等旧分离栈容器, 避免 <code>80/6365/8066</code> 继续暴露.</p><pre class="runbook"><code>sudo /opt/overlord-broil/install-master.sh upgrade</code></pre></article>
         </div>
       </section>

@@ -39,6 +39,12 @@ public class ControlServer extends BaseEntity {
 
     private String apiToken;
 
+    private String joinToken;
+
+    private Long joinTokenExpiresAt;
+
+    private Long joinTokenUsedAt;
+
     private Integer allowInsecure;
 
     private String agentVersion;

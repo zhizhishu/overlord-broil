@@ -70,25 +70,25 @@ sudo bash /opt/overlord-broil/install-master.sh uninstall --yes
 
 ## Install Controlled Agent
 
-Create a server in the control center, copy the generated token command, then run:
+Create a server in the control center, click `Join Command` on the server card, then run the generated one-line command. The command uses a short-lived join token; the agent registers itself and stores the internal server id/token locally.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent.sh \
-  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash
+  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_JOIN_TOKEN="paste-join-token-here" bash
 ```
 
 Alpine or minimal systems:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent-bootstrap.sh \
-  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" sh
+  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_JOIN_TOKEN="paste-join-token-here" sh
 ```
 
 Preflight:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent.sh \
-  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
+  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_JOIN_TOKEN="paste-join-token-here" bash -s -- doctor
 ```
 
 ## Runtime Providers
@@ -109,7 +109,7 @@ Dangerous actions, including agent uninstall and runtime-port closure, require e
 
 1. Open `http://MASTER_IP:5166`.
 2. Register each controlled server.
-3. Install the controlled agent with the generated token command.
+3. Install the controlled agent with the generated join command.
 4. Wait for heartbeat.
 5. Select one or more servers.
 6. Run deployments for Xray Runtime, Xray starter nodes, Snell, certificates, firewall checks or remote forwarding.

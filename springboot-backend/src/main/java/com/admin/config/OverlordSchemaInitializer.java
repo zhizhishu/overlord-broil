@@ -66,6 +66,9 @@ public class OverlordSchemaInitializer implements ApplicationRunner {
                   `ssh_port` int(10) DEFAULT '22',
                   `ssh_user` varchar(100) DEFAULT 'root',
                   `api_token` varchar(100) NOT NULL,
+                  `join_token` varchar(512) DEFAULT NULL,
+                  `join_token_expires_at` bigint(20) DEFAULT NULL,
+                  `join_token_used_at` bigint(20) DEFAULT NULL,
                   `allow_insecure` int(1) NOT NULL DEFAULT '0',
                   `agent_version` varchar(100) DEFAULT NULL,
                   `xray_version` varchar(100) DEFAULT NULL,
@@ -287,6 +290,9 @@ public class OverlordSchemaInitializer implements ApplicationRunner {
         ensureMysqlColumn("control_server", "ssh_port", "int(10) DEFAULT '22'");
         ensureMysqlColumn("control_server", "ssh_user", "varchar(100) DEFAULT 'root'");
         ensureMysqlColumn("control_server", "api_token", "varchar(100) NOT NULL DEFAULT ''");
+        ensureMysqlColumn("control_server", "join_token", "varchar(512) DEFAULT NULL");
+        ensureMysqlColumn("control_server", "join_token_expires_at", "bigint(20) DEFAULT NULL");
+        ensureMysqlColumn("control_server", "join_token_used_at", "bigint(20) DEFAULT NULL");
         ensureMysqlColumn("control_server", "allow_insecure", "int(1) NOT NULL DEFAULT '0'");
         ensureMysqlColumn("control_server", "agent_version", "varchar(100) DEFAULT NULL");
         ensureMysqlColumn("control_server", "xray_version", "varchar(100) DEFAULT NULL");
@@ -372,6 +378,9 @@ public class OverlordSchemaInitializer implements ApplicationRunner {
         ensureSqliteColumn("control_server", "ssh_port", "INTEGER DEFAULT 22");
         ensureSqliteColumn("control_server", "ssh_user", "TEXT DEFAULT 'root'");
         ensureSqliteColumn("control_server", "api_token", "TEXT NOT NULL DEFAULT ''");
+        ensureSqliteColumn("control_server", "join_token", "TEXT");
+        ensureSqliteColumn("control_server", "join_token_expires_at", "INTEGER");
+        ensureSqliteColumn("control_server", "join_token_used_at", "INTEGER");
         ensureSqliteColumn("control_server", "allow_insecure", "INTEGER NOT NULL DEFAULT 0");
         ensureSqliteColumn("control_server", "agent_version", "TEXT");
         ensureSqliteColumn("control_server", "xray_version", "TEXT");

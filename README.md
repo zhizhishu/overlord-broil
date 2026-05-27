@@ -129,27 +129,27 @@ sudo bash /opt/overlord-broil/install-master.sh uninstall --yes
 
 ## Controlled Agent Install
 
-Create a server in the master control center, then use the server card `Token` action to get `OB_SERVER_ID` and `OB_AGENT_TOKEN`.
+Create a server in the master control center, then use the server card `Join Command` action. The master generates a one-line install command with `OB_MASTER_URL` and a short-lived `OB_JOIN_TOKEN`; the controlled host exchanges it for its internal server id and agent token automatically.
 
 Install the controlled agent on that host:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent.sh \
-  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash
+  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_JOIN_TOKEN="paste-join-token-here" bash
 ```
 
 Alpine or minimal images:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent-bootstrap.sh \
-  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" sh
+  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_JOIN_TOKEN="paste-join-token-here" sh
 ```
 
 Preflight:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent.sh \
-  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="paste-agent-token-here" bash -s -- doctor
+  | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_JOIN_TOKEN="paste-join-token-here" bash -s -- doctor
 ```
 
 The agent runs through systemd or OpenRC, claims tasks from the master, executes them locally and reports results back.
@@ -159,7 +159,7 @@ The agent runs through systemd or OpenRC, claims tasks from the master, executes
 1. Install the master and open `http://MASTER_IP:5166`.
 2. Log in and open the master control center.
 3. Register each controlled server.
-4. Install the agent with the generated token command.
+4. Install the agent with the generated join command.
 5. Wait for heartbeat.
 6. Select one or more servers and create deployment plans:
    - install or reuse Xray Runtime
@@ -217,6 +217,7 @@ Core task flow:
 POST /api/v1/control-server/create
 POST /api/v1/control-server/list
 POST /api/v1/control-server/token
+POST /api/v1/control-server/install-command
 POST /api/v1/control-server/heartbeat
 POST /api/v1/deploy-task/create
 POST /api/v1/deploy-task/plans

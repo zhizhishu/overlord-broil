@@ -29,3 +29,14 @@
 - Validation: Docker Maven backend package build passed with tests skipped.
 - Release: pushed commit `75a99c2` to `main` and `future`; GitHub Actions `CI` and `Docker Images` succeeded on both branches, and Pages succeeded on `main`.
 - Release: upgraded `isrco-hk` with the new `latest` image; local and public captcha checks returned `200`.
+
+## 2026-05-27 Broil Join And Node Flow
+
+- Completed: added `/api/v1/agent-join/register` and changed server-card join commands to short-lived `OB_JOIN_TOKEN` self-registration.
+- Completed: new server creation now immediately opens the full install command so the controlled host can be joined with one copied command.
+- Completed: protocol-node creation now auto-generates UUID, Reality private key, Reality short id, Trojan/SS password and Snell PSK instead of leaving placeholder values for the user.
+- Completed: protocol-node creation UI now hides passing checks and keeps only actionable warnings visible.
+- Completed: kept Snell in the unified protocol-node flow while preserving agent execution and result reporting.
+- Completed: replaced verbose request/response logging with sanitized logging that masks tokens, passwords, PSK, private keys, scripts and response data.
+- Docs: updated README, README.zh-CN, operations docs and Pages copy for the join-command flow.
+- Validation: frontend build, Docker Maven package, shell syntax, agent mock, SQLite schema, install matrix for Debian/Ubuntu/Alpine/Rocky/Oracle Linux and `git diff --check` passed.

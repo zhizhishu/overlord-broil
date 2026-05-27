@@ -1,6 +1,8 @@
 package com.admin.service.impl;
 
 import cn.hutool.core.util.IdUtil;
+import com.admin.common.dto.AgentJoinRequestDto;
+import com.admin.common.dto.AgentJoinResponseDto;
 import com.admin.common.dto.ControlServerDto;
 import com.admin.common.dto.ControlServerHeartbeatDto;
 import com.admin.common.dto.ControlServerUpdateDto;
@@ -24,6 +26,8 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
 
     private static final int STATUS_ACTIVE = 1;
     private static final int STATUS_ERROR = -1;
+    private static final long JOIN_TOKEN_TTL_MS = 24 * 60 * 60 * 1000L;
+    private static final String AGENT_BOOTSTRAP_URL = "https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent-bootstrap.sh";
 
     @Resource
     private MonitorAlertService monitorAlertService;
@@ -97,6 +101,72 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
             return R.err("server not found");
         }
         return R.ok(secretCryptoUtils.decryptIfNeeded(server.getApiToken()));
+    }
+
+    @Override
+    public R getServerInstallCommand(Long id, String masterUrl) {
+        ControlServer server = this.getById(id);
+        if (server == null) {
+            return R.err("server not found");
+        }
+        String normalizedMasterUrl = normalizeMasterUrl(masterUrl);
+        if (normalizedMasterUrl == null || normalizedMasterUrl.trim().isEmpty()) {
+            return R.err("master url is unavailable; open the console through its public 5166 address and try again");
+        }
+        String joinToken = IdUtil.simpleUUID() + IdUtil.simpleUUID();
+        ControlServer update = new ControlServer();
+        update.setId(server.getId());
+        update.setJoinToken(secretCryptoUtils.encryptIfNeeded(joinToken));
+        update.setJoinTokenExpiresAt(System.currentTimeMillis() + JOIN_TOKEN_TTL_MS);
+        update.setJoinTokenUsedAt(null);
+        update.setUpdatedTime(System.currentTimeMillis());
+        if (!this.updateById(update)) {
+            return R.err("join token create failed");
+        }
+        String command = "curl -fsSL " + shellQuote(AGENT_BOOTSTRAP_URL)
+                + " | env OB_MASTER_URL=" + shellQuote(normalizedMasterUrl)
+                + " OB_JOIN_TOKEN=" + shellQuote(joinToken)
+                + " sh";
+
+        return R.ok(command);
+    }
+
+    @Override
+    public R joinAgent(AgentJoinRequestDto dto) {
+        String token = dto.getJoinToken() == null ? "" : dto.getJoinToken().trim();
+        if (token.isEmpty()) {
+            return R.err(401, "invalid join token");
+        }
+        long now = System.currentTimeMillis();
+        ControlServer server = findByJoinToken(token, now);
+        if (server == null) {
+            return R.err(401, "invalid or expired join token");
+        }
+        String agentToken = secretCryptoUtils.decryptIfNeeded(server.getApiToken());
+        if (agentToken == null || agentToken.trim().isEmpty()) {
+            agentToken = IdUtil.simpleUUID();
+        }
+
+        ControlServer update = new ControlServer();
+        update.setId(server.getId());
+        update.setApiToken(secretCryptoUtils.encryptIfNeeded(agentToken));
+        update.setHost(firstNotBlank(dto.getHost(), dto.getHostname(), server.getHost()));
+        update.setEndpoint(firstNotBlank(dto.getEndpoint(), server.getEndpoint()));
+        update.setAgentVersion(firstNotBlank(dto.getAgentVersion(), server.getAgentVersion()));
+        update.setMemoryTotalMb(dto.getMemoryTotalMb() == null ? server.getMemoryTotalMb() : dto.getMemoryTotalMb());
+        update.setJoinTokenUsedAt(now);
+        update.setLastError(null);
+        update.setStatus(STATUS_ACTIVE);
+        update.setUpdatedTime(now);
+        if (!this.updateById(update)) {
+            return R.err("agent join failed");
+        }
+
+        AgentJoinResponseDto response = new AgentJoinResponseDto();
+        response.setServerId(server.getId());
+        response.setServerName(server.getName());
+        response.setAgentToken(agentToken);
+        return R.ok(response);
     }
 
     @Override
@@ -183,7 +253,36 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         if (copy.getXrayRuntimeTwoFactorCode() != null && !copy.getXrayRuntimeTwoFactorCode().isEmpty()) {
             copy.setXrayRuntimeTwoFactorCode("******");
         }
+        copy.setJoinToken(null);
         return copy;
+    }
+
+    private ControlServer findByJoinToken(String joinToken, long now) {
+        for (ControlServer server : this.list()) {
+            if (server == null || server.getJoinToken() == null || server.getJoinTokenExpiresAt() == null) {
+                continue;
+            }
+            if (server.getJoinTokenExpiresAt() < now) {
+                continue;
+            }
+            String current = secretCryptoUtils.decryptIfNeeded(server.getJoinToken());
+            if (joinToken.equals(current)) {
+                return server;
+            }
+        }
+        return null;
+    }
+
+    private String firstNotBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.trim().isEmpty()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private String maskSecret(String value, String fallback) {
@@ -194,6 +293,27 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
             return fallback;
         }
         return value.substring(0, 4) + "****" + value.substring(value.length() - 4);
+    }
+
+    private String normalizeMasterUrl(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return trimmed;
+        }
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            return trimmed.replaceAll("/+$", "");
+        }
+        return ("http://" + trimmed).replaceAll("/+$", "");
+    }
+
+    private String shellQuote(String value) {
+        if (value == null) {
+            return "''";
+        }
+        return "'" + value.replace("'", "'\"'\"'") + "'";
     }
 
     private void encryptSecrets(ControlServer server) {

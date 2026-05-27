@@ -28,6 +28,7 @@ import {
   deleteXrayRuntimeInbound,
   ensureDefaultProtocolProfiles,
   getControlServerList,
+  getControlServerInstallCommand,
   getControlServerToken,
   getDeployTaskList,
   getDeployTaskScript,
@@ -783,6 +784,28 @@ const withOutboundTag = (payload: any, outboundTag: string) => {
 const isPlaceholderValue = (value?: string) => {
   const normalized = (value || "").trim().toLowerCase();
   return !normalized || normalized.includes("replace-") || normalized === "password" || normalized === "psk";
+};
+
+const withGeneratedProtocolNodeSecrets = (form: ProtocolNodeForm): ProtocolNodeForm => {
+  const next = { ...form };
+  if ((next.protocol === "vless" || next.protocol === "vmess") && isPlaceholderValue(next.clientId)) {
+    next.clientId = randomUuid();
+  }
+  if ((next.protocol === "trojan" || next.protocol === "shadowsocks") && isPlaceholderValue(next.clientPassword)) {
+    next.clientPassword = randomToken(24);
+  }
+  if (next.protocol === "vless" && next.security === "reality") {
+    if (isPlaceholderValue(next.realityPrivateKey)) {
+      next.realityPrivateKey = randomRealityPrivateKey();
+    }
+    if (!next.realityShortId.trim()) {
+      next.realityShortId = randomHex(8);
+    }
+  }
+  if (next.protocol === "snell" && isPlaceholderValue(next.snellPsk)) {
+    next.snellPsk = randomToken(32);
+  }
+  return next;
 };
 
 const protocolNodePayloadPreview = (form: ProtocolNodeForm) => JSON.stringify(
@@ -1704,7 +1727,7 @@ export default function ControlCenterPage() {
     const protocol = (node?.protocol || "vless") as ProtocolNodeForm["protocol"];
     const engine = (node?.engine || (protocol === "snell" ? "snell" : "xray")) as ProtocolNodeForm["engine"];
     const savedConfig = safeJsonParse(node?.configJson);
-    setProtocolNodeForm({
+    setProtocolNodeForm(withGeneratedProtocolNodeSecrets({
       ...blankProtocolNodeForm,
       id: node?.id,
       serverId: node?.serverId || server?.id || servers[0]?.id || null,
@@ -1716,7 +1739,7 @@ export default function ControlCenterPage() {
       transport: node?.transport === "ws" ? "ws" : "tcp",
       security: (node?.security as ProtocolNodeForm["security"]) || (protocol === "snell" ? "psk" : protocol === "vless" ? "reality" : protocol === "trojan" ? "tls" : "none"),
       outboundTag: typeof savedConfig?.outboundTag === "string" ? savedConfig.outboundTag : ""
-    });
+    }));
     setProtocolNodePreviewOpen(false);
     setProtocolNodeModalOpen(true);
   };
@@ -1727,11 +1750,11 @@ export default function ControlCenterPage() {
 
   const updateProtocolNodeProtocol = (protocol: ProtocolNodeForm["protocol"]) => {
     const defaults: Record<ProtocolNodeForm["protocol"], Partial<ProtocolNodeForm>> = {
-      vless: { protocol, engine: "xray", name: "ob-vless", port: 443, transport: "tcp", security: "reality", flow: "xtls-rprx-vision" },
-      vmess: { protocol, engine: "xray", name: "ob-vmess", port: 2086, transport: "ws", security: "none", flow: "" },
-      trojan: { protocol, engine: "xray", name: "ob-trojan", port: 8443, transport: "tcp", security: "tls", flow: "" },
-      shadowsocks: { protocol, engine: "xray", name: "ob-shadowsocks", port: 8388, transport: "tcp", security: "none", flow: "" },
-      snell: { protocol, engine: "snell", name: "ob-snell", listen: "::0", port: 8390, transport: "tcp", security: "psk", flow: "" }
+      vless: { protocol, engine: "xray", name: "ob-vless", port: 443, transport: "tcp", security: "reality", flow: "xtls-rprx-vision", clientId: randomUuid(), realityPrivateKey: randomRealityPrivateKey(), realityShortId: randomHex(8) },
+      vmess: { protocol, engine: "xray", name: "ob-vmess", port: 2086, transport: "ws", security: "none", flow: "", clientId: randomUuid() },
+      trojan: { protocol, engine: "xray", name: "ob-trojan", port: 8443, transport: "tcp", security: "tls", flow: "", clientPassword: randomToken(24) },
+      shadowsocks: { protocol, engine: "xray", name: "ob-shadowsocks", port: 8388, transport: "tcp", security: "none", flow: "", clientPassword: randomToken(24) },
+      snell: { protocol, engine: "snell", name: "ob-snell", listen: "::0", port: 8390, transport: "tcp", security: "psk", flow: "", snellPsk: randomToken(32) }
     };
     patchProtocolNodeForm(defaults[protocol]);
   };
@@ -1812,6 +1835,9 @@ export default function ControlCenterPage() {
     if (res.code === 0) {
       toast.success(serverForm.id ? t("服务器已更新") : t("服务器已添加"));
       setServerModalOpen(false);
+      if (!serverForm.id && res.data?.id) {
+        await showServerInstallCommand(res.data);
+      }
       loadData();
     } else {
       toast.error(res.msg || t("保存服务器失败"));
@@ -1838,58 +1864,60 @@ export default function ControlCenterPage() {
   };
 
   const saveProtocolNode = async () => {
-    if (!protocolNodeForm.serverId) {
+    const form = withGeneratedProtocolNodeSecrets(protocolNodeForm);
+    setProtocolNodeForm(form);
+    if (!form.serverId) {
       toast.error(t("请选择目标服务器"));
       return;
     }
-    if (!protocolNodeForm.name.trim()) {
+    if (!form.name.trim()) {
       toast.error(t("请填写节点名称"));
       return;
     }
-    if (!protocolNodeForm.port || protocolNodeForm.port < 1 || protocolNodeForm.port > 65535) {
+    if (!form.port || form.port < 1 || form.port > 65535) {
       toast.error(t("节点端口不合法"));
       return;
     }
-    if (protocolNodeForm.protocol !== "snell" && isNanoCriticalServer(selectedProtocolServer)) {
+    if (form.protocol !== "snell" && isNanoCriticalServer(selectedProtocolServer)) {
       toast.error(t("Nano 被控低于 200MB，不支持创建 Xray 入站节点；请改用 Snell 或远端端口转发。"));
       return;
     }
 
-    const isSnell = protocolNodeForm.protocol === "snell";
+    const isSnell = form.protocol === "snell";
     const payload = isSnell ? undefined : withOutboundTag(
-      buildInboundPayloadFromForm(inboundFormFromNodeForm(protocolNodeForm)),
-      protocolNodeForm.outboundTag
+      buildInboundPayloadFromForm(inboundFormFromNodeForm(form)),
+      form.outboundTag
     );
     const requestPayload = isSnell ? {
-      id: protocolNodeForm.id,
-      serverId: protocolNodeForm.serverId,
-      name: protocolNodeForm.name,
+      id: form.id,
+      serverId: form.serverId,
+      name: form.name,
       protocol: "snell",
       engine: "snell",
       direction: "inbound",
-      listen: protocolNodeForm.listen || "::0",
-      port: protocolNodeForm.port,
+      listen: form.listen || "::0",
+      port: form.port,
       transport: "tcp",
       security: "psk",
-      credentialJson: JSON.stringify({ psk: protocolNodeForm.snellPsk }),
-      configJson: JSON.stringify({ version: protocolNodeForm.snellVersion || "v4.1.1" })
+      credentialJson: JSON.stringify({ psk: form.snellPsk }),
+      configJson: JSON.stringify({ version: form.snellVersion || "v4.1.1" })
     } : {
-      id: protocolNodeForm.id,
-      serverId: protocolNodeForm.serverId,
-      name: protocolNodeForm.name,
-      protocol: protocolNodeForm.protocol,
+      id: form.id,
+      serverId: form.serverId,
+      name: form.name,
+      protocol: form.protocol,
       engine: "xray",
       direction: "inbound",
-      listen: protocolNodeForm.listen,
-      port: protocolNodeForm.port,
-      transport: protocolNodeForm.transport,
-      security: protocolNodeForm.security,
+      listen: form.listen,
+      port: form.port,
+      transport: form.transport,
+      security: form.security,
       configJson: JSON.stringify(payload),
       payload
     };
 
     setSubmitting(true);
-    const res = protocolNodeForm.id ? await updateProtocolNode(requestPayload) : await createProtocolNode(requestPayload);
+    const res = form.id ? await updateProtocolNode(requestPayload) : await createProtocolNode(requestPayload);
     setSubmitting(false);
 
     if (res.code === 0) {
@@ -2213,6 +2241,17 @@ export default function ControlCenterPage() {
       if (rotate) loadData();
     } else {
       toast.error(res.msg || t("读取 token 失败"));
+    }
+  };
+
+  const showServerInstallCommand = async (server: ControlServer) => {
+    const res = await getControlServerInstallCommand(server.id);
+    if (res.code === 0) {
+      setScriptTitle(t("{name} 被控加入命令", { name: server.name }));
+      setScriptText(res.data || "");
+      setScriptModalOpen(true);
+    } else {
+      toast.error(res.msg || t("生成被控加入命令失败"));
     }
   };
 
@@ -3326,6 +3365,7 @@ export default function ControlCenterPage() {
                     </ServerActionGroup>
                     <ServerActionGroup title="管理">
                       <Button size="sm" variant="flat" onPress={() => openServerModal(server)}>{t("编辑")}</Button>
+                      <Button size="sm" color="primary" variant="flat" onPress={() => showServerInstallCommand(server)}>{t("加入命令")}</Button>
                       <Button size="sm" variant="flat" onPress={() => showServerToken(server)}>Token</Button>
                       <Button size="sm" variant="flat" color="warning" onPress={() => showServerToken(server, true)}>{t("轮换")}</Button>
                       <Button size="sm" variant="light" color="danger" onPress={() => removeServer(server)}>{t("删除")}</Button>
@@ -3610,7 +3650,12 @@ export default function ControlCenterPage() {
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-                  {protocolNodeChecks.map((check, index) => (
+                  {protocolNodeChecks.filter(check => check.state !== "ok").length === 0 && (
+                    <div className="rounded-small border border-success-200 bg-success-50/70 px-3 py-2 text-xs text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-300">
+                      {t("关键参数已就绪，凭据会自动生成，保存后由 Agent 执行。")}
+                    </div>
+                  )}
+                  {protocolNodeChecks.filter(check => check.state !== "ok").map((check, index) => (
                     <div key={`${check.label}-${index}`} className="rounded-small border border-default-200 bg-white/70 px-3 py-2 dark:bg-default-50/5">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">{check.label}</span>

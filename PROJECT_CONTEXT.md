@@ -19,6 +19,7 @@ Overlord Broil is an independent master/agent operations console for multi-serve
 - `springboot-backend/src/main/java/com/admin/runtime`: Runtime Provider registry, action catalog and assignment logic.
 - `scripts/install-master.sh`: master install, doctor, backup, restore, upgrade and uninstall.
 - `scripts/install-agent.sh` and `scripts/overlord-agent.sh`: controlled-agent install and task runner.
+- `POST /api/v1/agent-join/register`: unauthenticated controlled-agent join endpoint guarded by a short-lived high-entropy join token generated from the authenticated control center.
 - `vite-frontend/src/pages/control-center.tsx`: main operations console.
 - `vite-frontend/src/i18n/index.tsx`: `zh-CN` / `en-US` dictionary.
 

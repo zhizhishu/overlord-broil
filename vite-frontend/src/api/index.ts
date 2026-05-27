@@ -40,6 +40,7 @@ export const getControlServerList = () => Network.post("/control-server/list");
 export const updateControlServer = (data: any) => Network.post("/control-server/update", data);
 export const deleteControlServer = (id: number) => Network.post("/control-server/delete", { id });
 export const getControlServerToken = (id: number) => Network.post("/control-server/token", { id });
+export const getControlServerInstallCommand = (id: number) => Network.post("/control-server/install-command", { id });
 export const rotateControlServerToken = (id: number) => Network.post("/control-server/rotate-token", { id });
 
 // Xray Runtime / Snell 协议模板

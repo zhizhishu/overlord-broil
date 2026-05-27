@@ -296,6 +296,7 @@ const en: Record<string, string> = {
   "Inbound Payload 预览": "Inbound payload preview",
   "配置体检": "Configuration checks",
   "保存前检查目标服务器、端口、凭据和协议关键参数。": "Check the target server, port, credentials and protocol-critical fields before saving.",
+  "关键参数已就绪，凭据会自动生成，保存后由 Agent 执行。": "Key parameters are ready. Credentials are generated automatically and the Agent will execute after saving.",
   "未选择服务器": "No server selected",
   "{ok}/{total} 通过": "{ok}/{total} passed",
   "通过": "Passed",

@@ -2,45 +2,42 @@
 
 ## Current Goal
 
-Fix the HK master login captcha/database failure, harden old-database upgrades, and push the installable fix to `main` and `future`.
+Close the Broil product flow for urgent use: simpler controlled-agent joining, easier protocol node creation, Snell as a first-class agent-executed node, and safer logs.
 
 ## Authorization
 
-- Local Docker, GitHub Actions, Browser MCP, Serena Pool, ACE and subagents are allowed for validation.
+- Local Docker, GitHub Actions, Browser MCP, Serena Pool, ACE, CodeSandbox skill and subagents are allowed for validation.
 - Termius access to `isrco-hk` is allowed when real-host verification is needed.
 - Do not expose tokens, cookies, private keys, Xray Runtime secrets, Snell PSK values or generated agent tokens in logs, docs or final replies.
 
 ## Completed This Round
 
-- Restored `isrco-hk` MySQL service and restarted `overlord-master`.
-- Repaired the retained HK MySQL schema by adding missing Runtime columns and the traffic snapshot table.
-- Verified public frontend and captcha status endpoint now return `200`.
-- Replaced the narrow audit-table initializer with an Overlord schema initializer that creates missing product tables, adds missing `control_server` columns, and migrates old runtime column values into the current fields.
-
-## In Progress
-
-- None.
-
-## Remaining
-
-1. Monitor the next real install/upgrade run for any other retained-database edge cases.
+- Added `/api/v1/agent-join/register` and short-lived join-token install commands so each controlled host can join with one command.
+- Added frontend `Join Command` action and auto-opened the install command after creating a controlled server.
+- Simplified protocol-node creation by auto-generating UUID, Trojan/SS password, Reality private key, Reality short id and Snell PSK when the user leaves placeholders.
+- Simplified the protocol-node modal so it shows only missing/warning checks instead of a full wall of passing checks.
+- Kept Snell in the same protocol-node creation flow, backed by the existing agent task execution and status report path.
+- Replaced request/response logging with a sanitized logger that masks tokens, passwords, PSK, private keys, scripts, stdout/stderr and response data.
+- Updated README, Chinese README, operations docs and GitHub Pages text for the generated join-command flow.
 
 ## Validation Status
 
-- Passed: HK public frontend `200`.
-- Passed: HK public captcha check `200`, body reports success.
-- Passed: HK compose shows `overlord-master` and `overlord-mysql` healthy.
+- Passed: `npm run build` in `vite-frontend`.
 - Passed: Docker Maven backend package build with tests skipped.
-- Passed: shell syntax and bootstrap syntax through `bash -n`.
-- Passed: `scripts/test-sqlite-schema.sh`.
+- Passed: `bash -n scripts/*.sh`.
+- Passed: `bash scripts/test-agent-mock.sh`.
+- Passed: `bash scripts/test-sqlite-schema.sh`.
+- Passed: `bash scripts/test-install-matrix.sh` across Debian 12, Ubuntu 24.04, Alpine 3.20, Rocky Linux 9 and Oracle Linux 9 userspaces.
 - Passed: `git diff --check`.
-- Passed: pushed `75a99c2` to `origin/main` and `origin/future`.
-- Passed: GitHub Actions `CI` and `Docker Images` succeeded on both `main` and `future`; Pages deployment succeeded on `main`.
-- Passed: HK upgraded to the new `ghcr.io/zhizhishu/overlord-broil:latest` image with `docker compose pull master && docker compose up -d`.
-- Passed: HK local and public frontend/captcha checks return `200`.
+
+## Remaining
+
+1. Commit and push the current changes to GitHub.
+2. Let GitHub Actions build the public image.
+3. Pull the new image on `isrco-hk` and run a browser/HK smoke if the user wants another real-host proof cycle.
 
 ## Risks
 
+- The join flow is now server-card based self-registration: the server record is created first, then the agent exchanges `OB_JOIN_TOKEN` for internal credentials automatically.
 - Xray Runtime connector paths are internal service contracts and must not be blindly renamed.
-- `isrco-hk` is a real server. Any temporary Snell or Xray Runtime test node must use high ports and be cleaned after validation.
 - Local host has no native Java/Maven; backend validation uses Docker Maven and is slow on the Windows bind mount.

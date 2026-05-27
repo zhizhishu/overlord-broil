@@ -1,22 +1,26 @@
 package com.admin.common.aop;
 
-
-import cn.hutool.core.util.ArrayUtil;
-import com.admin.common.utils.JwtUtil;
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.admin.common.utils.HttpContextUtils;
 import com.admin.common.utils.IpUtils;
+import com.admin.common.utils.JwtUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
-import org.aspectj.lang.annotation.*;
+import org.aspectj.lang.annotation.AfterReturning;
+import org.aspectj.lang.annotation.AfterThrowing;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.CodeSignature;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.stereotype.Component;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.HashMap;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Component
@@ -24,170 +28,144 @@ import java.util.Map;
 @Slf4j
 public class LogAspect {
 
+    private static final String MASK = "******";
+
     @Pointcut("@annotation(com.admin.common.aop.LogAnnotation)")
     public void pt() {
-
     }
 
-    /**
-     * 返回后通知（@AfterReturning）：在某连接点（joinpoint）
-     * 正常完成后执行的通知：例如，一个方法没有抛出任何异常，正常返回
-     * 方法执行完毕之后
-     * 注意在这里不能使用ProceedingJoinPoint
-     * 不然会报错ProceedingJoinPoint is only supported for around advice
-     * crmAspect()指向需要控制的方法
-     * returning  注解返回值
-     *
-     * @param joinPoint
-     * @param returnValue 返回值
-     * @throws Exception
-     */
     @AfterReturning(value = "pt()", returning = "returnValue")
-    public void log(JoinPoint joinPoint, Object returnValue) throws Throwable {
-        // 获取请求信息
-        HttpServletRequest request = HttpContextUtils.getHttpServletRequest();
-        
-        // 获取请求方法类型（POST/GET等）
-        String requestMethod = request.getMethod();
-        
-        // 获取用户ID
-        String authorization = request.getHeader("Authorization") + "";
-        Object user_id = "未登录"; // 请求用户的id
-        if (!authorization.equals("null")) {
-            user_id = JwtUtil.getUserIdFromToken(authorization);
+    public void log(JoinPoint joinPoint, Object returnValue) {
+        try {
+            HttpServletRequest request = HttpContextUtils.getHttpServletRequest();
+            String controllerMethod = controllerMethod(joinPoint);
+            log.info("request log userId=[{}], ip=[{}], method=[{}], handler=[{}], request=[{}], response=[{}]",
+                    userId(request),
+                    IpUtils.getIpAddr(request),
+                    request == null ? "" : request.getMethod(),
+                    controllerMethod,
+                    safeJson(requestParams(joinPoint)),
+                    safeJson(returnValue));
+        } catch (Exception e) {
+            log.warn("request log failed: {}", e.getMessage());
         }
-        
-        // 获取请求IP
-        String ipAddr = IpUtils.getIpAddr(request);
-        
-        // 获取方法签名信息
-        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
-        Method method = signature.getMethod();
-        
-        // 获取控制器方法名
-        String className = joinPoint.getTarget().getClass().getName();
-        String methodName = signature.getName();
-        String controllerMethod = className + "." + methodName;
-        
-
-        // 获取请求参数
-        String requestParams = getRequestParams(joinPoint);
-        
-        // 获取返回参数
-        String responseParams = returnValue != null ? JSON.toJSONString(returnValue) : "无返回值";
-        
-        // 合并为一条完整的日志信息
-        String logMessage = String.format(
-            "【请求日志】用户ID:[%s], IP地址:[%s], 请求方式:[%s], 控制器方法:[%s], 请求参数:[%s], 返回参数:[%s]", user_id, ipAddr, requestMethod, controllerMethod, requestParams, responseParams
-        );
-        
-        // 打印单条完整日志
-        log.info(logMessage);
     }
 
-
-    /**
-     * 抛出异常后通知（@AfterThrowing）：方法抛出异常退出时执行的通知
-     * 注意在这里不能使用ProceedingJoinPoint
-     * 不然会报错ProceedingJoinPoint is only supported for around advice
-     * throwing注解为错误信息
-     *
-     * @param joinPoint
-     * @param ex
-     */
     @AfterThrowing(value = "pt()", throwing = "ex")
     public void recordLog(JoinPoint joinPoint, Exception ex) {
         try {
-            // 获取请求信息
             HttpServletRequest request = HttpContextUtils.getHttpServletRequest();
-            
-            // 获取请求方法类型（POST/GET等）
-            String requestMethod = request.getMethod();
-            
-            // 获取用户ID
-            String authorization = request.getHeader("Authorization") + "";
-            Object user_id = "未登录"; // 请求用户的id
-            if (!authorization.equals("null")) {
-                user_id = JwtUtil.getUserIdFromToken(authorization);
-            }
-            
-            // 获取请求IP
-            String ipAddr = IpUtils.getIpAddr(request);
-            
-            // 获取方法签名信息
-            MethodSignature signature = (MethodSignature) joinPoint.getSignature();
-            Method method = signature.getMethod();
-            
-            // 获取控制器方法名
-            String className = joinPoint.getTarget().getClass().getName();
-            String methodName = signature.getName();
-            String controllerMethod = className + "." + methodName;
-            
-
-            
-            // 获取请求参数
-            String requestParams = getRequestParams(joinPoint);
-            
-            // 获取异常信息
-            String exceptionMsg = ex != null ? ex.getMessage() : "未知异常";
-            
-            // 合并为一条完整的异常日志信息
-            String errorMessage = String.format(
-                "【异常日志】用户ID:[%s], IP地址:[%s], 请求方式:[%s], 控制器方法:[%s], 请求参数:[%s], 异常信息:[%s]", user_id, ipAddr, requestMethod, controllerMethod, requestParams, exceptionMsg
-            );
-            
-            // 打印单条完整异常日志
-            log.info(errorMessage, ex);
+            log.warn("exception log userId=[{}], ip=[{}], method=[{}], handler=[{}], request=[{}], error=[{}]",
+                    userId(request),
+                    IpUtils.getIpAddr(request),
+                    request == null ? "" : request.getMethod(),
+                    controllerMethod(joinPoint),
+                    safeJson(requestParams(joinPoint)),
+                    ex == null ? "unknown" : ex.getMessage(),
+                    ex);
         } catch (Exception e) {
-            log.info("记录异常日志时出错: {}", e.getMessage());
+            log.warn("exception log failed: {}", e.getMessage());
         }
     }
-    
-    /**
-     * 获取请求参数
-     */
-    private String getRequestParams(JoinPoint joinPoint) {
-        try {
-            Object[] args = joinPoint.getArgs();
-            if (args.length == 0) {
-                return "无参数";
-            } else if (args[0] != null && args[0].toString().contains("SecurityContextHolderAwareRequestWrapper")) {
-                return JSON.toJSONString(Arrays.toString(ArrayUtil.remove(args, 0)));
-            } else {
-                // 检查是否只有一个参数且已经是JSON字符串格式
-                if (args.length == 1 && args[0] != null) {
-                    // 如果参数本身就是字符串且是JSON格式，直接返回
-                    if (args[0] instanceof String && ((String) args[0]).startsWith("{") && ((String) args[0]).endsWith("}")) {
-                        return (String) args[0];
-                    }
-                    
-                    // 如果参数是普通对象，直接序列化
-                    try {
-                        return JSON.toJSONString(args[0]);
-                    } catch (Exception e) {
-                        // 如果序列化失败，再尝试使用参数名映射
-                        Map<String, Object> map = new HashMap<>();
-                        String[] names = ((CodeSignature) joinPoint.getSignature()).getParameterNames();
-                        if (names != null) {
-                            map.put(names[0], args[0]);
-                            return JSON.toJSONString(map);
-                        }
-                        return JSON.toJSONString(args[0]);
-                    }
-                } else {
-                    // 多个参数时，使用参数名映射
-                    Map<String, Object> map = new HashMap<>();
-                    String[] names = ((CodeSignature) joinPoint.getSignature()).getParameterNames();
-                    if (names != null) {
-                        for (int i = 0; i < names.length; i++) {
-                            map.put(names[i], args[i]);
-                        }
-                    }
-                    return JSON.toJSONString(map);
-                }
-            }
-        } catch (Exception e) {
-            return "获取参数失败: " + e.getMessage();
+
+    private String userId(HttpServletRequest request) {
+        if (request == null) {
+            return "anonymous";
         }
+        String authorization = request.getHeader("Authorization");
+        if (authorization == null || authorization.trim().isEmpty()) {
+            return "anonymous";
+        }
+        try {
+            return String.valueOf(JwtUtil.getUserIdFromToken(authorization));
+        } catch (Exception ignored) {
+            return "anonymous";
+        }
+    }
+
+    private String controllerMethod(JoinPoint joinPoint) {
+        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+        Method method = signature.getMethod();
+        return joinPoint.getTarget().getClass().getName() + "." + method.getName();
+    }
+
+    private Object requestParams(JoinPoint joinPoint) {
+        Object[] args = joinPoint.getArgs();
+        String[] names = ((CodeSignature) joinPoint.getSignature()).getParameterNames();
+        if (args == null || args.length == 0) {
+            return new LinkedHashMap<>();
+        }
+        Map<String, Object> map = new LinkedHashMap<>();
+        for (int i = 0; i < args.length; i++) {
+            Object arg = args[i];
+            if (arg instanceof HttpServletRequest || arg instanceof HttpServletResponse) {
+                continue;
+            }
+            String name = names != null && i < names.length ? names[i] : "arg" + i;
+            map.put(name, arg);
+        }
+        return map;
+    }
+
+    private String safeJson(Object value) {
+        try {
+            return JSON.toJSONString(maskSensitive(JSON.parse(JSON.toJSONString(value))));
+        } catch (Exception ignored) {
+            return String.valueOf(value);
+        }
+    }
+
+    private Object maskSensitive(Object value) {
+        if (value instanceof JSONObject) {
+            JSONObject source = (JSONObject) value;
+            JSONObject copy = new JSONObject(true);
+            for (String key : source.keySet()) {
+                copy.put(key, isSensitiveKey(key) ? MASK : maskSensitive(source.get(key)));
+            }
+            return copy;
+        }
+        if (value instanceof JSONArray) {
+            JSONArray source = (JSONArray) value;
+            JSONArray copy = new JSONArray();
+            for (Object item : source) {
+                copy.add(maskSensitive(item));
+            }
+            return copy;
+        }
+        if (value instanceof Map<?, ?>) {
+            Map<?, ?> source = (Map<?, ?>) value;
+            Map<String, Object> copy = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : source.entrySet()) {
+                String key = String.valueOf(entry.getKey());
+                copy.put(key, isSensitiveKey(key) ? MASK : maskSensitive(entry.getValue()));
+            }
+            return copy;
+        }
+        if (value instanceof Collection<?>) {
+            JSONArray copy = new JSONArray();
+            for (Object item : (Collection<?>) value) {
+                copy.add(maskSensitive(item));
+            }
+            return copy;
+        }
+        return value;
+    }
+
+    private boolean isSensitiveKey(String key) {
+        if (key == null) {
+            return false;
+        }
+        String normalized = key.toLowerCase();
+        return normalized.contains("password")
+                || normalized.contains("token")
+                || normalized.contains("secret")
+                || normalized.contains("psk")
+                || normalized.contains("privatekey")
+                || normalized.contains("twofactor")
+                || normalized.contains("authorization")
+                || normalized.equals("data")
+                || normalized.equals("script")
+                || normalized.equals("stdout")
+                || normalized.equals("stderr");
     }
 }
