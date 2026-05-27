@@ -18,6 +18,19 @@ Read these files in order before code changes, tests, service startup, or remote
 4. `TASK.md`
 5. `LOG.md` only when history or verification context is needed
 
+## Default Startup Receipt
+
+Use this exact project boundary summary when entering or continuing work in this repository:
+
+```text
+project_root: C:\Users\echo\Downloads\claude\overlord-broil
+project_type: code
+rules_loaded: global / project AGENTS / PROJECT_ID / TASK
+task_file: TASK.md
+mcp_needed: yes
+subagent_allowed: yes
+```
+
 ## Write Boundaries
 
 - Allowed write scope is this repository only.

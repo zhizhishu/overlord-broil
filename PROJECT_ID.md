@@ -6,6 +6,14 @@ project_type: code
 task_file: C:\Users\echo\Downloads\claude\overlord-broil\TASK.md
 log_file: C:\Users\echo\Downloads\claude\overlord-broil\LOG.md
 
+startup_receipt:
+  project_root: C:\Users\echo\Downloads\claude\overlord-broil
+  project_type: code
+  rules_loaded: global / project AGENTS / PROJECT_ID / TASK
+  task_file: TASK.md
+  mcp_needed: yes
+  subagent_allowed: yes
+
 serena:
   enabled: true
   required: false
