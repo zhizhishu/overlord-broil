@@ -198,7 +198,7 @@ interface ServerForwardRuleForm {
   targetPort: number;
 }
 
-type RuleKindFilter = "all" | "protocol" | "forward" | "xrayPanel";
+type RuleKindFilter = "all" | "protocol" | "forward" | "xrayRuntime";
 type RuleHealthFilter = "all" | "healthy" | "warning" | "error";
 type RuleHealth = Exclude<RuleHealthFilter, "all">;
 type FormCheckState = "ok" | "warning" | "missing";
@@ -244,20 +244,20 @@ const fallbackAction = (
 });
 
 const FALLBACK_AGENT_MAINTENANCE_ACTIONS: RuntimeProviderAction[] = [
-  fallbackAction("doctor", "诊断", "diagnostic", "xrayPanel", false, true, false),
-  fallbackAction("status", "状态", "diagnostic", "xrayPanel", false, false, false),
-  fallbackAction("logs", "日志", "diagnostic", "xrayPanel", false, true, false),
-  fallbackAction("install-diagnose", "安装诊断", "diagnostic", "xrayPanel", false, true, true),
+  fallbackAction("doctor", "诊断", "diagnostic", "xrayRuntime", false, true, false),
+  fallbackAction("status", "状态", "diagnostic", "xrayRuntime", false, false, false),
+  fallbackAction("logs", "日志", "diagnostic", "xrayRuntime", false, true, false),
+  fallbackAction("install-diagnose", "安装诊断", "diagnostic", "xrayRuntime", false, true, true),
   fallbackAction("cert-diagnose", "证书诊断", "diagnostic", "certificate", false, true, true),
   fallbackAction("firewall-diagnose", "防火墙诊断", "diagnostic", "firewall", false, true, true),
   fallbackAction("firewall-diagnose", "防火墙诊断", "diagnostic", "forward", false, true, true),
-  fallbackAction("repair-all", "一键修复", "repair", "xrayPanel", false, true, false),
-  fallbackAction("repair-xrayPanel", "修复 Xray 面板", "repair", "xrayPanel", false, true, true),
-  fallbackAction("repair-xray", "修复 Xray", "repair", "xrayPanel", false, true, true),
+  fallbackAction("repair-all", "一键修复", "repair", "xrayRuntime", false, true, false),
+  fallbackAction("repair-xray-runtime", "修复 Xray Runtime", "repair", "xrayRuntime", false, true, true),
+  fallbackAction("repair-xray", "修复 Xray", "repair", "xrayRuntime", false, true, true),
   fallbackAction("repair-snell", "修复 Snell", "repair", "snell", false, true, true),
-  fallbackAction("restart-agent", "重启 agent", "maintenance", "xrayPanel"),
-  fallbackAction("upgrade-agent", "升级 agent", "maintenance", "xrayPanel"),
-  fallbackAction("uninstall-agent", "卸载 agent", "danger", "xrayPanel", true, false, false)
+  fallbackAction("restart-agent", "重启 agent", "maintenance", "xrayRuntime"),
+  fallbackAction("upgrade-agent", "升级 agent", "maintenance", "xrayRuntime"),
+  fallbackAction("uninstall-agent", "卸载 agent", "danger", "xrayRuntime", true, false, false)
 ];
 
 const AGENT_ACTION_ORDER = [
@@ -267,7 +267,7 @@ const AGENT_ACTION_ORDER = [
   "cert-diagnose",
   "firewall-diagnose",
   "repair-all",
-  "repair-xrayPanel",
+  "repair-xray-runtime",
   "repair-xray",
   "repair-snell",
   "restart-agent",
@@ -311,7 +311,7 @@ const mergeProviderActions = (runtimeProviders: RuntimeProviderDescriptor[]) => 
 const dedupeActionsByKey = (actions: RuntimeProviderAction[]) => {
   const byKey = new Map<string, RuntimeProviderAction>();
   for (const action of actions) {
-    if (!byKey.has(action.key) || action.providerKey !== "xrayPanel") {
+    if (!byKey.has(action.key) || action.providerKey !== "xrayRuntime") {
       byKey.set(action.key, action);
     }
   }
@@ -340,7 +340,7 @@ const findProviderAction = (actions: RuntimeProviderAction[], providerKey: strin
 
 const runtimeProviderDiagnosticAction = (item: RuntimeStateOverviewItem | undefined, actions: RuntimeProviderAction[]): RuntimeProviderAction => {
   const providerKey = item?.providerKey;
-  if (providerKey === "xrayPanel") {
+  if (providerKey === "xrayRuntime") {
     return findProviderAction(actions, providerKey, "install-diagnose")
       || findProviderAction(actions, providerKey, "doctor")
       || FALLBACK_AGENT_MAINTENANCE_ACTIONS[0];
@@ -356,10 +356,10 @@ const runtimeProviderDiagnosticAction = (item: RuntimeStateOverviewItem | undefi
 };
 
 const runtimeProviderRepairAction = (item: RuntimeStateOverviewItem | undefined, actions: RuntimeProviderAction[]): RuntimeProviderAction | null => {
-  if (item?.providerKey === "xrayPanel") {
+  if (item?.providerKey === "xrayRuntime") {
     return runtimeProviderStatusNeedsRepair(item.serviceStatuses?.xray)
       ? findProviderAction(actions, item.providerKey, "repair-xray") || null
-      : findProviderAction(actions, item.providerKey, "repair-xrayPanel") || null;
+      : findProviderAction(actions, item.providerKey, "repair-xray-runtime") || null;
   }
   return actions.find(action =>
     action.providerKey === item?.providerKey &&
@@ -848,7 +848,7 @@ const runtimeStateColor = (status?: string): StatusColor => {
 };
 
 const runtimeProviderColor = (key?: string) => {
-  if (key === "xrayPanel") return "primary";
+  if (key === "xrayRuntime") return "primary";
   if (key === "snell") return "secondary";
   if (key === "forward") return "success";
   if (key === "certificate") return "warning";
@@ -1229,7 +1229,7 @@ const inboundFormFromNodeForm = (form: ProtocolNodeForm): XrayPanelInboundForm =
   ssMethod: form.ssMethod
 });
 
-export default function OrchestratorPage() {
+export default function ControlCenterPage() {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -1583,8 +1583,8 @@ export default function OrchestratorPage() {
     }));
 
     const xrayPanelRows = trafficSnapshots.map(snapshot => ({
-      id: `xrayPanel-${snapshot.id}`,
-      kind: "xrayPanel" as const,
+      id: `xrayRuntime-${snapshot.id}`,
+      kind: "xrayRuntime" as const,
       title: snapshot.inboundRemark || snapshot.email || snapshot.tag || `${snapshot.sourceType} #${snapshot.inboundId || snapshot.id}`,
       serverId: snapshot.serverId,
       serverName: serverName(snapshot.serverId, snapshot.serverName),
@@ -2104,7 +2104,7 @@ export default function OrchestratorPage() {
       protocol: "agent-maintenance",
       action: actionKey,
       requestJson: JSON.stringify({
-        source: "orchestrator-ui",
+        source: "control-center-ui",
         ...meta,
         serverId: server.id,
         serverName: server.name,
@@ -3111,7 +3111,7 @@ export default function OrchestratorPage() {
                   <SelectItem key="all">{t("全部类型")}</SelectItem>
                   <SelectItem key="protocol">{t("协议节点")}</SelectItem>
                   <SelectItem key="forward">{t("远端转发")}</SelectItem>
-                  <SelectItem key="xrayPanel">{t("入站视图")}</SelectItem>
+                  <SelectItem key="xrayRuntime">{t("入站视图")}</SelectItem>
                 </Select>
                 <Select aria-label={t("规则服务器")} selectedKeys={[ruleServerFilter]} onSelectionChange={keys => setRuleServerFilter(Array.from(keys)[0] as string)} variant="bordered" size="sm">
                   {ruleServerOptions.map(option => <SelectItem key={option.id}>{option.name}</SelectItem>)}
@@ -3243,7 +3243,7 @@ export default function OrchestratorPage() {
                       <p className="truncate">{server.endpoint || "-"}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">{t("面板入口")}</p>
+                      <p className="text-gray-500">{t("Xray Runtime 入口")}</p>
                       <p className="truncate">{server.xrayPanelEndpoint || "-"}</p>
                     </div>
                     <div>
@@ -3545,13 +3545,13 @@ export default function OrchestratorPage() {
               <Input label="SSH 端口" type="number" value={serverForm.sshPort.toString()} onChange={e => setServerForm(prev => ({ ...prev, sshPort: Number(e.target.value) || 22 }))} variant="bordered" />
               <Input label="SSH 用户" value={serverForm.sshUser} onChange={e => setServerForm(prev => ({ ...prev, sshUser: e.target.value }))} variant="bordered" />
               <Input label={t("副控 API")} value={serverForm.endpoint} onChange={e => setServerForm(prev => ({ ...prev, endpoint: e.target.value }))} variant="bordered" />
-              <Input label={t("面板地址")} value={serverForm.xrayPanelEndpoint} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelEndpoint: e.target.value }))} variant="bordered" placeholder="https://1.2.3.4:5168" />
-              <Input label={t("面板 Base Path")} value={serverForm.xrayPanelBasePath} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelBasePath: e.target.value }))} variant="bordered" placeholder="/secret-path" />
-              <Input label={t("面板 API Token")} value={serverForm.xrayPanelApiToken} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelApiToken: e.target.value }))} variant="bordered" />
-              <Input label={t("面板用户名")} value={serverForm.xrayPanelUsername} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelUsername: e.target.value }))} variant="bordered" />
-              <Input label={t("面板密码")} type="password" value={serverForm.xrayPanelPassword} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelPassword: e.target.value }))} variant="bordered" />
-              <Input label={t("面板 2FA")} value={serverForm.xrayPanelTwoFactorCode} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelTwoFactorCode: e.target.value }))} variant="bordered" />
-              <Select label={t("面板 TLS 校验")} selectedKeys={[serverForm.xrayPanelAllowInsecure.toString()]} onSelectionChange={keys => setServerForm(prev => ({ ...prev, xrayPanelAllowInsecure: Number(Array.from(keys)[0]) }))} variant="bordered">
+              <Input label={t("Xray Runtime 地址")} value={serverForm.xrayPanelEndpoint} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelEndpoint: e.target.value }))} variant="bordered" placeholder="https://1.2.3.4:5168" />
+              <Input label={t("Xray Runtime Base Path")} value={serverForm.xrayPanelBasePath} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelBasePath: e.target.value }))} variant="bordered" placeholder="/secret-path" />
+              <Input label={t("Xray Runtime API Token")} value={serverForm.xrayPanelApiToken} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelApiToken: e.target.value }))} variant="bordered" />
+              <Input label={t("Xray Runtime 用户名")} value={serverForm.xrayPanelUsername} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelUsername: e.target.value }))} variant="bordered" />
+              <Input label={t("Xray Runtime 密码")} type="password" value={serverForm.xrayPanelPassword} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelPassword: e.target.value }))} variant="bordered" />
+              <Input label={t("Xray Runtime 2FA")} value={serverForm.xrayPanelTwoFactorCode} onChange={e => setServerForm(prev => ({ ...prev, xrayPanelTwoFactorCode: e.target.value }))} variant="bordered" />
+              <Select label={t("Xray Runtime TLS 校验")} selectedKeys={[serverForm.xrayPanelAllowInsecure.toString()]} onSelectionChange={keys => setServerForm(prev => ({ ...prev, xrayPanelAllowInsecure: Number(Array.from(keys)[0]) }))} variant="bordered">
                 <SelectItem key="0">{t("校验证书")}</SelectItem>
                 <SelectItem key="1">{t("允许自签名")}</SelectItem>
               </Select>
@@ -3826,7 +3826,7 @@ export default function OrchestratorPage() {
                   {renderServerOptions()}
                 </Select>
                 <Input label={t("公网主机")} value={orchestrationForm.publicHost} onChange={e => patchOrchestrationForm({ publicHost: e.target.value })} variant="bordered" />
-                <Input label={t("面板版本")} value={orchestrationForm.xrayPanelVersion} onChange={e => patchOrchestrationForm({ xrayPanelVersion: e.target.value })} variant="bordered" placeholder={t("留空使用最新版")} />
+                <Input label={t("Xray Runtime 版本")} value={orchestrationForm.xrayPanelVersion} onChange={e => patchOrchestrationForm({ xrayPanelVersion: e.target.value })} variant="bordered" placeholder={t("留空使用最新版")} />
               </div>
               {selectedOrchestrationHasMaster && (
                 <MasterRiskNotice context="生成一键编排任务" />
@@ -3845,16 +3845,16 @@ export default function OrchestratorPage() {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-small border border-default-200 p-4">
-                <Switch isSelected={orchestrationForm.installXrayPanel} onValueChange={value => patchOrchestrationForm({ installXrayPanel: value })}>{t("安装面板运行时")}</Switch>
-                <Switch isSelected={orchestrationForm.configurePanel} onValueChange={value => patchOrchestrationForm({ configurePanel: value })}>{t("配置面板")}</Switch>
+                <Switch isSelected={orchestrationForm.installXrayPanel} onValueChange={value => patchOrchestrationForm({ installXrayPanel: value })}>{t("安装 Xray Runtime")}</Switch>
+                <Switch isSelected={orchestrationForm.configurePanel} onValueChange={value => patchOrchestrationForm({ configurePanel: value })}>{t("配置 Xray Runtime")}</Switch>
                 <Switch isSelected={orchestrationForm.installSnell} onValueChange={value => patchOrchestrationForm({ installSnell: value })}>{t("安装 Snell")}</Switch>
                 <Switch isSelected={orchestrationForm.createVlessReality || orchestrationForm.createVmessWs || orchestrationForm.createTrojanTls || orchestrationForm.createShadowsocks} isReadOnly>{t("创建节点")}</Switch>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input label={t("面板端口")} type="number" value={orchestrationForm.panelPort.toString()} onChange={e => patchOrchestrationForm({ panelPort: Number(e.target.value) || 5168 })} variant="bordered" />
-                <Input label={t("面板用户名")} value={orchestrationForm.panelUsername} onChange={e => patchOrchestrationForm({ panelUsername: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
-                <Input label={t("面板密码")} type="password" value={orchestrationForm.panelPassword} onChange={e => patchOrchestrationForm({ panelPassword: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
+                <Input label={t("Xray Runtime 端口")} type="number" value={orchestrationForm.panelPort.toString()} onChange={e => patchOrchestrationForm({ panelPort: Number(e.target.value) || 5168 })} variant="bordered" />
+                <Input label={t("Xray Runtime 用户名")} value={orchestrationForm.panelUsername} onChange={e => patchOrchestrationForm({ panelUsername: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
+                <Input label={t("Xray Runtime 密码")} type="password" value={orchestrationForm.panelPassword} onChange={e => patchOrchestrationForm({ panelPassword: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
                 <Input label="Web Base Path" value={orchestrationForm.webBasePath} onChange={e => patchOrchestrationForm({ webBasePath: e.target.value })} variant="bordered" />
                 <Input label={t("监听 IP")} value={orchestrationForm.listenIp} onChange={e => patchOrchestrationForm({ listenIp: e.target.value })} variant="bordered" />
                 <Select label={t("证书模式")} selectedKeys={[orchestrationForm.certificateMode]} onSelectionChange={keys => patchOrchestrationForm({ certificateMode: Array.from(keys)[0] as OrchestrationForm["certificateMode"] })} variant="bordered">

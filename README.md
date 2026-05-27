@@ -37,7 +37,7 @@ Runtime Providers are the product boundary between the master task engine and co
 
 | Provider | Scope | Executor | Nano hosts |
 | --- | --- | --- | --- |
-| `xrayPanel` | Xray, Reality, inbounds, outbounds, routing rules, IPv4/IPv6 strategy, traffic | master API + agent task | not recommended |
+| `xrayRuntime` | Xray, Reality, inbounds, outbounds, routing rules, IPv4/IPv6 strategy, traffic | master API + agent task | not recommended |
 | `snell` | Snell node services | agent task | supported |
 | `forward` | TCP/UDP remote forwarding | agent task | supported |
 | `certificate` | self-signed, ACME and certificate diagnostics | agent task | task-dependent |
@@ -65,13 +65,13 @@ Agent task history redacts panel secrets before storage. Installation/orchestrat
 
 Firewall maintenance is also executable from the same provider contract. `open-runtime-ports` and `close-runtime-ports` parse requested runtime ports from task `requestJson`, apply local `ufw`, `firewalld` or `iptables` rules when available, and then return structured diagnostics. Cloud security groups still need operator confirmation.
 
-Remote log collection also uses the same `agent-maintenance` path. A `logs` action returns structured `logs.items` for the Overlord agent runner, Xray Panel/Xray services, Snell node services, forwarding/task logs and related service managers, and the control-center task card renders a compact remote-log summary before operators open raw output.
+Remote log collection also uses the same `agent-maintenance` path. A `logs` action returns structured `logs.items` for the Overlord agent runner, Xray Runtime/Xray services, Snell node services, forwarding/task logs and related service managers, and the control-center task card renders a compact remote-log summary before operators open raw output.
 
 Agent upgrade now uses the same controlled task loop with a safer lifecycle: the agent binary reports `--version`, the upgrade task downloads to a temporary file, verifies Bash syntax, calculates SHA-256, backs up the previous binary, installs the new file, schedules a service restart, and returns structured `maintenance.upgrade` metadata for the master task card.
 
 ## UI Preview
 
-![Overlord Broil live control center](docs/assets/actual-orchestrator-top.png)
+![Overlord Broil live control center](docs/assets/actual-control-center-top.png)
 
 The screenshots below were captured from the live `isrco-hk` validation master after redeploying `ghcr.io/zhizhishu/overlord-broil:latest` in SQLite single-container mode.
 
@@ -195,7 +195,7 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scrip
 ```
 
 The agent runs through systemd or OpenRC, claims tasks from the master, executes them locally and reports results back.
-Claimed tasks include their Runtime Provider assignment, so task history can be audited by `xrayPanel`, `snell`, `forward`, `certificate` or `firewall`.
+Claimed tasks include their Runtime Provider assignment, so task history can be audited by `xrayRuntime`, `snell`, `forward`, `certificate` or `firewall`.
 
 ## Operator Flow
 
@@ -205,7 +205,7 @@ Claimed tasks include their Runtime Provider assignment, so task history can be 
 4. Install the agent with the generated token command.
 5. Wait for heartbeat.
 6. Select one or more servers and run orchestration:
-   - install or reuse the compatible Xray panel runtime
+   - install or reuse the compatible Xray Runtime
    - create VLESS Reality, VMess WebSocket, Trojan TLS or Shadowsocks nodes
    - deploy Snell nodes
    - issue or bind certificates
@@ -231,7 +231,7 @@ Agent heartbeat reports total memory. The master classifies tiny hosts:
 | Agent service | systemd | systemd | OpenRC |
 | Snell node tasks | systemd | systemd | OpenRC |
 | Remote forwarding tasks | systemd + `socat` | systemd + `socat` | OpenRC + `socat` |
-| Full Xray panel install/configure | supported | supported | not supported in `0.6.0` |
+| Full Xray Runtime install/configure | supported | supported | not supported in `0.6.0` |
 
 ## Docker And GHCR
 
@@ -270,9 +270,9 @@ POST /api/v1/agent-task/report
 ```
 
 Agent reports store both `resultJson.runtimeProvider` and `resultJson.runtimeState`, so task history can be audited by runtime owner, source task, target server, resource type and resolved service/node/diagnostic status.
-`agent-maintenance` log reports additionally store structured `logs.items`, covering Overlord agent, Xray Panel/Xray, Snell, forwarding and task-log sources for task-card summaries.
+`agent-maintenance` log reports additionally store structured `logs.items`, covering Overlord agent, Xray Runtime/Xray, Snell, forwarding and task-log sources for task-card summaries.
 
-Profiles, nodes, forwarding and Xray Panel:
+Profiles, nodes, forwarding and Xray Runtime:
 
 ```text
 POST /api/v1/protocol-profile/create
@@ -286,10 +286,10 @@ POST /api/v1/protocol-node/sync
 POST /api/v1/server-forward/create
 POST /api/v1/server-forward/list
 POST /api/v1/server-rule/overview
-POST /api/v1/xray-panel/inbounds/list
-POST /api/v1/xray-panel/outbounds
-POST /api/v1/xray-panel/traffic/sync
-POST /api/v1/xray-panel/restart-xray
+POST /api/v1/runtimes/xray/inbounds/list
+POST /api/v1/runtimes/xray/outbounds
+POST /api/v1/runtimes/xray/traffic/sync
+POST /api/v1/runtimes/xray/restart-xray
 ```
 
 ## Verification
@@ -303,7 +303,7 @@ bash scripts/release-check.sh --full
 Backend with Docker Maven:
 
 ```bash
-docker run --rm -v "$PWD/springboot-backend:/workspace" -w /workspace maven:3.9-eclipse-temurin-21 mvn -B -DskipTests package
+docker run --rm -v "$PWD:/workspace" -v overlord-broil-m2:/root/.m2 -w /workspace/springboot-backend maven:3.9.9-eclipse-temurin-21 mvn -B "-Dtest=RuntimeProviderServiceTest,DeployTaskServiceImplTest,XrayRuntimeRouteContractTest" test
 ```
 
 Frontend:
@@ -318,28 +318,28 @@ Common smoke checks:
 
 ```bash
 bash scripts/test-agent-mock.sh
-bash scripts/test-xray-panel-fixture.sh
+bash scripts/test-xray-runtime-fixture.sh
 bash scripts/test-snell-real-smoke.sh
-bash scripts/test-xray-panel-e2e.sh
+bash scripts/test-xray-runtime-e2e.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
 bash scripts/test-compose-smoke.sh --build-local
 ```
 
-Real Xray Panel contract smoke is optional and skips unless a target endpoint and API token are provided:
+Real Xray Runtime contract smoke is optional and skips unless a target endpoint and API token are provided:
 
 ```bash
-export XRAY_PANEL_E2E_URL="https://panel.example.com:5168"
-export XRAY_PANEL_E2E_TOKEN="YOUR_XRAY_PANEL_API_TOKEN"
-bash scripts/test-xray-panel-e2e.sh
+export XRAY_RUNTIME_E2E_URL="https://panel.example.com:5168"
+export XRAY_RUNTIME_E2E_TOKEN="YOUR_XRAY_RUNTIME_API_TOKEN"
+bash scripts/test-xray-runtime-e2e.sh
 ```
 
-To create, toggle and delete a temporary VLESS inbound on the real Xray Panel host, opt in explicitly:
+To create, toggle and delete a temporary VLESS inbound on the real Xray Runtime host, opt in explicitly:
 
 ```bash
-XRAY_PANEL_E2E_WRITE=1 XRAY_PANEL_E2E_PORT=42123 bash scripts/test-xray-panel-e2e.sh
+XRAY_RUNTIME_E2E_WRITE=1 XRAY_RUNTIME_E2E_PORT=42123 bash scripts/test-xray-runtime-e2e.sh
 ```
 
-Live validation note: on `isrco-hk`, `authorized disposable Xray Panel runtime image` (`Xray Panel 3.1.0`) passed the direct real Xray Panel E2E write contract and the Overlord master API inbound add/toggle/delete path. The temporary ports `42123` and `42124` were cleaned after the run.
+Live validation note: on `isrco-hk`, `authorized disposable Xray Runtime image` (`Xray Runtime 3.1.0`) passed the direct real Xray Runtime E2E write contract and the Overlord master API inbound add/toggle/delete path. The temporary ports `42123` and `42124` were cleaned after the run.
 
 Real Snell smoke runs against a live master/agent host. It logs in to the master, creates a temporary Snell protocol node, lets the controlled agent claim the task, checks the service and listen port, then deletes the temporary node by default. The delete phase also verifies that the service is inactive, the listen port is closed and the protocol-node state is no longer active:
 
@@ -350,7 +350,7 @@ OB_MASTER_URL="http://127.0.0.1:5166" OB_SNELL_PORT=18390 bash scripts/test-snel
 ## Remaining Work Before 1.0
 
 - Real VPS matrix: Debian, Ubuntu, Rocky Linux, Oracle Linux and Alpine.
-- Extend the recorded real Xray Panel E2E beyond the current `isrco-hk` container run to more VPS/provider targets.
+- Extend the recorded real Xray Runtime E2E beyond the current `isrco-hk` container run to more VPS/provider targets.
 - Better certificate, firewall and cloud-security-group diagnostics.
 - RBAC, audit retention/export, agent token expiry/revocation and key-rotation migration.
 - Mobile layout, loading/error states and task-detail polish.

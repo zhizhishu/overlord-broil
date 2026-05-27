@@ -19,7 +19,7 @@ Usage: scripts/test-install-matrix.sh [--image IMAGE]...
 
 Runs non-destructive installer diagnostics in Linux containers. The matrix
 validates the current checkout on Debian, Ubuntu, Alpine, Rocky Linux and
-Oracle Linux style userspaces without starting Docker, systemd, OpenRC or Xray Panel.
+Oracle Linux style userspaces without starting Docker, systemd, OpenRC or Xray Runtime.
 
 Set OB_INSTALL_MATRIX_SKIP_PULL=true to skip docker pull.
 EOF

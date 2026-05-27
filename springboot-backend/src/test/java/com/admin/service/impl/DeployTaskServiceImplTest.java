@@ -69,8 +69,8 @@ class DeployTaskServiceImplTest {
         String resultJson = attach("{\"runtimeProvider\":{\"key\":\"custom-agent\"}}", task);
         JSONObject result = JSON.parseObject(resultJson);
 
-        assertEquals("xrayPanel", result.getJSONObject("runtimeProvider").getString("key"));
-        assertEquals("xrayPanel", result.getJSONObject("runtimeState").getString("providerKey"));
+        assertEquals("xrayRuntime", result.getJSONObject("runtimeProvider").getString("key"));
+        assertEquals("xrayRuntime", result.getJSONObject("runtimeState").getString("providerKey"));
     }
 
     @Test
@@ -78,7 +78,7 @@ class DeployTaskServiceImplTest {
         DeployTask task = new DeployTask();
         task.setId(202L);
         task.setServerId(9L);
-        task.setServerName("edge-xrayPanel");
+        task.setServerName("edge-xray-runtime");
         task.setProtocol("vless");
         task.setAction("present");
 
@@ -105,15 +105,15 @@ class DeployTaskServiceImplTest {
 
         JSONObject runtimeState = JSON.parseObject(resultJson).getJSONObject("runtimeState");
 
-        assertEquals("xrayPanel", runtimeState.getString("providerKey"));
-        assertEquals("Xray Panel / Xray Runtime", runtimeState.getString("providerName"));
+        assertEquals("xrayRuntime", runtimeState.getString("providerKey"));
+        assertEquals("Xray Runtime", runtimeState.getString("providerName"));
         assertEquals("vless", runtimeState.getString("protocol"));
         assertEquals("present", runtimeState.getString("action"));
         assertEquals("succeeded", runtimeState.getString("taskState"));
         assertEquals("task", runtimeState.getString("source"));
         assertEquals(202L, runtimeState.getLongValue("sourceTaskId"));
         assertEquals(9L, runtimeState.getLongValue("serverId"));
-        assertEquals("edge-xrayPanel", runtimeState.getString("serverName"));
+        assertEquals("edge-xray-runtime", runtimeState.getString("serverName"));
         assertEquals("protocol-node", runtimeState.getString("resourceType"));
         assertNull(runtimeState.get("resourceId"));
         assertEquals(false, runtimeState.getBooleanValue("danger"));
@@ -237,7 +237,7 @@ class DeployTaskServiceImplTest {
         assertEquals("snell", items.getJSONObject(0).getString("runtime"));
         assertEquals("journalctl:snell.service", items.getJSONObject(0).getString("source"));
         assertEquals("line1\nline2", items.getJSONObject(0).getString("content"));
-        assertEquals("xrayPanel", result.getJSONObject("runtimeProvider").getString("key"));
+        assertEquals("xrayRuntime", result.getJSONObject("runtimeProvider").getString("key"));
         assertNotNull(result.getJSONObject("runtimeState"));
     }
 
@@ -259,7 +259,7 @@ class DeployTaskServiceImplTest {
         assertTrue(script.contains("LOG_LINES=\"${OB_MAINTENANCE_LOG_LINES:-160}\""));
         assertTrue(script.contains("LOG_FILE=\"${TMPDIR:-/tmp}/overlord-maintenance-logs-$$.jsonl\""));
         assertTrue(script.contains("capture_journal_log \"agent\" \"overlord-agent.service\""));
-        assertTrue(script.contains("capture_journal_log \"xrayPanel\" \"$unit\""));
+        assertTrue(script.contains("capture_journal_log \"xrayRuntime\" \"$unit\""));
         assertTrue(script.contains("capture_file_log \"snell\""));
         assertTrue(script.contains("capture_file_log \"agent-task\""));
         assertTrue(script.contains("def load_logs(path):"));
@@ -561,7 +561,7 @@ class DeployTaskServiceImplTest {
         Map<String, Map<String, Object>> items = new LinkedHashMap<>();
         ReflectionTestUtils.invokeMethod(service, "seedServerProviderRuntimeStates", items, server, System.currentTimeMillis());
 
-        assertEquals("running", items.get("9:xrayPanel").get("status"));
+        assertEquals("running", items.get("9:xrayRuntime").get("status"));
         assertEquals("not-installed", items.get("9:snell").get("status"));
         assertEquals("expiring", items.get("9:certificate").get("status"));
 

@@ -10,11 +10,11 @@ The project is currently a `0.6.0` public trial reliability candidate, not a bro
 
   Master stack runs through Docker Compose.
   `mysql`: MySQL 5.7 with `overlord.sql` seed data. Host port is not published by default. This remains the default production DB mode.
-  `master`: `overlord master` single image. The Dockerfile builds the Vite UI, embeds it into the Spring Boot jar, and serves both Web UI and API on container port `5166`.
-  Optional SQLite mode uses `docker compose.sqlite.yml`, `SPRING_PROFILES_ACTIVE=sqlite`, the embedded `schema sqlite.sql`, and `/app/data/overlord master.sqlite` mounted from the install directory. It is meant for small labs or single node trials, not as a forced replacement for MySQL.
+  `master`: `overlord-master` single image. The Dockerfile builds the Vite UI, embeds it into the Spring Boot jar, and serves both Web UI and API on container port `5166`.
+  Optional SQLite mode uses `docker-compose.sqlite.yml`, `SPRING_PROFILES_ACTIVE=sqlite`, the embedded `schema-sqlite.sql`, and `/app/data/overlord-master.sqlite` mounted from the install directory. It is meant for small labs or single node trials, not as a forced replacement for MySQL.
   `phpmyadmin`: optional maintenance override only. It is not part of the default compose stack and is created by the installer only when `PHPMYADMIN_PORT` is set.
   Legacy split `backend`/`frontend` compose files and standalone backend/frontend runtime images are no longer part of the supported product surface.
-  During install or upgrade, the installer removes old split stack containers and optional phpMyAdmin helpers before starting the single image master stack. In SQLite mode it also removes the obsolete `gost mysql` legacy container while keeping its Docker volumes and old install files for manual recovery.
+  During install or upgrade, the installer removes old split stack containers and optional phpMyAdmin helpers before starting the single image master stack. In SQLite mode it also removes the obsolete `gost-mysql` legacy container while keeping its Docker volumes and old install files for manual recovery.
 
 Default public master exposure:
 
@@ -32,7 +32,7 @@ phpMyAdmin 80, only when the optional override is enabled
 
 ## Controlled Server Model
 
-  The controlled server installs `overlord agent.sh` through `scripts/install agent.sh` or the POSIX bootstrap.
+  The controlled server installs `overlord-agent.sh` through `scripts/install-agent.sh` or the POSIX bootstrap.
   The agent stores `OB_PANEL_URL`, `OB_SERVER_ID`, and `OB_AGENT_TOKEN`.
   The agent claims tasks from the master, executes them locally, and reports results back.
   Controlled agent callback uses the same master URL as browser users, normally `http://MASTER_IP:5166`.
@@ -40,7 +40,7 @@ phpMyAdmin 80, only when the optional override is enabled
 
 Controlled hosts may expose business ports depending on orchestration choices:
 
-  Xray Panel panel port, default `5168` when intentionally enabled.
+  Xray Runtime panel port, default `5168` when intentionally enabled.
   Xray inbound ports.
   Snell listen ports.
   Remote forwarding listen ports.
@@ -48,66 +48,66 @@ Controlled hosts may expose business ports depending on orchestration choices:
 
 ## Main Code Areas
 
-  `springboot backend/`: Spring Boot 2.7, Java 21 backend.
-  `springboot backend/src/main/java/com/admin/controller/`: REST endpoints under `/api/v1/*` plus `/flow/test` health endpoint.
-  `springboot backend/src/main/java/com/admin/runtime/`: Runtime Provider registry for Xray Panel, Snell, Forward, Certificate and Firewall task boundaries.
-  `springboot backend/src/main/java/com/admin/service/`: orchestration, Xray Panel, Snell, forwarding, agent task, traffic, alert, and control server services.
-  `springboot backend/src/main/resources/mapper/`: MyBatis mapper XML.
-  `vite frontend/`: React 18 + Vite + HeroUI frontend.
-  `vite frontend/src/pages/orchestrator.tsx`: master control center for controlled server status, Xray inbound/outbound, Snell, rules, tasks, diagnostics, and traffic workflows.
-  `vite frontend/src/pages/forward.tsx`: forwarding page, now partly internationalized.
-  `vite frontend/src/i18n/index.tsx`: lightweight `zh CN` / `en US` dictionary.
+  `springboot-backend/`: Spring Boot 2.7, Java 21 backend.
+  `springboot-backend/src/main/java/com/admin/controller/`: REST endpoints under `/api/v1/*` plus `/flow/test` health endpoint.
+  `springboot-backend/src/main/java/com/admin/runtime/`: Runtime Provider registry for Xray Runtime, Snell, Forward, Certificate and Firewall task boundaries.
+  `springboot-backend/src/main/java/com/admin/service/`: orchestration, Xray Runtime, Snell, forwarding, agent task, traffic, alert, and control server services.
+  `springboot-backend/src/main/resources/mapper/`: MyBatis mapper XML.
+  `vite-frontend/`: React 18 + Vite + HeroUI frontend.
+  `vite-frontend/src/pages/control-center.tsx`: master control center for controlled server status, Xray inbound/outbound, Snell, rules, tasks, diagnostics, and traffic workflows.
+  `vite-frontend/src/pages/forward.tsx`: forwarding page, now partly internationalized.
+  `vite-frontend/src/i18n/index.tsx`: lightweight `zh-CN` / `en-US` dictionary.
   `scripts/`: installers, agent runtime, release checks, fixtures, and smoke tests.
   `docs/`: GitHub Pages site, operations docs, release notes, and screenshots.
   `.github/workflows/`: CI, Docker image build, and release workflows.
 
 ## Core Features
 
-  Overlord style dense operations UI with Chinese first language and `zh CN` / `en US` switch. Visible product copy uses Overlord/Xray/controlled server terminology; upstream Xray Panel wording is reserved for compatibility notes, API endpoints, tests, and acknowledgements.
+  Overlord style dense operations UI with Chinese first language and `zh-CN` / `en-US` switch. Visible product copy uses Overlord/Xray/controlled server terminology.
   Server registry, agent token generation/rotation, heartbeats, status updates, and Nano memory detection.
-  Runtime Provider registry and API for `xrayPanel`, `snell`, `forward`, `certificate`, and `firewall` task assignment.
+  Runtime Provider registry and API for `xrayRuntime`, `snell`, `forward`, `certificate`, and `firewall` task assignment.
   Runtime Provider Action Catalog for `agent maintenance` labels, categories, danger flags and State Sync visibility; backend validation and master UI buttons reuse it.
   Runtime Provider metadata travels through task claim/report and is stored in task result JSON for audit.
   Agent task claim uses an atomic `generated  > claimed` transition so competing agent loops cannot execute the same generated task twice.
   Dangerous `agent maintenance` actions require both UI confirmation and backend `dangerConfirmed=true` / `confirmAction=<action>` validation before entering the controlled agent queue.
   Operation audit logs are persisted in `operation_audit_log` for deploy/orchestration task creation, rejected task requests, manual state updates, retries, deletes, agent task claims and agent task reports; the control center displays recent actor/server/provider/action/outcome events.
   Runtime State is stored in `resultJson.runtimeState` and rendered on task cards, normalizing provider, protocol/action, source task, server, resource type/id, danger flag, task state, resolved status/source, services, nodes, forwarding, certificates and diagnostics.
-  Xray Panel deployment scripts are executable by the controlled agent: they resolve saved/local Xray Panel API metadata, call inbound add/delete or restart Xray APIs, and return inbound metadata through `OB_AGENT_RESULT_JSON`.
-  Agent task results are sanitized before storage: the master can use raw reports to update encrypted Xray Panel credentials, but stored task history removes API tokens, passwords, 2FA codes and `serverSecrets`.
+  Xray Runtime deployment scripts are executable by the controlled agent: they resolve saved/local Xray Runtime API metadata, call inbound add/delete or restart Xray APIs, and return inbound metadata through `OB_AGENT_RESULT_JSON`.
+  Agent task results are sanitized before storage: the master can use raw reports to update encrypted Xray Runtime credentials, but stored task history removes API tokens, passwords, 2FA codes and `serverSecrets`.
   Firewall Runtime Provider maintenance includes executable `open runtime ports` and `close runtime ports` tasks that parse task ports, apply local `ufw`, `firewalld` or `iptables` rules, and return structured diagnostics. Cloud security groups remain an operator boundary.
-  State Sync overview aggregates latest `runtimeState` task results with server heartbeat service/certificate fields through `/api/v1/deploy task/runtime state/overview` and renders a server by provider panel in the master control center.
-  State Sync row actions reuse `agent maintenance` tasks so operators can start provider diagnostics and Xray Panel/Snell repair flows directly from the runtime overview.
-  Agent maintenance log collection returns structured `logs.items` for Overlord agent, Xray Panel/Xray, Snell, forwarding and task log sources, and the master task card renders a remote log summary.
+  State Sync overview aggregates latest `runtimeState` task results with server heartbeat service/certificate fields through `/api/v1/deploy-task/runtime-state/overview` and renders a server by provider panel in the master control center.
+  State Sync row actions reuse `agent maintenance` tasks so operators can start provider diagnostics and Xray Runtime/Snell repair flows directly from the runtime overview.
+  Agent maintenance log collection returns structured `logs.items` for Overlord agent, Xray Runtime/Xray, Snell, forwarding and task log sources, and the master task card renders a remote log summary.
   Agent maintenance upgrade returns structured `maintenance.upgrade` metadata with source URL, previous/new version, SHA 256, backup path, install state and restart scheduling.
-  One click orchestration tasks for Xray Panel/Xray and Snell.
-  Xray Panel API integration for inbound/outbound/config/traffic/restart operations.
+  One click orchestration tasks for Xray Runtime/Xray and Snell.
+  Xray Runtime API integration for inbound/outbound/config/traffic/restart operations.
   Protocol node form flow with validation and advanced payload preview.
   Snell managed as a unified product layer protocol node deployed by the Overlord agent.
   Remote port forwarding through `socat` and systemd/OpenRC service scripts.
   Agent maintenance actions: diagnostics, logs, restart, upgrade, uninstall, retry, and repair.
   Structured certificate/firewall/install diagnostic summaries in task results.
-  Local traffic snapshot sync for Xray Panel.
-  Master port contract check: `scripts/test master port contract.sh` validates that default compose files publish only the `overlord master` entry and that installer migration guards stay in place.
-  Optional SQLite master mode with a dedicated Spring profile, SQLite schema, compose file, installer `  db mysql|sqlite` / `OB_DB_MODE` switch, and SQLite schema/compose smoke coverage.
+  Local traffic snapshot sync for Xray Runtime.
+  Master port contract check: `scripts/test-master-port-contract.sh` validates that default compose files publish only the `overlord-master` entry and that installer migration guards stay in place.
+  Optional SQLite master mode with a dedicated Spring profile, SQLite schema, compose file, installer `db mysql|sqlite` / `OB_DB_MODE` switch, and SQLite schema/compose smoke coverage.
 
 ## Install And Upgrade
 
 Master install:
 
 ```bash
-curl  fsSL https://raw.githubusercontent.com/zhizhishu/overlord broil/main/scripts/install master.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh | sudo bash
 ```
 
 Existing master upgrade:
 
 ```bash
-curl  fsSL https://raw.githubusercontent.com/zhizhishu/overlord broil/main/scripts/install master.sh | sudo bash  s    upgrade
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh | sudo bash -s -- upgrade
 ```
 
 Controlled agent install:
 
 ```bash
-curl  fsSL https://raw.githubusercontent.com/zhizhishu/overlord broil/main/scripts/install agent.sh \
+curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent.sh \
   | sudo env OB_PANEL_URL="http://MASTER_IP:5166" OB_SERVER_ID="1" OB_AGENT_TOKEN="TOKEN" bash
 ```
 
@@ -120,31 +120,31 @@ CI currently covers:
   Shell syntax.
   Agent mock tests, including Runtime Provider claim/report metadata.
   Backend Runtime Provider / Runtime State tests for task result audit metadata.
-  Xray Panel fixture tests.
-  Optional real Xray Panel E2E contract smoke through `scripts/test xray panel e2e.sh`; it skips unless endpoint/token are configured and only performs write checks when explicitly enabled.
+  Xray Runtime fixture tests.
+  Optional real Xray Runtime E2E contract smoke through `scripts/test-xray-runtime-e2e.sh`; it skips unless endpoint/token are configured and only performs write checks when explicitly enabled.
   Default, v4/v6 and SQLite compose config.
   Optional SQLite compose config and schema smoke.
-  Disposable compose smoke stack with the `overlord master` single image.
+  Disposable compose smoke stack with the `overlord-master` single image.
   Debian, Ubuntu, Alpine, Rocky Linux, and Oracle Linux installer diagnostics.
 
 Release gate:
 
 ```bash
-bash scripts/release check.sh   full
+bash scripts/release-check.sh --full
 ```
 
 ## Known Boundaries
 
-  Real VPS matrix and recorded real Xray Panel end to end smoke runs are still the biggest gaps before `1.0`; the E2E harness exists but does not prove real host coverage until endpoint secrets are configured and run.
-  Snell is product layer unified but runtime independent; do not describe it as a native Xray Panel/Xray protocol.
-  Alpine/OpenRC supports the agent, Snell tasks, and remote forwarding, but full Xray Panel install/configure orchestration is intended for systemd hosts.
+  Real VPS matrix and recorded real Xray Runtime end to end smoke runs are still the biggest gaps before `1.0`; the E2E harness exists but does not prove real host coverage until endpoint secrets are configured and run.
+  Snell is product layer unified but runtime independent; do not describe it as a native Xray Runtime/Xray protocol.
+  Alpine/OpenRC supports the agent, Snell tasks, and remote forwarding, but full Xray Runtime install/configure orchestration is intended for systemd hosts.
   Certificate automation depends on DNS, port `80`, local firewall, and cloud security groups.
   Security governance still needs RBAC, audit retention/export, token expiry/revocation, key rotation, and broader destructive action policy.
   UI still needs more mobile, loading, error, and task detail polish.
 
 ## Reference Projects
 
-  `zhizhishu/flux panel`: UI and forwarding panel foundation reference.
+  `zhizhishu/flux-panel`: UI and forwarding panel foundation reference.
   Xray-compatible panel API behavior and Xray management reference.
   `jinqians/snell.sh`: Snell deployment reference.
-  `komari monitor/komari`: master/agent control model inspiration.
+  `komari-monitor/komari`: master/agent control model inspiration.

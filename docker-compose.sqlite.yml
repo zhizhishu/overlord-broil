@@ -4,15 +4,15 @@ services:
     container_name: overlord-master
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT}:5166"
+      - "${FRONTEND_PORT:-5166}:5166"
     environment:
       SPRING_PROFILES_ACTIVE: sqlite
       SQLITE_DB_PATH: ${SQLITE_DB_PATH:-/app/data/overlord-master.sqlite}
       JWT_SECRET: ${JWT_SECRET}
       SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
       SERVER_PORT: 5166
-      FRONTEND_PORT: ${FRONTEND_PORT}
-      BACKEND_PORT: ${BACKEND_PORT}
+      FRONTEND_PORT: ${FRONTEND_PORT:-5166}
+      BACKEND_PORT: ${BACKEND_PORT:-6365}
       PHPMYADMIN_PORT: ""
       EXPOSE_BACKEND: ${EXPOSE_BACKEND:-0}
       DB_MODE: sqlite

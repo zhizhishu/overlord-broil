@@ -23,6 +23,9 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
+      - name: Run backend contract tests
+        working-directory: springboot-backend
+        run: mvn -B "-Dtest=RuntimeProviderServiceTest,DeployTaskServiceImplTest,XrayRuntimeRouteContractTest" test
       - name: Build backend
         working-directory: springboot-backend
         run: mvn -B -DskipTests package
@@ -55,15 +58,15 @@ jobs:
         run: bash scripts/test-agent-mock.sh
       - name: Run SQLite schema smoke test
         run: bash scripts/test-sqlite-schema.sh
-      - name: Run Xray Panel fixture tests
-        run: bash scripts/test-xray-panel-fixture.sh
-      - name: Run optional real Xray Panel E2E contract
+      - name: Run Xray Runtime fixture tests
+        run: bash scripts/test-xray-runtime-fixture.sh
+      - name: Run optional real Xray Runtime E2E contract
         env:
-          XRAY_PANEL_E2E_URL: ${{ secrets.XRAY_PANEL_E2E_URL }}
-          XRAY_PANEL_E2E_TOKEN: ${{ secrets.XRAY_PANEL_E2E_TOKEN }}
-          XRAY_PANEL_E2E_BASE_PATH: ${{ secrets.XRAY_PANEL_E2E_BASE_PATH }}
-          XRAY_PANEL_E2E_WRITE: "0"
-        run: bash scripts/test-xray-panel-e2e.sh
+          XRAY_RUNTIME_E2E_URL: ${{ secrets.XRAY_RUNTIME_E2E_URL }}
+          XRAY_RUNTIME_E2E_TOKEN: ${{ secrets.XRAY_RUNTIME_E2E_TOKEN }}
+          XRAY_RUNTIME_E2E_BASE_PATH: ${{ secrets.XRAY_RUNTIME_E2E_BASE_PATH }}
+          XRAY_RUNTIME_E2E_WRITE: "0"
+        run: bash scripts/test-xray-runtime-e2e.sh
       - name: Validate compose files
         env:
           DB_NAME: overlord

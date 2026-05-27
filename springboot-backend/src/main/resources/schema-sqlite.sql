@@ -335,4 +335,4 @@ VALUES (1, 'app_name', 'Overlord Broil', 1755147963000);
 
 UPDATE vite_config
 SET value = 'Overlord Broil', time = CAST(strftime('%s', 'now') AS INTEGER) * 1000
-WHERE name = 'app_name' AND lower(value) IN ('flux', 'flux panel', 'flux Xray Panel orchestrator');
+WHERE name = 'app_name' AND lower(value) IN ('flux', 'flux panel', 'flux xray runtime orchestrator');

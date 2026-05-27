@@ -182,7 +182,7 @@ public class ViteConfigServiceImpl extends ServiceImpl<ViteConfigMapper, ViteCon
         if (!StringUtils.hasText(value)
                 || "flux".equalsIgnoreCase(value.trim())
                 || "flux panel".equalsIgnoreCase(value.trim())
-                || "flux Xray Panel orchestrator".equalsIgnoreCase(value.trim())) {
+                || "flux Xray Runtime orchestrator".equalsIgnoreCase(value.trim())) {
             config.setValue(DEFAULT_APP_NAME);
             config.setTime(System.currentTimeMillis());
             this.updateById(config);

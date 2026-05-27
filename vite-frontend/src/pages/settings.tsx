@@ -31,13 +31,13 @@ export const SettingsPage = () => {
     setPanelAddresses(newAddress); 
   }
 
-  // 加载面板地址列表
+  // 加载主控地址列表
   const loadPanelAddresses = async () => {
     (window as any).setPanelAddresses = setPanelAddressesFunc
     getPanelAddresses();
   };
 
-  // 添加新面板地址
+  // 添加新主控地址
   const addPanelAddress = async () => {
     if (!newName.trim() || !newAddress.trim()) {
       toast.error('请输入名称和地址');
@@ -56,14 +56,14 @@ export const SettingsPage = () => {
     toast.success('添加成功');
   };
 
-  // 设置当前面板地址
+  // 设置当前主控地址
   const setCurrentPanel = async (name: string) => {
     (window as any).setPanelAddresses = setPanelAddressesFunc
     setCurrentPanelAddress(name);
     reinitializeBaseURL();
   };
 
-  // 删除面板地址
+  // 删除主控地址
   const handleDeletePanelAddress = async (name: string) => {
     (window as any).setPanelAddresses = setPanelAddressesFunc
     deletePanelAddress(name);
@@ -103,7 +103,7 @@ export const SettingsPage = () => {
           {/* 添加新地址 */}
           <Card className="border border-gray-200 dark:border-gray-700">
             <CardBody className="p-6">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">添加新面板地址</h2>
+              <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">添加新主控地址</h2>
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input
@@ -129,9 +129,9 @@ export const SettingsPage = () => {
           {/* 地址列表 */}
           <Card className="border border-gray-200 dark:border-gray-700">
             <CardBody className="p-6">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">已保存的面板地址</h2>
+              <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">已保存的主控地址</h2>
               {panelAddresses.length === 0 ? (
-                <p className="text-gray-500 dark:text-gray-400 text-center py-8">暂无保存的面板地址</p>
+                <p className="text-gray-500 dark:text-gray-400 text-center py-8">暂无保存的主控地址</p>
               ) : (
                 <div className="space-y-3">
                   {panelAddresses.map((panel, index) => (

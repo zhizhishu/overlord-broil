@@ -15,7 +15,7 @@ import javax.annotation.Resource;
 
 @RestController
 @CrossOrigin
-@RequestMapping("/api/v1/xray-panel")
+@RequestMapping("/api/v1/runtimes/xray")
 public class XrayPanelController {
 
     @Resource

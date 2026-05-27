@@ -35,8 +35,8 @@ Read these files in order before code changes, tests, service startup, or remote
 - Preserve the default single public master entry: `5166/tcp`.
 - Backend `6365`, MySQL `3306`, and phpMyAdmin are internal by default.
 - Controlled agents should call the master panel URL, for example `http://MASTER_IP:5166`, not a backend debug port.
-- Snell is unified at the product/node-management layer, but it remains an independent runtime service deployed by the agent, not a native Xray or Xray Panel core protocol.
-- Nano controlled hosts below `200 MB` memory should not run full Xray Panel/Xray orchestration through the supported path.
+- Snell is unified at the product/node-management layer, but it remains an independent runtime service deployed by the agent, not a native Xray or Xray Runtime core protocol.
+- Nano controlled hosts below `200 MB` memory should not run full Xray Runtime/Xray orchestration through the supported path.
 
 ## Validation
 
@@ -46,7 +46,7 @@ Use the smallest validation set that matches the change. Common commands:
 bash -n scripts/*.sh
 sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh
 bash scripts/test-agent-mock.sh
-bash scripts/test-xray-panel-fixture.sh
+bash scripts/test-xray-runtime-fixture.sh
 bash scripts/test-compose-smoke.sh --build-local --dry-run
 bash scripts/test-sqlite-schema.sh
 bash scripts/test-compose-smoke.sh --compose-file docker-compose.sqlite.yml --build-local --dry-run

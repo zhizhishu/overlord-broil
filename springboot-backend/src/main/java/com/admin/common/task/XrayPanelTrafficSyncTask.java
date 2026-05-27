@@ -38,7 +38,7 @@ public class XrayPanelTrafficSyncTask {
                 dto.setServerId(server.getId());
                 xrayPanelService.syncTraffic(dto);
             } catch (Exception e) {
-                log.warn("Xray Panel traffic sync failed, serverId={}", server.getId(), e);
+                log.warn("Xray Runtime traffic sync failed, serverId={}", server.getId(), e);
             }
         }
     }

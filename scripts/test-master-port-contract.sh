@@ -57,6 +57,20 @@ assert_single_public_entry() {
   echo "${file}: single public entry contract passed"
 }
 
+assert_direct_compose_default_port() {
+  local file="$1"
+  local config
+
+  config="$(FRONTEND_PORT= BACKEND_PORT= compose_config "$file")"
+  printf '%s\n' "$config" | grep -q 'published: "5166"' || {
+    echo "${file} must default to publishing 5166 when FRONTEND_PORT is not set." >&2
+    printf '%s\n' "$config" >&2
+    exit 1
+  }
+
+  echo "${file}: direct compose default port passed"
+}
+
 assert_installer_migration_guard() {
   local installer="${PROJECT_ROOT}/scripts/install-master.sh"
 
@@ -121,6 +135,10 @@ assert_single_public_entry docker-compose.yml
 assert_single_public_entry docker-compose-v4.yml
 assert_single_public_entry docker-compose-v6.yml
 assert_single_public_entry docker-compose.sqlite.yml
+assert_direct_compose_default_port docker-compose.yml
+assert_direct_compose_default_port docker-compose-v4.yml
+assert_direct_compose_default_port docker-compose-v6.yml
+assert_direct_compose_default_port docker-compose.sqlite.yml
 assert_installer_migration_guard
 
 echo "master port contract tests passed"

@@ -90,7 +90,7 @@ export default function AdminLayout({
       adminOnly: true
     },
     {
-      path: '/orchestrator',
+      path: '/control-center',
       label: t('主控中心'),
       icon: (
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">

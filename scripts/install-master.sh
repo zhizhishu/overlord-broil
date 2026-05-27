@@ -838,10 +838,10 @@ print_success() {
 Overlord Broil is running.
 
 Install dir: ${INSTALL_DIR}
-Panel URL:   http://${PANEL_HOST}:${FINAL_FRONTEND_PORT}
+Master URL:  http://${PANEL_HOST}:${FINAL_FRONTEND_PORT}
 Agent URL:   http://${PANEL_HOST}:${FINAL_FRONTEND_PORT}
 Runtime:     overlord-master single-image + $(if [ "$FINAL_DB_MODE" = "sqlite" ]; then printf 'SQLite'; else printf 'MySQL'; fi)
-Backend API: $(if [ "$FINAL_EXPOSE_BACKEND" = "1" ]; then printf 'http://%s:%s  (debug alias for the same overlord-master app; agents should still use the Panel URL)' "$PANEL_HOST" "$FINAL_BACKEND_PORT"; else printf 'served by the same Panel URL under /api/v1/*'; fi)
+Backend API: $(if [ "$FINAL_EXPOSE_BACKEND" = "1" ]; then printf 'http://%s:%s  (debug alias for the same overlord-master app; agents should still use the Master URL)' "$PANEL_HOST" "$FINAL_BACKEND_PORT"; else printf 'served by the same Master URL under /api/v1/*'; fi)
 phpMyAdmin:  $(if [ "$FINAL_DB_MODE" = "sqlite" ]; then printf 'not available in SQLite mode'; elif [ -n "$FINAL_PHPMYADMIN_PORT" ]; then printf 'http://%s:%s  (restrict by firewall in production)' "$PANEL_HOST" "$FINAL_PHPMYADMIN_PORT"; else printf 'not publicly exposed; set OB_PHPMYADMIN_PORT or --phpmyadmin-port to expose temporarily'; fi)
 
 Default login:

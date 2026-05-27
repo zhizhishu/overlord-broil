@@ -86,7 +86,7 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
 
                 require_systemd_host() {
                   if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then
-                    echo 'Xray Panel orchestration requires a Linux host with running systemd. Use Debian, Ubuntu, Rocky Linux or Oracle Linux for full Xray Panel install/configure tasks; Alpine/OpenRC is supported only for the Overlord agent, Snell node tasks and remote forwarding tasks.' >&2
+                    echo 'Xray Runtime orchestration requires a Linux host with running systemd. Use Debian, Ubuntu, Rocky Linux or Oracle Linux for full Xray Runtime install/configure tasks; Alpine/OpenRC is supported only for the Overlord agent, Snell node tasks and remote forwarding tasks.' >&2
                     exit 1
                   fi
                 }
@@ -150,7 +150,7 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                     tag="$(curl -4fsSL https://api.github.com/repos/${XRAY_PANEL_RELEASE_REPO}/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\\1/' | head -n 1 || true)"
                   fi
                   if [ -z "$tag" ]; then
-                    echo 'Failed to resolve latest Xray Panel version.' >&2
+                    echo 'Failed to resolve latest Xray Runtime version.' >&2
                     exit 1
                   fi
                   echo "$tag"
@@ -160,10 +160,10 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                   local arch version tarball url work
                   if [ "$INSTALL_XRAY_PANEL" != "1" ]; then
                     if command -v "$PANEL_LEGACY_NAME" >/dev/null 2>&1 || [ -x "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}" ]; then
-                      log 'Xray Panel install step skipped.'
+                      log 'Xray Runtime install step skipped.'
                       return
                     fi
-                    echo 'Xray Panel is not installed and installXrayPanel is disabled.' >&2
+                    echo 'Xray Runtime is not installed and installXrayPanel is disabled.' >&2
                     exit 1
                   fi
 
@@ -174,7 +174,7 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                   fi
                   url="https://github.com/${XRAY_PANEL_RELEASE_REPO}/releases/download/${version}/${PANEL_LEGACY_NAME}-linux-${arch}.tar.gz"
                   work="$(mktemp -d)"
-                  log "Installing Xray Panel ${version} for ${arch}"
+                  log "Installing Xray Runtime ${version} for ${arch}"
                   curl -4fL "$url" -o "${work}/${PANEL_LEGACY_NAME}-linux-${arch}.tar.gz"
                   tar zxf "${work}/${PANEL_LEGACY_NAME}-linux-${arch}.tar.gz" -C "$work"
 
@@ -213,7 +213,7 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                   local clean_base
                   clean_base="${WEB_BASE_PATH#/}"
                   if [ "$CONFIGURE_PANEL" = "1" ]; then
-                    log "Configuring Xray Panel panel on port ${PANEL_PORT}/${clean_base}"
+                    log "Configuring Xray Runtime panel on port ${PANEL_PORT}/${clean_base}"
                     "$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}" setting -username "$PANEL_USERNAME" -password "$PANEL_PASSWORD" -port "$PANEL_PORT" -webBasePath "$clean_base" -listenIP "$LISTEN_IP"
                     systemctl restart "$XRAY_PANEL_UNIT"
                   fi
@@ -345,7 +345,7 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                     fi
                     sleep 2
                   done
-                  echo "Xray Panel panel did not become ready at ${base}" >&2
+                  echo "Xray Runtime panel did not become ready at ${base}" >&2
                   exit 1
                 }
 
@@ -750,7 +750,7 @@ public class XrayPanelOrchestrationScriptServiceImpl implements XrayPanelOrchest
                 setup_certificate
                 API_TOKEN="$("$XRAY_PANEL_FOLDER/${PANEL_LEGACY_NAME}" setting -getApiToken true | awk '/apiToken:/ {print $2; exit}')"
                 if [ -z "$API_TOKEN" ]; then
-                  echo 'Failed to get or create Xray Panel API token.' >&2
+                  echo 'Failed to get or create Xray Runtime API token.' >&2
                   exit 1
                 fi
                 export API_TOKEN RESULT_FILE CERTIFICATE_DOMAIN PUBLIC_HOST REALITY_DEST REALITY_SNI WS_PATH SS_METHOD

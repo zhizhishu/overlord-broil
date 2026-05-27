@@ -30,7 +30,7 @@ services:
     container_name: overlord-master
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT}:5166"
+      - "${FRONTEND_PORT:-5166}:5166"
     environment:
       DB_HOST: mysql
       DB_NAME: ${DB_NAME}
@@ -39,8 +39,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
       SERVER_PORT: 5166
-      FRONTEND_PORT: ${FRONTEND_PORT}
-      BACKEND_PORT: ${BACKEND_PORT}
+      FRONTEND_PORT: ${FRONTEND_PORT:-5166}
+      BACKEND_PORT: ${BACKEND_PORT:-6365}
       PHPMYADMIN_PORT: ${PHPMYADMIN_PORT:-}
       EXPOSE_BACKEND: ${EXPOSE_BACKEND:-0}
       LOG_DIR: /app/logs

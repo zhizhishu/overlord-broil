@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Small stateful Xray Panel API fixture for local regression tests."""
+"""Small stateful Xray Runtime API fixture for local regression tests."""
 
 from __future__ import annotations
 
@@ -182,7 +182,7 @@ class Handler(BaseHTTPRequestHandler):
         method = self.command.upper()
 
         if parsed.path in ("/", "/healthz"):
-            self._ok({"fixture": "Xray Panel", "ok": True})
+            self._ok({"fixture": "Xray Runtime", "ok": True})
             return
 
         if Handler.api_token and parts[:1] == ["panel"] and not self._authorized():
@@ -364,11 +364,11 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run a local Xray Panel API fixture.")
+    parser = argparse.ArgumentParser(description="Run a local Xray Runtime API fixture.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--ready-file", default="")
-    parser.add_argument("--api-token", default=os.environ.get("XRAY_PANEL_FIXTURE_TOKEN", ""))
+    parser.add_argument("--api-token", default=os.environ.get("XRAY_RUNTIME_FIXTURE_TOKEN", ""))
     args = parser.parse_args()
 
     Handler.api_token = args.api_token
@@ -377,7 +377,7 @@ def main() -> int:
 
     if args.ready_file:
         pathlib.Path(args.ready_file).write_text(f"{host}:{port}", encoding="utf-8")
-    print(f"Xray Panel fixture listening on http://{host}:{port}", flush=True)
+    print(f"Xray Runtime fixture listening on http://{host}:{port}", flush=True)
 
     def stop(_signum: int, _frame: Any) -> None:
         threading.Thread(target=server.shutdown, daemon=True).start()

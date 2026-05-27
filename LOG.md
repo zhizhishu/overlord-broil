@@ -1,35 +1,58 @@
 # LOG.md
 
-## 2026-05-26
+## 2026-05-27
 
-### Full Source Rename To Xray Panel
+### Product Closeout Route, Port And Gate Hardening
 
-- Completed: removed upstream panel naming from Java classes, DTOs, REST routes, frontend API helpers, workflow names, script names, schema/table names, README/docs/release notes and generated screenshot text.
-- Completed: renamed the public master API surface to `/api/v1/xray-panel/*`.
-- Completed: renamed compatibility fixtures and optional real E2E to `scripts/test-xray-panel-fixture.sh`, `scripts/xray-panel-fixture.py`, `scripts/test-xray-panel-e2e.sh` and `.github/workflows/xray-panel-e2e.yml`.
-- Completed: compatible runtime service/path calls are now generated through runtime variables, preserving controlled-host behavior without keeping the upstream service literal in source.
-- Validation: upstream naming scan returned no hits.
-- Validation: `bash -n scripts/*.sh`, `bash scripts/test-xray-panel-fixture.sh`, `bash scripts/test-sqlite-schema.sh`, frontend `npm run build`, Docker Maven Java 21 `mvn -B -DskipTests package` and `git diff --check` passed.
+- Completed: locked the public master page route to `/control-center` and moved the frontend page module to `control-center.tsx`.
+- Completed: visible Xray connection and orchestration labels now use `Xray Runtime`, while master address settings use `主控地址`.
+- Completed: compose files now default to publishing `5166` when users run Docker Compose without `FRONTEND_PORT`.
+- Completed: `scripts/test-master-port-contract.sh` now verifies both installer-provided ports and direct compose defaults.
+- Completed: CI and `scripts/release-check.sh` now run backend contract tests for runtime routes, Runtime Provider capabilities and deploy-task behavior.
+- Completed: Runtime Provider orchestration protocol now uses `xray-runtime` in public API data and new tasks, without retaining the previous alias.
+- Completed: H5 navigation gained an admin-only control-center tab, and live screenshot assets now use `actual-control-center-*` names.
+- Validation: public naming scan had no blocking route/source-specific hits.
+- Validation: shell syntax, master port contract, Xray Runtime fixture, SQLite schema, agent mock, frontend `npm run build`, Docker Maven targeted tests, compose config/dry-run smoke and `git diff --check` passed.
 - Next: commit, push `main` and `future`, then confirm GitHub Actions.
 
-### Real Xray Panel Container And Master API E2E
+## 2026-05-26
 
-- Found: official `authorized disposable Xray Panel runtime image` (`Xray Panel 3.1.0`) can return `success=true` with `obj=null` from `/panel/api/server/status`, while the existing real E2E script required `obj` to be a JSON object.
-- Fixed: `scripts/test-xray-panel-e2e.sh` now accepts newer Xray Panel status envelopes as long as the `obj` key is present.
-- Completed: on `isrco-hk`, started a temporary Xray Panel container on `overlord-network`, generated a temporary API token, and ran direct real Xray Panel E2E write mode.
+### Product Runtime API Route Closure
+
+- Completed: collapsed the public Xray runtime API route to `/api/v1/runtimes/xray/*`.
+- Completed: the old source-specific route is not registered as a compatibility alias.
+- Completed: frontend API calls now use `/runtimes/xray/*` under the existing API base path.
+- Completed: README, docs and task handoff notes now point operators at the product runtime route.
+- Next: run frontend/backend/script verification, then push `main` and `future`.
+
+### Full Source Rename To Xray Runtime
+
+- Completed: removed upstream panel naming from Java classes, DTOs, REST routes, frontend API helpers, workflow names, script names, schema/table names, README/docs/release notes and generated screenshot text.
+- Completed: renamed the public master API surface to `/api/v1/runtimes/xray/*`.
+- Completed: renamed compatibility fixtures and optional real E2E to `scripts/test-xray-runtime-fixture.sh`, `scripts/xray-runtime-fixture.py`, `scripts/test-xray-runtime-e2e.sh` and `.github/workflows/xray-runtime-e2e.yml`.
+- Completed: compatible runtime service/path calls are now generated through runtime variables, preserving controlled-host behavior without keeping the upstream service literal in source.
+- Validation: upstream naming scan returned no hits.
+- Validation: `bash -n scripts/*.sh`, `bash scripts/test-xray-runtime-fixture.sh`, `bash scripts/test-sqlite-schema.sh`, frontend `npm run build`, Docker Maven Java 21 `mvn -B -DskipTests package` and `git diff --check` passed.
+- Next: commit, push `main` and `future`, then confirm GitHub Actions.
+
+### Real Xray Runtime Container And Master API E2E
+
+- Found: official `authorized disposable Xray Runtime image` (`Xray Runtime 3.1.0`) can return `success=true` with `obj=null` from `/panel/api/server/status`, while the existing real E2E script required `obj` to be a JSON object.
+- Fixed: `scripts/test-xray-runtime-e2e.sh` now accepts newer Xray Runtime status envelopes as long as the `obj` key is present.
+- Completed: on `isrco-hk`, started a temporary Xray Runtime container on `overlord-network`, generated a temporary API token, and ran direct real Xray Runtime E2E write mode.
 - Completed: direct E2E created, toggled and deleted a temporary VLESS inbound on port `42123`; DB verification confirmed `inbound_port_42123_count=0`.
-- Completed: Overlord master API used the same temporary real Xray Panel instance to test `/api/v1/xray-panel/test`, inbound list, add, set-enable false/true and delete on temporary port `42124`.
-- Cleanup: restored the server's original Xray Panel fields, removed the temporary Xray Panel container, deleted `/tmp/ob-xray-panel-e2e`, and verified only SSH plus master `5166/tcp` remained listening.
-- Validation: `bash -n scripts/test-xray-panel-e2e.sh` and `bash scripts/test-xray-panel-fixture.sh` passed after the compatibility fix.
+- Completed: Overlord master API used the same temporary real Xray Runtime instance to test `/api/v1/runtimes/xray/test`, inbound list, add, set-enable false/true and delete on temporary port `42124`.
+- Cleanup: restored the server's original Xray Runtime fields, removed the temporary Xray Runtime container, deleted `/tmp/ob-xray-runtime-e2e`, and verified only SSH plus master `5166/tcp` remained listening.
+- Validation: `bash -n scripts/test-xray-runtime-e2e.sh` and `bash scripts/test-xray-runtime-fixture.sh` passed after the compatibility fix.
 
 ### Live UI Evidence And Screenshot Capture
 
 - Completed: verified the live `isrco-hk` master UI after redeploying `ghcr.io/zhizhishu/overlord-broil:latest` in SQLite single-container mode.
-- Completed: confirmed the remote HTML now serves the Vite module script and the control center renders at `http://82.158.91.116:5166/?v=3437e2b#/orchestrator`.
-- Completed: captured real screenshots into `docs/assets/actual-login.png`, `docs/assets/actual-orchestrator-top.png` and `docs/assets/actual-orchestrator-full.png`.
+- Completed: confirmed the remote HTML now serves the Vite module script and the control center renders at `http://82.158.91.116:5166/?v=3437e2b#/control-center`.
+- Completed: captured real screenshots into `docs/assets/actual-login.png`, `docs/assets/actual-control-center-top.png` and `docs/assets/actual-control-center-full.png`.
 - Completed: README, README.zh-CN, GitHub Pages and Release Notes now reference the live console screenshot.
 - Validation: Chrome DevTools snapshot showed the live control center with server registry, State Sync, Runtime Provider layer, Operation Audit, Snell task history and server-card action groups.
-- Note: Browser cache can keep an old `/#/` shell; use a query before the hash, for example `/?v=<commit>#/orchestrator`, when validating a freshly redeployed image.
+- Note: Browser cache can keep an old `/#/` shell; use a query before the hash, for example `/?v=<commit>#/control-center`, when validating a freshly redeployed image.
 - Next: commit, push to `origin/main` and `origin/future`, then confirm CI/Pages.
 
 ### Snell Cleanup And Operator Confirmation Hardening
@@ -39,7 +62,7 @@
 - Completed: `scripts/test-snell-real-smoke.sh` now verifies service inactive, port closed and node cleanup after deleting the temporary Snell node.
 - Completed: source default Spring Boot port now matches the single master entry `5166`, while `6365` remains only a debug alias when explicitly exposed.
 - Completed: control-center delete/restart/outbound-save flows now reuse an in-app confirmation modal beyond the existing `agent-maintenance` dangerous-action contract.
-- Validation: shell syntax, agent mock, Xray Panel fixture, master port contract, SQLite schema, frontend `npm run build`, Docker Maven targeted tests `RuntimeProviderServiceTest,DeployTaskServiceImplTest` all passed.
+- Validation: shell syntax, agent mock, Xray Runtime fixture, master port contract, SQLite schema, frontend `npm run build`, Docker Maven targeted tests `RuntimeProviderServiceTest,DeployTaskServiceImplTest` all passed.
 - Next: push to `origin/main` and `origin/future`, wait for GHCR image build, redeploy `isrco-hk`, rerun live Snell smoke and capture console screenshots.
 
 ## 2026-05-26
@@ -51,11 +74,11 @@
 - Fixed: generated Snell scripts now chown config files to `nobody` when available and assert that install/restart leaves the service active before reporting success.
 - Found on the live UI: the post-build `toFile.mjs` removed `type="module"` script tags, leaving HTML with CSS but no app JavaScript, which caused the remote console to render an empty root.
 - Fixed: `toFile.mjs` now strips only unsupported attributes and preserves module scripts.
-- UI polish: added stable `data-testid` hooks for the control center, runtime panels, server cards and Xray Panel/Agent action groups, and replaced native dangerous-action confirmation with an in-app modal.
+- UI polish: added stable `data-testid` hooks for the control center, runtime panels, server cards and Xray Runtime/Agent action groups, and replaced native dangerous-action confirmation with an in-app modal.
 - Local validation passed:
   - shell syntax and bootstrap syntax
   - `bash scripts/test-agent-mock.sh`
-  - `bash scripts/test-xray-panel-fixture.sh`
+  - `bash scripts/test-xray-runtime-fixture.sh`
   - `bash scripts/test-master-port-contract.sh`
   - `bash scripts/test-sqlite-schema.sh`
   - frontend `npm run build`, with script tag verified in `dist/index.html`
@@ -95,7 +118,7 @@
 - 完成：删除旧分体 runtime 产品面，默认发布和安装路径只保留 `overlord-master` 单体主控镜像与当前 `overlord-agent` 被控安装方式。
 - 修改：移除 legacy compose、旧根级安装脚本、旧分体 Dockerfile、旧 VitePress 文档站和 standalone frontend Nginx 配置；GitHub Docker Images workflow 只构建/推送 `overlord-broil`；CI/release gate 不再验证 legacy compose。
 - 修正：`NodeServiceImpl` 生成当前项目 `install-agent-bootstrap.sh` 命令；配置页改为主控访问地址 `5166` 语义；浏览器标题/meta 和前端包名改为 Overlord Broil；新生成证书目录改为 `/root/cert/overlord-broil`，agent 保留旧证书路径读取兜底。
-- 验证：`bash -n scripts/*.sh`、bootstrap `sh -n`、master port contract、MySQL/SQLite compose dry-run、agent mock、Xray Panel fixture、前端 `npm run build`、Docker Maven package build、`git diff --check` 均通过。
+- 验证：`bash -n scripts/*.sh`、bootstrap `sh -n`、master port contract、MySQL/SQLite compose dry-run、agent mock、Xray Runtime fixture、前端 `npm run build`、Docker Maven package build、`git diff --check` 均通过。
 - 清理：Docker Maven 使用 `--rm`，测试容器已退出；未启动本地 dev server，未占用 `5166/5168/6365/8066` 等项目端口。
 - 后续：提交并推送 `origin/main` 与 `origin/future`，再确认 GitHub Actions 和 GHCR `overlord-master` 镜像。
 
@@ -109,7 +132,7 @@
 - 注意：`gh run list --commit f6381606c7410e1d8b89c6b93aaecbfbf210697f` 未返回 Actions run，因此本次以手动 Docker buildx push 和 `imagetools inspect` 作为镜像成果证明。
 - Actions：远端验证记录提交 `1fc801068ec3df0d8b329f4560bc40f140bd9182` 已推送到 `main` 和 `future`；`main CI` run `26448892387` 成功，`future CI` run `26448900654` 初次受 GitHub checkout/action 下载 403 影响失败，重跑失败项后成功，Pages run `26448891539` 初次下载官方 action 失败，重跑后成功。
 - 清理：未启动本地 dev server，未占用 `5166/5168/6365/8066` 等项目端口；保留 Docker buildx builder 容器 `buildx_buildkit_halowebui-multi0`。
-- 后续：继续推进真实 VPS 矩阵、真实 Xray Panel E2E 记录、UI polish、安全治理和镜像发布自动化稳定性。
+- 后续：继续推进真实 VPS 矩阵、真实 Xray Runtime E2E 记录、UI polish、安全治理和镜像发布自动化稳定性。
 
 ### Operation Audit Log
 
@@ -117,7 +140,7 @@
 - 修改：新增 `operation_audit_log` MySQL/SQLite schema、启动自动建表、后端实体/Mapper/Service/Controller、主控任务审计写入、前端 Operation Audit 面板、中英文 README/Operations/Pages/Release Notes 说明。
 - 安全：agent report 审计只记录 stdout/stderr/resultJson 长度，不写入原始日志；master 侧 actor 从 JWT 请求上下文解析，无请求上下文时明确记录为 `master-unknown`。
 - 验证：`bash -n scripts/*.sh`、`bash scripts/test-sqlite-schema.sh`、`git diff --check`、`npm run build` 通过；Docker Maven targeted test `RuntimeProviderServiceTest,DeployTaskServiceImplTest` 通过，25 tests、0 failures。
-- 清理：本轮未启动长期 dev server；Docker Maven 使用 `--rm`，测试容器已退出；保留 Maven 缓存卷 `flux-xray-panel-m2` 加速后续验证。
+- 清理：本轮未启动长期 dev server；Docker Maven 使用 `--rm`，测试容器已退出；保留 Maven 缓存卷 `flux-xray-runtime-m2` 加速后续验证。
 - 后续：提交推送到 `origin/main` 和 `origin/future`，再确认 GitHub Actions、Pages 和 GHCR 镜像成果。
 
 ## 2026-05-25
@@ -133,13 +156,13 @@
 
 - 完成：把默认运行形态收敛为 `mysql + overlord-master`，主控 Web UI 和 API 由同一个 Spring Boot 进程在 `5166` 提供。
 - 修改：更新根 `Dockerfile`、Compose、安装脚本、release 脚本、CI、Docker Images workflow、README、中文 README、Operations、Release Notes 和项目上下文。
-- 验证：通过 compose config、shell syntax、agent mock、Xray Panel fixture、dry-run compose smoke 和真实 Docker smoke；真实 smoke 中 `/flow/test` 与公共入口 `http://127.0.0.1:18080/` 均通过。
+- 验证：通过 compose config、shell syntax、agent mock、Xray Runtime fixture、dry-run compose smoke 和真实 Docker smoke；真实 smoke 中 `/flow/test` 与公共入口 `http://127.0.0.1:18080/` 均通过。
 - 推送：已推送 `ad9bb2e Add overlord-master single image runtime` 到 `origin/main` 和 `origin/future`。
 - 清理：Docker smoke 自动删除测试容器、网络、卷；复查 `18080` 无监听。
 
 ### Runtime Provider Registry Milestone
 
-- 完成：新增 Runtime Provider 层，主控可枚举并解析 `xrayPanel`、`snell`、`forward`、`certificate`、`firewall` 五类运行时。
+- 完成：新增 Runtime Provider 层，主控可枚举并解析 `xrayRuntime`、`snell`、`forward`、`certificate`、`firewall` 五类运行时。
 - 修改：
   - 后端新增 `RuntimeProviderDescriptor`、`RuntimeProviderAssignment`、`RuntimeProviderService` 和 `RuntimeProviderController`。
   - `DeployTask` 增加非数据库字段 `runtimeProvider`。
@@ -176,7 +199,7 @@
 
 ### Runtime State Task Result Model
 
-- 完成：新增统一 `resultJson.runtimeState` 任务结果模型，让 Xray Panel、Snell、转发、证书和防火墙任务共用一套运行时状态视图。
+- 完成：新增统一 `resultJson.runtimeState` 任务结果模型，让 Xray Runtime、Snell、转发、证书和防火墙任务共用一套运行时状态视图。
 - 修改：
   - `DeployTaskServiceImpl` 保存 Agent report 时生成 `runtimeState`，包含 provider、协议/动作、任务状态、解析后的 `status/statusSource`、服务状态、节点数量、转发数量、证书状态和诊断摘要。
   - `DeployTaskServiceImplTest` 新增服务/节点、诊断摘要和旧 Agent 兼容覆盖，验证运行时状态兜底逻辑。
@@ -197,7 +220,7 @@
 - 完成：新增 State Sync 运行时聚合视图，把单个任务的 `resultJson.runtimeState` 提升为“服务器 × Runtime Provider”的主控状态面板。
 - 修改：
   - `DeployTaskController` / `DeployTaskService` 新增 `/api/v1/deploy-task/runtime-state/overview`。
-  - `DeployTaskServiceImpl` 聚合最新任务运行时状态，并用 `control_server` 心跳里的 Xray Panel/Xray、Snell、证书字段补齐基础状态。
+  - `DeployTaskServiceImpl` 聚合最新任务运行时状态，并用 `control_server` 心跳里的 Xray Runtime/Xray、Snell、证书字段补齐基础状态。
   - `DeployTaskServiceImplTest` 新增 runtimeState 提取、任务聚合项、心跳种子状态和健康计数覆盖。
   - 前端新增 API/type，主控中心增加 State Sync 面板，展示健康/观察/异常/未知统计、来源、服务 chip、任务编号、节点/转发/证书和诊断摘要。
   - README、中文 README、Operations、Release Notes 和 PROJECT_CONTEXT 补充 State Sync 聚合接口和 UI 说明。
@@ -215,10 +238,10 @@
 
 ### State Sync Runtime Actions
 
-- 完成：State Sync 行现在可以直接创建 Runtime Provider 诊断任务；Xray Panel/Snell 行也可以创建对应修复任务。
+- 完成：State Sync 行现在可以直接创建 Runtime Provider 诊断任务；Xray Runtime/Snell 行也可以创建对应修复任务。
 - 修改：
-  - `vite-frontend/src/pages/orchestrator.tsx` 增加 provider 到诊断/修复 action 的映射。
-  - `createAgentMaintenance` 支持附加 State Sync 触发元数据，并保留 `source: orchestrator-ui`。
+  - `vite-frontend/src/pages/control-center.tsx` 增加 provider 到诊断/修复 action 的映射。
+  - `createAgentMaintenance` 支持附加 State Sync 触发元数据，并保留 `source: control-center-ui`。
   - State Sync 行增加 `运行时诊断` 和 `运行时修复` 按钮，继续复用普通 `agent-maintenance` 部署任务链路。
   - README、中文 README、Operations、Release Notes 和 PROJECT_CONTEXT 补充 State Sync 行动作说明。
 - 验证：
@@ -232,11 +255,11 @@
 
 ### Agent Remote Runtime Logs
 
-- 完成：`agent-maintenance logs` 现在会结构化回传 `logs.items`，覆盖 overlord-agent、Xray Panel/Xray、Snell、转发服务和最近任务日志；主控任务卡新增“远端日志”摘要面板。
+- 完成：`agent-maintenance logs` 现在会结构化回传 `logs.items`，覆盖 overlord-agent、Xray Runtime/Xray、Snell、转发服务和最近任务日志；主控任务卡新增“远端日志”摘要面板。
 - 修改：
   - `DeployTaskServiceImpl` 的维护脚本新增 `LOG_FILE`、日志行数上限、systemd/OpenRC 日志采集、最近任务日志采集和 `payload["logs"]` 输出。
   - `DeployTaskServiceImplTest` 覆盖 `logs.items` 在 runtime 元数据兜底时不丢失，并验证生成脚本包含结构化日志采集链路。
-  - `vite-frontend/src/pages/orchestrator.tsx` 新增远端日志解析和任务卡摘要面板，`vite-frontend/src/i18n/index.tsx` 补齐英文文案。
+  - `vite-frontend/src/pages/control-center.tsx` 新增远端日志解析和任务卡摘要面板，`vite-frontend/src/i18n/index.tsx` 补齐英文文案。
   - README、中文 README、Operations、Release Notes 和 PROJECT_CONTEXT 补充远端日志说明。
 - 验证：
   - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
@@ -253,9 +276,9 @@
 - 完成：新增 Runtime Provider Action Catalog，把 `agent-maintenance` 动作的 label、category、danger、stateSync 等元数据收回 Runtime Provider 层，主控 UI、后端校验和 Agent 维护任务入口共用同一份动作契约。
 - 修改：
   - 新增 `RuntimeProviderAction`，`RuntimeProviderDescriptor` 暴露 `actionCatalog`。
-  - `RuntimeProviderService` 注册 Xray Panel、Snell、Forward、Certificate、Firewall 的维护动作，并提供 `listAgentMaintenanceActions()` / `isAllowedAgentMaintenanceAction()`。
+  - `RuntimeProviderService` 注册 Xray Runtime、Snell、Forward、Certificate、Firewall 的维护动作，并提供 `listAgentMaintenanceActions()` / `isAllowedAgentMaintenanceAction()`。
   - `DeployTaskServiceImpl.validateDeployTask` 改为复用 catalog 校验 `agent-maintenance`，不再维护散落字符串白名单。
-  - `vite-frontend/src/pages/orchestrator.tsx` 增加 fallback catalog；State Sync 行动作和服务器卡片 Agent 按钮从 Runtime Provider action catalog 派生。
+  - `vite-frontend/src/pages/control-center.tsx` 增加 fallback catalog；State Sync 行动作和服务器卡片 Agent 按钮从 Runtime Provider action catalog 派生。
   - README、中文 README、Operations、Release Notes 和 PROJECT_CONTEXT 补充 Action Catalog 说明。
 - 验证：
   - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
@@ -306,27 +329,27 @@
   - 手动触发 main Docker Images run `26425624672` 成功，手动触发 future Docker Images run `26425624679` 成功。
   - GHCR `ghcr.io/zhizhishu/overlord-broil:latest` 可读取，index digest 为 `sha256:6ac01a8f03dbf17187d2c8a3ed69514dd79e841ffea30c6b5b753abbe092ba31`，linux/amd64 digest 为 `sha256:205667901f5dd3b59c765b56fca05dc4a52c948620e442a11de3ca0bc91bf240`。
 - 清理：本阶段只使用 `gh` 和 Docker imagetools 读取远端状态，未启动本地服务、未占用端口、未创建容器。
-- 后续：继续推进正式版缺口：真实 Xray Panel 容器级 E2E、真实 VPS 矩阵、UI 错误/加载/空状态 polish、安全治理和 agent 自动升级。
+- 后续：继续推进正式版缺口：真实 Xray Runtime 容器级 E2E、真实 VPS 矩阵、UI 错误/加载/空状态 polish、安全治理和 agent 自动升级。
 
-### Real Xray Panel E2E Harness
+### Real Xray Runtime E2E Harness
 
-- 完成：新增真实 Xray Panel E2E 合同烟测入口，继续把 Xray Panel/Xray Runtime 从 API fixture 推向可验证的真实端到端 gate。
+- 完成：新增真实 Xray Runtime E2E 合同烟测入口，继续把 Xray Runtime 从 API fixture 推向可验证的真实端到端 gate。
 - 修改：
-  - 新增 `scripts/test-xray-panel-e2e.sh`，支持真实 Xray Panel endpoint/token 的状态、入站、Xray config 只读检查，以及显式写入模式下临时 VLESS inbound 创建、切换和删除。
-  - 新增 `.github/workflows/xray-panel-e2e.yml` 手动 workflow，并把可选真实 E2E gate 接入 CI 和 `scripts/release-check.sh`。
-  - 增强 `scripts/xray-panel-fixture.py` 的 form-urlencoded 和 `/panel/api/server/getConfigJson` 覆盖，让 `scripts/test-xray-panel-fixture.sh` 能反打真实 E2E 脚本。
+  - 新增 `scripts/test-xray-runtime-e2e.sh`，支持真实 Xray Runtime endpoint/token 的状态、入站、Xray config 只读检查，以及显式写入模式下临时 VLESS inbound 创建、切换和删除。
+  - 新增 `.github/workflows/xray-runtime-e2e.yml` 手动 workflow，并把可选真实 E2E gate 接入 CI 和 `scripts/release-check.sh`。
+  - 增强 `scripts/xray-runtime-fixture.py` 的 form-urlencoded 和 `/panel/api/server/getConfigJson` 覆盖，让 `scripts/test-xray-runtime-fixture.sh` 能反打真实 E2E 脚本。
   - README、中文 README、Operations、Release Notes、GitHub Pages 和 PROJECT_CONTEXT 补充真实 E2E 的使用方式、skip 语义和剩余真机证明边界。
 - 验证：
   - `bash -lc 'bash -n scripts/*.sh && sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh'` 通过。
-  - `bash scripts/test-xray-panel-e2e.sh` 在无 endpoint/token 时按设计 skip。
-  - `bash scripts/test-xray-panel-fixture.sh` 通过，并完成新 E2E 脚本对本地 fixture 的状态、入站、Xray config、临时 inbound 创建/切换/删除验证。
-  - `bash scripts/release-check.sh` 通过，覆盖 agent mock、Xray Panel fixture、可选真实 E2E skip、compose、master port contract、Docker Node 22 前端 build、compose dry-run 和 `git diff --check`。
-- 清理：本地 Xray Panel fixture 随脚本退出清理；临时 inbound 已删除；Docker Node 22 验证容器使用 `--rm`；未保留本轮端口监听。
-- 后续：提交推送到 `origin/main` 和 `origin/future`，确认 GitHub Actions、Pages 和 GHCR 镜像成果；配置真实 Xray Panel secrets 后再跑手动 workflow。
+  - `bash scripts/test-xray-runtime-e2e.sh` 在无 endpoint/token 时按设计 skip。
+  - `bash scripts/test-xray-runtime-fixture.sh` 通过，并完成新 E2E 脚本对本地 fixture 的状态、入站、Xray config、临时 inbound 创建/切换/删除验证。
+  - `bash scripts/release-check.sh` 通过，覆盖 agent mock、Xray Runtime fixture、可选真实 E2E skip、compose、master port contract、Docker Node 22 前端 build、compose dry-run 和 `git diff --check`。
+- 清理：本地 Xray Runtime fixture 随脚本退出清理；临时 inbound 已删除；Docker Node 22 验证容器使用 `--rm`；未保留本轮端口监听。
+- 后续：提交推送到 `origin/main` 和 `origin/future`，确认 GitHub Actions、Pages 和 GHCR 镜像成果；配置真实 Xray Runtime secrets 后再跑手动 workflow。
 
-### Real Xray Panel E2E Remote Verification
+### Real Xray Runtime E2E Remote Verification
 
-- 完成：确认 `f9691f4 Add real Xray Panel E2E contract gate` 已同步到 `origin/main` 和 `origin/future`，并完成远端 CI、Pages、Docker Images 与 GHCR 镜像验证。
+- 完成：确认 `f9691f4 Add real Xray Runtime E2E contract gate` 已同步到 `origin/main` 和 `origin/future`，并完成远端 CI、Pages、Docker Images 与 GHCR 镜像验证。
 - 验证：
   - `origin/main` 和 `origin/future` 均指向 `f9691f4f28063f09391687c087519f4a0ff17cc6`。
   - main CI run `26428766161` 成功，future CI run `26428766915` 成功，main Pages deployment run `26428765778` 成功。
@@ -352,15 +375,15 @@
   - Docker Maven `RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 17 个测试成功。
   - `git diff --check` 通过，仅有 Windows LF/CRLF 提示。
   - `bash scripts/release-check.sh` 通过。
-- 清理：Agent mock 临时目录已清理；Xray Panel fixture 临时 inbound 已删除；Docker Maven 和 Docker Node 验证容器均使用 `--rm`，未保留容器或端口监听。
+- 清理：Agent mock 临时目录已清理；Xray Runtime fixture 临时 inbound 已删除；Docker Maven 和 Docker Node 验证容器均使用 `--rm`，未保留容器或端口监听。
 - 后续：提交推送到 `origin/main` 和 `origin/future`，确认 GitHub Actions、Pages 和 GHCR 镜像成果。
 
 ### Xray Agent Execution And Firewall Runtime Ports
 
-- 完成：把 Runtime Provider 继续从“可见/可审计”推进到“可执行”，补齐 Xray/Xray Panel inbound 编排和 firewall runtime port open/close 的 Agent 执行闭环。
+- 完成：把 Runtime Provider 继续从“可见/可审计”推进到“可执行”，补齐 Xray/Xray Runtime inbound 编排和 firewall runtime port open/close 的 Agent 执行闭环。
 - 修改：
-  - `DeployTaskServiceImpl.buildXrayAgentPayload` 不再只输出占位 payload，而是生成 Agent 可执行脚本，解析 Xray Panel endpoint/base path/token，调用 inbound add/delete 或 restart Xray API，并通过 `OB_AGENT_RESULT_JSON` 回传 inbound metadata。
-  - Xray agent 结果已做 token 脱敏：执行脚本可以使用 Xray Panel API token，但回报 JSON 只包含 `tokenConfigured`，不保存 token 明文。
+  - `DeployTaskServiceImpl.buildXrayAgentPayload` 不再只输出占位 payload，而是生成 Agent 可执行脚本，解析 Xray Runtime endpoint/base path/token，调用 inbound add/delete 或 restart Xray API，并通过 `OB_AGENT_RESULT_JSON` 回传 inbound metadata。
+  - Xray agent 结果已做 token 脱敏：执行脚本可以使用 Xray Runtime API token，但回报 JSON 只包含 `tokenConfigured`，不保存 token 明文。
   - `RuntimeProviderService` 将 `open-runtime-ports` 和 `close-runtime-ports` 注册为 firewall provider action，并让 runtime-port 类维护动作解析到 `firewall`。
   - `agent-maintenance` 脚本新增 runtime port 解析和本机 firewall 执行逻辑，支持 `ufw`、active `firewalld` 和 `iptables`，执行后继续输出结构化诊断。
   - 后端测试新增生成脚本 `bash -n` 校验，避免 Java text block / shell 拼接错误。
@@ -370,10 +393,10 @@
   - `bash -n scripts/*.sh` 通过。
   - `sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh` 通过。
   - `bash scripts/test-agent-mock.sh` 通过。
-  - `bash scripts/test-xray-panel-fixture.sh` 通过，完成 Xray Panel fixture 状态、入站、Xray config、临时 inbound 创建/切换/删除。
-  - `bash scripts/release-check.sh` 通过，覆盖 shell、agent mock、Xray Panel fixture + E2E fixture 反打、可选真实 E2E skip、compose config、master port contract、Docker Node 22 前端 build、compose dry-run 和 `git diff --check`。
+  - `bash scripts/test-xray-runtime-fixture.sh` 通过，完成 Xray Runtime fixture 状态、入站、Xray config、临时 inbound 创建/切换/删除。
+  - `bash scripts/release-check.sh` 通过，覆盖 shell、agent mock、Xray Runtime fixture + E2E fixture 反打、可选真实 E2E skip、compose config、master port contract、Docker Node 22 前端 build、compose dry-run 和 `git diff --check`。
   - Agent 任务结果脱敏修正后，Docker Maven targeted test：`RuntimeProviderServiceTest` + `DeployTaskServiceImplTest` 共 20 个测试成功。
-- 清理：Docker Maven 容器 `flux-runtime-provider-clean-test`、`flux-runtime-provider-ret-test` 和 `flux-runtime-provider-sanitize-test` 均使用 `--rm` 并已退出；release-check 使用的 Docker Node 22 容器、agent mock 和 Xray Panel fixture 的临时目录、临时服务和临时 inbound 已清理；未保留本轮端口监听。
+- 清理：Docker Maven 容器 `flux-runtime-provider-clean-test`、`flux-runtime-provider-ret-test` 和 `flux-runtime-provider-sanitize-test` 均使用 `--rm` 并已退出；release-check 使用的 Docker Node 22 容器、agent mock 和 Xray Runtime fixture 的临时目录、临时服务和临时 inbound 已清理；未保留本轮端口监听。
 - 后续：提交推送到 `origin/main` 和 `origin/future`，确认 GitHub Actions、Pages 和 GHCR 镜像成果。
 
 ### Runtime Provider Agent Execution Remote Verification
@@ -404,8 +427,8 @@
   - `bash -lc 'sh -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh'` 通过。
   - `npm run build` 通过，仅有既有 Vite dynamic/static import chunk 提示。
   - Docker Maven targeted test `RuntimeProviderServiceTest,DeployTaskServiceImplTest` 通过：22 tests, 0 failures。
-  - `bash scripts/release-check.sh` 通过，覆盖 shell、agent mock、SQLite schema、Xray Panel fixture、可选真实 Xray Panel E2E skip、compose config、master port contract、Docker Node 22 前端 build、MySQL/SQLite compose dry-run 和 `git diff --check`。
-- 清理：Docker Maven 容器 `flux-task-safety-test` 使用 `--rm` 并已退出；release-check 使用的 Docker Node 22 容器、agent mock 和 Xray Panel fixture 临时资源已清理；未保留本轮端口监听。
+  - `bash scripts/release-check.sh` 通过，覆盖 shell、agent mock、SQLite schema、Xray Runtime fixture、可选真实 Xray Runtime E2E skip、compose config、master port contract、Docker Node 22 前端 build、MySQL/SQLite compose dry-run 和 `git diff --check`。
+- 清理：Docker Maven 容器 `flux-task-safety-test` 使用 `--rm` 并已退出；release-check 使用的 Docker Node 22 容器、agent mock 和 Xray Runtime fixture 临时资源已清理；未保留本轮端口监听。
 - 后续：提交推送到 `origin/main` 和 `origin/future`，确认 GitHub Actions、Pages 和 GHCR 镜像成果。
 
 ### Overlord Broil Identity Consolidation
@@ -413,9 +436,9 @@
 - Completed: unified runtime and public product surface around Overlord Broil, overlord-master, overlord-agent, overlord.sql, overlord-mysql and overlord-network.
 - Completed: removed supported split backend/frontend image publishing and kept GitHub Actions Docker workflow focused on ghcr.io/zhizhishu/overlord-broil.
 - Completed: fixed app_name defaults and legacy app_name migration so new and upgraded installs show Overlord Broil instead of the previous name.
-- Completed: updated generated Xray Panel inbound comments and forwarding service descriptions to Overlord Broil wording.
+- Completed: updated generated Xray Runtime inbound comments and forwarding service descriptions to Overlord Broil wording.
 - Completed: rewrote README.zh-CN.md and docs/index.html as valid UTF-8 after detecting a PowerShell encoding regression.
-- Validation: shell syntax, master port contract, agent mock, MySQL and SQLite compose dry-runs, SQLite schema, Xray Panel fixture, frontend build, Docker Maven package and git diff --check passed.
+- Validation: shell syntax, master port contract, agent mock, MySQL and SQLite compose dry-runs, SQLite schema, Xray Runtime fixture, frontend build, Docker Maven package and git diff --check passed.
 - Cleanup: no long-running dev server was left open; Docker Maven used --rm and only retained the overlord-broil-m2 cache volume.
 
 ### Control Console Status-First UI Pass
@@ -427,6 +450,6 @@
 - Completed: updated README, README.zh-CN, GitHub Pages, release notes and PROJECT_CONTEXT so upstream names are compatibility/reference details rather than the product identity.
 - Validation:
   - frontend `npm run build` passed.
-  - `bash scripts/test-xray-panel-fixture.sh` passed, including temporary inbound create/toggle/delete against the local fixture.
+  - `bash scripts/test-xray-runtime-fixture.sh` passed, including temporary inbound create/toggle/delete against the local fixture.
   - `git diff --check` passed with only Windows CRLF warnings.
 - Cleanup: no dev server or long-running process was left open.

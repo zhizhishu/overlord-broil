@@ -1,7 +1,7 @@
 
 
 
-// 获取面板地址列表
+// 获取主控地址列表
 export async function getPanelAddresses(callback: string = "setPanelAddresses"){
     if ((window as any).JsInterface && (window as any).JsInterface.getPanelAddresses) {
         (window as any).JsInterface.getPanelAddresses(callback);
@@ -11,7 +11,7 @@ export async function getPanelAddresses(callback: string = "setPanelAddresses"){
 
 }
 
-// 保存面板地址
+// 保存主控地址
 export async function savePanelAddress(name: string, address: string){
     if ((window as any).JsInterface) {
         (window as any).JsInterface.savePanelAddress(name, address);
@@ -20,7 +20,7 @@ export async function savePanelAddress(name: string, address: string){
     }
 }
 
-// 设置当前面板地址
+// 设置当前主控地址
 export async function setCurrentPanelAddress(name: string) {
     if ((window as any).JsInterface) {
         (window as any).JsInterface.setCurrentPanelAddress(name);
@@ -29,7 +29,7 @@ export async function setCurrentPanelAddress(name: string) {
     }
 }
 
-// 删除面板地址
+// 删除主控地址
 export async function deletePanelAddress(name: string){
     if ((window as any).JsInterface) {
         (window as any).JsInterface.deletePanelAddress(name);
@@ -48,7 +48,7 @@ export function isWebViewFunc(){
   }
 }
 
-// 验证面板地址格式
+// 验证主控地址格式
 export function validatePanelAddress(address: string): boolean {
   try {
     // 基本格式检查：必须以 http:// 或 https:// 开头

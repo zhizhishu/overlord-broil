@@ -713,19 +713,19 @@ def low_memory_state(total_mb):
         return (
             True,
             "nano-critical",
-            "Memory is below 200 MB. Avoid full Xray Panel/Xray orchestration; prefer Snell or port forwarding and enable swap.",
+            "Memory is below 200 MB. Avoid full Xray Runtime/Xray orchestration; prefer Snell or port forwarding and enable swap.",
         )
     if total_mb < 256:
         return (
             True,
             "nano",
-            "Memory is below 256 MB. Treat this as a Nano node; avoid full Xray Panel/Xray unless swap is available.",
+            "Memory is below 256 MB. Treat this as a Nano node; avoid full Xray Runtime/Xray unless swap is available.",
         )
     if total_mb < 512:
         return (
             False,
             "small",
-            "Memory is below 512 MB. Full Xray Panel/Xray may work only with careful swap and low concurrency.",
+            "Memory is below 512 MB. Full Xray Runtime/Xray may work only with careful swap and low concurrency.",
         )
     return False, "standard", None
 

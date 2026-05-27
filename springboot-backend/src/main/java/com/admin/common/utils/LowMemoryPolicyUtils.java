@@ -38,13 +38,13 @@ public final class LowMemoryPolicyUtils {
             return null;
         }
         if (memoryTotalMb < NANO_CRITICAL_MEMORY_MB) {
-            return "Memory is below 200 MB. Avoid full Xray Panel/Xray orchestration; prefer Snell or port forwarding and enable swap.";
+            return "Memory is below 200 MB. Avoid full Xray Runtime/Xray orchestration; prefer Snell or port forwarding and enable swap.";
         }
         if (memoryTotalMb < NANO_MEMORY_MB) {
-            return "Memory is below 256 MB. Treat this as a Nano node; avoid full Xray Panel/Xray unless swap is available.";
+            return "Memory is below 256 MB. Treat this as a Nano node; avoid full Xray Runtime/Xray unless swap is available.";
         }
         if (memoryTotalMb < SMALL_MEMORY_MB) {
-            return "Memory is below 512 MB. Full Xray Panel/Xray may work only with careful swap and low concurrency.";
+            return "Memory is below 512 MB. Full Xray Runtime/Xray may work only with careful swap and low concurrency.";
         }
         return null;
     }

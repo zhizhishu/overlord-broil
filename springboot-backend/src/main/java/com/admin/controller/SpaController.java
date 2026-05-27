@@ -12,7 +12,7 @@ public class SpaController {
             "/forward",
             "/tunnel",
             "/node",
-            "/orchestrator",
+            "/control-center",
             "/user",
             "/profile",
             "/limit",

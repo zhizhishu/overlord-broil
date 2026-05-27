@@ -15,9 +15,10 @@ Default checks:
   - shell syntax
   - agent mock test
   - SQLite schema smoke test
-  - tokenized Xray Panel fixture test
-  - optional real Xray Panel E2E contract when XRAY_PANEL_E2E_URL/TOKEN are set
+  - tokenized Xray Runtime fixture test
+  - optional real Xray Runtime E2E contract when XRAY_RUNTIME_E2E_URL/TOKEN are set
   - single-image compose config validation
+  - backend contract tests for runtime routes, providers and deploy tasks
   - frontend install and production build in Docker Node 22
   - git whitespace check
 
@@ -97,11 +98,11 @@ bash scripts/test-agent-mock.sh
 step "Run SQLite schema smoke test"
 bash scripts/test-sqlite-schema.sh
 
-step "Run tokenized Xray Panel fixture tests"
-bash scripts/test-xray-panel-fixture.sh
+step "Run tokenized Xray Runtime fixture tests"
+bash scripts/test-xray-runtime-fixture.sh
 
-step "Run optional real Xray Panel E2E contract"
-bash scripts/test-xray-panel-e2e.sh
+step "Run optional real Xray Runtime E2E contract"
+bash scripts/test-xray-runtime-e2e.sh
 
 step "Validate compose files"
 docker compose -f docker-compose.yml config --quiet
@@ -112,10 +113,18 @@ docker compose -f docker-compose.sqlite.yml config --quiet
 step "Validate master port contract"
 bash scripts/test-master-port-contract.sh
 
+step "Run backend contract tests with Docker Maven"
+docker run --rm \
+  -v "${PROJECT_ROOT}:/workspace" \
+  -v ob_overlord_backend_m2:/root/.m2 \
+  -w /workspace/springboot-backend \
+  maven:3.9.9-eclipse-temurin-21 \
+  mvn -B "-Dtest=RuntimeProviderServiceTest,DeployTaskServiceImplTest,XrayRuntimeRouteContractTest" test
+
 step "Build frontend with Docker Node 22"
 docker run --rm \
   -v "${PROJECT_ROOT}:/workspace" \
-  -v ob_xray-panel_frontend_node_modules:/workspace/vite-frontend/node_modules \
+  -v ob_xray-runtime_frontend_node_modules:/workspace/vite-frontend/node_modules \
   -w /workspace/vite-frontend \
   node:22-bookworm \
   bash -lc "npm install --legacy-peer-deps --no-audit --no-fund && npm run build"

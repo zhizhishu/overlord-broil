@@ -108,7 +108,7 @@ export default function IndexPage() {
         tacInstanceRef.current = null;
       }
 
-      // 使用axios的baseURL，确保在WebView中使用正确的面板地址
+      // 使用axios的baseURL，确保在WebView中使用正确的主控地址
       const baseURL = axios.defaults.baseURL || (import.meta.env.VITE_API_BASE ? `${import.meta.env.VITE_API_BASE}/api/v1/` : '/api/v1/');
       
       const config: CaptchaConfig = {

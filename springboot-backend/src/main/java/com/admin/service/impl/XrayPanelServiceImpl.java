@@ -185,7 +185,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
 
         R inboundResult = apiGet(server, "/panel/api/inbounds/list", true);
         if (inboundResult.getCode() != 0 || !isSuccessEnvelope(inboundResult.getData())) {
-            return inboundResult.getCode() != 0 ? inboundResult : R.err("Xray Panel inbound traffic sync failed");
+            return inboundResult.getCode() != 0 ? inboundResult : R.err("Xray Runtime inbound traffic sync failed");
         }
         syncInboundSnapshots(server, toJsonArray(unwrapObj(inboundResult.getData())), now, snapshots, totals);
 
@@ -196,7 +196,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
         } else {
             outboundError = outboundResult.getMsg();
             if (outboundError == null || outboundError.isEmpty()) {
-                outboundError = "Xray Panel outbound traffic sync skipped";
+                outboundError = "Xray Runtime outbound traffic sync skipped";
             }
         }
 
@@ -273,19 +273,19 @@ public class XrayPanelServiceImpl implements XrayPanelService {
             return R.err("server not found");
         }
         if (bearerRequired && isBlank(server.getXrayPanelApiToken())) {
-            return R.err("Xray Panel api token is required for this action");
+            return R.err("Xray Runtime api token is required for this action");
         }
         if (isBlank(server.getXrayPanelEndpoint())) {
-            return R.err("Xray Panel endpoint is required");
+            return R.err("Xray Runtime endpoint is required");
         }
 
         try {
             ResponseEntity<String> response = clientFor(server).exchange(buildUrl(server, path), method, entity, String.class);
             return normalizeResponse(response.getBody());
         } catch (RestClientException e) {
-            return R.err("Xray Panel request failed: " + e.getMessage());
+            return R.err("Xray Runtime request failed: " + e.getMessage());
         } catch (Exception e) {
-            return R.err("Xray Panel client error: " + e.getMessage());
+            return R.err("Xray Runtime client error: " + e.getMessage());
         }
     }
 
@@ -303,7 +303,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
             return XrayPanelSession.error("server not found");
         }
         if (isBlank(server.getXrayPanelUsername()) || isBlank(server.getXrayPanelPassword())) {
-            return XrayPanelSession.error("Xray Panel username and password are required for outbound save");
+            return XrayPanelSession.error("Xray Runtime username and password are required for outbound save");
         }
         try {
             RestTemplate client = clientFor(server);
@@ -311,7 +311,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
             String csrf = extractObjString(csrfResp.getBody());
             List<String> cookies = new ArrayList<>(csrfResp.getHeaders().getOrEmpty(HttpHeaders.SET_COOKIE));
             if (isBlank(csrf)) {
-                return XrayPanelSession.error("Xray Panel csrf token missing");
+                return XrayPanelSession.error("Xray Runtime csrf token missing");
             }
 
             MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
@@ -331,12 +331,12 @@ public class XrayPanelServiceImpl implements XrayPanelService {
             cookies.addAll(loginResp.getHeaders().getOrEmpty(HttpHeaders.SET_COOKIE));
             R loginResult = normalizeResponse(loginResp.getBody());
             if (loginResult.getCode() != 0 || !isSuccessEnvelope(loginResult.getData())) {
-                return XrayPanelSession.error("Xray Panel login failed");
+                return XrayPanelSession.error("Xray Runtime login failed");
             }
 
             return new XrayPanelSession(csrf, joinCookies(cookies), null);
         } catch (Exception e) {
-            return XrayPanelSession.error("Xray Panel login request failed: " + e.getMessage());
+            return XrayPanelSession.error("Xray Runtime login request failed: " + e.getMessage());
         }
     }
 
@@ -356,7 +356,7 @@ public class XrayPanelServiceImpl implements XrayPanelService {
 
     private String guardInboundPort(ControlServer server, Map<String, Object> payload) {
         Integer port = payloadPort(payload);
-        return MasterSelfProtectionUtils.validateListenPort(server, port, "Xray Panel inbound 端口");
+        return MasterSelfProtectionUtils.validateListenPort(server, port, "Xray Runtime inbound 端口");
     }
 
     private Integer payloadPort(Map<String, Object> payload) {

@@ -14,6 +14,8 @@ import java.util.Map;
 @Service
 public class RuntimeProviderService {
 
+    public static final String XRAY_ORCHESTRATION_PROTOCOL = "xray-runtime";
+
     private final List<RuntimeProviderDescriptor> providers;
     private final Map<String, RuntimeProviderDescriptor> providerMap;
 
@@ -22,6 +24,7 @@ public class RuntimeProviderService {
         Map<String, RuntimeProviderDescriptor> map = new LinkedHashMap<>();
         for (RuntimeProviderDescriptor provider : providers) {
             map.put(provider.getKey(), provider);
+            map.put(normalize(provider.getKey()), provider);
         }
         this.providerMap = Collections.unmodifiableMap(map);
     }
@@ -40,7 +43,7 @@ public class RuntimeProviderService {
     public RuntimeProviderAssignment assign(String protocol, String action) {
         RuntimeProviderDescriptor provider = resolve(protocol, action);
         if (provider == null) {
-            provider = providerMap.get("xrayPanel");
+            provider = providerMap.get("xrayRuntime");
         }
         RuntimeProviderAssignment assignment = new RuntimeProviderAssignment();
         assignment.setKey(provider.getKey());
@@ -78,8 +81,8 @@ public class RuntimeProviderService {
         if ("agent-maintenance".equals(normalizedProtocol)) {
             return resolveAgentMaintenance(normalizedAction);
         }
-        if ("xrayPanel-orchestrator".equals(normalizedProtocol)) {
-            return providerMap.get("xrayPanel");
+        if (XRAY_ORCHESTRATION_PROTOCOL.equals(normalizedProtocol)) {
+            return providerMap.get("xrayRuntime");
         }
         for (RuntimeProviderDescriptor provider : providers) {
             if (contains(provider.getProtocols(), normalizedProtocol)
@@ -87,7 +90,7 @@ public class RuntimeProviderService {
                 return provider;
             }
         }
-        return providerMap.get("xrayPanel");
+        return providerMap.get("xrayRuntime");
     }
 
     public List<RuntimeProviderAction> listAgentMaintenanceActions() {
@@ -141,12 +144,13 @@ public class RuntimeProviderService {
         if (action.contains("snell")) {
             return providerMap.get("snell");
         }
-        return providerMap.get("xrayPanel");
+        return providerMap.get("xrayRuntime");
     }
 
     private List<String> resolveRelatedProviders(RuntimeProviderDescriptor provider, String protocol) {
-        if ("xrayPanel-orchestrator".equals(normalize(protocol))) {
-            return Arrays.asList("xrayPanel", "snell", "certificate", "firewall");
+        String normalizedProtocol = normalize(protocol);
+        if (XRAY_ORCHESTRATION_PROTOCOL.equals(normalizedProtocol)) {
+            return Arrays.asList("xrayRuntime", "snell", "certificate", "firewall");
         }
         return new ArrayList<>(provider.getRelatedProviders());
     }
@@ -166,31 +170,31 @@ public class RuntimeProviderService {
     private List<RuntimeProviderDescriptor> buildProviders() {
         List<RuntimeProviderDescriptor> result = new ArrayList<>();
         result.add(provider(
-                "xrayPanel",
-                "Xray Panel / Xray Runtime",
+                "xrayRuntime",
+                "Xray Runtime",
                 "proxy-runtime",
                 "master-api + agent-task",
-                "control_server.xrayPanel/xray status, xray_panel_traffic_snapshot, protocol_node",
-                "Xray Panel panel API, Xray inbound/outbound, Reality, VMess, Trojan, Shadowsocks and traffic sync.",
+                "control_server runtime/xray status, runtime traffic snapshots, protocol_node",
+                "Xray Runtime panel API, Xray inbound/outbound, Reality, VMess, Trojan, Shadowsocks and traffic sync.",
                 true,
                 true,
                 false,
-                list("vless", "vmess", "trojan", "shadowsocks", "xrayPanel-orchestrator"),
-                list("present", "absent", "restart", "orchestrate", "repair-xrayPanel", "repair-xray", "sync-traffic"),
+                list("vless", "vmess", "trojan", "shadowsocks", XRAY_ORCHESTRATION_PROTOCOL),
+                list("present", "absent", "restart", "orchestrate", "repair-xray-runtime", "repair-xray", "sync-traffic"),
                 list(
-                        action("doctor", "诊断", "diagnostic", "agent-maintenance", "xrayPanel", false, true, true),
-                        action("status", "状态", "diagnostic", "agent-maintenance", "xrayPanel", false, false, false),
-                        action("logs", "日志", "diagnostic", "agent-maintenance", "xrayPanel", false, true, false),
-                        action("install-diagnose", "安装诊断", "diagnostic", "agent-maintenance", "xrayPanel", false, true, true),
-                        action("repair-xrayPanel", "修复 Xray Panel", "repair", "agent-maintenance", "xrayPanel", false, true, true),
-                        action("repair-xray", "修复 Xray", "repair", "agent-maintenance", "xrayPanel", false, true, true),
-                        action("repair-all", "一键修复", "repair", "agent-maintenance", "xrayPanel", false, true, false),
-                        action("restart-agent", "重启 agent", "maintenance", "agent-maintenance", "xrayPanel", false, false, false),
-                        action("upgrade-agent", "升级 agent", "maintenance", "agent-maintenance", "xrayPanel", false, false, false),
-                        action("uninstall-agent", "卸载 agent", "danger", "agent-maintenance", "xrayPanel", true, false, false)
+                        action("doctor", "诊断", "diagnostic", "agent-maintenance", "xrayRuntime", false, true, true),
+                        action("status", "状态", "diagnostic", "agent-maintenance", "xrayRuntime", false, false, false),
+                        action("logs", "日志", "diagnostic", "agent-maintenance", "xrayRuntime", false, true, false),
+                        action("install-diagnose", "安装诊断", "diagnostic", "agent-maintenance", "xrayRuntime", false, true, true),
+                        action("repair-xray-runtime", "修复 Xray Runtime", "repair", "agent-maintenance", "xrayRuntime", false, true, true),
+                        action("repair-xray", "修复 Xray", "repair", "agent-maintenance", "xrayRuntime", false, true, true),
+                        action("repair-all", "一键修复", "repair", "agent-maintenance", "xrayRuntime", false, true, false),
+                        action("restart-agent", "重启 agent", "maintenance", "agent-maintenance", "xrayRuntime", false, false, false),
+                        action("upgrade-agent", "升级 agent", "maintenance", "agent-maintenance", "xrayRuntime", false, false, false),
+                        action("uninstall-agent", "卸载 agent", "danger", "agent-maintenance", "xrayRuntime", true, false, false)
                 ),
-                list("install-Xray Panel", "configure-panel", "create-inbound", "manage-outbound", "restart-xray", "sync-traffic"),
-                list("xrayPanelEndpoint", "xrayPanelApiToken or xrayPanelUsername/xrayPanelPassword"),
+                list("install-runtime", "configure-runtime", "create-inbound", "manage-outbound", "read-config", "save-config", "restart-xray", "sync-traffic"),
+                list("runtimeEndpoint", "runtimeApiToken or runtimeUsername/runtimePassword"),
                 list("5168 optional panel", "user-defined inbound ports"),
                 list("certificate", "firewall")
         ));
@@ -240,7 +244,7 @@ public class RuntimeProviderService {
                 "certificate-runtime",
                 "agent-task",
                 "control_server.certificate status, deploy_task result",
-                "Certificate tasks diagnose or issue local certificates for Xray Panel/Xray and related inbound services.",
+                "Certificate tasks diagnose or issue local certificates for Xray Runtime/Xray and related inbound services.",
                 true,
                 false,
                 false,
@@ -252,7 +256,7 @@ public class RuntimeProviderService {
                 list("self-signed", "acme-http", "expiry-report", "diagnose-dns-and-port"),
                 list("certificate domain for acme-http"),
                 list("80 only for acme-http validation"),
-                list("xrayPanel", "firewall")
+                list("xrayRuntime", "firewall")
         ));
         result.add(provider(
                 "firewall",
@@ -274,7 +278,7 @@ public class RuntimeProviderService {
                 list("ufw/firewalld/iptables-detect", "port-diagnose", "open-runtime-ports", "close-runtime-ports"),
                 list("runtime ports"),
                 list("runtime-dependent ports"),
-                list("xrayPanel", "snell", "forward", "certificate")
+                list("xrayRuntime", "snell", "forward", "certificate")
         ));
         return result;
     }

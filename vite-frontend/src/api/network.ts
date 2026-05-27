@@ -66,9 +66,9 @@ function isTokenExpired(response: ApiResponse) {
 const Network = {
   get: function<T = any>(path: string = '', data: any = {}): Promise<ApiResponse<T>> {
     return new Promise(function(resolve) {
-      // 如果baseURL是默认值且是WebView环境，说明没有设置面板地址
+      // 如果baseURL是默认值且是WebView环境，说明没有设置主控地址
       if (baseURL === '') {
-        resolve({"code": -1, "msg": " - 请先设置面板地址", "data": null as T});
+        resolve({"code": -1, "msg": " - 请先设置主控地址", "data": null as T});
         return;
       }
 
@@ -103,9 +103,9 @@ const Network = {
 
   post: function<T = any>(path: string = '', data: any = {}): Promise<ApiResponse<T>> {
     return new Promise(function(resolve) {
-      // 如果baseURL是默认值且是WebView环境，说明没有设置面板地址
+      // 如果baseURL是默认值且是WebView环境，说明没有设置主控地址
       if (baseURL === '') {
-        resolve({"code": -1, "msg": " - 请先设置面板地址", "data": null as T});
+        resolve({"code": -1, "msg": " - 请先设置主控地址", "data": null as T});
         return;
       }
 
@@ -139,4 +139,4 @@ const Network = {
   }
 };
 
-export default Network; 
+export default Network;

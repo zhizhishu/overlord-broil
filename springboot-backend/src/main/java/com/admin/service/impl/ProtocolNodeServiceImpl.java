@@ -120,7 +120,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         inboundDto.setPayload(payload);
         R remote = xrayPanelService.addInbound(inboundDto);
         if (!isRemoteSuccess(remote)) {
-            return R.err(remoteError(remote, "Xray Panel inbound create failed"));
+            return R.err(remoteError(remote, "Xray Runtime inbound create failed"));
         }
 
         node.setRemoteId(firstNotBlank(node.getRemoteId(), extractRemoteId(remote.getData())));
@@ -194,7 +194,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
             inboundDto.setPayload(payload);
             R remote = xrayPanelService.updateInbound(inboundDto);
             if (!isRemoteSuccess(remote)) {
-                return R.err(remoteError(remote, "Xray Panel inbound update failed"));
+                return R.err(remoteError(remote, "Xray Runtime inbound update failed"));
             }
             exists.setConfigJson(JSON.toJSONString(payload));
             exists.setState("active");
@@ -259,7 +259,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
             inboundDto.setInboundId(parseInt(node.getRemoteId()));
             R remote = xrayPanelService.deleteInbound(inboundDto);
             if (!isRemoteSuccess(remote)) {
-                return R.err(remoteError(remote, "Xray Panel inbound delete failed"));
+                return R.err(remoteError(remote, "Xray Runtime inbound delete failed"));
             }
         }
         return this.removeById(node.getId()) ? R.ok("protocol node deleted") : R.err("protocol node delete failed");
@@ -303,7 +303,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         }
         R remote = xrayPanelService.listInbounds(serverDto(server.getId()));
         if (!isRemoteSuccess(remote)) {
-            return R.err(remoteError(remote, "Xray Panel inbound sync failed"));
+            return R.err(remoteError(remote, "Xray Runtime inbound sync failed"));
         }
 
         long now = System.currentTimeMillis();
