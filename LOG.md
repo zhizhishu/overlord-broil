@@ -91,3 +91,4 @@
 - Completed: updated README, Chinese README and project context so public API examples only show product routes.
 - Completed: renamed frontend node-service API/type identifiers away from old node-core wording.
 - Validation: public keyword scan, frontend build, shell syntax, bootstrap syntax, master port contract, agent mock, SQLite schema, Docker Maven backend contract tests and `git diff --check` passed.
+- Release: pushed `a9e0ca2` to `main`; GitHub Actions `CI`, `Docker Images` and `Pages` all succeeded for that commit.

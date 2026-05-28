@@ -105,14 +105,16 @@ Close the Broil product flow for urgent use: one cohesive control center, simple
 
 ## Remaining
 
-1. Commit and push the API surface close to GitHub.
-2. Confirm the latest GitHub Actions result after push.
-3. Optional next hardening outside this goal: pull the latest image on `isrco-hk` and run a browser/HK smoke with a real master login.
-4. Optional before claiming `1.0`: add broader long-running real-VPS soak tests.
+No required work remains for the current productization goal.
+
+Optional next hardening outside this goal:
+
+1. Pull the latest image on `isrco-hk` and run a browser/HK smoke with a real master login.
+2. Add broader long-running real-VPS soak tests before claiming `1.0` commercial stability.
 
 ## Risks
 
 - The join flow is now server-card based self-registration: the server record is created first, then the agent exchanges `OB_JOIN_TOKEN` for internal credentials automatically.
 - Node-service connector paths are internal service contracts and must not be blindly renamed.
 - Local host has no native Java/Maven; Docker Maven can be very slow on the Windows bind mount.
-- Current GitHub `main` head before this local API-surface close is `1f885f6`; CI, Docker Images and Pages succeeded for that commit.
+- Current GitHub `main` head is `a9e0ca2`; CI, Docker Images and Pages succeeded for that commit.
