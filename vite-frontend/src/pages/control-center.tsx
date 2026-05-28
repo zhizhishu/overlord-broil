@@ -11,6 +11,7 @@ import { Spinner } from "@heroui/spinner";
 import { Switch } from "@heroui/switch";
 import toast from "react-hot-toast";
 
+import { controlCenterSectionIds } from "@/config/control-center";
 import { useLanguage } from "@/i18n";
 import {
   createControlServer,
@@ -303,17 +304,6 @@ const blankServerForwardRuleForm: ServerForwardRuleForm = {
 
 const GB = 1024 * 1024 * 1024;
 const DEFAULT_OUTBOUND_TAGS = ["direct", "block", "dns"];
-const CONTROL_CENTER_SECTION_IDS = [
-  "dashboard",
-  "servers",
-  "inbounds",
-  "routes",
-  "tunnels",
-  "traffic",
-  "certificates",
-  "settings"
-];
-
 const uniqueStrings = (values: string[]) => Array.from(new Set(values.map(value => value.trim()).filter(Boolean)));
 
 const randomBytes = (length: number) => {
@@ -889,7 +879,7 @@ export default function ControlCenterPage() {
   }, []);
 
   const scrollControlSection = (sectionId: string) => {
-    if (!CONTROL_CENTER_SECTION_IDS.includes(sectionId)) {
+    if (!controlCenterSectionIds.includes(sectionId as any)) {
       return;
     }
     const container = scrollRootRef.current;

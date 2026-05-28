@@ -74,7 +74,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         registry.addResourceHandler("/assets/**", "/favicon*.ico", "/vite.svg")
                 .addResourceLocations("classpath:/static/")
-                .setCacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic().immutable());
+                .setCacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic());
         registry.addResourceHandler("/**")
                 .addResourceLocations("classpath:/static/")
                 .setCacheControl(CacheControl.noStore());

@@ -11,6 +11,7 @@ import { LanguageSwitch } from '@/components/language-switch';
 import { updatePassword } from '@/api';
 import { safeLogout } from '@/utils/logout';
 import { siteConfig } from '@/config/site';
+import { controlCenterSections } from '@/config/control-center';
 import { useLanguage } from '@/i18n';
 
 interface MenuItem {
@@ -26,17 +27,6 @@ interface PasswordForm {
   newPassword: string;
   confirmPassword: string;
 }
-
-const controlCenterSections = [
-  { id: 'dashboard', label: '仪表盘' },
-  { id: 'servers', label: '服务器' },
-  { id: 'inbounds', label: '入站节点' },
-  { id: 'routes', label: '出站与路由' },
-  { id: 'tunnels', label: '转发/隧道' },
-  { id: 'traffic', label: '流量' },
-  { id: 'certificates', label: '证书' },
-  { id: 'settings', label: '设置' }
-];
 
 export default function AdminLayout({
   children,
@@ -119,17 +109,9 @@ export default function AdminLayout({
     }
   };
 
-  const scrollToSection = (id: string) => {
-    const run = () => {
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    };
-    window.requestAnimationFrame(() => window.requestAnimationFrame(run));
-  };
-
   const handleSectionClick = (id: string) => {
     navigate(`/control-center#${id}`);
     window.dispatchEvent(new CustomEvent('ob-control-section', { detail: id }));
-    scrollToSection(id);
     if (isMobile) {
       hideMobileMenu();
     }
