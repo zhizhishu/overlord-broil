@@ -632,6 +632,57 @@ public class XrayRuntimeDeploymentPlanScriptServiceImpl implements XrayRuntimeDe
                 PY
                 }
 
+                service_status() {
+                  local service="$1"
+                  if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+                    systemctl is-active "$service" 2>/dev/null || true
+                    return
+                  fi
+                  if command -v rc-service >/dev/null 2>&1; then
+                    if rc-service "${service%.service}" status >/dev/null 2>&1; then
+                      echo active
+                    else
+                      echo inactive
+                    fi
+                    return
+                  fi
+                  echo unknown
+                }
+
+                snell_status() {
+                  local services service state found active failed inactive
+                  services=''
+                  found=0
+                  active=0
+                  failed=0
+                  inactive=0
+                  if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+                    services="$(systemctl list-units --type=service --all 'snell-node-*.service' --no-legend --no-pager 2>/dev/null | awk '{print $1}' || true)"
+                  elif command -v rc-service >/dev/null 2>&1; then
+                    services="$(rc-service -l 2>/dev/null | awk '/^snell-node-/ {print $1}' || true)"
+                  fi
+                  for service in $services; do
+                    found=$((found + 1))
+                    state="$(service_status "$service")"
+                    case "$state" in
+                      active|running) active=$((active + 1)) ;;
+                      failed|error) failed=$((failed + 1)) ;;
+                      *) inactive=$((inactive + 1)) ;;
+                    esac
+                  done
+                  if [ "$found" -eq 0 ]; then
+                    service_status snell.service
+                  elif [ "$active" -gt 0 ] && [ "$failed" -eq 0 ] && [ "$inactive" -eq 0 ]; then
+                    echo active
+                  elif [ "$active" -gt 0 ]; then
+                    echo mixed
+                  elif [ "$failed" -gt 0 ]; then
+                    echo failed
+                  else
+                    echo inactive
+                  fi
+                }
+
                 build_result_marker() {
                   local xray_bin xray_version snell_version endpoint base_path api_token
                   local xray_runtime_service_status xray_service_status snell_service_status cert_status cert_expire_at now_ts
@@ -652,7 +703,7 @@ public class XrayRuntimeDeploymentPlanScriptServiceImpl implements XrayRuntimeDe
                     snell_version="$(snell-server -v 2>&1 | head -n 1 || true)"
                   fi
                   xray_runtime_service_status="$(systemctl is-active "$XRAY_RUNTIME_UNIT" 2>/dev/null || echo unknown)"
-                  snell_service_status="$(systemctl is-active snell 2>/dev/null || echo not-installed)"
+                  snell_service_status="$(snell_status)"
                   if pgrep -fa '[x]ray' >/dev/null 2>&1; then
                     xray_service_status='active'
                   else

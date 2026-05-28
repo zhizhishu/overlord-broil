@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
@@ -302,6 +303,16 @@ const blankServerForwardRuleForm: ServerForwardRuleForm = {
 
 const GB = 1024 * 1024 * 1024;
 const DEFAULT_OUTBOUND_TAGS = ["direct", "block", "dns"];
+const CONTROL_CENTER_SECTION_IDS = [
+  "dashboard",
+  "servers",
+  "inbounds",
+  "routes",
+  "tunnels",
+  "traffic",
+  "certificates",
+  "settings"
+];
 
 const uniqueStrings = (values: string[]) => Array.from(new Set(values.map(value => value.trim()).filter(Boolean)));
 
@@ -668,6 +679,38 @@ const isNanoCriticalServer = (server?: ControlServer) => {
   return Boolean(server?.memoryTotalMb && server.memoryTotalMb > 0 && server.memoryTotalMb < NANO_CRITICAL_MEMORY_MB);
 };
 
+const applyRoutingTemplate = (value: any, template: "ipv4" | "ipv6" | "direct" | "block-cn") => {
+  const config = typeof value === "string" ? safeJsonParse(value) : value;
+  if (!config || typeof config !== "object") {
+    return null;
+  }
+  const next = JSON.parse(JSON.stringify(config));
+  next.routing = next.routing && typeof next.routing === "object" ? next.routing : {};
+  const existingRules = Array.isArray(next.routing.rules) ? next.routing.rules : [];
+  const withoutBroilRules = existingRules.filter((rule: any) => !String(rule?.tag || "").startsWith("broil-"));
+
+  if (template === "ipv4") {
+    next.routing.domainStrategy = "UseIPv4";
+  }
+  if (template === "ipv6") {
+    next.routing.domainStrategy = "UseIPv6";
+  }
+  if (template === "direct") {
+    next.routing.rules = [
+      { tag: "broil-direct-private", type: "field", outboundTag: "direct", ip: ["geoip:private"] },
+      ...withoutBroilRules
+    ];
+  }
+  if (template === "block-cn") {
+    next.routing.rules = [
+      { tag: "broil-direct-cn", type: "field", outboundTag: "direct", domain: ["geosite:cn"], ip: ["geoip:cn"] },
+      { tag: "broil-block-ads", type: "field", outboundTag: "block", domain: ["geosite:category-ads-all"] },
+      ...withoutBroilRules
+    ];
+  }
+  return next;
+};
+
 const isLoopbackNodeServiceEndpoint = (server?: ControlServer) => {
   const endpoint = (server?.xrayRuntimeEndpoint || "").trim().toLowerCase();
   return endpoint.includes("://127.0.0.1")
@@ -709,6 +752,7 @@ const MasterRiskNotice = ({ context }: { context: string }) => {
 
 export default function ControlCenterPage() {
   const { t } = useLanguage();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [servers, setServers] = useState<ControlServer[]>([]);
@@ -842,6 +886,28 @@ export default function ControlCenterPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    const sectionId = location.hash.replace("#", "");
+    if (!CONTROL_CENTER_SECTION_IDS.includes(sectionId)) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, loading ? 250 : 50);
+    return () => window.clearTimeout(timer);
+  }, [location.hash, loading]);
+
+  const applyOutboundTemplate = (template: "ipv4" | "ipv6" | "direct" | "block-cn") => {
+    const next = applyRoutingTemplate(xraySettingText, template);
+    if (!next) {
+      toast.error(t("路由配置 JSON 格式不正确"));
+      return;
+    }
+    setXraySettingText(JSON.stringify(next, null, 2));
+    rememberOutboundTags(next);
+    toast.success(t("路由模板已应用"));
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -2337,7 +2403,19 @@ export default function ControlCenterPage() {
         <ModalContent>
           <ModalHeader>{t("保存节点路由 / 出站配置")}</ModalHeader>
           <ModalBody>
-            <Input label={t("出站测试地址")} value={outboundTestUrl} onChange={e => setOutboundTestUrl(e.target.value)} variant="bordered" />
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <Input label={t("出站测试地址")} value={outboundTestUrl} onChange={e => setOutboundTestUrl(e.target.value)} variant="bordered" />
+              <Button variant="flat" onPress={() => saveNodeServiceSetting()} isLoading={submitting}>{t("保存配置")}</Button>
+            </div>
+            <div className="rounded-small border border-default-200 bg-white p-3 dark:bg-default-50/5">
+              <p className="text-sm font-medium text-gray-900 dark:text-white">{t("快速路由")}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" variant="flat" onPress={() => applyOutboundTemplate("ipv4")}>{t("IPv4 优先")}</Button>
+                <Button size="sm" variant="flat" onPress={() => applyOutboundTemplate("ipv6")}>{t("IPv6 优先")}</Button>
+                <Button size="sm" variant="flat" onPress={() => applyOutboundTemplate("direct")}>{t("私网直连")}</Button>
+                <Button size="sm" variant="flat" onPress={() => applyOutboundTemplate("block-cn")}>{t("常用规则")}</Button>
+              </div>
+            </div>
             <div className="rounded-small border border-default-200 bg-default-50/60 p-3 text-xs leading-5 text-gray-600 dark:bg-default-50/5 dark:text-gray-300">
               <div className="mb-2 flex flex-wrap gap-1.5">
                 <Chip size="sm" variant="flat" color="primary">{t("出站")}</Chip>
@@ -2345,11 +2423,11 @@ export default function ControlCenterPage() {
                 <Chip size="sm" variant="flat" color="primary">IPv4 / IPv6</Chip>
                 <Chip size="sm" variant="flat" color="primary">{t("规则优先")}</Chip>
               </div>
-              {t("这里保存出站和路由规则，包含 IPv4/IPv6 优先级、域名/IP 规则和 DNS 策略；规则顺序按列表从上到下生效。")}
+              {t("常用场景先点上面的模板；需要精细规则时再编辑下方 JSON。规则顺序按列表从上到下生效。")}
             </div>
             <Textarea
               label={t("路由规则 JSON")}
-              minRows={22}
+              minRows={16}
               value={xraySettingText}
               onChange={e => setXraySettingText(e.target.value)}
               variant="bordered"

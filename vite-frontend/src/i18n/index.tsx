@@ -663,7 +663,14 @@ const en: Record<string, string> = {
   "订阅内容已复制": "Subscription content copied",
   "该服务器还没有可复制的节点": "This server has no node config to copy yet",
   "浏览器未允许自动复制，请打开详情后手动复制": "Browser blocked auto-copy. Open the detail dialog and copy manually.",
-  "保存后主控会自动复制接入命令并预先生成部署任务。到被控服务器执行这一条命令后，Agent 会主动回连主控并自动领取任务，不需要开放管理端口。": "After saving, the master copies the join command and queues deploy tasks. Run that one command on the controlled server; the agent calls back and claims tasks automatically, with no inbound management port required."
+  "保存后主控会自动复制接入命令并预先生成部署任务。到被控服务器执行这一条命令后，Agent 会主动回连主控并自动领取任务，不需要开放管理端口。": "After saving, the master copies the join command and queues deploy tasks. Run that one command on the controlled server; the agent calls back and claims tasks automatically, with no inbound management port required.",
+  "路由模板已应用": "Routing template applied",
+  "快速路由": "Quick routing",
+  "IPv4 优先": "IPv4 first",
+  "IPv6 优先": "IPv6 first",
+  "私网直连": "Direct private networks",
+  "常用规则": "Common rules",
+  "常用场景先点上面的模板；需要精细规则时再编辑下方 JSON。规则顺序按列表从上到下生效。": "Use the templates above for common cases; edit the JSON below only for precise rules. Rules apply from top to bottom."
 };
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
