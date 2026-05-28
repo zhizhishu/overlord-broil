@@ -152,8 +152,7 @@ public class FlowController extends BaseController {
             return SUCCESS_RESPONSE;
         }
 
-        // 记录日志
-        log.info("节点上报流量数据{}", flowDataList);
+        log.info("节点上报流量数据 node={} up={} down={}", flowDataList.getN(), flowDataList.getU(), flowDataList.getD());
         // 4. 处理流量数据
         return processFlowData(flowDataList);
     }

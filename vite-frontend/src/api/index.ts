@@ -39,16 +39,8 @@ export const createControlServer = (data: any) => Network.post("/control-server/
 export const getControlServerList = () => Network.post("/control-server/list");
 export const updateControlServer = (data: any) => Network.post("/control-server/update", data);
 export const deleteControlServer = (id: number) => Network.post("/control-server/delete", { id });
-export const getControlServerToken = (id: number) => Network.post("/control-server/token", { id });
 export const getControlServerInstallCommand = (id: number) => Network.post("/control-server/install-command", { id });
 export const rotateControlServerToken = (id: number) => Network.post("/control-server/rotate-token", { id });
-
-// 协议模板
-export const createProtocolProfile = (data: any) => Network.post("/protocol-profile/create", data);
-export const getProtocolProfileList = () => Network.post("/protocol-profile/list");
-export const updateProtocolProfile = (data: any) => Network.post("/protocol-profile/update", data);
-export const deleteProtocolProfile = (id: number) => Network.post("/protocol-profile/delete", { id });
-export const ensureDefaultProtocolProfiles = () => Network.post("/protocol-profile/ensure-defaults");
 
 // 统一协议节点
 export const createProtocolNode = (data: any) => Network.post("/protocol-node/create", data);
@@ -67,11 +59,9 @@ export const restartServerForwardRule = (id: number) => Network.post("/server-fo
 export const getServerRuleOverview = (serverId: number) => Network.post("/server-rule/overview", { serverId });
 
 // 多服务器协议部署任务
-export const createDeployTask = (data: any) => Network.post("/deploy-task/create", data);
 export const createDeploymentPlanTask = (data: any) => Network.post("/deploy-task/plans", data);
 export const getDeployTaskList = () => Network.post("/deploy-task/list");
 export const getRuntimeStateOverview = () => Network.post("/deploy-task/runtime-state/overview");
-export const getDeployTaskScript = (id: number) => Network.post("/deploy-task/script", { id });
 export const updateDeployTaskState = (data: any) => Network.post("/deploy-task/state", data);
 export const retryDeployTask = (id: number) => Network.post("/deploy-task/retry", { id });
 export const deleteDeployTask = (id: number) => Network.post("/deploy-task/delete", { id });
@@ -83,7 +73,7 @@ export const acknowledgeMonitorAlert = (id: number) => Network.post("/monitor-al
 // 主控操作审计
 export const listOperationAuditLogs = (data: any = {}) => Network.post("/operation-audit/list", data);
 
-// 节点内核远端出入站管理
+// 节点服务远端出入站管理
 export const testNodeCoreConnection = (serverId: number) => Network.post("/runtimes/xray/test", { serverId });
 export const listNodeCoreInbounds = (serverId: number) => Network.post("/runtimes/xray/inbounds/list", { serverId });
 export const addNodeCoreInbound = (data: any) => Network.post("/runtimes/xray/inbounds/add", data);

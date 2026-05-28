@@ -66,10 +66,10 @@ public class ProtocolProfileServiceImpl extends ServiceImpl<ProtocolProfileMappe
         long now = System.currentTimeMillis();
         List<ProtocolProfile> defaults = new ArrayList<>();
         defaults.add(defaultProfile("Snell v4", "snell", "v4", 8388, "tcp", "Non-interactive Snell server install", "{\"dns\":{\"mode\":\"system\"},\"firewall\":{\"enabled\":false}}", now));
-        defaults.add(defaultProfile("Xray Runtime VLESS Reality", "vless", "xray", 443, "tcp", "Xray inbound profile for Xray Runtime compatible agents", "{\"security\":\"reality\",\"network\":\"tcp\"}", now));
-        defaults.add(defaultProfile("Xray Runtime VMess WS", "vmess", "xray", 2086, "ws", "VMess websocket inbound profile", "{\"network\":\"ws\",\"path\":\"/ws\"}", now));
-        defaults.add(defaultProfile("Xray Runtime Trojan TCP", "trojan", "xray", 443, "tcp", "Trojan TCP inbound profile", "{\"network\":\"tcp\",\"security\":\"tls\"}", now));
-        defaults.add(defaultProfile("Xray Runtime Shadowsocks", "shadowsocks", "xray", 8388, "tcp", "Shadowsocks inbound profile", "{\"method\":\"2022-blake3-aes-128-gcm\"}", now));
+        defaults.add(defaultProfile("VLESS Reality", "vless", "xray", 443, "tcp", "VLESS Reality inbound profile for compatible agents", "{\"security\":\"reality\",\"network\":\"tcp\"}", now));
+        defaults.add(defaultProfile("VMess WS", "vmess", "xray", 2086, "ws", "VMess websocket inbound profile", "{\"network\":\"ws\",\"path\":\"/ws\"}", now));
+        defaults.add(defaultProfile("Trojan TCP", "trojan", "xray", 443, "tcp", "Trojan TCP inbound profile", "{\"network\":\"tcp\",\"security\":\"tls\"}", now));
+        defaults.add(defaultProfile("Shadowsocks", "shadowsocks", "xray", 8388, "tcp", "Shadowsocks inbound profile", "{\"method\":\"2022-blake3-aes-128-gcm\"}", now));
 
         return this.saveBatch(defaults) ? R.ok(defaults) : R.err("default protocol profiles seed failed");
     }

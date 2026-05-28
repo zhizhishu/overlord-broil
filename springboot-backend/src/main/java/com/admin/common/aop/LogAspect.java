@@ -148,6 +148,9 @@ public class LogAspect {
             }
             return copy;
         }
+        if (value instanceof String) {
+            return sanitizeText((String) value);
+        }
         return value;
     }
 
@@ -156,16 +159,35 @@ public class LogAspect {
             return false;
         }
         String normalized = key.toLowerCase();
-        return normalized.contains("password")
-                || normalized.contains("token")
-                || normalized.contains("secret")
-                || normalized.contains("psk")
-                || normalized.contains("privatekey")
-                || normalized.contains("twofactor")
-                || normalized.contains("authorization")
-                || normalized.equals("data")
-                || normalized.equals("script")
-                || normalized.equals("stdout")
-                || normalized.equals("stderr");
+        String compact = normalized.replaceAll("[^a-z0-9]", "");
+        return compact.contains("password")
+                || compact.contains("token")
+                || compact.contains("secret")
+                || compact.contains("psk")
+                || compact.contains("privatekey")
+                || compact.contains("twofactor")
+                || compact.contains("authorization")
+                || compact.equals("data")
+                || compact.equals("script")
+                || compact.equals("stdout")
+                || compact.equals("stderr")
+                || compact.equals("requestjson")
+                || compact.equals("resultjson")
+                || compact.equals("rawresultjson")
+                || compact.equals("detailjson");
+    }
+
+    private String sanitizeText(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        String sanitized = text
+                .replaceAll("(?i)(password\\\"?\\s*[:=]\\s*\\\"?)[^\\\"\\s,;}]+", "$1" + MASK)
+                .replaceAll("(?i)(token\\\"?\\s*[:=]\\s*\\\"?)[^\\\"\\s,;}]+", "$1" + MASK)
+                .replaceAll("(?i)(secret\\\"?\\s*[:=]\\s*\\\"?)[^\\\"\\s,;}]+", "$1" + MASK)
+                .replaceAll("(?i)(psk\\\"?\\s*[:=]\\s*\\\"?)[^\\\"\\s,;}]+", "$1" + MASK)
+                .replaceAll("(?i)(private[_-]?key\\\"?\\s*[:=]\\s*\\\"?)[^\\\"\\s,;}]+", "$1" + MASK)
+                .replaceAll("(?i)(authorization\\\"?\\s*[:=]\\s*\\\"?)[^\\\"\\s,;}]+", "$1" + MASK);
+        return sanitized.length() > 2000 ? sanitized.substring(0, 2000) + "...[truncated]" : sanitized;
     }
 }

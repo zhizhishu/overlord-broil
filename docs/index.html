@@ -24,7 +24,7 @@
           <p class="lead">一个统一的多服务器主控产品: 在同一个工作台里选择多台服务器, 自动配置 Xray/Reality, Snell 和端口转发节点, 并统一查看证书, 流量, 服务状态和任务审计.</p>
           <div class="hero-actions"><a class="button primary" href="https://github.com/zhizhishu/overlord-broil">Open Repository</a><a class="button" href="#install">Quick Install</a></div>
         </div>
-        <div class="hero-preview"><img src="assets/actual-control-center-top.png" alt="Overlord Broil live control center screenshot"></div>
+        <div class="hero-preview"><img src="assets/overlord-broil-screenshot.svg" alt="Overlord Broil control center screenshot"></div>
       </section>
       <section id="install" class="section">
         <div class="section-header"><h2>一键安装</h2><p>默认主控只公开一个入口: <code>5166/tcp</code>. 浏览器和被控 Agent 都访问这个端口, MySQL, 后端调试别名和 phpMyAdmin 默认不暴露到宿主机公网.</p></div>
@@ -32,13 +32,13 @@
           <article class="card"><h3>安装主控</h3><p>安装脚本会创建 <code>/opt/overlord-broil/.env</code>, 下载 compose 和 <code>overlord.sql</code>, 然后拉取或构建 <code>overlord-master</code> 单体镜像.</p><pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh | sudo bash</code></pre></article>
           <article class="card"><h3>SQLite 轻量模式</h3><p>小规模烟测可跳过 MySQL sidecar. 迁移旧部署时, 脚本会停掉旧容器, SQLite 模式也会停掉旧数据库容器, 但保留卷和旧文件.</p><pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-master.sh \
   | sudo env OB_DB_MODE="sqlite" OB_FRONTEND_PORT="5166" bash</code></pre></article>
-          <article class="card"><h3>安装被控 Agent</h3><p>先在主控创建服务器并点击加入命令. Agent 使用一条 join token 命令加入, 无需开放管理端口.</p><pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent-bootstrap.sh \
+          <article class="card"><h3>安装被控 Agent</h3><p>先在主控创建服务器并点击加入命令. Agent 使用一次性 join token 命令加入, 24 小时后过期, 无需开放管理端口.</p><pre class="runbook"><code>curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent-bootstrap.sh \
   | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_JOIN_TOKEN="paste-join-token-here" sh</code></pre></article>
           <article class="card"><h3>迁移旧部署</h3><p>安装 / 升级会移除旧分离栈容器和临时维护容器, 避免 <code>80/6365/8066</code> 继续暴露.</p><pre class="runbook"><code>sudo /opt/overlord-broil/install-master.sh upgrade</code></pre></article>
         </div>
       </section>
       <section id="runtime" class="section">
-        <div class="section-header"><h2>统一节点管理</h2><p>Overlord Broil 不把 Snell 硬塞进 Xray 内核, 而是在主控层把它抽象成统一协议节点, 由 Agent 在被控服务器上部署独立服务.</p></div>
+        <div class="section-header"><h2>统一节点管理</h2><p>Overlord Broil 把 Snell 放进同一套协议节点工作流, 由 Agent 在被控服务器上部署独立服务, 状态和流量统一回到主控.</p></div>
         <div class="feature-grid">
           <article class="feature-card"><span>协议节点</span><p>统一管理 inbound, outbound, Reality, 路由规则, IPv4/IPv6 策略, 流量同步和服务重启.</p></article>
           <article class="feature-card"><span>Snell</span><p>统一显示在协议节点列表里, 底层由 systemd/OpenRC 管理 Snell 服务.</p></article>
@@ -52,7 +52,7 @@
           <div class="status-item"><span>主控 Web / API</span><span class="tag green">5166/tcp</span></div>
           <div class="status-item"><span>被控 Agent</span><span class="tag green">主动轮询, 无入站端口</span></div>
           <div class="status-item"><span>MySQL / phpMyAdmin</span><span class="tag">默认内网 / 不暴露</span></div>
-          <div class="status-item"><span>Xray / Snell / 转发</span><span class="tag">按节点任务开放</span></div>
+          <div class="status-item"><span>协议节点 / Snell / 转发</span><span class="tag">按节点任务开放</span></div>
         </div>
       </section>
       <section id="roadmap" class="section">

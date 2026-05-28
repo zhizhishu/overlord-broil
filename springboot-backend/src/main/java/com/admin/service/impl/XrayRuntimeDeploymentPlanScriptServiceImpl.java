@@ -86,7 +86,7 @@ public class XrayRuntimeDeploymentPlanScriptServiceImpl implements XrayRuntimeDe
 
                 require_systemd_host() {
                   if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then
-                    echo 'Xray Runtime deployment requires a Linux host with running systemd. Use Debian, Ubuntu, Rocky Linux or Oracle Linux for full Xray Runtime install/configure tasks; Alpine/OpenRC is supported only for the Overlord agent, Snell node tasks and remote forwarding tasks.' >&2
+                    echo 'Full protocol-node deployment requires a Linux host with running systemd. Use Debian, Ubuntu, Rocky Linux or Oracle Linux for full node-service install/configure tasks; Alpine/OpenRC is supported only for the Overlord agent, Snell node tasks and remote forwarding tasks.' >&2
                     exit 1
                   fi
                 }
@@ -150,7 +150,7 @@ public class XrayRuntimeDeploymentPlanScriptServiceImpl implements XrayRuntimeDe
                     tag="$(curl -4fsSL https://api.github.com/repos/${XRAY_RUNTIME_RELEASE_REPO}/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\\1/' | head -n 1 || true)"
                   fi
                   if [ -z "$tag" ]; then
-                    echo 'Failed to resolve latest Xray Runtime version.' >&2
+                    echo 'Failed to resolve latest node service version.' >&2
                     exit 1
                   fi
                   echo "$tag"
@@ -160,10 +160,10 @@ public class XrayRuntimeDeploymentPlanScriptServiceImpl implements XrayRuntimeDe
                   local arch version tarball url work
                   if [ "$INSTALL_XRAY_RUNTIME" != "1" ]; then
                     if command -v "$RUNTIME_BINARY_NAME" >/dev/null 2>&1 || [ -x "$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}" ]; then
-                      log 'Xray Runtime install step skipped.'
+                      log 'Node service install step skipped.'
                       return
                     fi
-                    echo 'Xray Runtime is not installed and installXrayRuntime is disabled.' >&2
+                    echo 'Node service is not installed and full node-service install is disabled.' >&2
                     exit 1
                   fi
 
@@ -174,7 +174,7 @@ public class XrayRuntimeDeploymentPlanScriptServiceImpl implements XrayRuntimeDe
                   fi
                   url="https://github.com/${XRAY_RUNTIME_RELEASE_REPO}/releases/download/${version}/${RUNTIME_BINARY_NAME}-linux-${arch}.tar.gz"
                   work="$(mktemp -d)"
-                  log "Installing Xray Runtime ${version} for ${arch}"
+                  log "Installing node service ${version} for ${arch}"
                   curl -4fL "$url" -o "${work}/${RUNTIME_BINARY_NAME}-linux-${arch}.tar.gz"
                   tar zxf "${work}/${RUNTIME_BINARY_NAME}-linux-${arch}.tar.gz" -C "$work"
 
@@ -213,7 +213,7 @@ public class XrayRuntimeDeploymentPlanScriptServiceImpl implements XrayRuntimeDe
                   local clean_base
                   clean_base="${WEB_BASE_PATH#/}"
                   if [ "$CONFIGURE_RUNTIME" = "1" ]; then
-                    log "Configuring Xray Runtime on port ${RUNTIME_PORT}/${clean_base}"
+                    log "Configuring node service on port ${RUNTIME_PORT}/${clean_base}"
                     "$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}" setting -username "$RUNTIME_USERNAME" -password "$RUNTIME_PASSWORD" -port "$RUNTIME_PORT" -webBasePath "$clean_base" -listenIP "$LISTEN_IP"
                     systemctl restart "$XRAY_RUNTIME_UNIT"
                   fi
@@ -345,7 +345,7 @@ public class XrayRuntimeDeploymentPlanScriptServiceImpl implements XrayRuntimeDe
                     fi
                     sleep 2
                   done
-                  echo "Xray Runtime did not become ready at ${base}" >&2
+                  echo "Node service did not become ready at ${base}" >&2
                   exit 1
                 }
 
@@ -750,7 +750,7 @@ public class XrayRuntimeDeploymentPlanScriptServiceImpl implements XrayRuntimeDe
                 setup_certificate
                 API_TOKEN="$("$XRAY_RUNTIME_FOLDER/${RUNTIME_BINARY_NAME}" setting -getApiToken true | awk '/apiToken:/ {print $2; exit}')"
                 if [ -z "$API_TOKEN" ]; then
-                  echo 'Failed to get or create Xray Runtime API token.' >&2
+                  echo 'Failed to get or create node service API token.' >&2
                   exit 1
                 fi
                 export API_TOKEN RESULT_FILE CERTIFICATE_DOMAIN PUBLIC_HOST REALITY_DEST REALITY_SNI WS_PATH SS_METHOD

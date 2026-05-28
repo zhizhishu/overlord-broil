@@ -120,7 +120,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         inboundDto.setPayload(payload);
         R remote = xrayRuntimeService.addInbound(inboundDto);
         if (!isRemoteSuccess(remote)) {
-            return R.err(remoteError(remote, "Xray Runtime inbound create failed"));
+            return R.err(remoteError(remote, "Protocol inbound create failed"));
         }
 
         node.setRemoteId(firstNotBlank(node.getRemoteId(), extractRemoteId(remote.getData())));
@@ -194,7 +194,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
             inboundDto.setPayload(payload);
             R remote = xrayRuntimeService.updateInbound(inboundDto);
             if (!isRemoteSuccess(remote)) {
-                return R.err(remoteError(remote, "Xray Runtime inbound update failed"));
+                return R.err(remoteError(remote, "Protocol inbound update failed"));
             }
             exists.setConfigJson(JSON.toJSONString(payload));
             exists.setState("active");
@@ -259,7 +259,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
             inboundDto.setInboundId(parseInt(node.getRemoteId()));
             R remote = xrayRuntimeService.deleteInbound(inboundDto);
             if (!isRemoteSuccess(remote)) {
-                return R.err(remoteError(remote, "Xray Runtime inbound delete failed"));
+                return R.err(remoteError(remote, "Protocol inbound delete failed"));
             }
         }
         return this.removeById(node.getId()) ? R.ok("protocol node deleted") : R.err("protocol node delete failed");
@@ -303,7 +303,7 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         }
         R remote = xrayRuntimeService.listInbounds(serverDto(server.getId()));
         if (!isRemoteSuccess(remote)) {
-            return R.err(remoteError(remote, "Xray Runtime inbound sync failed"));
+            return R.err(remoteError(remote, "Protocol inbound sync failed"));
         }
 
         long now = System.currentTimeMillis();
@@ -692,9 +692,26 @@ public class ProtocolNodeServiceImpl extends ServiceImpl<ProtocolNodeMapper, Pro
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("node", node);
         if (task != null) {
-            data.put("task", task);
+            data.put("task", taskSummary(task));
         }
         return data;
+    }
+
+    private Map<String, Object> taskSummary(DeployTask task) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        if (task == null) {
+            return item;
+        }
+        item.put("id", task.getId());
+        item.put("serverId", task.getServerId());
+        item.put("serverName", task.getServerName());
+        item.put("protocol", task.getProtocol());
+        item.put("action", task.getAction());
+        item.put("state", task.getState());
+        item.put("status", task.getStatus());
+        item.put("createdTime", task.getCreatedTime());
+        item.put("updatedTime", task.getUpdatedTime());
+        return item;
     }
 
     private XrayRuntimeServerDto serverDto(Long serverId) {

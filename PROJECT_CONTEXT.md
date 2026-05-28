@@ -15,8 +15,8 @@ Overlord Broil is an independent master/agent operations console for multi-serve
 ## Core Modules
 
 - `springboot-backend/src/main/java/com/admin/controller`: public API controllers.
-- `springboot-backend/src/main/java/com/admin/service`: deployment, Xray Runtime, Snell, forwarding, agent task, traffic, alert and control-server services.
-- `springboot-backend/src/main/java/com/admin/runtime`: Runtime Provider registry, action catalog and assignment logic.
+- `springboot-backend/src/main/java/com/admin/service`: deployment, node service, Snell, forwarding, agent task, traffic, alert and control-server services.
+- `springboot-backend/src/main/java/com/admin/runtime`: internal capability registry, action catalog and assignment logic.
 - `scripts/install-master.sh`: master install, doctor, backup, restore, upgrade and uninstall.
 - `scripts/install-agent.sh` and `scripts/overlord-agent.sh`: controlled-agent install and task runner.
 - `POST /api/v1/agent-join/register`: unauthenticated controlled-agent join endpoint guarded by a short-lived high-entropy join token generated from the authenticated control center.
@@ -25,12 +25,12 @@ Overlord Broil is an independent master/agent operations console for multi-serve
 
 ## Product Contracts
 
-- Xray Runtime public route: `/api/v1/runtimes/xray/*`.
+- Internal node-service connector route: `/api/v1/runtimes/xray/*`.
 - Deployment plan route: `/api/v1/deploy-task/plans`.
 - Runtime state route: `/api/v1/deploy-task/runtime-state/overview`.
-- Runtime Providers: `xrayRuntime`, `snell`, `forward`, `certificate`, `firewall`.
+- Internal capability providers: `xrayRuntime`, `snell`, `forward`, `certificate`, `firewall`.
 - Snell is managed as a product-level protocol node, but it remains a separate service on the controlled host.
-- Xray Runtime connector paths are internal service contracts used by the connector and fixture. Do not rename them as product branding.
+- Node-service connector paths are internal compatibility contracts used by the connector and fixture. Do not expose them as product branding.
 
 ## Validation
 
@@ -44,7 +44,7 @@ bash scripts/test-agent-mock.sh
 bash scripts/test-xray-runtime-fixture.sh
 bash scripts/test-sqlite-schema.sh
 cd vite-frontend && npm run build
-docker run --rm -v "$PWD:/workspace" -v overlord-broil-m2:/root/.m2 -w /workspace/springboot-backend maven:3.9.9-eclipse-temurin-21 mvn -B "-Dtest=RuntimeProviderServiceTest,DeployTaskServiceImplTest,XrayRuntimeRouteContractTest" test
+docker run --rm -v "$PWD:/workspace" -v overlord-broil-m2:/root/.m2 -w /workspace/springboot-backend maven:3.9.9-eclipse-temurin-21 mvn -B -DskipTests package
 git diff --check
 ```
 

@@ -113,9 +113,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             return R.err(validationError);
         }
         if (isNanoCritical(server) && requiresXrayTask(protocol)) {
-            String reason = "server memory is below 200 MB; Nano nodes should use Snell or remote port forwarding instead of Xray/Xray Runtime deployment tasks";
+            String reason = "server memory is below 200 MB; Nano nodes should use Snell or remote port forwarding instead of full protocol-node deployment tasks";
             auditRejectedTask(server, protocol, dto.getAction(), reason);
-            return R.err("server memory is below 200 MB; Nano nodes should use Snell or remote port forwarding instead of Xray/Xray Runtime deployment tasks");
+            return R.err("server memory is below 200 MB; Nano nodes should use Snell or remote port forwarding instead of full protocol-node deployment tasks");
         }
         Integer listenPort = dto.getListenPort() != null ? dto.getListenPort() : profile == null ? null : profile.getListenPort();
         String masterGuardError = MasterSelfProtectionUtils.validateListenPortAndAction(
@@ -152,7 +152,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         runtimeProviderService.applyToTask(task);
         auditMasterTaskEvent("deploy_task.created", task,
                 "requested", "Created deploy task #" + task.getId(), taskDetail(task, "created"));
-        return R.ok(task);
+        return R.ok(taskResponse(task));
     }
 
     @Override
@@ -187,7 +187,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         runtimeProviderService.applyToTask(task);
         auditMasterTaskEvent("deploy_task.plan_created", task,
                 "requested", "Created deployment plan task #" + task.getId(), taskDetail(task, "deployment-plan"));
-        return R.ok(task);
+        return R.ok(taskResponse(task));
     }
 
     private String validateDeploymentPlan(DeploymentPlanDto dto, ControlServer server) {
@@ -199,7 +199,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             return "certificate domain is required for acme-http mode";
         }
         if (isNanoCritical(server) && requiresFullXrayRuntimeStack(dto)) {
-            return "server memory is below 200 MB; Nano nodes should use Snell or remote port forwarding instead of full Xray Runtime/Xray deployment";
+            return "server memory is below 200 MB; Nano nodes should use Snell or remote port forwarding instead of full protocol-node deployment";
         }
         if (enabled(dto.getCreateVlessReality())) {
             String realityError = ProtocolValidationUtils.validateReality(dto.getRealitySni(), dto.getRealityDest(), null);
@@ -212,7 +212,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             return "snell psk is invalid";
         }
         Set<Integer> ports = new HashSet<>();
-        String guard = MasterSelfProtectionUtils.validateListenPort(server, dto.getRuntimePort(), "Xray Runtime 端口");
+        String guard = MasterSelfProtectionUtils.validateListenPort(server, dto.getRuntimePort(), "节点服务端口");
         if (guard != null) return guard;
         String duplicate = addPort(ports, dto.getRuntimePort(), "runtimePort");
         if (duplicate != null) {
@@ -333,7 +333,11 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
     public R getAllTasks() {
         List<DeployTask> tasks = this.list();
         tasks.forEach(runtimeProviderService::applyToTask);
-        return R.ok(tasks);
+        List<Map<String, Object>> summaries = new ArrayList<>();
+        for (DeployTask task : tasks) {
+            summaries.add(taskResponse(task));
+        }
+        return R.ok(summaries);
     }
 
     @Override
@@ -380,7 +384,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         Map<String, Object> overview = new LinkedHashMap<>();
         overview.put("generatedAt", now);
         overview.put("servers", serverMap.size());
-        overview.put("providers", runtimeProviderService.listProviders().size());
+        overview.put("services", runtimeProviderService.listProviders().size());
         overview.putAll(counts);
         overview.put("items", items);
         return R.ok(overview);
@@ -424,8 +428,8 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("serverId", server.getId());
         item.put("serverName", server.getName());
-        item.put("providerKey", providerKey);
-        item.put("providerName", provider == null ? providerKey : provider.getName());
+        item.put("serviceKey", providerKey);
+        item.put("serviceName", provider == null ? providerKey : provider.getName());
         item.put("status", notBlank(status) ? status : heartbeatStatus(server, now));
         item.put("statusSource", notBlank(status) ? statusSource : "control_server.heartbeat");
         item.put("stateUpdatedAt", server.getLastHeartbeat() == null ? server.getUpdatedTime() : server.getLastHeartbeat());
@@ -454,8 +458,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("serverId", task.getServerId());
         item.put("serverName", notBlank(task.getServerName()) ? task.getServerName() : server == null ? null : server.getName());
-        item.put("providerKey", providerKey);
-        item.put("providerName", runtimeState.getString("providerName"));
+        item.put("serviceKey", providerKey);
+        String serviceName = runtimeState.getString("serviceName");
+        item.put("serviceName", notBlank(serviceName) ? serviceName : runtimeState.getString("providerName"));
         item.put("status", runtimeState.getString("status"));
         item.put("statusSource", runtimeState.getString("statusSource"));
         item.put("protocol", runtimeState.getString("protocol"));
@@ -581,8 +586,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         if (task == null) {
             return R.err("deploy task not found");
         }
-        runtimeProviderService.applyToTask(task);
-        return R.ok(task.getScript());
+        return R.err(410, "task scripts are only delivered to the controlled agent");
     }
 
     @Override
@@ -598,10 +602,11 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
 
         long now = System.currentTimeMillis();
         String previousState = exists.getState();
+        String sanitizedResultJson = sanitizeAgentResultJson(dto.getResultJson());
         DeployTask task = new DeployTask();
         task.setId(dto.getId());
         task.setState(state);
-        task.setResultJson(dto.getResultJson());
+        task.setResultJson(sanitizedResultJson);
         task.setUpdatedTime(now);
         if (STATE_RUNNING.equals(state)) {
             task.setStartedTime(now);
@@ -613,9 +618,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         boolean updated = this.updateById(task);
         if (updated) {
             monitorAlertService.handleTaskFailed(exists.getServerId(), exists.getServerName(), exists.getId(),
-                    state, dto.getResultJson(), now);
+                    state, sanitizedResultJson, now);
             exists.setState(state);
-            exists.setResultJson(dto.getResultJson());
+            exists.setResultJson(sanitizedResultJson);
             runtimeProviderService.applyToTask(exists);
             Map<String, Object> detail = taskDetail(exists, "state-updated");
             detail.put("previousState", previousState);
@@ -665,7 +670,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         detail.put("retryFromState", exists.getState());
         auditMasterTaskEvent("deploy_task.retried", retry,
                 "requested", "Retried deploy task #" + exists.getId() + " as #" + retry.getId(), detail);
-        return R.ok(retry);
+        return R.ok(taskResponse(retry));
     }
 
     @Override
@@ -870,6 +875,66 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
         return detail;
     }
 
+    private Map<String, Object> taskResponse(DeployTask task) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        if (task == null) {
+            return item;
+        }
+        item.put("id", task.getId());
+        item.put("serverId", task.getServerId());
+        item.put("serverName", task.getServerName());
+        item.put("protocol", task.getProtocol());
+        item.put("action", task.getAction());
+        item.put("state", task.getState());
+        item.put("status", task.getStatus());
+        item.put("createdTime", task.getCreatedTime());
+        item.put("updatedTime", task.getUpdatedTime());
+        item.put("startedTime", task.getStartedTime());
+        item.put("finishedTime", task.getFinishedTime());
+        item.put("hasScript", notBlank(task.getScript()));
+        item.put("requestSummary", summarizeJson(task.getRequestJson()));
+        item.put("resultSummary", summarizeJson(task.getResultJson()));
+        return item;
+    }
+
+    private Object summarizeJson(String value) {
+        if (!notBlank(value)) {
+            return null;
+        }
+        String sanitized = sanitizeAgentResultJson(value);
+        try {
+            JSONObject object = JSON.parseObject(sanitized);
+            Map<String, Object> summary = new LinkedHashMap<>();
+            for (String key : object.keySet()) {
+                if (isInternalSummaryKey(key)) {
+                    continue;
+                }
+                Object child = object.get(key);
+                if (child == null || child instanceof String || child instanceof Number || child instanceof Boolean) {
+                    summary.put(key, child);
+                }
+                if (summary.size() >= 12) {
+                    break;
+                }
+            }
+            return summary;
+        } catch (Exception ignored) {
+            return sanitized.length() > 500 ? sanitized.substring(0, 500) + "..." : sanitized;
+        }
+    }
+
+    private boolean isInternalSummaryKey(String key) {
+        if (key == null) {
+            return false;
+        }
+        String normalized = key.replaceAll("[^A-Za-z0-9]", "").toLowerCase();
+        return normalized.equals("runtimeprovider")
+                || normalized.equals("rawresultjson")
+                || normalized.equals("requestjson")
+                || normalized.equals("resultjson")
+                || normalized.equals("script");
+    }
+
     private String safeProtocol(String protocol) {
         return protocol == null || protocol.trim().isEmpty() ? "unknown" : protocol.trim().toLowerCase();
     }
@@ -963,10 +1028,78 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             redactServerSecret(root.getJSONObject("server"), "xrayRuntimePassword", "xrayRuntimePasswordConfigured");
             redactServerSecret(root.getJSONObject("server"), "xrayRuntimeTwoFactorCode", "xrayRuntimeTwoFactorConfigured");
             root.remove("serverSecrets");
+            redactSensitiveValues(root);
             return JSON.toJSONString(root);
         } catch (Exception ignored) {
-            return resultJson;
+            return sanitizeTextForDisplay(resultJson);
         }
+    }
+
+    private void redactSensitiveValues(Object value) {
+        if (value instanceof JSONObject) {
+            JSONObject object = (JSONObject) value;
+            for (String key : new ArrayList<>(object.keySet())) {
+                Object child = object.get(key);
+                if (isSensitiveKey(key)) {
+                    object.put(key, redactValue(child));
+                } else {
+                    redactSensitiveValues(child);
+                }
+            }
+            return;
+        }
+        if (value instanceof JSONArray) {
+            JSONArray array = (JSONArray) value;
+            for (Object child : array) {
+                redactSensitiveValues(child);
+            }
+        }
+    }
+
+    private boolean isSensitiveKey(String key) {
+        if (key == null) {
+            return false;
+        }
+        String normalized = key.toLowerCase();
+        return normalized.contains("token")
+                || normalized.contains("password")
+                || normalized.contains("passwd")
+                || normalized.contains("secret")
+                || normalized.contains("privatekey")
+                || normalized.contains("private_key")
+                || normalized.equals("psk")
+                || normalized.equals("script")
+                || normalized.equals("stdout")
+                || normalized.equals("stderr")
+                || normalized.equals("requestjson")
+                || normalized.equals("rawresultjson");
+    }
+
+    private Object redactValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof String) {
+            String text = (String) value;
+            return text.isEmpty() ? text : "[redacted:" + text.length() + "]";
+        }
+        return "[redacted]";
+    }
+
+    private String sanitizeScriptForDisplay(String script) {
+        return sanitizeTextForDisplay(script);
+    }
+
+    private String sanitizeTextForDisplay(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        String sanitized = text;
+        sanitized = sanitized.replaceAll("(?im)^([A-Z0-9_]*(TOKEN|PASSWORD|PASSWD|SECRET|PRIVATE_KEY|PRIVATEKEY|PSK)[A-Z0-9_]*=).*$", "$1'[redacted]'");
+        sanitized = sanitized.replaceAll("(?i)(Bearer\\s+)[A-Za-z0-9._~+\\-/]+=*", "$1[redacted]");
+        sanitized = sanitized.replaceAll("(?i)(psk\\s*=\\s*)[^\\s,;]+", "$1[redacted]");
+        sanitized = sanitized.replaceAll("(?i)(privateKey\\\"?\\s*[:=]\\s*\\\"?)[^\\\"\\s,;}]+", "$1[redacted]");
+        return sanitized;
     }
 
     private void redactServerSecret(JSONObject serverMeta, String secretKey, String configuredKey) {
@@ -1428,7 +1561,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 fi
 
                 if [ -z "$XRAY_RUNTIME_API_TOKEN" ]; then
-                  echo 'Xray Runtime API token is required. Save it on the server card or run this task on a host with a local runtime CLI.' >&2
+                  echo 'Node service API token is required. Save it on the server card or run this task on a host with a local service CLI.' >&2
                   exit 1
                 fi
 
@@ -1561,7 +1694,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                         if security == "reality":
                             private_key = str(first(request_meta.get("privateKey"), request_meta.get("realityPrivateKey"), find_xray_private_key()))
                             if not private_key:
-                                raise SystemExit("Reality private key is required; install Xray Runtime/Xray first or provide realityPrivateKey in requestJson.")
+                                raise SystemExit("Reality private key is required; install the node service first or provide realityPrivateKey in requestJson.")
                             stream["realitySettings"] = {
                                 "show": False,
                                 "dest": str(first(request_meta.get("dest"), request_meta.get("realityDest"), profile_config.get("dest"), "www.cloudflare.com:443")),
@@ -1607,7 +1740,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                         }
                         stream = {"network": transport, "security": "none"}
                     else:
-                        raise SystemExit("Unsupported Xray/Xray Runtime protocol: %s" % protocol)
+                        raise SystemExit("Unsupported protocol-node type: %s" % protocol)
 
                     return {
                         "up": 0,
@@ -2216,7 +2349,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 repair_xray_runtime() {
                   local manager
                   manager="$(detect_service_manager)"
-                  section "Xray Runtime repair"
+                  section "Node service repair"
                   local runtime_unit runtime_dir runtime_bin
                   runtime_unit="$(printf '%s-%s.service' 'x' 'ui')"
                   runtime_dir="/usr/local/$(printf '%s-%s' 'x' 'ui')"
@@ -2224,7 +2357,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   if service_exists "$manager" "$runtime_unit"; then
                     restart_service "$manager" "$runtime_unit"
                   else
-                    echo "[fail] Xray Runtime service not found. Run one-click deployment or the Xray Runtime installer first."
+                    echo "[fail] Node service not found. Run one-click deployment first."
                     return 1
                   fi
                   if [ -x "$runtime_bin" ]; then
@@ -2243,12 +2376,12 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     "${runtime_dir}/bin/xray" version 2>/dev/null | head -n 1 || true
                   fi
                   if service_exists "$manager" "$runtime_unit"; then
-                    echo "Restarting Xray Runtime because it owns the embedded Xray runtime."
+                    echo "Restarting node service because it owns the embedded protocol engine."
                     restart_service "$manager" "$runtime_unit"
                   elif service_exists "$manager" "xray.service"; then
                     restart_service "$manager" "xray.service"
                   else
-                    echo "[fail] Xray service not found. If Xray is embedded in Xray Runtime, repair Xray Runtime first."
+                    echo "[fail] Protocol service not found. If it is embedded in the node service, repair the node service first."
                     return 1
                   fi
                 }

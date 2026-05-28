@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import IndexPage from "@/pages/index";
 import ChangePasswordPage from "@/pages/change-password";
 import ControlCenterPage from "@/pages/control-center";
-import { SettingsPage } from "@/pages/settings";
 
 import AdminLayout from "@/layouts/admin";
 import H5Layout from "@/layouts/h5";
@@ -173,7 +172,7 @@ function App() {
         path="/settings" 
         element={
           <ProtectedRoute useSimpleLayout={true}>
-            <SettingsPage />
+            <Navigate to="/control-center#settings" replace />
           </ProtectedRoute>
         }
       />

@@ -50,7 +50,7 @@ Snell is unified in the inbound-node product flow, but it is not a native Xray c
 
 ## UI Preview
 
-![Overlord Broil live control center](docs/assets/actual-control-center-top.png)
+![Overlord Broil control center](docs/assets/overlord-broil-screenshot.svg)
 
 ![Overlord Broil login](docs/assets/actual-login.png)
 
@@ -130,7 +130,7 @@ sudo bash /opt/overlord-broil/install-master.sh uninstall --yes
 
 ## Controlled Agent Install
 
-Create a server in the master control center, then use the server card `Join Command` action. The master generates a one-line install command with `OB_MASTER_URL` and a short-lived `OB_JOIN_TOKEN`; the controlled host exchanges it for its internal server id and agent token automatically.
+Create a server in the master control center, then use the server card `Join Command` action. The master generates a one-line install command with `OB_MASTER_URL` and a single-use `OB_JOIN_TOKEN` that expires after 24 hours; the controlled host exchanges it for its internal server id and agent token automatically.
 
 Install the controlled agent on that host:
 
@@ -210,7 +210,6 @@ Product task flow:
 ```text
 POST /api/v1/control-server/create
 POST /api/v1/control-server/list
-POST /api/v1/control-server/token
 POST /api/v1/control-server/install-command
 POST /api/v1/control-server/heartbeat
 POST /api/v1/deploy-task/create

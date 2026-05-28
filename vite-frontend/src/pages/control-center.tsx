@@ -13,16 +13,12 @@ import toast from "react-hot-toast";
 import { useLanguage } from "@/i18n";
 import {
   createControlServer,
-  createDeployTask,
   createProtocolNode,
   createDeploymentPlanTask,
-  createProtocolProfile,
   createServerForwardRule,
   deleteControlServer,
   deleteProtocolNode,
-  deleteProtocolProfile,
   deleteServerForwardRule,
-  ensureDefaultProtocolProfiles,
   getControlServerList,
   getControlServerInstallCommand,
   getDeployTaskList,
@@ -30,7 +26,6 @@ import {
   listMonitorAlerts,
   listOperationAuditLogs,
   getProtocolNodeList,
-  getProtocolProfileList,
   getServerForwardRuleList,
   getNodeCoreConfig,
   getNodeCoreOutboundTraffic,
@@ -40,13 +35,13 @@ import {
   restartServerForwardRule,
   restartNodeCoreService,
   saveNodeCoreOutbounds,
+  syncNodeCoreTraffic,
   syncProtocolNodes,
   updateControlServer,
   updateProtocolNode,
-  updateProtocolProfile,
   updateServerForwardRule
 } from "@/api";
-import type { ControlServer, DeployTask, MonitorAlert, OperationAuditLog, ProtocolNode, ProtocolProfile, RuntimeStateOverview, ServerForwardRule, NodeCoreTrafficSnapshot } from "@/types";
+import type { ControlServer, DeployTask, MonitorAlert, OperationAuditLog, ProtocolNode, RuntimeStateOverview, ServerForwardRule, NodeCoreTrafficSnapshot } from "@/types";
 
 interface ServerForm {
   id?: number;
@@ -64,28 +59,6 @@ interface ServerForm {
   sshPort: number;
   sshUser: string;
   allowInsecure: number;
-}
-
-interface ProfileForm {
-  id?: number;
-  name: string;
-  protocol: string;
-  versionFamily: string;
-  listenPort: number;
-  transport: string;
-  remark: string;
-  configJson: string;
-}
-
-interface DeployForm {
-  serverId: number | null;
-  profileId: number | null;
-  protocol: string;
-  action: string;
-  versionFamily: string;
-  exactVersion: string;
-  listenPort: number;
-  psk: string;
 }
 
 interface DeploymentPlanForm {
@@ -214,27 +187,6 @@ const blankServerForm: ServerForm = {
   sshPort: 22,
   sshUser: "root",
   allowInsecure: 0
-};
-
-const blankProfileForm: ProfileForm = {
-  name: "",
-  protocol: "snell",
-  versionFamily: "v4",
-  listenPort: 8388,
-  transport: "tcp",
-  remark: "",
-  configJson: "{\"dns\":{\"mode\":\"system\"},\"firewall\":{\"enabled\":false}}"
-};
-
-const blankDeployForm: DeployForm = {
-  serverId: null,
-  profileId: null,
-  protocol: "snell",
-  action: "present",
-  versionFamily: "v4",
-  exactVersion: "v4.1.1",
-  listenPort: 8388,
-  psk: ""
 };
 
 const blankDeploymentPlanForm: DeploymentPlanForm = {
@@ -620,7 +572,7 @@ const MasterRiskNotice = ({ context }: { context: string }) => {
 
   return (
     <div className="rounded-small border border-warning-300 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
-      <span className="font-semibold">{t("主控高风险：")}</span>{t("{context}会作用在控制面服务器上，建议确认节点内核、协议节点以及证书任务不会影响现有部署。", { context: t(context) })}
+      <span className="font-semibold">{t("主控高风险：")}</span>{t("{context}会作用在控制面服务器上，建议确认节点服务、协议节点以及证书任务不会影响现有部署。", { context: t(context) })}
     </div>
   );
 };
@@ -632,34 +584,31 @@ export default function ControlCenterPage() {
   const [servers, setServers] = useState<ControlServer[]>([]);
   const [protocolNodes, setProtocolNodes] = useState<ProtocolNode[]>([]);
   const [forwardRules, setForwardRules] = useState<ServerForwardRule[]>([]);
-  const [profiles, setProfiles] = useState<ProtocolProfile[]>([]);
   const [tasks, setTasks] = useState<DeployTask[]>([]);
   const [runtimeStateOverview, setRuntimeStateOverview] = useState<RuntimeStateOverview | null>(null);
   const [trafficSnapshots, setTrafficSnapshots] = useState<NodeCoreTrafficSnapshot[]>([]);
+  const [trafficServerFilter, setTrafficServerFilter] = useState("all");
+  const [trafficSourceFilter, setTrafficSourceFilter] = useState("all");
   const [monitorAlerts, setMonitorAlerts] = useState<MonitorAlert[]>([]);
   const [operationAuditLogs, setOperationAuditLogs] = useState<OperationAuditLog[]>([]);
   const [serverModalOpen, setServerModalOpen] = useState(false);
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [protocolNodeModalOpen, setProtocolNodeModalOpen] = useState(false);
   const [serverForwardModalOpen, setServerForwardModalOpen] = useState(false);
-  const [deployModalOpen, setDeployModalOpen] = useState(false);
   const [deploymentPlanModalOpen, setDeploymentPlanModalOpen] = useState(false);
-  const [scriptModalOpen, setScriptModalOpen] = useState(false);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [xraySettingModalOpen, setXraySettingModalOpen] = useState(false);
   const [protocolAdvancedOpen, setProtocolAdvancedOpen] = useState(false);
   const [deploymentAdvancedOpen, setDeploymentAdvancedOpen] = useState(false);
-  const [scriptTitle, setScriptTitle] = useState("");
-  const [scriptText, setScriptText] = useState("");
+  const [detailTitle, setDetailTitle] = useState("");
+  const [detailText, setDetailText] = useState("");
   const [pendingUiConfirmation, setPendingUiConfirmation] = useState<PendingUiConfirmation | null>(null);
   const [xraySettingServerId, setXraySettingServerId] = useState<number | null>(null);
   const [xraySettingText, setXraySettingText] = useState("");
   const [outboundTestUrl, setOutboundTestUrl] = useState("https://www.google.com/generate_204");
   const [outboundTagHints, setOutboundTagHints] = useState<string[]>(DEFAULT_OUTBOUND_TAGS);
   const [serverForm, setServerForm] = useState<ServerForm>(blankServerForm);
-  const [profileForm, setProfileForm] = useState<ProfileForm>(blankProfileForm);
   const [protocolNodeForm, setProtocolNodeForm] = useState<ProtocolNodeForm>(blankProtocolNodeForm);
   const [serverForwardRuleForm, setServerForwardRuleForm] = useState<ServerForwardRuleForm>(blankServerForwardRuleForm);
-  const [deployForm, setDeployForm] = useState<DeployForm>(blankDeployForm);
   const [deploymentPlanForm, setDeploymentPlanForm] = useState<DeploymentPlanForm>(blankDeploymentPlanForm);
 
   const onlineServers = useMemo(() => {
@@ -707,6 +656,16 @@ export default function ControlCenterPage() {
       .map(snapshot => snapshot.tag || ""),
     ...collectOutboundTags(xraySettingText)
   ]), [outboundTagHints, trafficSnapshots, xraySettingText]);
+
+  const trafficSourceTypes = useMemo(() => uniqueStrings(trafficSnapshots.map(snapshot => snapshot.sourceType || "")), [trafficSnapshots]);
+
+  const filteredTrafficSnapshots = useMemo(() => {
+    return trafficSnapshots.filter(snapshot => {
+      const serverMatched = trafficServerFilter === "all" || String(snapshot.serverId) === trafficServerFilter;
+      const sourceMatched = trafficSourceFilter === "all" || snapshot.sourceType === trafficSourceFilter;
+      return serverMatched && sourceMatched;
+    });
+  }, [trafficServerFilter, trafficSourceFilter, trafficSnapshots]);
 
   const selectedProtocolServer = useMemo(() => {
     return servers.find(server => server.id === protocolNodeForm.serverId);
@@ -756,10 +715,8 @@ export default function ControlCenterPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      await ensureDefaultProtocolProfiles();
-      const [serverRes, profileRes, taskRes, nodeRes, forwardRes, trafficRes, alertRes, auditRes, runtimeStateRes] = await Promise.all([
+      const [serverRes, taskRes, nodeRes, forwardRes, trafficRes, alertRes, auditRes, runtimeStateRes] = await Promise.all([
         getControlServerList(),
-        getProtocolProfileList(),
         getDeployTaskList(),
         getProtocolNodeList({ limit: 300 }),
         getServerForwardRuleList({ limit: 300 }),
@@ -770,7 +727,6 @@ export default function ControlCenterPage() {
       ]);
 
       if (serverRes.code === 0) setServers(serverRes.data || []);
-      if (profileRes.code === 0) setProfiles(profileRes.data || []);
       if (taskRes.code === 0) setTasks(taskRes.data || []);
       if (nodeRes.code === 0) setProtocolNodes(nodeRes.data || []);
       if (forwardRes.code === 0) setForwardRules(forwardRes.data || []);
@@ -778,7 +734,7 @@ export default function ControlCenterPage() {
       if (alertRes.code === 0) setMonitorAlerts(alertRes.data || []);
       if (auditRes.code === 0) setOperationAuditLogs(auditRes.data || []);
       if (runtimeStateRes.code === 0) setRuntimeStateOverview(runtimeStateRes.data || null);
-      if (serverRes.code !== 0 || profileRes.code !== 0 || taskRes.code !== 0 || nodeRes.code !== 0 || forwardRes.code !== 0 || trafficRes.code !== 0 || alertRes.code !== 0 || auditRes.code !== 0 || runtimeStateRes.code !== 0) {
+      if (serverRes.code !== 0 || taskRes.code !== 0 || nodeRes.code !== 0 || forwardRes.code !== 0 || trafficRes.code !== 0 || alertRes.code !== 0 || auditRes.code !== 0 || runtimeStateRes.code !== 0) {
         toast.error(t("主控数据加载不完整"));
       }
     } catch (error) {
@@ -807,20 +763,6 @@ export default function ControlCenterPage() {
       allowInsecure: server.allowInsecure || 0
     } : blankServerForm);
     setServerModalOpen(true);
-  };
-
-  const openProfileModal = (profile?: ProtocolProfile) => {
-    setProfileForm(profile ? {
-      id: profile.id,
-      name: profile.name,
-      protocol: profile.protocol,
-      versionFamily: profile.versionFamily || "xray",
-      listenPort: profile.listenPort || 443,
-      transport: profile.transport || "tcp",
-      remark: profile.remark || "",
-      configJson: profile.configJson || "{}"
-    } : blankProfileForm);
-    setProfileModalOpen(true);
   };
 
   const openProtocolNodeModal = (server?: ControlServer, node?: ProtocolNode) => {
@@ -881,25 +823,6 @@ export default function ControlCenterPage() {
     setServerForwardRuleForm(prev => ({ ...prev, ...patch }));
   };
 
-  const selectProfileForDeploy = (profileId: number) => {
-    const profile = profiles.find(item => item.id === profileId);
-    setDeployForm(prev => ({
-      ...prev,
-      profileId,
-      protocol: profile?.protocol || prev.protocol,
-      versionFamily: profile?.versionFamily || prev.versionFamily,
-      listenPort: profile?.listenPort || prev.listenPort
-    }));
-  };
-
-  const openDeployModal = (server?: ControlServer) => {
-    setDeployForm({
-      ...blankDeployForm,
-      serverId: server?.id || null
-    });
-    setDeployModalOpen(true);
-  };
-
   const openDeploymentPlanModal = (server?: ControlServer) => {
     const firstServer = server || servers[0];
     const host = firstServer?.host || "";
@@ -942,25 +865,6 @@ export default function ControlCenterPage() {
       loadData();
     } else {
       toast.error(res.msg || t("保存服务器失败"));
-    }
-  };
-
-  const saveProfile = async () => {
-    if (!profileForm.name.trim() || !profileForm.protocol.trim()) {
-      toast.error(t("请填写协议模板名称和协议"));
-      return;
-    }
-
-    setSubmitting(true);
-    const res = profileForm.id ? await updateProtocolProfile(profileForm) : await createProtocolProfile(profileForm);
-    setSubmitting(false);
-
-    if (res.code === 0) {
-      toast.success(profileForm.id ? t("协议模板已更新") : t("协议模板已添加"));
-      setProfileModalOpen(false);
-      loadData();
-    } else {
-      toast.error(res.msg || t("保存协议模板失败"));
     }
   };
 
@@ -1176,32 +1080,6 @@ export default function ControlCenterPage() {
     }
   };
 
-  const saveDeployTask = async () => {
-    if (!deployForm.serverId) {
-      toast.error(t("请选择目标服务器"));
-      return;
-    }
-    if (!deployForm.protocol.trim()) {
-      toast.error(t("请选择协议"));
-      return;
-    }
-
-    setSubmitting(true);
-    const res = await createDeployTask(deployForm);
-    setSubmitting(false);
-
-    if (res.code === 0) {
-      toast.success(t("部署任务已生成"));
-      setDeployModalOpen(false);
-      setScriptTitle(t("任务 #{id} 脚本", { id: res.data.id }));
-      setScriptText(res.data.script || "");
-      setScriptModalOpen(true);
-      loadData();
-    } else {
-      toast.error(res.msg || t("生成部署任务失败"));
-    }
-  };
-
   const saveDeploymentPlanTask = async () => {
     const targetServerIds = deploymentPlanForm.serverIds.length > 0
       ? deploymentPlanForm.serverIds
@@ -1215,11 +1093,11 @@ export default function ControlCenterPage() {
       return;
     }
     if (selectedDeploymentPlanCriticalNanoServers.length > 0 && selectedDeploymentPlanUsesFullNodeCoreStack) {
-      toast.error(t("Nano 被控内存低于 200MB，不支持完整节点内核部署；请关闭完整协议节点选项，仅保留 Snell 或端口转发。"));
+      toast.error(t("Nano 被控内存低于 200MB，不支持完整节点服务部署；请关闭完整协议节点选项，仅保留 Snell 或端口转发。"));
       return;
     }
     const ports = [
-      [t("节点内核"), deploymentPlanForm.runtimePort, true],
+      [t("节点服务"), deploymentPlanForm.runtimePort, true],
       ["VLESS Reality", deploymentPlanForm.vlessPort, deploymentPlanForm.createVlessReality],
       ["VMess WS", deploymentPlanForm.vmessPort, deploymentPlanForm.createVmessWs],
       ["Trojan TLS", deploymentPlanForm.trojanPort, deploymentPlanForm.createTrojanTls],
@@ -1270,9 +1148,6 @@ export default function ControlCenterPage() {
     if (!failed) {
       toast.success(t("已生成 {count} 个一键部署任务，等待被控 Agent 自动领取", { count: results.length }));
       setDeploymentPlanModalOpen(false);
-      setScriptTitle(t("一键部署任务"));
-      setScriptText(results.map(res => `# Task ${res.data.id} / ${res.data.serverName || res.data.serverId}\n${res.data.script || ""}`).join("\n\n"));
-      setScriptModalOpen(true);
       loadData();
     } else {
       toast.error(failed.msg || t("生成一键部署任务失败"));
@@ -1282,9 +1157,9 @@ export default function ControlCenterPage() {
   const showServerInstallCommand = async (server: ControlServer) => {
     const res = await getControlServerInstallCommand(server.id);
     if (res.code === 0) {
-      setScriptTitle(t("{name} 被控加入命令", { name: server.name }));
-      setScriptText(res.data || "");
-      setScriptModalOpen(true);
+      setDetailTitle(t("{name} 被控加入命令", { name: server.name }));
+      setDetailText(res.data || "");
+      setDetailModalOpen(true);
     } else {
       toast.error(res.msg || t("生成被控加入命令失败"));
     }
@@ -1292,17 +1167,17 @@ export default function ControlCenterPage() {
 
   const isNodeCoreSuccess = (res: any) => res.code === 0 && (!res.data || res.data.success !== false);
 
-  const showNodeCoreResult = (title: string, data: any) => {
-    setScriptTitle(title);
-    setScriptText(typeof data === "string" ? data : JSON.stringify(data, null, 2));
-    setScriptModalOpen(true);
+  const showNodeServiceDetail = (title: string, data: any) => {
+    setDetailTitle(title);
+    setDetailText(typeof data === "string" ? data : JSON.stringify(data, null, 2));
+    setDetailModalOpen(true);
   };
 
   const showNodeCoreOutbounds = async (server: ControlServer) => {
     const res = await getNodeCoreOutbounds(server.id);
     if (isNodeCoreSuccess(res)) {
       rememberOutboundTags(res.data);
-      showNodeCoreResult(t("{name} 出站配置", { name: server.name }), res.data);
+      showNodeServiceDetail(t("{name} 出站配置", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("读取出站失败"));
     }
@@ -1311,10 +1186,33 @@ export default function ControlCenterPage() {
   const showNodeCoreOutboundTraffic = async (server: ControlServer) => {
     const res = await getNodeCoreOutboundTraffic(server.id);
     if (isNodeCoreSuccess(res)) {
-      showNodeCoreResult(t("{name} 出站流量", { name: server.name }), res.data);
+      showNodeServiceDetail(t("{name} 出站流量", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("读取出站流量失败"));
     }
+  };
+
+  const syncTrafficForSelection = async () => {
+    const targetServers = trafficServerFilter === "all"
+      ? servers
+      : servers.filter(server => String(server.id) === trafficServerFilter);
+    if (targetServers.length === 0) {
+      toast.error(t("请选择服务器"));
+      return;
+    }
+    setSubmitting(true);
+    const results = [];
+    for (const server of targetServers) {
+      results.push(await syncNodeCoreTraffic(server.id));
+    }
+    setSubmitting(false);
+    const failed = results.find(res => !isNodeCoreSuccess(res));
+    if (failed) {
+      toast.error(failed.msg || failed.data?.msg || t("同步流量失败"));
+      return;
+    }
+    toast.success(t("远端流量已同步入库"));
+    loadData();
   };
 
   const openNodeCoreSettingModal = async (server: ControlServer) => {
@@ -1367,7 +1265,7 @@ export default function ControlCenterPage() {
     if (isNodeCoreSuccess(res)) {
       toast.success(t("出站配置已保存"));
       setXraySettingModalOpen(false);
-      showNodeCoreResult(t("出站保存结果"), res.data);
+      showNodeServiceDetail(t("出站保存结果"), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("保存出站配置失败"));
     }
@@ -1389,14 +1287,14 @@ export default function ControlCenterPage() {
     const res = await restartNodeCoreService(server.id);
     if (isNodeCoreSuccess(res)) {
       toast.success(t("已请求重启节点服务"));
-      showNodeCoreResult(t("{name} 节点服务重启结果", { name: server.name }), res.data);
+      showNodeServiceDetail(t("{name} 节点服务重启结果", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("重启节点服务失败"));
     }
   };
 
-  const copyScript = async () => {
-    await navigator.clipboard.writeText(scriptText);
+  const copyDetail = async () => {
+    await navigator.clipboard.writeText(detailText);
     toast.success(t("已复制"));
   };
 
@@ -1416,28 +1314,6 @@ export default function ControlCenterPage() {
     const res = await deleteControlServer(server.id);
     if (res.code === 0) {
       toast.success(t("服务器已删除"));
-      loadData();
-    } else {
-      toast.error(res.msg || t("删除失败"));
-    }
-  };
-
-  const removeProfile = async (profile: ProtocolProfile, confirmed = false) => {
-    if (!confirmed) {
-      requestUiConfirmation({
-        title: t("确认删除模板"),
-        message: t("确定删除协议模板 {name}?", { name: profile.name || profile.id }),
-        detail: t("已有节点不会变化, 但该模板无法继续复用。"),
-        confirmText: t("确认删除"),
-        color: "danger",
-        testId: "confirm-delete-profile",
-        onConfirm: () => removeProfile(profile, true)
-      });
-      return;
-    }
-    const res = await deleteProtocolProfile(profile.id);
-    if (res.code === 0) {
-      toast.success(t("协议模板已删除"));
       loadData();
     } else {
       toast.error(res.msg || t("删除失败"));
@@ -1563,7 +1439,7 @@ export default function ControlCenterPage() {
               <CardBody>
                 <p className="text-sm text-gray-500">{t("入站节点")}</p>
                 <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{protocolNodes.length}</p>
-                <p className="mt-1 text-xs text-gray-500">Xray {xrayNodes} / Snell {snellNodes}</p>
+                <p className="mt-1 text-xs text-gray-500">{t("完整协议 {xray} / 轻量协议 {snell}", { xray: xrayNodes, snell: snellNodes })}</p>
               </CardBody>
             </Card>
             <Card radius="sm" className="border border-default-200">
@@ -1585,7 +1461,7 @@ export default function ControlCenterPage() {
             <CardHeader className="flex flex-col items-start gap-2 md:flex-row md:items-center md:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("状态总览")}</h2>
-                <p className="text-xs text-gray-500">{t("只看在线、异常、服务和证书状态, 详细信息进入日志。")}</p>
+                <p className="text-xs text-gray-500">{t("只看在线、异常、服务和证书状态, 详细信息进入近期事件。")}</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Chip size="sm" variant="flat" color="success">{t("健康 {count}", { count: runtimeStateOverview?.healthy || 0 })}</Chip>
@@ -1645,8 +1521,8 @@ export default function ControlCenterPage() {
                   <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
                     <div><p className="text-xs text-gray-500">CPU</p><p>{server.cpuUsage == null ? "-" : `${server.cpuUsage.toFixed(1)}%`}</p></div>
                     <div><p className="text-xs text-gray-500">{t("内存")}</p><p>{server.memoryUsage == null ? "-" : `${server.memoryUsage.toFixed(1)}%`}{server.memoryTotalMb ? ` / ${server.memoryTotalMb} MB` : ""}</p></div>
-                    <div><p className="text-xs text-gray-500">Xray</p><p>{server.xrayServiceStatus || "-"}</p></div>
-                    <div><p className="text-xs text-gray-500">Snell</p><p>{server.snellServiceStatus || "-"}</p></div>
+                    <div><p className="text-xs text-gray-500">{t("协议服务")}</p><p>{server.xrayServiceStatus || "-"}</p></div>
+                    <div><p className="text-xs text-gray-500">{t("轻量服务")}</p><p>{server.snellServiceStatus || "-"}</p></div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" color="primary" variant="flat" onPress={() => showServerInstallCommand(server)}>{t("加入命令")}</Button>
@@ -1751,13 +1627,44 @@ export default function ControlCenterPage() {
         </section>
 
         <section id="traffic" data-testid="broil-traffic">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("流量")}</h2>
-            <Button size="sm" variant="flat" onPress={loadData}>{t("刷新")}</Button>
+            <div className="flex flex-wrap gap-2">
+              <Select
+                aria-label={t("服务器")}
+                size="sm"
+                className="w-44"
+                selectedKeys={[trafficServerFilter]}
+                onSelectionChange={keys => setTrafficServerFilter(String(Array.from(keys)[0] || "all"))}
+                variant="bordered"
+                items={[
+                  { key: "all", label: t("全部服务器") },
+                  ...servers.map(server => ({ key: String(server.id), label: server.name || server.host || String(server.id) }))
+                ]}
+              >
+                {item => <SelectItem key={item.key}>{item.label}</SelectItem>}
+              </Select>
+              <Select
+                aria-label={t("类型")}
+                size="sm"
+                className="w-40"
+                selectedKeys={[trafficSourceFilter]}
+                onSelectionChange={keys => setTrafficSourceFilter(String(Array.from(keys)[0] || "all"))}
+                variant="bordered"
+                items={[
+                  { key: "all", label: t("全部类型") },
+                  ...trafficSourceTypes.map(type => ({ key: type, label: type }))
+                ]}
+              >
+                {item => <SelectItem key={item.key}>{item.label}</SelectItem>}
+              </Select>
+              <Button size="sm" variant="flat" isLoading={submitting} onPress={syncTrafficForSelection}>{t("同步流量")}</Button>
+              <Button size="sm" variant="flat" onPress={loadData}>{t("刷新")}</Button>
+            </div>
           </div>
           <Card radius="sm" className="border border-default-200">
             <CardBody className="space-y-2">
-              {trafficSnapshots.slice(0, 12).map(snapshot => (
+              {filteredTrafficSnapshots.slice(0, 24).map(snapshot => (
                 <div key={`broil-traffic-${snapshot.id}`} className="grid grid-cols-1 gap-2 rounded-small border border-default-200 bg-default-50/60 p-3 text-sm md:grid-cols-4 dark:bg-default-50/5">
                   <p className="font-medium text-gray-900 dark:text-white">{snapshot.serverName || snapshot.serverId}</p>
                   <p>{snapshot.inboundRemark || snapshot.email || snapshot.tag || snapshot.sourceType}</p>
@@ -1765,7 +1672,7 @@ export default function ControlCenterPage() {
                   <p className="text-xs text-gray-500">{formatTime(snapshot.syncedTime)}</p>
                 </div>
               ))}
-              {trafficSnapshots.length === 0 && <p className="text-sm text-gray-500">{t("暂无流量快照。")}</p>}
+              {filteredTrafficSnapshots.length === 0 && <p className="text-sm text-gray-500">{t("暂无流量快照。")}</p>}
             </CardBody>
           </Card>
         </section>
@@ -1787,6 +1694,10 @@ export default function ControlCenterPage() {
                     <Chip size="sm" variant="flat" color={serviceColor(server.certificateStatus) as any}>{server.certificateStatus || "-"}</Chip>
                   </div>
                   <p className="text-xs text-gray-500">{t("到期：{time}", { time: formatTime(server.certificateExpireAt) })}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="flat" onPress={() => openDeploymentPlanModal(server)}>{t("申请/续期")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => openNodeCoreSettingModal(server)}>{t("查看详情")}</Button>
+                  </div>
                 </CardBody>
               </Card>
             ))}
@@ -1796,10 +1707,6 @@ export default function ControlCenterPage() {
         <section id="settings" data-testid="broil-settings">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("设置")}</h2>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="flat" onPress={() => openProfileModal()}>{t("节点模板")}</Button>
-              <Button size="sm" variant="flat" onPress={() => openDeployModal()}>{t("手动任务")}</Button>
-            </div>
           </div>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,.8fr)]">
             <Card radius="sm" className="border border-default-200">
@@ -1815,7 +1722,7 @@ export default function ControlCenterPage() {
             </Card>
             <Card radius="sm" className="border border-default-200">
               <CardHeader className="flex justify-between gap-3">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("日志")}</h3>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t("近期事件")}</h3>
                 <Chip size="sm" variant="flat">{activeAlerts + failedTasks}</Chip>
               </CardHeader>
               <CardBody className="space-y-2">
@@ -1846,7 +1753,7 @@ export default function ControlCenterPage() {
                     <p className="mt-1 text-gray-500">{log.serverName || log.serverId || "-"} · {formatTime(log.createdTime)}</p>
                   </div>
                 ))}
-                {recentAlerts.length === 0 && tasks.length === 0 && recentAuditLogs.length === 0 && <p className="text-sm text-gray-500">{t("暂无日志。")}</p>}
+                {recentAlerts.length === 0 && tasks.length === 0 && recentAuditLogs.length === 0 && <p className="text-sm text-gray-500">{t("暂无事件。")}</p>}
               </CardBody>
             </Card>
           </div>
@@ -1878,27 +1785,6 @@ export default function ControlCenterPage() {
           <ModalFooter>
             <Button variant="light" onPress={() => setServerModalOpen(false)}>{t("取消")}</Button>
             <Button color="primary" isLoading={submitting} onPress={saveServer}>{t("保存")}</Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-
-      <Modal isOpen={profileModalOpen} onOpenChange={setProfileModalOpen} size="3xl">
-        <ModalContent>
-          <ModalHeader>{profileForm.id ? t("编辑协议模板") : t("添加协议模板")}</ModalHeader>
-          <ModalBody>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input label={t("名称")} value={profileForm.name} onChange={e => setProfileForm(prev => ({ ...prev, name: e.target.value }))} variant="bordered" />
-              <Input label={t("协议")} value={profileForm.protocol} onChange={e => setProfileForm(prev => ({ ...prev, protocol: e.target.value }))} variant="bordered" />
-              <Input label={t("版本族")} value={profileForm.versionFamily} onChange={e => setProfileForm(prev => ({ ...prev, versionFamily: e.target.value }))} variant="bordered" />
-              <Input label={t("端口")} type="number" value={profileForm.listenPort.toString()} onChange={e => setProfileForm(prev => ({ ...prev, listenPort: Number(e.target.value) || 0 }))} variant="bordered" />
-              <Input label={t("传输")} value={profileForm.transport} onChange={e => setProfileForm(prev => ({ ...prev, transport: e.target.value }))} variant="bordered" />
-              <Input label={t("备注")} value={profileForm.remark} onChange={e => setProfileForm(prev => ({ ...prev, remark: e.target.value }))} variant="bordered" />
-            </div>
-            <Textarea label={t("配置 JSON")} minRows={5} value={profileForm.configJson} onChange={e => setProfileForm(prev => ({ ...prev, configJson: e.target.value }))} variant="bordered" />
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="light" onPress={() => setProfileModalOpen(false)}>{t("取消")}</Button>
-            <Button color="primary" isLoading={submitting} onPress={saveProfile}>{t("保存")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
@@ -2002,7 +1888,7 @@ export default function ControlCenterPage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Input label="Outbound Tag" value={protocolNodeForm.outboundTag} onChange={e => patchProtocolNodeForm({ outboundTag: e.target.value })} variant="bordered" placeholder={t("留空使用默认路由")} />
+                    <Input label={t("出站标签")} value={protocolNodeForm.outboundTag} onChange={e => patchProtocolNodeForm({ outboundTag: e.target.value })} variant="bordered" placeholder={t("留空使用默认路由")} />
                     {renderOutboundTagButtons(tag => patchProtocolNodeForm({ outboundTag: tag }))}
                   </div>
                     </>
@@ -2040,40 +1926,6 @@ export default function ControlCenterPage() {
           <ModalFooter>
             <Button variant="light" onPress={() => setServerForwardModalOpen(false)}>{t("取消")}</Button>
             <Button color="primary" isLoading={submitting} onPress={saveServerForwardRule}>{t("保存")}</Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-
-      <Modal isOpen={deployModalOpen} onOpenChange={setDeployModalOpen} size="2xl">
-        <ModalContent>
-          <ModalHeader>{t("生成部署任务")}</ModalHeader>
-          <ModalBody>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Select label={t("目标服务器")} selectedKeys={deployForm.serverId ? [deployForm.serverId.toString()] : []} onSelectionChange={keys => setDeployForm(prev => ({ ...prev, serverId: Number(Array.from(keys)[0]) }))} variant="bordered">
-                {renderServerOptions()}
-              </Select>
-              <Select label={t("协议模板")} selectedKeys={deployForm.profileId ? [deployForm.profileId.toString()] : []} onSelectionChange={keys => selectProfileForDeploy(Number(Array.from(keys)[0]))} variant="bordered">
-                {profiles.map(profile => <SelectItem key={profile.id.toString()}>{profile.name}</SelectItem>)}
-              </Select>
-              <Select label={t("动作")} selectedKeys={[deployForm.action]} onSelectionChange={keys => setDeployForm(prev => ({ ...prev, action: Array.from(keys)[0] as string }))} variant="bordered">
-                <SelectItem key="present">{t("安装/更新")}</SelectItem>
-                <SelectItem key="restarted">{t("重启")}</SelectItem>
-                <SelectItem key="status">{t("状态")}</SelectItem>
-                <SelectItem key="absent">{t("卸载")}</SelectItem>
-              </Select>
-              <Input label={t("协议")} value={deployForm.protocol} onChange={e => setDeployForm(prev => ({ ...prev, protocol: e.target.value }))} variant="bordered" />
-              <Input label={t("版本族")} value={deployForm.versionFamily} onChange={e => setDeployForm(prev => ({ ...prev, versionFamily: e.target.value }))} variant="bordered" />
-              <Input label={t("固定版本")} value={deployForm.exactVersion} onChange={e => setDeployForm(prev => ({ ...prev, exactVersion: e.target.value }))} variant="bordered" />
-              <Input label={t("监听端口")} type="number" value={deployForm.listenPort.toString()} onChange={e => setDeployForm(prev => ({ ...prev, listenPort: Number(e.target.value) || 0 }))} variant="bordered" />
-              <div className="space-y-2">
-                <Input label="Snell PSK" value={deployForm.psk} onChange={e => setDeployForm(prev => ({ ...prev, psk: e.target.value }))} variant="bordered" />
-                <Button size="sm" variant="flat" onPress={() => setDeployForm(prev => ({ ...prev, psk: randomToken(32) }))}>{t("生成 PSK")}</Button>
-              </div>
-            </div>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="light" onPress={() => setDeployModalOpen(false)}>{t("取消")}</Button>
-            <Button color="primary" isLoading={submitting} onPress={saveDeployTask}>{t("生成")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
@@ -2124,7 +1976,7 @@ export default function ControlCenterPage() {
                     : "border-warning-300 bg-warning-50 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300"
                 }`}>
                   <span className="font-semibold">{t("Nano 被控风险：")}</span>
-                  {t("已选择 {count} 台低内存服务器。低于 200MB 时主控会阻止完整节点内核部署；建议只保留 Snell 或端口转发，并先开启 swap。", {
+                  {t("已选择 {count} 台低内存服务器。低于 200MB 时主控会阻止完整节点服务部署；建议只保留 Snell 或端口转发，并先开启 swap。", {
                     count: selectedDeploymentPlanLowMemoryServers.length
                   })}
                 </div>
@@ -2139,9 +1991,9 @@ export default function ControlCenterPage() {
 
               {deploymentAdvancedOpen && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Input label={t("节点内核端口")} type="number" value={deploymentPlanForm.runtimePort.toString()} onChange={e => patchDeploymentPlanForm({ runtimePort: Number(e.target.value) || 5168 })} variant="bordered" />
-                  <Input label={t("节点内核用户")} value={deploymentPlanForm.runtimeUsername} onChange={e => patchDeploymentPlanForm({ runtimeUsername: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
-                  <Input label={t("节点内核密码")} type="password" value={deploymentPlanForm.runtimePassword} onChange={e => patchDeploymentPlanForm({ runtimePassword: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
+                  <Input label={t("节点服务端口")} type="number" value={deploymentPlanForm.runtimePort.toString()} onChange={e => patchDeploymentPlanForm({ runtimePort: Number(e.target.value) || 5168 })} variant="bordered" />
+                  <Input label={t("节点服务用户")} value={deploymentPlanForm.runtimeUsername} onChange={e => patchDeploymentPlanForm({ runtimeUsername: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
+                  <Input label={t("节点服务密码")} type="password" value={deploymentPlanForm.runtimePassword} onChange={e => patchDeploymentPlanForm({ runtimePassword: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
                   <Input label={t("访问路径")} value={deploymentPlanForm.webBasePath} onChange={e => patchDeploymentPlanForm({ webBasePath: e.target.value })} variant="bordered" />
                   <Input label={t("监听 IP")} value={deploymentPlanForm.listenIp} onChange={e => patchDeploymentPlanForm({ listenIp: e.target.value })} variant="bordered" />
                   <Select label={t("证书模式")} selectedKeys={[deploymentPlanForm.certificateMode]} onSelectionChange={keys => patchDeploymentPlanForm({ certificateMode: Array.from(keys)[0] as DeploymentPlanForm["certificateMode"] })} variant="bordered">
@@ -2197,7 +2049,7 @@ export default function ControlCenterPage() {
         <ModalContent>
           <ModalHeader>{t("保存节点路由 / 出站配置")}</ModalHeader>
           <ModalBody>
-            <Input label={t("Outbound 测试地址")} value={outboundTestUrl} onChange={e => setOutboundTestUrl(e.target.value)} variant="bordered" />
+            <Input label={t("出站测试地址")} value={outboundTestUrl} onChange={e => setOutboundTestUrl(e.target.value)} variant="bordered" />
             <div className="rounded-small border border-default-200 bg-default-50/60 p-3 text-xs leading-5 text-gray-600 dark:bg-default-50/5 dark:text-gray-300">
               <div className="mb-2 flex flex-wrap gap-1.5">
                 <Chip size="sm" variant="flat" color="primary">{t("出站")}</Chip>
@@ -2205,10 +2057,10 @@ export default function ControlCenterPage() {
                 <Chip size="sm" variant="flat" color="primary">IPv4 / IPv6</Chip>
                 <Chip size="sm" variant="flat" color="primary">{t("规则优先")}</Chip>
               </div>
-              {t("这里保存完整路由配置，包含 outbounds、routing.rules、domainStrategy、DNS 和 IPv4/IPv6 相关策略；规则匹配顺序以 JSON 中的数组顺序为准。")}
+              {t("这里保存出站和路由规则，包含 IPv4/IPv6 优先级、域名/IP 规则和 DNS 策略；规则顺序按列表从上到下生效。")}
             </div>
             <Textarea
-              label={t("完整路由配置 JSON")}
+              label={t("路由规则 JSON")}
               minRows={22}
               value={xraySettingText}
               onChange={e => setXraySettingText(e.target.value)}
@@ -2245,15 +2097,15 @@ export default function ControlCenterPage() {
         </ModalContent>
       </Modal>
 
-      <Modal isOpen={scriptModalOpen} onOpenChange={setScriptModalOpen} size="5xl" scrollBehavior="inside">
+      <Modal isOpen={detailModalOpen} onOpenChange={setDetailModalOpen} size="5xl" scrollBehavior="inside">
         <ModalContent>
-          <ModalHeader>{scriptTitle}</ModalHeader>
+          <ModalHeader>{detailTitle}</ModalHeader>
           <ModalBody>
-            <Textarea value={scriptText} minRows={18} readOnly variant="bordered" classNames={{ input: "font-mono text-xs" }} />
+            <Textarea value={detailText} minRows={18} readOnly variant="bordered" classNames={{ input: "font-mono text-xs" }} />
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setScriptModalOpen(false)}>{t("关闭")}</Button>
-            <Button color="primary" onPress={copyScript}>{t("复制")}</Button>
+            <Button variant="light" onPress={() => setDetailModalOpen(false)}>{t("关闭")}</Button>
+            <Button color="primary" onPress={copyDetail}>{t("复制")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

@@ -9,7 +9,7 @@ log_file: C:\Users\echo\Downloads\claude\overlord-broil\LOG.md
 startup_receipt:
   project_root: C:\Users\echo\Downloads\claude\overlord-broil
   project_type: code
-  rules_loaded: global / project AGENTS / PROJECT_ID / TASK
+  rules_loaded: global / project AGENTS / PROJECT_ID / TASK / skill
   task_file: TASK.md
   mcp_needed: yes
   subagent_allowed: yes

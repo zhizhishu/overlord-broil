@@ -70,7 +70,7 @@ sudo bash /opt/overlord-broil/install-master.sh uninstall --yes
 
 ## Install Controlled Agent
 
-Create a server in the control center, click `Join Command` on the server card, then run the generated one-line command. The command uses a short-lived join token; the agent registers itself and stores the internal server id/token locally.
+Create a server in the control center, click `Join Command` on the server card, then run the generated one-line command. The command uses a single-use join token that expires after 24 hours; the agent registers itself and stores the internal server id/token locally.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent.sh \

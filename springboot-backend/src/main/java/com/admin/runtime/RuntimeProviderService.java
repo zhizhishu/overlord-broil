@@ -171,11 +171,11 @@ public class RuntimeProviderService {
         List<RuntimeProviderDescriptor> result = new ArrayList<>();
         result.add(provider(
                 "xrayRuntime",
-                "Xray Runtime",
+                "Node Service",
                 "proxy-runtime",
                 "master-api + agent-task",
                 "control_server runtime/xray status, runtime traffic snapshots, protocol_node",
-                "Xray Runtime API, Xray inbound/outbound, Reality, VMess, Trojan, Shadowsocks and traffic sync.",
+                "Protocol inbound/outbound, Reality, VMess, Trojan, Shadowsocks and traffic sync.",
                 true,
                 true,
                 false,
@@ -186,7 +186,7 @@ public class RuntimeProviderService {
                         action("status", "状态", "diagnostic", "agent-maintenance", "xrayRuntime", false, false, false),
                         action("logs", "日志", "diagnostic", "agent-maintenance", "xrayRuntime", false, true, false),
                         action("install-diagnose", "安装诊断", "diagnostic", "agent-maintenance", "xrayRuntime", false, true, true),
-                        action("repair-xray-runtime", "修复 Xray Runtime", "repair", "agent-maintenance", "xrayRuntime", false, true, true),
+                        action("repair-xray-runtime", "修复节点服务", "repair", "agent-maintenance", "xrayRuntime", false, true, true),
                         action("repair-xray", "修复 Xray", "repair", "agent-maintenance", "xrayRuntime", false, true, true),
                         action("repair-all", "一键修复", "repair", "agent-maintenance", "xrayRuntime", false, true, false),
                         action("restart-agent", "重启 agent", "maintenance", "agent-maintenance", "xrayRuntime", false, false, false),
@@ -200,7 +200,7 @@ public class RuntimeProviderService {
         ));
         result.add(provider(
                 "snell",
-                "Snell Runtime",
+                "Snell Service",
                 "proxy-runtime",
                 "agent-task",
                 "control_server.snell status, protocol_node, deploy_task result",
@@ -220,7 +220,7 @@ public class RuntimeProviderService {
         ));
         result.add(provider(
                 "forward",
-                "Forward Runtime",
+                "Forward Service",
                 "forward-runtime",
                 "agent-task",
                 "server_forward_rule, deploy_task result",
@@ -240,11 +240,11 @@ public class RuntimeProviderService {
         ));
         result.add(provider(
                 "certificate",
-                "Certificate Runtime",
+                "Certificate Service",
                 "certificate-runtime",
                 "agent-task",
                 "control_server.certificate status, deploy_task result",
-                "Certificate tasks diagnose or issue local certificates for Xray Runtime/Xray and related inbound services.",
+                "Certificate tasks diagnose or issue local certificates for node services and related inbound services.",
                 true,
                 false,
                 false,
@@ -260,7 +260,7 @@ public class RuntimeProviderService {
         ));
         result.add(provider(
                 "firewall",
-                "Firewall Runtime",
+                "Firewall Service",
                 "network-runtime",
                 "agent-task",
                 "deploy_task diagnostic result",

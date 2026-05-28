@@ -13,6 +13,7 @@ import com.admin.entity.ControlServer;
 import com.admin.mapper.ControlServerMapper;
 import com.admin.service.ControlServerService;
 import com.admin.service.MonitorAlertService;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -100,7 +101,7 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         if (server == null) {
             return R.err("server not found");
         }
-        return R.ok(secretCryptoUtils.decryptIfNeeded(server.getApiToken()));
+        return R.err(410, "agent token is hidden; use the one-time join command or rotate the token");
     }
 
     @Override
@@ -147,19 +148,24 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
             agentToken = IdUtil.simpleUUID();
         }
 
-        ControlServer update = new ControlServer();
-        update.setId(server.getId());
-        update.setApiToken(secretCryptoUtils.encryptIfNeeded(agentToken));
-        update.setHost(firstNotBlank(dto.getHost(), dto.getHostname(), server.getHost()));
-        update.setEndpoint(firstNotBlank(dto.getEndpoint(), server.getEndpoint()));
-        update.setAgentVersion(firstNotBlank(dto.getAgentVersion(), server.getAgentVersion()));
-        update.setMemoryTotalMb(dto.getMemoryTotalMb() == null ? server.getMemoryTotalMb() : dto.getMemoryTotalMb());
-        update.setJoinTokenUsedAt(now);
-        update.setLastError(null);
-        update.setStatus(STATUS_ACTIVE);
-        update.setUpdatedTime(now);
-        if (!this.updateById(update)) {
-            return R.err("agent join failed");
+        UpdateWrapper<ControlServer> consumeToken = new UpdateWrapper<>();
+        consumeToken.eq("id", server.getId())
+                .eq("join_token", server.getJoinToken())
+                .isNull("join_token_used_at")
+                .ge("join_token_expires_at", now)
+                .set("api_token", secretCryptoUtils.encryptIfNeeded(agentToken))
+                .set("host", firstNotBlank(dto.getHost(), dto.getHostname(), server.getHost()))
+                .set("endpoint", firstNotBlank(dto.getEndpoint(), server.getEndpoint()))
+                .set("agent_version", firstNotBlank(dto.getAgentVersion(), server.getAgentVersion()))
+                .set("memory_total_mb", dto.getMemoryTotalMb() == null ? server.getMemoryTotalMb() : dto.getMemoryTotalMb())
+                .set("join_token", null)
+                .set("join_token_expires_at", null)
+                .set("join_token_used_at", now)
+                .set("last_error", null)
+                .set("status", STATUS_ACTIVE)
+                .set("updated_time", now);
+        if (!this.update(consumeToken)) {
+            return R.err(401, "invalid or expired join token");
         }
 
         AgentJoinResponseDto response = new AgentJoinResponseDto();
@@ -178,7 +184,7 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         String token = IdUtil.simpleUUID();
         server.setApiToken(secretCryptoUtils.encryptIfNeeded(token));
         server.setUpdatedTime(System.currentTimeMillis());
-        return this.updateById(server) ? R.ok(token) : R.err("server token rotate failed");
+        return this.updateById(server) ? R.ok("server token rotated; create a new join command if the agent must be reinstalled") : R.err("server token rotate failed");
     }
 
     @Override
@@ -259,7 +265,7 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
 
     private ControlServer findByJoinToken(String joinToken, long now) {
         for (ControlServer server : this.list()) {
-            if (server == null || server.getJoinToken() == null || server.getJoinTokenExpiresAt() == null) {
+            if (server == null || server.getJoinToken() == null || server.getJoinTokenExpiresAt() == null || server.getJoinTokenUsedAt() != null) {
                 continue;
             }
             if (server.getJoinTokenExpiresAt() < now) {

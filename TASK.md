@@ -31,12 +31,20 @@ Close the Broil product flow for urgent use: one cohesive control center, simple
 - Removed the old visible engineering console sections from the control-center page; detailed events now surface through the Settings log block.
 - Kept Snell as a first-class inbound-node option beside VLESS Reality, VMess, Trojan and Shadowsocks.
 - Removed the remaining old engineering console code paths from the control-center page, including runtime-provider state blocks, diagnostic cards, raw inbound payload preview and hidden advanced inbound modal.
-- Persisted the startup boundary receipt in `PROJECT_ID.md` and `AGENTS.md` so future turns do not need the project root repeated.
+- Persisted the startup boundary receipt, MCP need and subagent allowance in `PROJECT_ID.md` and `AGENTS.md` so future turns do not need the project root repeated.
 - Protected `/settings` behind the logged-in simple layout.
 - Removed public README/Pages/frontend-bundle references to old runtime/provider wording, `node-core` wording, `XRAY_RUNTIME_*` examples and unused Runtime API i18n strings.
 - Removed unused frontend runtime-provider API exports from the public API layer.
 - Renamed frontend deployment-plan state to node-service product fields while mapping to the existing backend compatibility DTO at submit time.
 - Updated the public screenshot copy to show protocol/node-service wording instead of internal service labels.
+- Completed another parallel read-only audit pass for frontend/docs and backend/API leakage risks.
+- Removed old public control-center PNG screenshots and switched README/GitHub Pages to the current 8-module product SVG.
+- Removed remaining public product-surface wording for protocol profiles, raw results, full routing config, visible provider terms and internal payload labels.
+- Removed unused frontend exports for protocol-profile and manual deploy-task APIs.
+- Changed Snell protocol-node and server-forward responses to return a safe deploy-task summary instead of full `DeployTask` entities with scripts or request JSON.
+- Changed `/api/v1/capabilities/list` and `/api/v1/capabilities/resolve` to HTTP 410 because the service registry is internal.
+- Extended request/response log masking for `requestJson`, `resultJson`, `rawResultJson`, `detailJson` and common embedded secret patterns.
+- Removed raw task fields and provider DTOs from the frontend public type layer.
 
 ## Validation Status
 
@@ -64,6 +72,18 @@ Close the Broil product flow for urgent use: one cohesive control center, simple
 - Passed after product-surface tightening: `bash scripts/test-sqlite-schema.sh`.
 - Passed after product-surface tightening: `git diff --check`.
 - Passed after product-surface tightening: public product-surface keyword scan across README, docs, frontend source and built dist.
+- Passed after latest cleanup: public product-surface keyword scan across README, docs, frontend source, backend source and scripts for old visible engineering terms.
+- Passed after latest cleanup: `npm run build` in `vite-frontend`.
+- Passed after latest cleanup: `bash -n scripts/*.sh`.
+- Passed after latest cleanup: `bash -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh`.
+- Passed after latest cleanup: `bash scripts/test-master-port-contract.sh`.
+- Passed after latest cleanup: `bash scripts/test-agent-mock.sh`.
+- Passed after latest cleanup: `bash scripts/test-sqlite-schema.sh`.
+- Passed after latest cleanup: Docker Maven backend package build with tests skipped.
+- Passed after latest cleanup: `bash scripts/test-xray-runtime-fixture.sh`.
+- Passed after latest cleanup: `bash scripts/test-compose-smoke.sh --build-local --dry-run`.
+- Passed after latest cleanup: `bash scripts/test-install-matrix.sh` across Debian 12, Ubuntu 24.04, Alpine 3.20, Rocky Linux 9 and Oracle Linux 9 userspaces.
+- Passed after latest cleanup: `git diff --check`.
 - Browser preview was attempted through the in-app Browser plugin; the protected route needs a real login/local storage state, so visual proof is deferred to a live master session.
 
 ## Remaining

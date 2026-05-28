@@ -30,7 +30,7 @@ This release closes the product surface around Overlord Broil as one master imag
 | Master install | One-command installer, preflight doctor and GHCR/source-build fallback. |
 | Master runtime | Single `overlord-master` image on `5166/tcp`; optional SQLite mode. |
 | Agent install | systemd/OpenRC service plus preflight doctor and runtime doctor. |
-| Node core | API fixture in CI plus recorded `isrco-hk` real container write smoke. |
+| Node service | API fixture in CI plus recorded `isrco-hk` real container write smoke. |
 | Snell | Product-level protocol node backed by generated systemd/OpenRC services. |
 | Remote forwarding | Auditable controlled-agent tasks for TCP/UDP forwarding. |
 | Status sync | Runtime-state aggregation by server and module. |
@@ -59,7 +59,7 @@ This release closes the product surface around Overlord Broil as one master imag
 ### Honest Boundaries
 
 - The Linux matrix is Docker/CI preflight coverage, not a full real-VPS matrix with public DNS, cloud firewall, ACME HTTP validation and real service managers.
-- Node core has one recorded real-host container smoke; more providers and VPS images are still needed.
+- Node service has one recorded real-host container smoke; more host images and long-running cases are still needed.
 - Snell remains a separate runtime service managed by the Overlord agent rather than a native Xray protocol.
 - Sub-200 MB hosts should stay on Snell or forwarding unless swap and real-host testing prove otherwise.
 - Enterprise governance is future work: RBAC, audit export/retention, key-rotation migration, agent token expiry/revocation and broader dangerous-operation policy.

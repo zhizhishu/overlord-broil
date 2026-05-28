@@ -185,53 +185,9 @@ export interface ServerRuleOverview {
   xrayRuntimeOutbounds?: any;
 }
 
-export interface RuntimeProviderAction {
-  key: string;
-  label: string;
-  category: "diagnostic" | "repair" | "maintenance" | "danger" | string;
-  protocol: string;
-  providerKey: string;
-  danger: boolean;
-  primary: boolean;
-  stateSync: boolean;
-}
-
-export interface RuntimeProviderDescriptor {
-  key: string;
-  name: string;
-  runtimeType: string;
-  executor: string;
-  stateSource: string;
-  summary: string;
-  agentRequired: boolean;
-  masterApiSupported: boolean;
-  nanoSupported: boolean;
-  protocols: string[];
-  actions: string[];
-  actionCatalog?: RuntimeProviderAction[];
-  capabilities: string[];
-  requiredServerFields: string[];
-  exposedPorts: string[];
-  relatedProviders: string[];
-}
-
-export interface RuntimeProviderAssignment {
-  key: string;
-  name: string;
-  protocol: string;
-  action: string;
-  executor: string;
-  stateSource: string;
-  agentRequired: boolean;
-  masterApiSupported: boolean;
-  nanoSupported: boolean;
-  capabilities: string[];
-  relatedProviders: string[];
-}
-
 export interface RuntimeState {
-  providerKey?: string;
-  providerName?: string;
+  serviceKey?: string;
+  serviceName?: string;
   protocol?: string;
   action?: string;
   taskState?: string;
@@ -261,8 +217,8 @@ export interface RuntimeState {
 export interface RuntimeStateOverviewItem {
   serverId: number;
   serverName?: string;
-  providerKey: string;
-  providerName?: string;
+  serviceKey: string;
+  serviceName?: string;
   status?: string;
   statusSource?: string;
   protocol?: string;
@@ -290,7 +246,7 @@ export interface RuntimeStateOverviewItem {
 export interface RuntimeStateOverview {
   generatedAt: number;
   servers: number;
-  providers: number;
+  services: number;
   healthy: number;
   warning: number;
   failed: number;
@@ -305,13 +261,9 @@ export interface DeployTask {
   protocol: string;
   action: string;
   state: string;
-  requestJson?: string;
-  script?: string;
-  resultJson?: string;
   startedTime?: number;
   finishedTime?: number;
   createdTime?: number;
-  runtimeProvider?: RuntimeProviderAssignment;
   status: number;
 }
 

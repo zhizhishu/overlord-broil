@@ -185,7 +185,7 @@ public class XrayRuntimeServiceImpl implements XrayRuntimeService {
 
         R inboundResult = apiGet(server, "/panel/api/inbounds/list", true);
         if (inboundResult.getCode() != 0 || !isSuccessEnvelope(inboundResult.getData())) {
-            return inboundResult.getCode() != 0 ? inboundResult : R.err("Xray Runtime inbound traffic sync failed");
+            return inboundResult.getCode() != 0 ? inboundResult : R.err("Protocol inbound traffic sync failed");
         }
         syncInboundSnapshots(server, toJsonArray(unwrapObj(inboundResult.getData())), now, snapshots, totals);
 
@@ -196,7 +196,7 @@ public class XrayRuntimeServiceImpl implements XrayRuntimeService {
         } else {
             outboundError = outboundResult.getMsg();
             if (outboundError == null || outboundError.isEmpty()) {
-                outboundError = "Xray Runtime outbound traffic sync skipped";
+                outboundError = "Protocol outbound traffic sync skipped";
             }
         }
 
@@ -273,19 +273,19 @@ public class XrayRuntimeServiceImpl implements XrayRuntimeService {
             return R.err("server not found");
         }
         if (bearerRequired && isBlank(server.getXrayRuntimeApiToken())) {
-            return R.err("Xray Runtime api token is required for this action");
+            return R.err("Node service api token is required for this action");
         }
         if (isBlank(server.getXrayRuntimeEndpoint())) {
-            return R.err("Xray Runtime endpoint is required");
+            return R.err("Node service endpoint is required");
         }
 
         try {
             ResponseEntity<String> response = clientFor(server).exchange(buildUrl(server, path), method, entity, String.class);
             return normalizeResponse(response.getBody());
         } catch (RestClientException e) {
-            return R.err("Xray Runtime request failed: " + e.getMessage());
+            return R.err("Node service request failed: " + e.getMessage());
         } catch (Exception e) {
-            return R.err("Xray Runtime client error: " + e.getMessage());
+            return R.err("Node service client error: " + e.getMessage());
         }
     }
 
@@ -303,7 +303,7 @@ public class XrayRuntimeServiceImpl implements XrayRuntimeService {
             return XrayRuntimeSession.error("server not found");
         }
         if (isBlank(server.getXrayRuntimeUsername()) || isBlank(server.getXrayRuntimePassword())) {
-            return XrayRuntimeSession.error("Xray Runtime username and password are required for outbound save");
+            return XrayRuntimeSession.error("Node service username and password are required for outbound save");
         }
         try {
             RestTemplate client = clientFor(server);
@@ -311,7 +311,7 @@ public class XrayRuntimeServiceImpl implements XrayRuntimeService {
             String csrf = extractObjString(csrfResp.getBody());
             List<String> cookies = new ArrayList<>(csrfResp.getHeaders().getOrEmpty(HttpHeaders.SET_COOKIE));
             if (isBlank(csrf)) {
-                return XrayRuntimeSession.error("Xray Runtime csrf token missing");
+                return XrayRuntimeSession.error("Node service csrf token missing");
             }
 
             MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
@@ -331,12 +331,12 @@ public class XrayRuntimeServiceImpl implements XrayRuntimeService {
             cookies.addAll(loginResp.getHeaders().getOrEmpty(HttpHeaders.SET_COOKIE));
             R loginResult = normalizeResponse(loginResp.getBody());
             if (loginResult.getCode() != 0 || !isSuccessEnvelope(loginResult.getData())) {
-                return XrayRuntimeSession.error("Xray Runtime login failed");
+                return XrayRuntimeSession.error("Node service login failed");
             }
 
             return new XrayRuntimeSession(csrf, joinCookies(cookies), null);
         } catch (Exception e) {
-            return XrayRuntimeSession.error("Xray Runtime login request failed: " + e.getMessage());
+            return XrayRuntimeSession.error("Node service login request failed: " + e.getMessage());
         }
     }
 
@@ -356,7 +356,7 @@ public class XrayRuntimeServiceImpl implements XrayRuntimeService {
 
     private String guardInboundPort(ControlServer server, Map<String, Object> payload) {
         Integer port = payloadPort(payload);
-        return MasterSelfProtectionUtils.validateListenPort(server, port, "Xray Runtime inbound 端口");
+        return MasterSelfProtectionUtils.validateListenPort(server, port, "协议入站端口");
     }
 
     private Integer payloadPort(Map<String, Object> payload) {

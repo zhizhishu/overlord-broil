@@ -15,10 +15,10 @@ Default checks:
   - shell syntax
   - agent mock test
   - SQLite schema smoke test
-  - tokenized Xray Runtime fixture test
-  - optional real Xray Runtime E2E contract when XRAY_RUNTIME_E2E_URL/TOKEN are set
+  - tokenized node-service fixture test
+  - optional real node-service E2E contract when XRAY_RUNTIME_E2E_URL/TOKEN are set
   - single-image compose config validation
-  - backend contract tests for runtime routes, providers and deploy tasks
+  - backend contract tests for node-service routes and deploy tasks
   - frontend install and production build in Docker Node 22
   - git whitespace check
 
@@ -98,10 +98,10 @@ bash scripts/test-agent-mock.sh
 step "Run SQLite schema smoke test"
 bash scripts/test-sqlite-schema.sh
 
-step "Run tokenized Xray Runtime fixture tests"
+step "Run tokenized node-service fixture tests"
 bash scripts/test-xray-runtime-fixture.sh
 
-step "Run optional real Xray Runtime E2E contract"
+step "Run optional real node-service E2E contract"
 bash scripts/test-xray-runtime-e2e.sh
 
 step "Validate compose files"

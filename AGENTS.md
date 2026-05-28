@@ -25,7 +25,7 @@ Use this exact project boundary summary when entering or continuing work in this
 ```text
 project_root: C:\Users\echo\Downloads\claude\overlord-broil
 project_type: code
-rules_loaded: global / project AGENTS / PROJECT_ID / TASK
+rules_loaded: global / project AGENTS / PROJECT_ID / TASK / skill
 task_file: TASK.md
 mcp_needed: yes
 subagent_allowed: yes
@@ -46,8 +46,8 @@ subagent_allowed: yes
 - Preserve the default single public master entry: `5166/tcp`.
 - Backend `6365`, MySQL `3306`, and phpMyAdmin are internal by default.
 - Controlled agents should call the master console URL, for example `http://MASTER_IP:5166`, not a backend debug port.
-- Snell is unified at the product/node-management layer, but it remains an independent runtime service deployed by the agent, not a native Xray or Xray Runtime core protocol.
-- Nano controlled hosts below `200 MB` memory should not run full Xray Runtime/Xray deployment through the supported path.
+- Snell is unified at the product/node-management layer, but it remains an independent service deployed by the agent, not a native protocol inside the node service.
+- Nano controlled hosts below `200 MB` memory should not run full node-service or heavy protocol-node deployment through the supported path.
 
 ## Validation
 

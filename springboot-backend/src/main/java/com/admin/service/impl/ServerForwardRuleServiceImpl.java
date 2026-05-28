@@ -506,8 +506,27 @@ public class ServerForwardRuleServiceImpl extends ServiceImpl<ServerForwardRuleM
     private Map<String, Object> result(ServerForwardRule rule, DeployTask task) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("rule", rule);
-        data.put("task", task);
+        if (task != null) {
+            data.put("task", taskSummary(task));
+        }
         return data;
+    }
+
+    private Map<String, Object> taskSummary(DeployTask task) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        if (task == null) {
+            return item;
+        }
+        item.put("id", task.getId());
+        item.put("serverId", task.getServerId());
+        item.put("serverName", task.getServerName());
+        item.put("protocol", task.getProtocol());
+        item.put("action", task.getAction());
+        item.put("state", task.getState());
+        item.put("status", task.getStatus());
+        item.put("createdTime", task.getCreatedTime());
+        item.put("updatedTime", task.getUpdatedTime());
+        return item;
     }
 
     private ControlServer resolveServer(Long serverId) {
