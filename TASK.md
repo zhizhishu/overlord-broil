@@ -71,6 +71,8 @@ Close the Broil product flow for urgent use: one cohesive control center, simple
 - Passed after node-service/UI repair: Docker Maven tests `XrayRuntimeServiceImplTest` and `ControlServerServiceImplTest`.
 - Passed after node-service/UI repair: `bash scripts/test-xray-runtime-fixture.sh`.
 - Passed after node-service/UI repair: targeted `git diff --check` for all changed files.
+- Passed after push: GitHub Actions `CI`, `Docker Images` and `Pages` for commit `61f9246`.
+- Passed on `isrco-hk`: upgraded to the new image, generated repair task `8`, agent installed the node service on `5168`, rewrote the bad `127.0.0.1:2053` endpoint to `https://host.docker.internal:5168/ob-1`, and `/node-service/config`, `/node-service/outbounds`, `/node-service/outbounds/traffic`, `/node-service/traffic/sync` all returned code `0`.
 - Passed: `npm run build` in `vite-frontend` after the route/UI simplification.
 - Passed: `bash -n scripts/*.sh` and bootstrap `sh -n`.
 - Passed: `bash scripts/test-master-port-contract.sh`.
@@ -133,7 +135,7 @@ No required work remains for the current productization goal after this local an
 
 Optional next hardening outside this goal:
 
-1. Pull the latest image on `isrco-hk` and run a browser/HK smoke with a real master login.
+1. Run a browser screenshot pass against the logged-in HK UI after the user reviews the new sidebar placement.
 2. Add broader long-running real-VPS soak tests before claiming `1.0` commercial stability.
 
 ## Risks
