@@ -102,3 +102,12 @@
 - Completed: replaced the incorrect live login screenshot and added verified current UI screenshots for the 8 product modules.
 - Remote smoke: on `isrco-hk`, removed the old `/opt/flux-3xui-orchestrator` install, verified `/opt/overlord-broil`, healthy `overlord-master`, active `overlord-agent`, only public `5166/tcp`, and HTTP 200 for `/` plus `/flow/test`.
 - Validation: frontend build, shell syntax, bootstrap syntax, master port contract, agent mock, SQLite schema, `git diff --check`, and Docker Maven package with JDK 21 passed.
+
+## 2026-05-28 Node Service Repair And Sidebar Navigation
+
+- Completed: productized node-service connection failures so loopback Docker endpoints, refused ports, timeouts and DNS failures return actionable repair guidance instead of raw Java exceptions.
+- Completed: protected existing node-service endpoint/base path/token/user/password fields from being cleared by blank server-edit payloads.
+- Completed: moved the 8-module navigation under the left sidebar Overlord Broil entry and removed the content-top module grid.
+- Completed: added server-card and outbound/routing repair buttons plus a server-modal node-service connection editor for fixing outbounds/routing/traffic from the UI.
+- Completed: added `host.docker.internal:host-gateway` to all master compose files for same-host repair cases.
+- Validation: frontend `npm run build`, shell syntax, bootstrap syntax, master port contract, agent mock, SQLite schema, node-service fixture, Docker Maven package and the two new Docker Maven tests passed.

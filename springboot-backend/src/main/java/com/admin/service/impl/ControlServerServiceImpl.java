@@ -68,11 +68,33 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         ControlServer server = new ControlServer();
         BeanUtils.copyProperties(dto, server);
         server.setApiToken(null);
+        preserveBlankXrayRuntimeFields(dto, exists, server);
         preserveMaskedXrayRuntimeSecrets(dto, exists, server);
         server.setUpdatedTime(System.currentTimeMillis());
         encryptSecrets(server);
 
         return this.updateById(server) ? R.ok("server updated") : R.err("server update failed");
+    }
+
+    private void preserveBlankXrayRuntimeFields(ControlServerUpdateDto dto, ControlServer exists, ControlServer server) {
+        if (isBlank(dto.getXrayRuntimeEndpoint())) {
+            server.setXrayRuntimeEndpoint(exists.getXrayRuntimeEndpoint());
+        }
+        if (isBlank(dto.getXrayRuntimeBasePath())) {
+            server.setXrayRuntimeBasePath(exists.getXrayRuntimeBasePath());
+        }
+        if (isBlank(dto.getXrayRuntimeApiToken())) {
+            server.setXrayRuntimeApiToken(exists.getXrayRuntimeApiToken());
+        }
+        if (isBlank(dto.getXrayRuntimeUsername())) {
+            server.setXrayRuntimeUsername(exists.getXrayRuntimeUsername());
+        }
+        if (isBlank(dto.getXrayRuntimePassword())) {
+            server.setXrayRuntimePassword(exists.getXrayRuntimePassword());
+        }
+        if (isBlank(dto.getXrayRuntimeTwoFactorCode())) {
+            server.setXrayRuntimeTwoFactorCode(exists.getXrayRuntimeTwoFactorCode());
+        }
     }
 
     private void preserveMaskedXrayRuntimeSecrets(ControlServerUpdateDto dto, ControlServer exists, ControlServer server) {
@@ -289,6 +311,10 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
             }
         }
         return null;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private String maskSecret(String value, String fallback) {

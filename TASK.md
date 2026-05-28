@@ -12,6 +12,12 @@ Close the Broil product flow for urgent use: one cohesive control center, simple
 
 ## Completed This Round
 
+- Fixed the live node-service failure path behind the user-reported `127.0.0.1:2053` error: backend errors now explain loopback/Docker, wrong port, refused connection and the required "deploy/repair node service" action instead of returning raw Java exceptions.
+- Added Docker `host.docker.internal:host-gateway` support to every master compose file for same-host master/agent repair cases while still warning users not to use `127.0.0.1` for remote controlled servers.
+- Moved the 8-module control-center navigation into the left sidebar under the Overlord Broil entry and removed the disliked top module grid from the content page.
+- Added server-card and outbound/routing repair actions when a controlled server has no node-service endpoint, a loopback endpoint or an unhealthy service state.
+- Added a compact "node service connection" editor in the server modal so endpoint/base path/token/user/password can be fixed from the UI, and protected existing node-service fields from being cleared by blank update payloads.
+- Added backend tests for loopback connection messaging and blank-field preservation.
 - Ran two read-only subagent audits: one for the frontend product surface and one for backend/API/scripts/docs.
 - Made `/control-center` the logged-in product entry and redirected old visible routes (`/dashboard`, `/forward`, `/tunnel`, `/node`, `/user`, `/profile`, `/limit`, `/config`) back to it.
 - Reduced desktop and mobile navigation to the single Overlord Broil product entry.
@@ -59,6 +65,12 @@ Close the Broil product flow for urgent use: one cohesive control center, simple
 
 ## Validation Status
 
+- Passed after node-service/UI repair: `npm run build` in `vite-frontend`.
+- Passed after node-service/UI repair: `bash -n scripts/*.sh`, bootstrap `sh -n`, master port contract, agent mock and SQLite schema.
+- Passed after node-service/UI repair: Docker Maven backend package build with tests skipped.
+- Passed after node-service/UI repair: Docker Maven tests `XrayRuntimeServiceImplTest` and `ControlServerServiceImplTest`.
+- Passed after node-service/UI repair: `bash scripts/test-xray-runtime-fixture.sh`.
+- Passed after node-service/UI repair: targeted `git diff --check` for all changed files.
 - Passed: `npm run build` in `vite-frontend` after the route/UI simplification.
 - Passed: `bash -n scripts/*.sh` and bootstrap `sh -n`.
 - Passed: `bash scripts/test-master-port-contract.sh`.

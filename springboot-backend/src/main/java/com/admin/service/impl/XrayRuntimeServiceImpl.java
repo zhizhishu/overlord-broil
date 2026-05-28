@@ -25,6 +25,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -283,9 +284,9 @@ public class XrayRuntimeServiceImpl implements XrayRuntimeService {
             ResponseEntity<String> response = clientFor(server).exchange(buildUrl(server, path), method, entity, String.class);
             return normalizeResponse(response.getBody());
         } catch (RestClientException e) {
-            return R.err("Node service request failed: " + e.getMessage());
+            return R.err(nodeServiceConnectionMessage(server, path, e));
         } catch (Exception e) {
-            return R.err("Node service client error: " + e.getMessage());
+            return R.err(nodeServiceConnectionMessage(server, path, e));
         }
     }
 
@@ -336,7 +337,7 @@ public class XrayRuntimeServiceImpl implements XrayRuntimeService {
 
             return new XrayRuntimeSession(csrf, joinCookies(cookies), null);
         } catch (Exception e) {
-            return XrayRuntimeSession.error("Node service login request failed: " + e.getMessage());
+            return XrayRuntimeSession.error(nodeServiceConnectionMessage(server, "/login", e));
         }
     }
 
@@ -499,6 +500,68 @@ public class XrayRuntimeServiceImpl implements XrayRuntimeService {
         String basePath = normalizeBasePath(server.getXrayRuntimeBasePath());
         String cleanPath = path.startsWith("/") ? path : "/" + path;
         return endpoint + basePath + cleanPath;
+    }
+
+    private String nodeServiceConnectionMessage(ControlServer server, String path, Exception e) {
+        String serverName = server == null ? "unknown" : firstNotBlank(server.getName(), server.getHost(), String.valueOf(server.getId()));
+        String endpoint = server == null ? "" : nullToEmpty(server.getXrayRuntimeEndpoint()).trim();
+        String basePath = server == null ? "" : normalizeBasePath(server.getXrayRuntimeBasePath());
+        String raw = e == null || e.getMessage() == null ? "" : e.getMessage();
+        String lower = raw.toLowerCase(Locale.ROOT);
+        StringBuilder message = new StringBuilder();
+
+        message.append("节点服务未连接：").append(serverName);
+        if (!isBlank(endpoint)) {
+            message.append("（").append(endpoint).append(basePath).append("）");
+        }
+        message.append("。");
+
+        if (isLoopbackEndpoint(endpoint)) {
+            message.append("当前地址是 127.0.0.1/localhost，主控在 Docker 内时这不是被控服务器。");
+            message.append("请在服务器卡片点击“部署/修复节点服务”，或把节点服务地址改为 http://<被控服务器IP>:5168。");
+            message.append("如果主控和被控确实在同一台宿主机，可改用 http://host.docker.internal:5168。");
+        } else if (lower.contains("connection refused") || lower.contains("connectexception")) {
+            message.append("目标端口拒绝连接，通常是节点服务未安装、未启动、防火墙未放行，或端口不是 5168。");
+            message.append("请先执行“部署/修复节点服务”，完成后再同步出站/流量。");
+        } else if (lower.contains("timed out") || lower.contains("timeout")) {
+            message.append("连接超时，请检查被控服务器是否在线、端口是否放行、节点服务是否启动。");
+        } else if (lower.contains("unknownhost")) {
+            message.append("域名或主机不可解析，请检查服务器地址。");
+        } else {
+            message.append("请先确认节点服务已部署并在线，再重试出站、路由和流量操作。");
+        }
+
+        if (!isBlank(path)) {
+            message.append(" 操作路径：").append(path);
+        }
+        return message.toString();
+    }
+
+    private boolean isLoopbackEndpoint(String endpoint) {
+        if (isBlank(endpoint)) {
+            return false;
+        }
+        try {
+            URI uri = URI.create(endpoint.trim());
+            String host = uri.getHost();
+            return "127.0.0.1".equals(host) || "localhost".equalsIgnoreCase(host) || "::1".equals(host);
+        } catch (Exception ignored) {
+            String value = endpoint.toLowerCase(Locale.ROOT);
+            return value.contains("127.0.0.1") || value.contains("localhost") || value.contains("[::1]");
+        }
+    }
+
+    private String firstNotBlank(String... values) {
+        for (String value : values) {
+            if (!isBlank(value)) {
+                return value.trim();
+            }
+        }
+        return "unknown";
+    }
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private String normalizeBasePath(String basePath) {

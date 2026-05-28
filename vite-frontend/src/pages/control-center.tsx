@@ -559,6 +559,26 @@ const isNanoCriticalServer = (server?: ControlServer) => {
   return Boolean(server?.memoryTotalMb && server.memoryTotalMb > 0 && server.memoryTotalMb < NANO_CRITICAL_MEMORY_MB);
 };
 
+const isLoopbackNodeServiceEndpoint = (server?: ControlServer) => {
+  const endpoint = (server?.xrayRuntimeEndpoint || "").trim().toLowerCase();
+  return endpoint.includes("://127.0.0.1")
+    || endpoint.includes("://localhost")
+    || endpoint.includes("://[::1]")
+    || endpoint.startsWith("127.0.0.1:")
+    || endpoint.startsWith("localhost:");
+};
+
+const nodeServiceIssue = (server?: ControlServer) => {
+  if (!server) return "未选择服务器";
+  if (!server.xrayRuntimeEndpoint) return "节点服务未部署";
+  if (isLoopbackNodeServiceEndpoint(server)) return "节点服务地址指向主控容器本机";
+  const status = (server.xrayRuntimeServiceStatus || server.xrayServiceStatus || "").trim();
+  if (status && !["active", "running", "ok", "healthy"].includes(status.toLowerCase())) {
+    return `节点服务状态：${status}`;
+  }
+  return null;
+};
+
 const deploymentPlanUsesFullNodeServiceStack = (form: DeploymentPlanForm) => {
   return form.installNodeService
     || form.configureNodeService
@@ -598,6 +618,7 @@ export default function ControlCenterPage() {
   const [deploymentPlanModalOpen, setDeploymentPlanModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [xraySettingModalOpen, setXraySettingModalOpen] = useState(false);
+  const [serverAdvancedOpen, setServerAdvancedOpen] = useState(false);
   const [protocolAdvancedOpen, setProtocolAdvancedOpen] = useState(false);
   const [deploymentAdvancedOpen, setDeploymentAdvancedOpen] = useState(false);
   const [detailTitle, setDetailTitle] = useState("");
@@ -763,6 +784,7 @@ export default function ControlCenterPage() {
       sshUser: server.sshUser || "root",
       allowInsecure: server.allowInsecure || 0
     } : blankServerForm);
+    setServerAdvancedOpen(Boolean(server?.xrayRuntimeEndpoint || server?.xrayRuntimeBasePath || server?.xrayRuntimeApiToken || server?.xrayRuntimeUsername));
     setServerModalOpen(true);
   };
 
@@ -1442,27 +1464,6 @@ export default function ControlCenterPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
-          {[
-            ["dashboard", t("仪表盘")],
-            ["servers", t("服务器")],
-            ["inbounds", t("入站节点")],
-            ["routes", t("出站与路由")],
-            ["tunnels", t("转发/隧道")],
-            ["traffic", t("流量")],
-            ["certificates", t("证书")],
-            ["settings", t("设置")]
-          ].map(([id, label]) => (
-            <a
-              key={id}
-              href={`#${id}`}
-              className="rounded-small border border-default-200 bg-white px-3 py-2 text-center text-sm font-medium text-gray-700 shadow-sm transition hover:border-primary hover:text-primary dark:bg-default-50/5 dark:text-gray-200"
-            >
-              {label}
-            </a>
-          ))}
-        </div>
-
         <section id="dashboard" data-testid="broil-dashboard">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Card radius="sm" className="border border-default-200">
@@ -1561,8 +1562,15 @@ export default function ControlCenterPage() {
                     <div><p className="text-xs text-gray-500">{t("协议服务")}</p><p>{server.xrayServiceStatus || "-"}</p></div>
                     <div><p className="text-xs text-gray-500">{t("轻量服务")}</p><p>{server.snellServiceStatus || "-"}</p></div>
                   </div>
+                  {nodeServiceIssue(server) && (
+                    <div className="flex flex-col gap-2 rounded-small border border-warning-300 bg-warning-50 px-3 py-2 text-xs text-warning-700 md:flex-row md:items-center md:justify-between dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
+                      <span>{t(nodeServiceIssue(server) || "")}</span>
+                      <Button size="sm" color="warning" variant="flat" onPress={() => openDeploymentPlanModal(server)}>{t("部署/修复节点服务")}</Button>
+                    </div>
+                  )}
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" color="primary" variant="flat" onPress={() => showServerInstallCommand(server)}>{t("加入命令")}</Button>
+                    <Button size="sm" color="warning" variant="flat" onPress={() => openDeploymentPlanModal(server)}>{t("部署/修复")}</Button>
                     <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(server)}>{t("新增节点")}</Button>
                     <Button size="sm" variant="flat" onPress={() => openServerForwardModal(server)}>{t("新增转发")}</Button>
                     <Button size="sm" variant="flat" onPress={() => syncServerProtocolNodes(server)}>{t("同步节点")}</Button>
@@ -1621,9 +1629,14 @@ export default function ControlCenterPage() {
                 <div key={`broil-route-${server.id}`} className="grid grid-cols-1 gap-3 rounded-small border border-default-200 bg-default-50/60 p-3 md:grid-cols-[1fr_auto] md:items-center dark:bg-default-50/5">
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-gray-900 dark:text-white">{server.name}</p>
-                    <p className="truncate text-xs text-gray-500">{t("出站, 路由规则, IPv4/IPv6 优先级统一在这里调整。")}</p>
+                    <p className="truncate text-xs text-gray-500">
+                      {nodeServiceIssue(server) || t("出站, 路由规则, IPv4/IPv6 优先级统一在这里调整。")}
+                    </p>
                   </div>
                   <div className="flex flex-wrap gap-2 md:justify-end">
+                    {nodeServiceIssue(server) && (
+                      <Button size="sm" color="warning" variant="flat" onPress={() => openDeploymentPlanModal(server)}>{t("先修复")}</Button>
+                    )}
                     <Button size="sm" variant="flat" onPress={() => showNodeServiceOutbounds(server)}>{t("查看出站")}</Button>
                     <Button size="sm" variant="flat" onPress={() => openNodeServiceSettingModal(server)}>{t("路由规则")}</Button>
                     <Button size="sm" variant="flat" onPress={() => showNodeServiceOutboundTraffic(server)}>{t("出站流量")}</Button>
@@ -1813,6 +1826,62 @@ export default function ControlCenterPage() {
               <Input label={t("主机")} value={serverForm.host} onChange={e => setServerForm(prev => ({ ...prev, host: e.target.value }))} variant="bordered" />
               <Input label="SSH 端口" type="number" value={serverForm.sshPort.toString()} onChange={e => setServerForm(prev => ({ ...prev, sshPort: Number(e.target.value) || 22 }))} variant="bordered" />
               <Input label="SSH 用户" value={serverForm.sshUser} onChange={e => setServerForm(prev => ({ ...prev, sshUser: e.target.value }))} variant="bordered" />
+              <div className="md:col-span-2 rounded-small border border-default-200 bg-white p-3 dark:bg-default-50/5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{t("节点服务连接")}</p>
+                    <p className="text-xs text-gray-500">{t("出站、路由和流量需要这里可达；一键部署会自动回填。")}</p>
+                  </div>
+                  <Switch size="sm" isSelected={serverAdvancedOpen} onValueChange={setServerAdvancedOpen}>{t("编辑")}</Switch>
+                </div>
+                {serverAdvancedOpen && (
+                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <Input
+                      label={t("节点服务地址")}
+                      value={serverForm.xrayRuntimeEndpoint}
+                      onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeEndpoint: e.target.value }))}
+                      variant="bordered"
+                      placeholder="http://SERVER_IP:5168"
+                    />
+                    <Input
+                      label={t("访问路径")}
+                      value={serverForm.xrayRuntimeBasePath}
+                      onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeBasePath: e.target.value }))}
+                      variant="bordered"
+                      placeholder="/ob-1"
+                    />
+                    <Input
+                      label="API Token"
+                      value={serverForm.xrayRuntimeApiToken}
+                      onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeApiToken: e.target.value }))}
+                      variant="bordered"
+                      placeholder={t("留空保留已有值")}
+                    />
+                    <Input
+                      label={t("节点服务用户")}
+                      value={serverForm.xrayRuntimeUsername}
+                      onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeUsername: e.target.value }))}
+                      variant="bordered"
+                      placeholder={t("留空保留已有值")}
+                    />
+                    <Input
+                      label={t("节点服务密码")}
+                      type="password"
+                      value={serverForm.xrayRuntimePassword}
+                      onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimePassword: e.target.value }))}
+                      variant="bordered"
+                      placeholder={t("留空保留已有值")}
+                    />
+                    <Input
+                      label="2FA"
+                      value={serverForm.xrayRuntimeTwoFactorCode}
+                      onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeTwoFactorCode: e.target.value }))}
+                      variant="bordered"
+                      placeholder={t("留空保留已有值")}
+                    />
+                  </div>
+                )}
+              </div>
               <div className="md:col-span-2 rounded-small border border-default-200 bg-default-50/60 p-3 text-xs leading-5 text-gray-600 dark:bg-default-50/5 dark:text-gray-300">
                 {t("保存后在服务器卡片点击“加入命令”，到被控服务器执行一条命令即可接入。被控 Agent 主动回连主控，不需要开放管理端口。")}
               </div>

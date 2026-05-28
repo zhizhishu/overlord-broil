@@ -27,6 +27,17 @@ interface PasswordForm {
   confirmPassword: string;
 }
 
+const controlCenterSections = [
+  { id: 'dashboard', label: '仪表盘' },
+  { id: 'servers', label: '服务器' },
+  { id: 'inbounds', label: '入站节点' },
+  { id: 'routes', label: '出站与路由' },
+  { id: 'tunnels', label: '转发/隧道' },
+  { id: 'traffic', label: '流量' },
+  { id: 'certificates', label: '证书' },
+  { id: 'settings', label: '设置' }
+];
+
 export default function AdminLayout({
   children,
 }: {
@@ -103,6 +114,13 @@ export default function AdminLayout({
   // 菜单点击处理
   const handleMenuClick = (path: string) => {
     navigate(path);
+    if (isMobile) {
+      hideMobileMenu();
+    }
+  };
+
+  const handleSectionClick = (id: string) => {
+    navigate(`/control-center#${id}`);
     if (isMobile) {
       hideMobileMenu();
     }
@@ -212,10 +230,10 @@ export default function AdminLayout({
             {filteredMenuItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
-                <li key={item.path}>
-                                     <button
-                     onClick={() => handleMenuClick(item.path)}
-                     className={`
+                 <li key={item.path}>
+                                      <button
+                      onClick={() => handleMenuClick(item.path)}
+                      className={`
                        w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left
                        transition-colors duration-200 min-h-[44px]
                        ${isActive 
@@ -227,11 +245,33 @@ export default function AdminLayout({
                      <div className="flex-shrink-0">
                        {item.icon}
                      </div>
-                     <span className="font-medium text-sm">{item.label}</span>
-                   </button>
-                </li>
-              );
-            })}
+                      <span className="font-medium text-sm">{item.label}</span>
+                    </button>
+                    {item.path === '/control-center' && isActive && (
+                      <div className="mt-2 ml-8 space-y-1 border-l border-default-200 pl-3 dark:border-default-100/20">
+                        {controlCenterSections.map(section => {
+                          const sectionActive = location.hash === `#${section.id}`;
+                          return (
+                            <button
+                              key={section.id}
+                              onClick={() => handleSectionClick(section.id)}
+                              className={`
+                                w-full rounded-small px-3 py-2 text-left text-xs font-medium transition-colors
+                                ${sectionActive
+                                  ? 'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-300'
+                                  : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-100'
+                                }
+                              `}
+                            >
+                              {t(section.label)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                 </li>
+               );
+             })}
           </ul>
         </nav>
       </aside>

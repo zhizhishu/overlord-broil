@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-5166}:5166"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       SPRING_PROFILES_ACTIVE: sqlite
       SQLITE_DB_PATH: ${SQLITE_DB_PATH:-/app/data/overlord-master.sqlite}
