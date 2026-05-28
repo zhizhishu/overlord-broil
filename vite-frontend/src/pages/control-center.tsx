@@ -347,6 +347,115 @@ const safeJsonParse = (value?: string) => {
   }
 };
 
+const parseMaybeJson = (value: any) => {
+  if (!value) return null;
+  if (typeof value === "string") return safeJsonParse(value);
+  if (typeof value === "object") return value;
+  return null;
+};
+
+const textToBase64 = (value: string) => {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  bytes.forEach(byte => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
+};
+
+const textToBase64Url = (value: string) => textToBase64(value).replace(/=+$/g, "");
+
+const normalizeClientHost = (server?: ControlServer) => {
+  const host = (server?.host || server?.endpoint || "").trim();
+  if (!host) return "";
+  return host.replace(/^https?:\/\//i, "").replace(/\/.*$/, "").replace(/:\d+$/, "");
+};
+
+const firstClient = (settings: any) => Array.isArray(settings?.clients) ? settings.clients[0] : null;
+
+const buildProtocolNodeShareText = (node: ProtocolNode, server?: ControlServer) => {
+  const host = normalizeClientHost(server);
+  const port = node.port || 0;
+  const name = encodeURIComponent(node.name || `node-${node.id}`);
+  const config = parseMaybeJson(node.configJson) || {};
+  const credential = parseMaybeJson(node.credentialJson) || {};
+  const settings = parseMaybeJson(config.settings) || config.settings || {};
+  const stream = parseMaybeJson(config.streamSettings) || config.streamSettings || {};
+  const client = firstClient(settings) || {};
+
+  if (!host || !port) {
+    return JSON.stringify({ node, warning: "missing server host or node port" }, null, 2);
+  }
+
+  if (node.protocol === "vmess") {
+    const ws = stream.wsSettings || {};
+    const tls = stream.tlsSettings || {};
+    return `vmess://${textToBase64(JSON.stringify({
+      v: "2",
+      ps: node.name || `node-${node.id}`,
+      add: host,
+      port: String(port),
+      id: client.id || "",
+      aid: String(client.alterId || 0),
+      scy: "auto",
+      net: stream.network || node.transport || "ws",
+      type: "none",
+      host: ws.headers?.Host || tls.serverName || "",
+      path: ws.path || "/ws",
+      tls: stream.security === "tls" ? "tls" : "",
+      sni: tls.serverName || ""
+    }))}`;
+  }
+
+  if (node.protocol === "trojan") {
+    const password = client.password || credential.password || "";
+    const tls = stream.tlsSettings || {};
+    const params = new URLSearchParams();
+    params.set("type", stream.network || node.transport || "tcp");
+    params.set("security", stream.security || node.security || "tls");
+    if (tls.serverName) params.set("sni", tls.serverName);
+    return `trojan://${encodeURIComponent(password)}@${host}:${port}?${params.toString()}#${name}`;
+  }
+
+  if (node.protocol === "shadowsocks") {
+    const method = settings.method || credential.method || "2022-blake3-aes-128-gcm";
+    const password = settings.password || credential.password || "";
+    return `ss://${textToBase64Url(`${method}:${password}`)}@${host}:${port}#${name}`;
+  }
+
+  if (node.protocol === "snell" || node.engine === "snell") {
+    const version = String((config.version || "v4").replace(/^v/i, "")).split(".")[0] || "4";
+    const psk = credential.psk || "";
+    return `${node.name || `snell-${node.id}`} = snell, ${host}, ${port}, psk=${psk}, version=${version}`;
+  }
+
+  if (node.protocol === "vless") {
+    const reality = stream.realitySettings || {};
+    const tls = stream.tlsSettings || {};
+    const id = client.id || "";
+    const params = new URLSearchParams();
+    params.set("type", stream.network || node.transport || "tcp");
+    params.set("security", stream.security || node.security || "none");
+    if (client.flow) params.set("flow", client.flow);
+    const sni = reality.serverName || reality.serverNames?.[0] || tls.serverName || "";
+    if (sni) params.set("sni", sni);
+    if (reality.publicKey) params.set("pbk", reality.publicKey);
+    if (reality.shortIds?.[0]) params.set("sid", reality.shortIds[0]);
+    if (reality.dest) params.set("fp", "chrome");
+    if ((stream.security || node.security) === "reality" && !reality.publicKey) {
+      return JSON.stringify({
+        warning: "VLESS Reality link needs publicKey. Copy this node config and add the public key shown by the controlled node service.",
+        host,
+        port,
+        node
+      }, null, 2);
+    }
+    return `vless://${id}@${host}:${port}?${params.toString()}#${name}`;
+  }
+
+  return JSON.stringify({ node, serverHost: host }, null, 2);
+};
+
 const collectOutboundTags = (value: any): string[] => {
   if (!value) return [];
   const parsed = typeof value === "string" ? safeJsonParse(value) : value;
@@ -854,7 +963,8 @@ export default function ControlCenterPage() {
       serverId: firstServer?.id || null,
       serverIds: firstServer?.id ? [firstServer.id] : [],
       publicHost: host,
-      certificateDomain: host.includes(".") ? host : "",
+      certificateMode: "none",
+      certificateDomain: "",
       webBasePath: firstServer?.id ? `ob-${firstServer.id}` : "ob-control"
     });
     setDeploymentAdvancedOpen(false);
@@ -883,6 +993,26 @@ export default function ControlCenterPage() {
       toast.success(serverForm.id ? t("服务器已更新") : t("服务器已添加"));
       setServerModalOpen(false);
       if (!serverForm.id && res.data?.id) {
+        const createdServer = res.data as ControlServer;
+        const quickPlan = {
+          ...blankDeploymentPlanForm,
+          serverId: createdServer.id,
+          serverIds: [createdServer.id],
+          publicHost: createdServer.host || serverForm.host,
+          certificateMode: "none",
+          certificateDomain: "",
+          webBasePath: `ob-${createdServer.id}`
+        };
+        await createDeploymentPlanTask({
+          ...quickPlan,
+          installXrayRuntime: quickPlan.installNodeService,
+          configureRuntime: quickPlan.configureNodeService,
+          xrayRuntimeVersion: quickPlan.nodeServiceVersion,
+          serverIds: undefined,
+          installNodeService: undefined,
+          configureNodeService: undefined,
+          nodeServiceVersion: undefined
+        });
         await showServerInstallCommand(res.data);
       }
       loadData();
@@ -1183,6 +1313,9 @@ export default function ControlCenterPage() {
       setDetailTitle(t("{name} 被控加入命令", { name: server.name }));
       setDetailText(res.data || "");
       setDetailModalOpen(true);
+      if (res.data) {
+        await copyText(res.data, t("接入命令已复制"));
+      }
     } else {
       toast.error(res.msg || t("生成被控加入命令失败"));
     }
@@ -1373,6 +1506,33 @@ export default function ControlCenterPage() {
     toast.success(t("已复制"));
   };
 
+  const copyText = async (text: string, successMessage = t("已复制")) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(successMessage);
+    } catch (error) {
+      toast.error(t("浏览器未允许自动复制，请打开详情后手动复制"));
+    }
+  };
+
+  const copyNodeShare = async (node: ProtocolNode) => {
+    const server = servers.find(item => item.id === node.serverId);
+    const text = buildProtocolNodeShareText(node, server);
+    await copyText(text, t("节点配置已复制"));
+  };
+
+  const copyServerSubscription = async (server: ControlServer) => {
+    const lines = protocolNodes
+      .filter(node => node.serverId === server.id)
+      .map(node => buildProtocolNodeShareText(node, server))
+      .filter(Boolean);
+    if (lines.length === 0) {
+      toast.error(t("该服务器还没有可复制的节点"));
+      return;
+    }
+    await copyText(lines.join("\n"), t("订阅内容已复制"));
+  };
+
   const removeServer = async (server: ControlServer, confirmed = false) => {
     if (!confirmed) {
       requestUiConfirmation({
@@ -1428,7 +1588,7 @@ export default function ControlCenterPage() {
     if (!status) return "default";
     const normalized = status.toLowerCase();
     if (["active", "valid", "running", "healthy", "ok", "success", "succeeded", "synced"].includes(normalized)) return "success";
-    if (["expiring", "unknown", "not-installed", "pending", "generated", "claimed"].includes(normalized)) return "warning";
+    if (["mixed", "expiring", "unknown", "not-installed", "pending", "generated", "claimed"].includes(normalized)) return "warning";
     return "danger";
   };
 
@@ -1475,7 +1635,7 @@ export default function ControlCenterPage() {
           <div className="flex flex-wrap gap-2">
             <Button color="primary" data-testid="open-deployment-plan" onPress={() => openDeploymentPlanModal()}>{t("一键部署")}</Button>
             <Button color="primary" variant="flat" data-testid="open-protocol-node" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
-            <Button variant="flat" data-testid="open-server-modal" onPress={() => openServerModal()}>{t("添加服务器")}</Button>
+            <Button variant="flat" data-testid="open-server-modal" onPress={() => openServerModal()}>{t("接入被控")}</Button>
             <Button variant="light" onPress={loadData}>{t("刷新")}</Button>
           </div>
         </div>
@@ -1544,7 +1704,7 @@ export default function ControlCenterPage() {
                 {servers.length === 0 && (
                   <div className="rounded-small border border-dashed border-default-300 p-5 text-center lg:col-span-3">
                     <p className="font-medium text-gray-900 dark:text-white">{t("还没有服务器")}</p>
-                    <Button size="sm" color="primary" variant="flat" className="mt-3" onPress={() => openServerModal()}>{t("添加服务器")}</Button>
+                    <Button size="sm" color="primary" variant="flat" className="mt-3" onPress={() => openServerModal()}>{t("接入被控")}</Button>
                   </div>
                 )}
               </div>
@@ -1555,7 +1715,7 @@ export default function ControlCenterPage() {
         <section id="servers" data-testid="broil-servers">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("服务器")}</h2>
-            <Button size="sm" color="primary" variant="flat" onPress={() => openServerModal()}>{t("添加服务器")}</Button>
+            <Button size="sm" color="primary" variant="flat" onPress={() => openServerModal()}>{t("接入被控")}</Button>
           </div>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             {servers.map(server => (
@@ -1585,7 +1745,8 @@ export default function ControlCenterPage() {
                     </div>
                   )}
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" color="primary" variant="flat" onPress={() => showServerInstallCommand(server)}>{t("加入命令")}</Button>
+                    <Button size="sm" color="primary" variant="flat" onPress={() => showServerInstallCommand(server)}>{t("接入命令")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => copyServerSubscription(server)}>{t("复制订阅")}</Button>
                     <Button size="sm" color="warning" variant="flat" onPress={() => openDeploymentPlanModal(server)}>{t("部署/修复")}</Button>
                     <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(server)}>{t("新增节点")}</Button>
                     <Button size="sm" variant="flat" onPress={() => openServerForwardModal(server)}>{t("新增转发")}</Button>
@@ -1624,6 +1785,7 @@ export default function ControlCenterPage() {
                     <div><p className="text-xs text-gray-500">{t("流量")}</p><p>{formatBytes(node.total || ((node.up || 0) + (node.down || 0)))}</p></div>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="flat" onPress={() => copyNodeShare(node)}>{t("复制配置")}</Button>
                     <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(undefined, node)}>{t("编辑")}</Button>
                     <Button size="sm" variant="flat" onPress={() => restartNode(node)}>{t("重启")}</Button>
                     <Button size="sm" variant="light" color="danger" onPress={() => removeProtocolNode(node)}>{t("删除")}</Button>
@@ -1831,7 +1993,7 @@ export default function ControlCenterPage() {
 
       <Modal isOpen={serverModalOpen} onOpenChange={setServerModalOpen} size="4xl">
         <ModalContent>
-          <ModalHeader>{serverForm.id ? t("编辑服务器") : t("添加服务器")}</ModalHeader>
+          <ModalHeader>{serverForm.id ? t("编辑服务器") : t("接入被控")}</ModalHeader>
           <ModalBody>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input label={t("名称")} value={serverForm.name} onChange={e => setServerForm(prev => ({ ...prev, name: e.target.value }))} variant="bordered" />
@@ -1899,7 +2061,7 @@ export default function ControlCenterPage() {
                 )}
               </div>
               <div className="md:col-span-2 rounded-small border border-default-200 bg-default-50/60 p-3 text-xs leading-5 text-gray-600 dark:bg-default-50/5 dark:text-gray-300">
-                {t("保存后在服务器卡片点击“加入命令”，到被控服务器执行一条命令即可接入。被控 Agent 主动回连主控，不需要开放管理端口。")}
+                {t("保存后主控会自动复制接入命令并预先生成部署任务。到被控服务器执行这一条命令后，Agent 会主动回连主控并自动领取任务，不需要开放管理端口。")}
               </div>
             </div>
             {serverForm.role === "master" && (
@@ -2153,13 +2315,15 @@ export default function ControlCenterPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input label={t("Snell 端口")} type="number" value={deploymentPlanForm.snellPort.toString()} onChange={e => patchDeploymentPlanForm({ snellPort: Number(e.target.value) || 8390 })} variant="bordered" />
-                <div className="space-y-2">
-                  <Input label="Snell PSK" value={deploymentPlanForm.snellPsk} onChange={e => patchDeploymentPlanForm({ snellPsk: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
-                  <Button size="sm" variant="flat" onPress={() => patchDeploymentPlanForm({ snellPsk: randomToken(32) })}>{t("生成 PSK")}</Button>
+              {deploymentPlanForm.installSnell && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input label={t("Snell 端口")} type="number" value={deploymentPlanForm.snellPort.toString()} onChange={e => patchDeploymentPlanForm({ snellPort: Number(e.target.value) || 8390 })} variant="bordered" />
+                  <div className="space-y-2">
+                    <Input label="Snell PSK" value={deploymentPlanForm.snellPsk} onChange={e => patchDeploymentPlanForm({ snellPsk: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
+                    <Button size="sm" variant="flat" onPress={() => patchDeploymentPlanForm({ snellPsk: randomToken(32) })}>{t("生成 PSK")}</Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </ModalBody>
           <ModalFooter>

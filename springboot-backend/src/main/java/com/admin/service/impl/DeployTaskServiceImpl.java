@@ -2125,6 +2125,46 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   esac
                 }
 
+                snell_status() {
+                  local manager services service state found active failed inactive
+                  manager="$(detect_service_manager)"
+                  found=0
+                  active=0
+                  failed=0
+                  inactive=0
+                  case "$manager" in
+                    systemd)
+                      services="$(systemctl list-units --type=service --all 'snell-node-*.service' --no-legend --no-pager 2>/dev/null | awk '{print $1}' || true)"
+                      ;;
+                    openrc)
+                      services="$(rc-service -l 2>/dev/null | awk '/^snell-node-/ {print $1}' || true)"
+                      ;;
+                    *)
+                      services=""
+                      ;;
+                  esac
+                  for service in $services; do
+                    found=$((found + 1))
+                    state="$(service_status "$service")"
+                    case "$state" in
+                      active|running) active=$((active + 1)) ;;
+                      failed|error) failed=$((failed + 1)) ;;
+                      *) inactive=$((inactive + 1)) ;;
+                    esac
+                  done
+                  if [ "$found" -eq 0 ]; then
+                    service_status snell.service
+                  elif [ "$active" -gt 0 ] && [ "$failed" -eq 0 ] && [ "$inactive" -eq 0 ]; then
+                    echo active
+                  elif [ "$active" -gt 0 ]; then
+                    echo mixed
+                  elif [ "$failed" -gt 0 ]; then
+                    echo failed
+                  else
+                    echo inactive
+                  fi
+                }
+
                 tail_agent_logs() {
                   local manager
                   manager="$(detect_service_manager)"
@@ -2849,7 +2889,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     echo "python3 or python is unavailable; skipping structured maintenance metadata." >&2
                     return 0
                   fi
-                  "$python_bin" - "$action" "$status" "$manager" "$(overlord_agent_status)" "$(service_status "$(printf '%s-%s.service' 'x' 'ui')")" "$(service_status snell.service)" "$AGENT_BIN" "$DIAG_FILE" "$LOG_FILE" "$UPGRADE_FILE" <<'PY' || true
+                  "$python_bin" - "$action" "$status" "$manager" "$(overlord_agent_status)" "$(service_status "$(printf '%s-%s.service' 'x' 'ui')")" "$(snell_status)" "$AGENT_BIN" "$DIAG_FILE" "$LOG_FILE" "$UPGRADE_FILE" <<'PY' || true
                 import json
                 import os
                 import sys

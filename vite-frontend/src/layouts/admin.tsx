@@ -119,8 +119,16 @@ export default function AdminLayout({
     }
   };
 
+  const scrollToSection = (id: string) => {
+    const run = () => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    window.requestAnimationFrame(() => window.requestAnimationFrame(run));
+  };
+
   const handleSectionClick = (id: string) => {
     navigate(`/control-center#${id}`);
+    scrollToSection(id);
     if (isMobile) {
       hideMobileMenu();
     }

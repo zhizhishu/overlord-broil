@@ -653,7 +653,17 @@ const en: Record<string, string> = {
   "已选择 {count} 台低内存服务器。低于 200MB 时主控会阻止完整节点服务部署；建议只保留 Snell 或端口转发，并先开启 swap。": "{count} low-memory server(s) selected. Below 200 MB, the control plane blocks full node service deployment; keep only Snell or port forwarding and enable swap first.",
   "Nano 被控内存低于 200MB，不支持完整节点服务部署；请关闭重型协议节点选项，仅保留 Snell 或端口转发。": "Nano agent memory is below 200 MB, so full node service deployment is not supported. Disable heavy protocol options and keep only Snell or port forwarding.",
   "低于 200MB 的 Nano 被控不支持创建重型协议入站，请改用 Snell 或远端端口转发。": "Nano agents below 200 MB cannot create heavy protocol inbounds. Use Snell or remote port forwarding instead.",
-  "Nano 被控低于 200MB，不支持创建重型协议入站；请改用 Snell 或远端端口转发。": "This Nano agent is below 200 MB, so heavy protocol inbound creation is not supported. Use Snell or remote port forwarding instead."
+  "Nano 被控低于 200MB，不支持创建重型协议入站；请改用 Snell 或远端端口转发。": "This Nano agent is below 200 MB, so heavy protocol inbound creation is not supported. Use Snell or remote port forwarding instead.",
+  "接入被控": "Add Agent",
+  "接入命令": "Join Command",
+  "接入命令已复制": "Join command copied",
+  "复制订阅": "Copy Subscription",
+  "复制配置": "Copy Config",
+  "节点配置已复制": "Node config copied",
+  "订阅内容已复制": "Subscription content copied",
+  "该服务器还没有可复制的节点": "This server has no node config to copy yet",
+  "浏览器未允许自动复制，请打开详情后手动复制": "Browser blocked auto-copy. Open the detail dialog and copy manually.",
+  "保存后主控会自动复制接入命令并预先生成部署任务。到被控服务器执行这一条命令后，Agent 会主动回连主控并自动领取任务，不需要开放管理端口。": "After saving, the master copies the join command and queues deploy tasks. Run that one command on the controlled server; the agent calls back and claims tasks automatically, with no inbound management port required."
 };
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);

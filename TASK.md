@@ -130,15 +130,25 @@ Close the Broil product flow for urgent use: one cohesive control center, simple
 - Passed after uninstall/docs/live-UI update: Docker Maven backend package build with tests skipped using JDK 21.
 - Passed on `isrco-hk`: old Flux install removed, `/opt/overlord-broil` present, only public Overlord port `5166/tcp` listening, `/` returned 200, `/flow/test` returned 200, `overlord-master` container healthy, and `overlord-agent` systemd service active with about 10 MB memory.
 - Verified: live UI screenshots under `docs/assets/live-*.png` show the current Overlord Broil product surface; an initially wrong login screenshot was replaced with the verified Overlord Broil login image.
+- Completed after urgent UI/agent audit: left-sidebar module clicks now scroll to the requested control-center section instead of only changing the URL hash.
+- Completed after urgent UI/agent audit: adding a controlled server now auto-copies the join command and queues the default deployment plan with certificates disabled, so the controlled host can join and then claim setup tasks without a second manual deploy click.
+- Completed after urgent UI/agent audit: server cards now expose `Join Command` and `Copy Subscription`; protocol-node cards expose `Copy Config` for VMess, Trojan, Shadowsocks, Snell and best-effort VLESS.
+- Completed after urgent UI/agent audit: Snell heartbeat and maintenance status now aggregate `snell-node-*.service` instead of incorrectly checking only `snell.service`.
+- Completed after urgent UI/agent audit: Snell deploy fields hide when Snell deployment is disabled, `mixed` service status is treated as warning, and new UI text has English translations.
 
 ## Remaining
 
-No required work remains for the current productization goal after this local and `isrco-hk` smoke pass.
+Required before calling this slice fully closed:
+
+1. Push the current fix commit to `main` and wait for GitHub Actions.
+2. Upgrade `isrco-hk` to the pushed image.
+3. Click-test the live UI sections and key modals on `isrco-hk`, skipping real certificate issuance.
 
 Optional next hardening outside this goal:
 
-1. Run a browser screenshot pass against the logged-in HK UI after the user reviews the new sidebar placement.
-2. Add broader long-running real-VPS soak tests before claiming `1.0` commercial stability.
+1. Replace best-effort copied subscription text with a tokenized public subscription endpoint.
+2. Add a proper VLESS Reality public-key extraction path so generated Reality links are directly client-ready.
+3. Add broader long-running real-VPS soak tests before claiming `1.0` commercial stability.
 
 ## Risks
 

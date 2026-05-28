@@ -114,3 +114,12 @@
 - Validation: frontend `npm run build`, `git diff --check`, shell syntax, bootstrap syntax, master port contract, agent mock, SQLite schema, node-service fixture, Docker Maven package and the two new Docker Maven tests passed.
 - Release: pushed `61f9246` to `main`; GitHub Actions `CI`, `Docker Images` and `Pages` all succeeded.
 - Remote smoke: upgraded `isrco-hk`, created repair task `8`, verified the controlled agent installed node service on `5168`, rewrote the stale `127.0.0.1:2053` endpoint to `https://host.docker.internal:5168/ob-1`, and confirmed config, outbound, outbound traffic and traffic sync APIs returned code `0`.
+
+## 2026-05-28 Urgent Join, Snell Status And Copy Flow
+
+- Completed: fixed left-sidebar section navigation so clicks scroll the control-center content instead of only changing the hash.
+- Completed: changed controlled-server creation into a faster join flow: after saving, the UI generates and copies the join command and pre-queues the default deployment plan with certificate issuance disabled.
+- Completed: added server-level copy subscription text and node-level copy config actions for VMess, Trojan, Shadowsocks, Snell and best-effort VLESS.
+- Completed: fixed Snell status collection in the agent and maintenance script metadata to aggregate `snell-node-*.service` units instead of reading stale `snell.service`.
+- Completed: hid Snell port/PSK fields when Snell is disabled and added English strings for the new join/copy UI.
+- Validation: frontend `npm run build`, targeted shell syntax, agent mock, targeted `git diff --check`, and Docker Maven `DeployTaskServiceImplTest` plus `ControlServerServiceImplTest` passed.

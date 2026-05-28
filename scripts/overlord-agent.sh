@@ -598,6 +598,45 @@ service_status() {
   echo unknown
 }
 
+snell_status() {
+  local services="" service status found=0 active=0 failed=0 inactive=0 unknown=0
+
+  if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+    services="$(systemctl list-units --type=service --all 'snell-node-*.service' --no-legend --no-pager 2>/dev/null | awk '{print $1}' || true)"
+  elif command -v rc-service >/dev/null 2>&1; then
+    services="$(rc-service -l 2>/dev/null | awk '/^snell-node-/ {print $1}' || true)"
+  fi
+
+  for service in $services; do
+    found=$((found + 1))
+    status="$(service_status "$service")"
+    case "$status" in
+      active|running) active=$((active + 1)) ;;
+      failed|error) failed=$((failed + 1)) ;;
+      inactive|not-found|unknown|'') inactive=$((inactive + 1)) ;;
+      *) unknown=$((unknown + 1)) ;;
+    esac
+  done
+
+  if [ "$found" -eq 0 ]; then
+    service_status snell
+    return
+  fi
+  if [ "$active" -gt 0 ] && [ "$failed" -eq 0 ] && [ "$inactive" -eq 0 ] && [ "$unknown" -eq 0 ]; then
+    echo active
+    return
+  fi
+  if [ "$active" -gt 0 ]; then
+    echo mixed
+    return
+  fi
+  if [ "$failed" -gt 0 ]; then
+    echo failed
+    return
+  fi
+  echo inactive
+}
+
 xray_status() {
   if pgrep -fa '[x]ray' >/dev/null 2>&1; then
     echo active
@@ -682,7 +721,7 @@ heartbeat_payload() {
   tx="${net##* }"
   xrayRuntime_service="$(service_status "$(printf "%s-%s" "x" "ui")")"
   xray_service="$(xray_status)"
-  snell_service="$(service_status snell)"
+  snell_service="$(snell_status)"
   cert_json="$(certificate_json)"
   "$PYTHON_BIN" - "$SERVER_ID" "$AGENT_VERSION" "$xray_version" "$snell_version" "$cpu" "$mem_usage" "$mem_total" "$rx" "$tx" "$xrayRuntime_service" "$xray_service" "$snell_service" "$last_error" "$cert_json" <<'PY'
 import json
