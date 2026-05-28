@@ -1773,7 +1773,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                     "inbounds": [],
                 }
 
-                if action in ("restart", "restarted", "restart-xray"):
+                if action in ("restart", "restarted", "restart-service"):
                     response = post_empty("/panel/api/server/restartXrayService")
                     result["action"] = action
                     result["response"] = response[:1200]

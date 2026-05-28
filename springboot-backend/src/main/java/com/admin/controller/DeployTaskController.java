@@ -2,8 +2,6 @@ package com.admin.controller;
 
 import com.admin.common.annotation.RequireRole;
 import com.admin.common.aop.LogAnnotation;
-import com.admin.common.dto.DeployTaskDto;
-import com.admin.common.dto.DeployTaskStateDto;
 import com.admin.common.dto.DeploymentPlanDto;
 import com.admin.common.lang.R;
 import com.admin.service.DeployTaskService;
@@ -20,13 +18,6 @@ public class DeployTaskController {
 
     @Resource
     private DeployTaskService deployTaskService;
-
-    @LogAnnotation
-    @RequireRole
-    @PostMapping("/create")
-    public R create(@Validated @RequestBody DeployTaskDto dto) {
-        return deployTaskService.createTask(dto);
-    }
 
     @LogAnnotation
     @RequireRole
@@ -55,28 +46,5 @@ public class DeployTaskController {
     public R script(@RequestBody Map<String, Object> params) {
         Long id = Long.valueOf(params.get("id").toString());
         return deployTaskService.getTaskScript(id);
-    }
-
-    @LogAnnotation
-    @RequireRole
-    @PostMapping("/state")
-    public R state(@Validated @RequestBody DeployTaskStateDto dto) {
-        return deployTaskService.updateTaskState(dto);
-    }
-
-    @LogAnnotation
-    @RequireRole
-    @PostMapping("/retry")
-    public R retry(@RequestBody Map<String, Object> params) {
-        Long id = Long.valueOf(params.get("id").toString());
-        return deployTaskService.retryTask(id);
-    }
-
-    @LogAnnotation
-    @RequireRole
-    @PostMapping("/delete")
-    public R delete(@RequestBody Map<String, Object> params) {
-        Long id = Long.valueOf(params.get("id").toString());
-        return deployTaskService.deleteTask(id);
     }
 }

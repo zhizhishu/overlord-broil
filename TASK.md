@@ -17,7 +17,7 @@ Close the Broil product flow for urgent use: one cohesive control center, simple
 - Reduced desktop and mobile navigation to the single Overlord Broil product entry.
 - Simplified server registration UI so adding a server only asks for product-level fields and points the user to the generated one-command join flow.
 - Simplified protocol-node creation: default view now asks for server, name, protocol, port and light node settings; transport/security/keys/outbound tags are behind an advanced switch.
-- Simplified one-click deployment: default view emphasizes server selection and protocol bundle toggles; node-core credentials, listen IP and certificate internals are behind an advanced switch.
+- Simplified one-click deployment: default view emphasizes server selection and protocol bundle toggles; node-service credentials, listen IP and certificate internals are behind an advanced switch.
 - Disabled the old `/api/v1/node/install` long-lived token install route with HTTP 410 guidance toward the join-token flow.
 - Updated README, Chinese README, operations docs, release notes and GitHub Pages copy so the public product is described as one 8-module Overlord Broil surface instead of engineering/provider layers.
 - Added `/api/v1/agent-join/register` and short-lived join-token install commands so each controlled host can join with one command.
@@ -33,18 +33,22 @@ Close the Broil product flow for urgent use: one cohesive control center, simple
 - Removed the remaining old engineering console code paths from the control-center page, including runtime-provider state blocks, diagnostic cards, raw inbound payload preview and hidden advanced inbound modal.
 - Persisted the startup boundary receipt, MCP need and subagent allowance in `PROJECT_ID.md` and `AGENTS.md` so future turns do not need the project root repeated.
 - Protected `/settings` behind the logged-in simple layout.
-- Removed public README/Pages/frontend-bundle references to old runtime/provider wording, `node-core` wording, `XRAY_RUNTIME_*` examples and unused Runtime API i18n strings.
+- Removed public README/Pages/frontend-bundle references to old runtime/provider wording, node-service wording leaks, `XRAY_RUNTIME_*` examples and unused Runtime API i18n strings.
 - Removed unused frontend runtime-provider API exports from the public API layer.
 - Renamed frontend deployment-plan state to node-service product fields while mapping to the existing backend compatibility DTO at submit time.
 - Updated the public screenshot copy to show protocol/node-service wording instead of internal service labels.
 - Completed another parallel read-only audit pass for frontend/docs and backend/API leakage risks.
 - Removed old public control-center PNG screenshots and switched README/GitHub Pages to the current 8-module product SVG.
 - Removed remaining public product-surface wording for protocol profiles, raw results, full routing config, visible provider terms and internal payload labels.
-- Removed unused frontend exports for protocol-profile and manual deploy-task APIs.
+- Removed unused frontend exports for old profile and manual deploy-task APIs.
 - Changed Snell protocol-node and server-forward responses to return a safe deploy-task summary instead of full `DeployTask` entities with scripts or request JSON.
 - Changed `/api/v1/capabilities/list` and `/api/v1/capabilities/resolve` to HTTP 410 because the service registry is internal.
 - Extended request/response log masking for `requestJson`, `resultJson`, `rawResultJson`, `detailJson` and common embedded secret patterns.
 - Removed raw task fields and provider DTOs from the frontend public type layer.
+- Moved the authenticated remote node-service API from the old runtime route to `/api/v1/node-service/*`.
+- Removed unused manual deploy-task public endpoints and the old profile controller from the authenticated API surface.
+- Updated README and Chinese README so public API examples only show product routes.
+- Renamed frontend node-service API/type identifiers away from the old node-core wording while keeping the same 8-module UI.
 
 ## Validation Status
 
@@ -89,15 +93,26 @@ Close the Broil product flow for urgent use: one cohesive control center, simple
 - Fixed deploy-task result sanitizing so `*Configured` boolean flags are not redacted by the generic sensitive-key pass.
 - Passed after CI fix: Docker Maven contract tests `RuntimeProviderServiceTest`, `DeployTaskServiceImplTest`, `XrayRuntimeRouteContractTest` with 28 tests.
 - Browser preview was attempted through the in-app Browser plugin; the protected route needs a real login/local storage state, so visual proof is deferred to a live master session.
+- Passed after API surface close: public keyword scan for old visible engineering/API terms.
+- Passed after API surface close: `npm run build` in `vite-frontend`.
+- Passed after API surface close: `bash -n scripts/*.sh`.
+- Passed after API surface close: `bash -n scripts/install-master-bootstrap.sh scripts/install-agent-bootstrap.sh`.
+- Passed after API surface close: `bash scripts/test-master-port-contract.sh`.
+- Passed after API surface close: `bash scripts/test-agent-mock.sh`.
+- Passed after API surface close: `bash scripts/test-sqlite-schema.sh`.
+- Passed after API surface close: Docker Maven contract tests `RuntimeProviderServiceTest`, `DeployTaskServiceImplTest`, `XrayRuntimeRouteContractTest` with 28 tests.
+- Passed after API surface close: `git diff --check`.
 
 ## Remaining
 
-1. Commit and push the current changes to GitHub.
-2. Let GitHub Actions build the public image.
-3. Pull the new image on `isrco-hk` and run a browser/HK smoke with a real master login when remote validation is requested.
+1. Commit and push the API surface close to GitHub.
+2. Confirm the latest GitHub Actions result after push.
+3. Optional next hardening outside this goal: pull the latest image on `isrco-hk` and run a browser/HK smoke with a real master login.
+4. Optional before claiming `1.0`: add broader long-running real-VPS soak tests.
 
 ## Risks
 
 - The join flow is now server-card based self-registration: the server record is created first, then the agent exchanges `OB_JOIN_TOKEN` for internal credentials automatically.
 - Node-service connector paths are internal service contracts and must not be blindly renamed.
 - Local host has no native Java/Maven; Docker Maven can be very slow on the Windows bind mount.
+- Current GitHub `main` head before this local API-surface close is `1f885f6`; CI, Docker Images and Pages succeeded for that commit.

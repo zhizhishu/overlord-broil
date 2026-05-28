@@ -193,7 +193,7 @@ public class RuntimeProviderService {
                         action("upgrade-agent", "升级 agent", "maintenance", "agent-maintenance", "xrayRuntime", false, false, false),
                         action("uninstall-agent", "卸载 agent", "danger", "agent-maintenance", "xrayRuntime", true, false, false)
                 ),
-                list("install-runtime", "configure-runtime", "create-inbound", "manage-outbound", "read-config", "save-config", "restart-xray", "sync-traffic"),
+                list("install-runtime", "configure-runtime", "create-inbound", "manage-outbound", "read-config", "save-config", "restart-service", "sync-traffic"),
                 list("runtimeEndpoint", "runtimeApiToken or runtimeUsername/runtimePassword"),
                 list("5168 optional runtime", "user-defined inbound ports"),
                 list("certificate", "firewall")

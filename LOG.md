@@ -62,7 +62,7 @@
 - Completed: reduced desktop and mobile navigation to the single Overlord Broil product entry.
 - Completed: simplified server registration, protocol-node creation and one-click deployment by moving advanced runtime, key and routing fields behind advanced switches.
 - Completed: disabled the old `/api/v1/node/install` long-lived-token install route with a 410 response that points to the join-token flow.
-- Docs: updated README, README.zh-CN, operations docs, release notes and Pages text around the 8-module product surface and node-core wording.
+- Docs: updated README, README.zh-CN, operations docs, release notes and Pages text around the 8-module product surface and node-service wording.
 - Validation: frontend `npm run build`, shell syntax, master port contract, agent mock, SQLite schema, product-surface keyword scan and `git diff --check` passed.
 - Note: Docker Maven package on the Windows bind mount was attempted, but javac produced no output for about 10 minutes; the test container was stopped and cleaned up.
 
@@ -73,3 +73,21 @@
 - Completed: renamed deployment-plan frontend state to node-service product fields while keeping the backend compatibility DTO mapping at submit time.
 - Completed: cleaned README, Chinese README, operations docs, release notes, Pages copy and screenshot text so public docs describe Overlord Broil as one product surface.
 - Validation: frontend `npm run build`, shell syntax, master port contract, agent mock, SQLite schema, product-surface keyword scan across source and built dist, and `git diff --check` passed.
+
+## 2026-05-28 Productization Goal Close
+
+- Completed: closed the 8-module Overlord Broil product surface around dashboard, servers, inbound nodes, outbound/routing, forwarding/tunnels, traffic, certificates and settings.
+- Completed: removed stale public screenshots and switched README / Pages to the current Overlord Broil product SVG.
+- Completed: kept Snell as a first-class protocol node while leaving it as an agent-managed service on controlled hosts.
+- Completed: tightened public API responses so protocol-node and forwarding operations return deploy-task summaries instead of full task scripts or request/result JSON.
+- Completed: made `/api/v1/capabilities/*` internal-only with HTTP 410 responses and expanded request/result log redaction.
+- Validation: frontend build, shell syntax, bootstrap syntax, master port contract, agent mock, SQLite schema, node-service fixture, compose dry-run, Docker Maven package, Docker Maven backend contract tests and Debian/Ubuntu/Alpine/Rocky/Oracle install matrix passed.
+- Release: pushed `4896f34` and `1f885f6` to `main`; GitHub Actions `CI`, `Docker Images` and `Pages` all succeeded for `1f885f6`.
+
+## 2026-05-28 API Surface Close
+
+- Completed: moved the authenticated remote node-service API to `/api/v1/node-service/*` and retired the old runtime route from the product contract.
+- Completed: removed unused manual deploy-task endpoints and deleted the old profile controller from the authenticated API surface.
+- Completed: updated README, Chinese README and project context so public API examples only show product routes.
+- Completed: renamed frontend node-service API/type identifiers away from old node-core wording.
+- Validation: public keyword scan, frontend build, shell syntax, bootstrap syntax, master port contract, agent mock, SQLite schema, Docker Maven backend contract tests and `git diff --check` passed.

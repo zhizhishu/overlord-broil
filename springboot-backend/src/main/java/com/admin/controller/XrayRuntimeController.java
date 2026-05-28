@@ -15,7 +15,7 @@ import javax.annotation.Resource;
 
 @RestController
 @CrossOrigin
-@RequestMapping("/api/v1/runtimes/xray")
+@RequestMapping("/api/v1/node-service")
 public class XrayRuntimeController {
 
     @Resource
@@ -135,8 +135,8 @@ public class XrayRuntimeController {
 
     @LogAnnotation
     @RequireRole
-    @PostMapping("/restart-xray")
-    public R restartXray(@Validated @RequestBody XrayRuntimeServerDto dto) {
+    @PostMapping("/restart-service")
+    public R restartService(@Validated @RequestBody XrayRuntimeServerDto dto) {
         return xrayRuntimeService.restartXray(dto);
     }
 }

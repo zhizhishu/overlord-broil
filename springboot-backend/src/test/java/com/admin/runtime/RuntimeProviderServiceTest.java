@@ -32,7 +32,7 @@ class RuntimeProviderServiceTest {
         assertTrue(xrayRuntime.getCapabilities().contains("read-config"));
         assertTrue(xrayRuntime.getCapabilities().contains("save-config"));
         assertTrue(xrayRuntime.getCapabilities().contains("sync-traffic"));
-        assertTrue(xrayRuntime.getCapabilities().contains("restart-xray"));
+        assertTrue(xrayRuntime.getCapabilities().contains("restart-service"));
     }
 
     @Test

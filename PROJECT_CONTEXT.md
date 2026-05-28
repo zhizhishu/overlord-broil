@@ -25,7 +25,7 @@ Overlord Broil is an independent master/agent operations console for multi-serve
 
 ## Product Contracts
 
-- Internal node-service connector route: `/api/v1/runtimes/xray/*`.
+- Product node-service connector route: `/api/v1/node-service/*`.
 - Deployment plan route: `/api/v1/deploy-task/plans`.
 - Runtime state route: `/api/v1/deploy-task/runtime-state/overview`.
 - Internal capability providers: `xrayRuntime`, `snell`, `forward`, `certificate`, `firewall`.

@@ -212,22 +212,15 @@ POST /api/v1/control-server/create
 POST /api/v1/control-server/list
 POST /api/v1/control-server/install-command
 POST /api/v1/control-server/heartbeat
-POST /api/v1/deploy-task/create
 POST /api/v1/deploy-task/plans
 POST /api/v1/deploy-task/list
-POST /api/v1/deploy-task/retry
 POST /api/v1/agent-task/claim
 POST /api/v1/agent-task/report
 ```
 
-Profiles, nodes, forwarding and unified rule routes:
+Nodes, forwarding and unified rule routes:
 
 ```text
-POST /api/v1/protocol-profile/create
-POST /api/v1/protocol-profile/list
-POST /api/v1/protocol-profile/update
-POST /api/v1/protocol-profile/delete
-POST /api/v1/protocol-profile/ensure-defaults
 POST /api/v1/protocol-node/create
 POST /api/v1/protocol-node/list
 POST /api/v1/protocol-node/sync
@@ -236,7 +229,7 @@ POST /api/v1/server-forward/list
 POST /api/v1/server-rule/overview
 ```
 
-Low-level connector routes remain internal compatibility contracts for the master UI and CI fixtures; new integrations should prefer the product routes above.
+Node-service routes use `/api/v1/node-service/*` for authenticated console operations such as outbound/routing, traffic sync and service restart.
 
 ## Verification
 

@@ -267,7 +267,7 @@ export interface DeployTask {
   status: number;
 }
 
-export interface NodeCoreTrafficSnapshot {
+export interface NodeServiceTrafficSnapshot {
   id: number;
   serverId: number;
   serverName?: string;

@@ -163,13 +163,12 @@ POST /api/v1/control-server/install-command
 POST /api/v1/protocol-node/create
 POST /api/v1/server-forward/create
 POST /api/v1/server-rule/overview
-POST /api/v1/deploy-task/create
 POST /api/v1/deploy-task/plans
 POST /api/v1/agent-task/claim
 POST /api/v1/agent-task/report
 ```
 
-底层连接器接口只作为主控 UI 和 CI fixture 的内部兼容合同保留；新集成优先使用上面的产品接口。
+节点服务接口使用 `/api/v1/node-service/*`, 用于主控台进行出站/路由, 流量同步和服务重启等工作。
 
 ## 低内存服务器
 

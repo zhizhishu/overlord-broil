@@ -20,8 +20,8 @@ class XrayRuntimeRouteContractTest {
     void exposesProductRuntimeBaseRoute() {
         RequestMapping mapping = XrayRuntimeController.class.getAnnotation(RequestMapping.class);
 
-        assertEquals(Set.of("/api/v1/runtimes/xray"), Set.of(mapping.value()));
-        String retiredBase = "/api/v1/" + "xray" + "-" + "pane" + "l";
+        assertEquals(Set.of("/api/v1/node-service"), Set.of(mapping.value()));
+        String retiredBase = "/api/v1/runtimes/" + "xray";
         assertFalse(Arrays.asList(mapping.value()).contains(retiredBase));
     }
 
@@ -48,11 +48,11 @@ class XrayRuntimeRouteContractTest {
                 "/traffic/sync",
                 "/traffic/list",
                 "/outbounds/save",
-                "/restart-xray"
+                "/restart-service"
         );
 
         assertTrue(routes.containsAll(expected), "missing routes: " + missing(expected, routes));
-        String retiredSegment = "xray" + "-" + "pane" + "l";
+        String retiredSegment = "restart-" + "xray";
         assertFalse(routes.stream().anyMatch(route -> route.contains(retiredSegment)));
     }
 

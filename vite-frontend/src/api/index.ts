@@ -62,9 +62,6 @@ export const getServerRuleOverview = (serverId: number) => Network.post("/server
 export const createDeploymentPlanTask = (data: any) => Network.post("/deploy-task/plans", data);
 export const getDeployTaskList = () => Network.post("/deploy-task/list");
 export const getRuntimeStateOverview = () => Network.post("/deploy-task/runtime-state/overview");
-export const updateDeployTaskState = (data: any) => Network.post("/deploy-task/state", data);
-export const retryDeployTask = (id: number) => Network.post("/deploy-task/retry", { id });
-export const deleteDeployTask = (id: number) => Network.post("/deploy-task/delete", { id });
 
 // 主控监控告警
 export const listMonitorAlerts = (data: any = {}) => Network.post("/monitor-alert/list", data);
@@ -74,23 +71,13 @@ export const acknowledgeMonitorAlert = (id: number) => Network.post("/monitor-al
 export const listOperationAuditLogs = (data: any = {}) => Network.post("/operation-audit/list", data);
 
 // 节点服务远端出入站管理
-export const testNodeCoreConnection = (serverId: number) => Network.post("/runtimes/xray/test", { serverId });
-export const listNodeCoreInbounds = (serverId: number) => Network.post("/runtimes/xray/inbounds/list", { serverId });
-export const addNodeCoreInbound = (data: any) => Network.post("/runtimes/xray/inbounds/add", data);
-export const updateNodeCoreInbound = (data: any) => Network.post("/runtimes/xray/inbounds/update", data);
-export const deleteNodeCoreInbound = (data: any) => Network.post("/runtimes/xray/inbounds/delete", data);
-export const setNodeCoreInboundEnable = (data: any) => Network.post("/runtimes/xray/inbounds/set-enable", data);
-export const addNodeCoreClient = (data: any) => Network.post("/runtimes/xray/clients/add", data);
-export const updateNodeCoreClient = (data: any) => Network.post("/runtimes/xray/clients/update", data);
-export const deleteNodeCoreClient = (data: any) => Network.post("/runtimes/xray/clients/delete", data);
-export const resetNodeCoreClientTraffic = (data: any) => Network.post("/runtimes/xray/clients/reset-traffic", data);
-export const getNodeCoreConfig = (serverId: number) => Network.post("/runtimes/xray/config", { serverId });
-export const getNodeCoreOutbounds = (serverId: number) => Network.post("/runtimes/xray/outbounds", { serverId });
-export const getNodeCoreOutboundTraffic = (serverId: number) => Network.post("/runtimes/xray/outbounds/traffic", { serverId });
-export const syncNodeCoreTraffic = (serverId: number) => Network.post("/runtimes/xray/traffic/sync", { serverId });
-export const listNodeCoreTraffic = (data: any) => Network.post("/runtimes/xray/traffic/list", data);
-export const saveNodeCoreOutbounds = (data: any) => Network.post("/runtimes/xray/outbounds/save", data);
-export const restartNodeCoreService = (serverId: number) => Network.post("/runtimes/xray/restart-xray", { serverId });
+export const getNodeServiceConfig = (serverId: number) => Network.post("/node-service/config", { serverId });
+export const getNodeServiceOutbounds = (serverId: number) => Network.post("/node-service/outbounds", { serverId });
+export const getNodeServiceOutboundTraffic = (serverId: number) => Network.post("/node-service/outbounds/traffic", { serverId });
+export const syncNodeServiceTraffic = (serverId: number) => Network.post("/node-service/traffic/sync", { serverId });
+export const listNodeServiceTraffic = (data: any) => Network.post("/node-service/traffic/list", data);
+export const saveNodeServiceOutbounds = (data: any) => Network.post("/node-service/outbounds/save", data);
+export const restartNodeService = (serverId: number) => Network.post("/node-service/restart-service", { serverId });
 
 // 隧道CRUD操作 - 全部使用POST请求
 export const createTunnel = (data: any) => Network.post("/tunnel/create", data);

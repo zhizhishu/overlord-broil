@@ -27,21 +27,21 @@ import {
   listOperationAuditLogs,
   getProtocolNodeList,
   getServerForwardRuleList,
-  getNodeCoreConfig,
-  getNodeCoreOutboundTraffic,
-  getNodeCoreOutbounds,
-  listNodeCoreTraffic,
+  getNodeServiceConfig,
+  getNodeServiceOutboundTraffic,
+  getNodeServiceOutbounds,
+  listNodeServiceTraffic,
   restartProtocolNode,
   restartServerForwardRule,
-  restartNodeCoreService,
-  saveNodeCoreOutbounds,
-  syncNodeCoreTraffic,
+  restartNodeService as restartNodeServiceRequest,
+  saveNodeServiceOutbounds,
+  syncNodeServiceTraffic,
   syncProtocolNodes,
   updateControlServer,
   updateProtocolNode,
   updateServerForwardRule
 } from "@/api";
-import type { ControlServer, DeployTask, MonitorAlert, OperationAuditLog, ProtocolNode, RuntimeStateOverview, ServerForwardRule, NodeCoreTrafficSnapshot } from "@/types";
+import type { ControlServer, DeployTask, MonitorAlert, OperationAuditLog, ProtocolNode, RuntimeStateOverview, ServerForwardRule, NodeServiceTrafficSnapshot } from "@/types";
 
 interface ServerForm {
   id?: number;
@@ -93,7 +93,7 @@ interface DeploymentPlanForm {
   snellPsk: string;
 }
 
-interface NodeCoreInboundForm {
+interface NodeServiceInboundForm {
   serverId: number | null;
   inboundId: string;
   mode: "add" | "update" | "delete";
@@ -236,7 +236,7 @@ const defaultInboundPayload = {
   sniffing: "{\"enabled\":true,\"destOverride\":[\"http\",\"tls\",\"quic\",\"fakedns\"]}"
 };
 
-const blankNodeCoreInboundForm: NodeCoreInboundForm = {
+const blankNodeServiceInboundForm: NodeServiceInboundForm = {
   serverId: null,
   inboundId: "",
   mode: "add",
@@ -405,7 +405,7 @@ const asTrafficLimit = (gb: number) => {
   return Math.round(gb * GB);
 };
 
-const clientBase = (form: NodeCoreInboundForm) => ({
+const clientBase = (form: NodeServiceInboundForm) => ({
   email: form.clientEmail.trim(),
   limitIp: 0,
   totalGB: asTrafficLimit(form.totalGb),
@@ -417,7 +417,7 @@ const clientBase = (form: NodeCoreInboundForm) => ({
   reset: 0
 });
 
-const buildInboundPayloadFromForm = (form: NodeCoreInboundForm) => {
+const buildInboundPayloadFromForm = (form: NodeServiceInboundForm) => {
   const protocol = form.protocol;
   const sniffing = {
     enabled: true,
@@ -525,8 +525,8 @@ const buildInboundPayloadFromForm = (form: NodeCoreInboundForm) => {
   };
 };
 
-const inboundFormFromNodeForm = (form: ProtocolNodeForm): NodeCoreInboundForm => ({
-  ...blankNodeCoreInboundForm,
+const inboundFormFromNodeForm = (form: ProtocolNodeForm): NodeServiceInboundForm => ({
+  ...blankNodeServiceInboundForm,
   serverId: form.serverId,
   remark: form.name,
   listen: form.listen,
@@ -558,7 +558,7 @@ const isNanoCriticalServer = (server?: ControlServer) => {
   return Boolean(server?.memoryTotalMb && server.memoryTotalMb > 0 && server.memoryTotalMb < NANO_CRITICAL_MEMORY_MB);
 };
 
-const deploymentPlanUsesFullNodeCoreStack = (form: DeploymentPlanForm) => {
+const deploymentPlanUsesFullNodeServiceStack = (form: DeploymentPlanForm) => {
   return form.installNodeService
     || form.configureNodeService
     || form.createVlessReality
@@ -586,7 +586,7 @@ export default function ControlCenterPage() {
   const [forwardRules, setForwardRules] = useState<ServerForwardRule[]>([]);
   const [tasks, setTasks] = useState<DeployTask[]>([]);
   const [runtimeStateOverview, setRuntimeStateOverview] = useState<RuntimeStateOverview | null>(null);
-  const [trafficSnapshots, setTrafficSnapshots] = useState<NodeCoreTrafficSnapshot[]>([]);
+  const [trafficSnapshots, setTrafficSnapshots] = useState<NodeServiceTrafficSnapshot[]>([]);
   const [trafficServerFilter, setTrafficServerFilter] = useState("all");
   const [trafficSourceFilter, setTrafficSourceFilter] = useState("all");
   const [monitorAlerts, setMonitorAlerts] = useState<MonitorAlert[]>([]);
@@ -678,7 +678,7 @@ export default function ControlCenterPage() {
   const selectedDeploymentPlanHasMaster = selectedDeploymentPlanServers.some(server => server.role === "master");
   const selectedDeploymentPlanLowMemoryServers = selectedDeploymentPlanServers.filter(isLowMemoryServer);
   const selectedDeploymentPlanCriticalNanoServers = selectedDeploymentPlanServers.filter(isNanoCriticalServer);
-  const selectedDeploymentPlanUsesFullNodeCoreStack = deploymentPlanUsesFullNodeCoreStack(deploymentPlanForm);
+  const selectedDeploymentPlanUsesFullNodeServiceStack = deploymentPlanUsesFullNodeServiceStack(deploymentPlanForm);
 
   const rememberOutboundTags = (source: any) => {
     const tags = collectOutboundTags(source);
@@ -720,7 +720,7 @@ export default function ControlCenterPage() {
         getDeployTaskList(),
         getProtocolNodeList({ limit: 300 }),
         getServerForwardRuleList({ limit: 300 }),
-        listNodeCoreTraffic({ limit: 300 }),
+        listNodeServiceTraffic({ limit: 300 }),
         listMonitorAlerts({ acknowledged: 0, limit: 100 }),
         listOperationAuditLogs({ limit: 100 }),
         getRuntimeStateOverview()
@@ -1092,7 +1092,7 @@ export default function ControlCenterPage() {
       toast.error(t("ACME 证书模式需要填写域名"));
       return;
     }
-    if (selectedDeploymentPlanCriticalNanoServers.length > 0 && selectedDeploymentPlanUsesFullNodeCoreStack) {
+    if (selectedDeploymentPlanCriticalNanoServers.length > 0 && selectedDeploymentPlanUsesFullNodeServiceStack) {
       toast.error(t("Nano 被控内存低于 200MB，不支持完整节点服务部署；请关闭完整协议节点选项，仅保留 Snell 或端口转发。"));
       return;
     }
@@ -1165,7 +1165,7 @@ export default function ControlCenterPage() {
     }
   };
 
-  const isNodeCoreSuccess = (res: any) => res.code === 0 && (!res.data || res.data.success !== false);
+  const isNodeServiceSuccess = (res: any) => res.code === 0 && (!res.data || res.data.success !== false);
 
   const showNodeServiceDetail = (title: string, data: any) => {
     setDetailTitle(title);
@@ -1173,9 +1173,9 @@ export default function ControlCenterPage() {
     setDetailModalOpen(true);
   };
 
-  const showNodeCoreOutbounds = async (server: ControlServer) => {
-    const res = await getNodeCoreOutbounds(server.id);
-    if (isNodeCoreSuccess(res)) {
+  const showNodeServiceOutbounds = async (server: ControlServer) => {
+    const res = await getNodeServiceOutbounds(server.id);
+    if (isNodeServiceSuccess(res)) {
       rememberOutboundTags(res.data);
       showNodeServiceDetail(t("{name} 出站配置", { name: server.name }), res.data);
     } else {
@@ -1183,9 +1183,9 @@ export default function ControlCenterPage() {
     }
   };
 
-  const showNodeCoreOutboundTraffic = async (server: ControlServer) => {
-    const res = await getNodeCoreOutboundTraffic(server.id);
-    if (isNodeCoreSuccess(res)) {
+  const showNodeServiceOutboundTraffic = async (server: ControlServer) => {
+    const res = await getNodeServiceOutboundTraffic(server.id);
+    if (isNodeServiceSuccess(res)) {
       showNodeServiceDetail(t("{name} 出站流量", { name: server.name }), res.data);
     } else {
       toast.error(res.msg || res.data?.msg || t("读取出站流量失败"));
@@ -1203,10 +1203,10 @@ export default function ControlCenterPage() {
     setSubmitting(true);
     const results = [];
     for (const server of targetServers) {
-      results.push(await syncNodeCoreTraffic(server.id));
+      results.push(await syncNodeServiceTraffic(server.id));
     }
     setSubmitting(false);
-    const failed = results.find(res => !isNodeCoreSuccess(res));
+    const failed = results.find(res => !isNodeServiceSuccess(res));
     if (failed) {
       toast.error(failed.msg || failed.data?.msg || t("同步流量失败"));
       return;
@@ -1215,9 +1215,9 @@ export default function ControlCenterPage() {
     loadData();
   };
 
-  const openNodeCoreSettingModal = async (server: ControlServer) => {
-    const res = await getNodeCoreConfig(server.id);
-    if (!isNodeCoreSuccess(res)) {
+  const openNodeServiceSettingModal = async (server: ControlServer) => {
+    const res = await getNodeServiceConfig(server.id);
+    if (!isNodeServiceSuccess(res)) {
       toast.error(res.msg || res.data?.msg || t("读取路由配置失败"));
       return;
     }
@@ -1230,7 +1230,7 @@ export default function ControlCenterPage() {
     setXraySettingModalOpen(true);
   };
 
-  const saveNodeCoreSetting = async (confirmed = false) => {
+  const saveNodeServiceSetting = async (confirmed = false) => {
     if (!xraySettingServerId) {
       toast.error(t("缺少服务器"));
       return;
@@ -1249,20 +1249,20 @@ export default function ControlCenterPage() {
         confirmText: t("确认保存"),
         color: "warning",
         testId: "confirm-save-xray-setting",
-        onConfirm: () => saveNodeCoreSetting(true)
+        onConfirm: () => saveNodeServiceSetting(true)
       });
       return;
     }
 
     setSubmitting(true);
-    const res = await saveNodeCoreOutbounds({
+    const res = await saveNodeServiceOutbounds({
       serverId: xraySettingServerId,
       xraySetting: xraySettingText,
       outboundTestUrl
     });
     setSubmitting(false);
 
-    if (isNodeCoreSuccess(res)) {
+    if (isNodeServiceSuccess(res)) {
       toast.success(t("出站配置已保存"));
       setXraySettingModalOpen(false);
       showNodeServiceDetail(t("出站保存结果"), res.data);
@@ -1271,7 +1271,7 @@ export default function ControlCenterPage() {
     }
   };
 
-  const restartNodeCore = async (server: ControlServer, confirmed = false) => {
+  const restartNodeService = async (server: ControlServer, confirmed = false) => {
     if (!confirmed) {
       requestUiConfirmation({
         title: t("确认重启节点服务"),
@@ -1279,13 +1279,13 @@ export default function ControlCenterPage() {
         detail: t("该服务器上的活动连接可能会重新连接。"),
         confirmText: t("确认重启"),
         color: "warning",
-        testId: "confirm-restart-xray",
-        onConfirm: () => restartNodeCore(server, true)
+        testId: "confirm-restart-service",
+        onConfirm: () => restartNodeService(server, true)
       });
       return;
     }
-    const res = await restartNodeCoreService(server.id);
-    if (isNodeCoreSuccess(res)) {
+    const res = await restartNodeServiceRequest(server.id);
+    if (isNodeServiceSuccess(res)) {
       toast.success(t("已请求重启节点服务"));
       showNodeServiceDetail(t("{name} 节点服务重启结果", { name: server.name }), res.data);
     } else {
@@ -1585,9 +1585,9 @@ export default function ControlCenterPage() {
                     <p className="truncate text-xs text-gray-500">{t("出站, 路由规则, IPv4/IPv6 优先级统一在这里调整。")}</p>
                   </div>
                   <div className="flex flex-wrap gap-2 md:justify-end">
-                    <Button size="sm" variant="flat" onPress={() => showNodeCoreOutbounds(server)}>{t("查看出站")}</Button>
-                    <Button size="sm" variant="flat" onPress={() => openNodeCoreSettingModal(server)}>{t("路由规则")}</Button>
-                    <Button size="sm" variant="flat" onPress={() => showNodeCoreOutboundTraffic(server)}>{t("出站流量")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => showNodeServiceOutbounds(server)}>{t("查看出站")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => openNodeServiceSettingModal(server)}>{t("路由规则")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => showNodeServiceOutboundTraffic(server)}>{t("出站流量")}</Button>
                   </div>
                 </div>
               ))}
@@ -1696,7 +1696,7 @@ export default function ControlCenterPage() {
                   <p className="text-xs text-gray-500">{t("到期：{time}", { time: formatTime(server.certificateExpireAt) })}</p>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="flat" onPress={() => openDeploymentPlanModal(server)}>{t("申请/续期")}</Button>
-                    <Button size="sm" variant="flat" onPress={() => openNodeCoreSettingModal(server)}>{t("查看详情")}</Button>
+                    <Button size="sm" variant="flat" onPress={() => openNodeServiceSettingModal(server)}>{t("查看详情")}</Button>
                   </div>
                 </CardBody>
               </Card>
@@ -2070,7 +2070,7 @@ export default function ControlCenterPage() {
           </ModalBody>
           <ModalFooter>
             <Button variant="light" onPress={() => setXraySettingModalOpen(false)}>{t("取消")}</Button>
-            <Button color="primary" isLoading={submitting} onPress={() => saveNodeCoreSetting()}>{t("保存配置")}</Button>
+            <Button color="primary" isLoading={submitting} onPress={() => saveNodeServiceSetting()}>{t("保存配置")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
