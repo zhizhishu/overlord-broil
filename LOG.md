@@ -92,3 +92,13 @@
 - Completed: renamed frontend node-service API/type identifiers away from old node-core wording.
 - Validation: public keyword scan, frontend build, shell syntax, bootstrap syntax, master port contract, agent mock, SQLite schema, Docker Maven backend contract tests and `git diff --check` passed.
 - Release: pushed `a9e0ca2` to `main`; GitHub Actions `CI`, `Docker Images` and `Pages` all succeeded for that commit.
+
+## 2026-05-28 Live UI And Uninstall Smoke
+
+- Completed: added controlled-agent CLI uninstall with `install-agent.sh uninstall --yes`, plus path persistence for agent script/env/service files.
+- Completed: tightened the master UI `uninstall-agent` task so it removes the controlled service, script, credentials and `/var/lib/overlord-agent`.
+- Completed: updated master migration cleanup for obsolete `overlord-mysql` containers in SQLite mode.
+- Completed: refreshed README and README.zh-CN with live UI screenshot links and clear master/controlled uninstall instructions.
+- Completed: replaced the incorrect live login screenshot and added verified current UI screenshots for the 8 product modules.
+- Remote smoke: on `isrco-hk`, removed the old `/opt/flux-3xui-orchestrator` install, verified `/opt/overlord-broil`, healthy `overlord-master`, active `overlord-agent`, only public `5166/tcp`, and HTTP 200 for `/` plus `/flow/test`.
+- Validation: frontend build, shell syntax, bootstrap syntax, master port contract, agent mock, SQLite schema, `git diff --check`, and Docker Maven package with JDK 21 passed.

@@ -21,19 +21,21 @@ SYSTEMD_SERVICE_FILE="${OB_AGENT_SYSTEMD_SERVICE:-/etc/systemd/system/overlord-a
 OPENRC_SERVICE_FILE="${OB_AGENT_OPENRC_SERVICE:-/etc/init.d/overlord-agent}"
 REPO_RAW_URL="${OB_REPO_RAW_URL:-https://raw.githubusercontent.com/zhizhishu/overlord-broil/main}"
 SOURCE_URL="${OB_AGENT_SOURCE_URL:-${REPO_RAW_URL}/scripts/overlord-agent.sh}"
-SOURCE_SCRIPT="${1:-}"
+SOURCE_SCRIPT=""
 GITHUB_TOKEN="${OB_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
 ACTION="install"
+ASSUME_YES="0"
 
 usage() {
   cat <<'EOF'
 Usage:
-  install-agent.sh [doctor]
+  install-agent.sh [install|doctor|uninstall] [--yes]
   install-agent.sh [path/to/overlord-agent.sh]
 
 Actions:
   install                 Install or repair the long-running agent service (default)
   doctor                  Run non-destructive controlled-host diagnostics and exit
+  uninstall               Stop and remove the agent service, script, credentials and work dir; requires --yes
 
 Required for install:
   OB_MASTER_URL          Master URL, for example https://master.example.com
@@ -49,13 +51,32 @@ Doctor environment:
 EOF
 }
 
-if [ "$SOURCE_SCRIPT" = "doctor" ]; then
-  ACTION="doctor"
-  SOURCE_SCRIPT=""
-elif [ "$SOURCE_SCRIPT" = "-h" ] || [ "$SOURCE_SCRIPT" = "--help" ]; then
-  usage
-  exit 0
-fi
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    install|doctor|uninstall)
+      ACTION="$1"
+      shift
+      ;;
+    --yes)
+      ASSUME_YES="1"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      if [ "$ACTION" = "install" ] && [ -z "$SOURCE_SCRIPT" ]; then
+        SOURCE_SCRIPT="$1"
+        shift
+      else
+        echo "Unknown option: $1" >&2
+        usage >&2
+        exit 2
+      fi
+      ;;
+  esac
+done
 
 quote_env_value() {
   case "$1" in
@@ -253,6 +274,39 @@ if [ "$ACTION" = "doctor" ]; then
   exit $?
 fi
 
+uninstall_agent() {
+  if [ "$ASSUME_YES" != "1" ]; then
+    echo "uninstall requires --yes. This removes the local agent service, script, credentials and /var/lib/overlord-agent." >&2
+    exit 2
+  fi
+
+  if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+    systemctl stop overlord-agent.service 2>/dev/null || true
+    systemctl disable overlord-agent.service 2>/dev/null || true
+    rm -f "$SYSTEMD_SERVICE_FILE"
+    systemctl daemon-reload 2>/dev/null || true
+  fi
+
+  if command -v rc-service >/dev/null 2>&1 && command -v rc-update >/dev/null 2>&1; then
+    rc-service overlord-agent stop 2>/dev/null || true
+    rc-update del overlord-agent default 2>/dev/null || true
+    rm -f "$OPENRC_SERVICE_FILE" "$OPENRC_WRAPPER"
+  fi
+
+  rm -f "$INSTALL_BIN" "$ENV_FILE"
+  rm -rf /var/lib/overlord-agent
+  echo "Overlord Broil agent removed from this host."
+}
+
+if [ "$ACTION" = "uninstall" ]; then
+  if [ "$(id -u)" -ne 0 ]; then
+    echo "Please run uninstall as root." >&2
+    exit 2
+  fi
+  uninstall_agent
+  exit 0
+fi
+
 if [ "$(id -u)" -ne 0 ]; then
   echo "Please run this installer as root." >&2
   exit 2
@@ -364,6 +418,11 @@ fi
   write_env_line "OB_AGENT_TOKEN" "$AGENT_TOKEN"
   write_env_line "OB_POLL_INTERVAL" "$POLL_INTERVAL"
   write_env_line "OB_WORK_DIR" "/var/lib/overlord-agent"
+  write_env_line "OB_AGENT_BIN" "$INSTALL_BIN"
+  write_env_line "OB_AGENT_ENV" "$ENV_FILE"
+  write_env_line "OB_AGENT_SYSTEMD_SERVICE" "$SYSTEMD_SERVICE_FILE"
+  write_env_line "OB_AGENT_OPENRC_SERVICE" "$OPENRC_SERVICE_FILE"
+  write_env_line "OB_AGENT_OPENRC_WRAPPER" "$OPENRC_WRAPPER"
   write_env_line "OB_HTTP_RETRIES" "$HTTP_RETRIES"
   write_env_line "OB_HTTP_BACKOFF_BASE" "$HTTP_BACKOFF_BASE"
   write_env_line "OB_HTTP_BACKOFF_MAX" "$HTTP_BACKOFF_MAX"

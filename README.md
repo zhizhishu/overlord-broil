@@ -54,6 +54,20 @@ Snell is unified in the inbound-node product flow, but it is not a native Xray c
 
 ![Overlord Broil login](docs/assets/actual-login.png)
 
+Live UI smoke screenshots from the current master build:
+
+| View | Screenshot |
+| --- | --- |
+| Login | [docs/assets/live-login.png](docs/assets/live-login.png) |
+| Dashboard | [docs/assets/live-control-overview.png](docs/assets/live-control-overview.png) |
+| Servers | [docs/assets/live-servers.png](docs/assets/live-servers.png) |
+| Inbound nodes | [docs/assets/live-inbounds.png](docs/assets/live-inbounds.png) |
+| Outbound and routing | [docs/assets/live-routes.png](docs/assets/live-routes.png) |
+| Forwarding and tunnels | [docs/assets/live-tunnels.png](docs/assets/live-tunnels.png) |
+| Traffic | [docs/assets/live-traffic.png](docs/assets/live-traffic.png) |
+| Certificates | [docs/assets/live-certificates.png](docs/assets/live-certificates.png) |
+| Settings | [docs/assets/live-settings.png](docs/assets/live-settings.png) |
+
 The UI is a dense operations console: server cards, grouped actions, compact status chips and a unified rule view. It is built for repeated infrastructure work, not for a marketing landing page.
 
 Current UI coverage includes:
@@ -158,8 +172,9 @@ The agent runs through systemd or OpenRC, claims tasks from the master, executes
 Uninstall paths:
 
 - Master CLI: `sudo bash /opt/overlord-broil/install-master.sh uninstall --yes`
-- Controlled agent CLI: stop/remove `overlord-agent.service` or reinstall/repair with the agent installer.
+- Controlled agent CLI: `curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scripts/install-agent.sh | sudo bash -s -- uninstall --yes`; this removes the local service, script, credentials and `/var/lib/overlord-agent` work directory.
 - Master UI: open a server card and click `Uninstall Agent`; this creates a confirmed `uninstall-agent` task, the controlled agent reports once, then removes its service, script and local credentials. Use `Delete record` afterward only when you want to remove the server record from the master.
+- Master UI record cleanup: `Delete record` only removes the server row from the master. It does not uninstall a remote agent by itself.
 
 ## Operator Flow
 

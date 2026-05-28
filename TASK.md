@@ -49,6 +49,13 @@ Close the Broil product flow for urgent use: one cohesive control center, simple
 - Removed unused manual deploy-task public endpoints and the old profile controller from the authenticated API surface.
 - Updated README and Chinese README so public API examples only show product routes.
 - Renamed frontend node-service API/type identifiers away from the old node-core wording while keeping the same 8-module UI.
+- Added a command-line controlled-agent uninstall path to `scripts/install-agent.sh` with explicit `uninstall --yes`.
+- Persisted actual controlled-agent service/script/env paths into the agent env file for future maintenance tasks.
+- Updated master-side `uninstall-agent` maintenance generation so UI-triggered controlled-agent removal deletes systemd/OpenRC service files, the agent script, credentials and `/var/lib/overlord-agent`.
+- Updated the master installer migration guard to remove obsolete stopped `overlord-mysql` containers in SQLite mode, matching the older `gost-mysql` cleanup.
+- Added live control-center screenshots for login, dashboard, servers, inbound nodes, outbound/routing, forwarding/tunnels, traffic, certificates and settings.
+- Updated README and Chinese README with UI screenshot links and clarified master CLI uninstall, controlled-agent CLI uninstall, UI `Uninstall Agent` and master-side `Delete record` behavior.
+- Reinstalled/refreshed the master on `isrco-hk`, removed the old `/opt/flux-3xui-orchestrator` install, and verified the same host runs master plus controlled agent for smoke testing.
 
 ## Validation Status
 
@@ -102,10 +109,15 @@ Close the Broil product flow for urgent use: one cohesive control center, simple
 - Passed after API surface close: `bash scripts/test-sqlite-schema.sh`.
 - Passed after API surface close: Docker Maven contract tests `RuntimeProviderServiceTest`, `DeployTaskServiceImplTest`, `XrayRuntimeRouteContractTest` with 28 tests.
 - Passed after API surface close: `git diff --check`.
+- Passed after uninstall/docs/live-UI update: `npm run build` in `vite-frontend`.
+- Passed after uninstall/docs/live-UI update: `bash -n scripts/*.sh`, bootstrap `sh -n`, `bash scripts/test-master-port-contract.sh`, `bash scripts/test-agent-mock.sh`, `bash scripts/test-sqlite-schema.sh`, and `git diff --check`.
+- Passed after uninstall/docs/live-UI update: Docker Maven backend package build with tests skipped using JDK 21.
+- Passed on `isrco-hk`: old Flux install removed, `/opt/overlord-broil` present, only public Overlord port `5166/tcp` listening, `/` returned 200, `/flow/test` returned 200, `overlord-master` container healthy, and `overlord-agent` systemd service active with about 10 MB memory.
+- Verified: live UI screenshots under `docs/assets/live-*.png` show the current Overlord Broil product surface; an initially wrong login screenshot was replaced with the verified Overlord Broil login image.
 
 ## Remaining
 
-No required work remains for the current productization goal.
+No required work remains for the current productization goal after this local and `isrco-hk` smoke pass.
 
 Optional next hardening outside this goal:
 
@@ -117,4 +129,4 @@ Optional next hardening outside this goal:
 - The join flow is now server-card based self-registration: the server record is created first, then the agent exchanges `OB_JOIN_TOKEN` for internal credentials automatically.
 - Node-service connector paths are internal service contracts and must not be blindly renamed.
 - Local host has no native Java/Maven; Docker Maven can be very slow on the Windows bind mount.
-- Current GitHub `main` head is `a9e0ca2`; CI, Docker Images and Pages succeeded for that commit.
+- Current GitHub `main` head before this live-UI/uninstall commit is `e521e21`; push and Actions status still need to be recorded after the final commit.

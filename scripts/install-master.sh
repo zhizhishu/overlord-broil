@@ -723,9 +723,12 @@ list_obsolete_split_containers() {
     fi
   done
 
-  if [ "$(read_env_value DB_MODE "$ENV_FILE")" = "sqlite" ] \
-    && docker container inspect gost-mysql >/dev/null 2>&1; then
-    printf '%s\n' "gost-mysql"
+  if [ "$(read_env_value DB_MODE "$ENV_FILE")" = "sqlite" ]; then
+    for container in gost-mysql overlord-mysql; do
+      if docker container inspect "$container" >/dev/null 2>&1; then
+        printf '%s\n' "$container"
+      fi
+    done
   fi
 }
 
@@ -742,7 +745,7 @@ remove_obsolete_split_containers() {
     echo "  - ${container}"
     docker rm -f "$container" >/dev/null
   done
-  if printf '%s\n' "$containers" | grep -qx 'gost-mysql'; then
+  if printf '%s\n' "$containers" | grep -Eqx 'gost-mysql|overlord-mysql'; then
     echo "Kept old MySQL Docker volumes and install files; only the obsolete container was removed for SQLite mode."
   fi
 }

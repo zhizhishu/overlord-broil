@@ -86,10 +86,12 @@ assert_installer_migration_guard() {
     }
   done
 
-  grep -q 'docker container inspect gost-mysql' "$installer" || {
-    echo "install-master.sh must remove the obsolete gost-mysql container when migrating to SQLite mode." >&2
-    exit 1
-  }
+  for sqlite_obsolete_container in gost-mysql overlord-mysql; do
+    grep -q "$sqlite_obsolete_container" "$installer" || {
+      echo "install-master.sh must remove the obsolete ${sqlite_obsolete_container} container when migrating to SQLite mode." >&2
+      exit 1
+    }
+  done
 
   grep -q 'Kept old MySQL Docker volumes' "$installer" || {
     echo "install-master.sh must document that SQLite migration removes only the old MySQL container, not its volumes." >&2

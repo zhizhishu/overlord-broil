@@ -1837,6 +1837,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 + "REQUEST_JSON='" + escapeShell(requestJson) + "'\n"
                 + "AGENT_BIN='${OB_AGENT_BIN:-/usr/local/bin/overlord-agent.sh}'\n"
                 + "AGENT_ENV='${OB_AGENT_ENV:-/etc/overlord-agent.env}'\n"
+                + "SYSTEMD_SERVICE_FILE='${OB_AGENT_SYSTEMD_SERVICE:-/etc/systemd/system/overlord-agent.service}'\n"
+                + "OPENRC_SERVICE_FILE='${OB_AGENT_OPENRC_SERVICE:-/etc/init.d/overlord-agent}'\n"
+                + "OPENRC_WRAPPER='${OB_AGENT_OPENRC_WRAPPER:-/usr/local/bin/overlord-agent-openrc-wrapper.sh}'\n"
                 + "REPO_RAW_URL='${OB_REPO_RAW_URL:-https://raw.githubusercontent.com/zhizhishu/overlord-broil/main}'\n"
                 + "SOURCE_URL='${OB_AGENT_SOURCE_URL:-${REPO_RAW_URL}/scripts/overlord-agent.sh}'\n"
                 + "LOG_LINES=\"${OB_MAINTENANCE_LOG_LINES:-160}\"\n\n"
@@ -2207,21 +2210,22 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                   local manager script
                   manager="$(detect_service_manager)"
                   script="/tmp/overlord-agent-uninstall-$$.sh"
-                  cat > "$script" <<'UNINSTALL'
+                  cat > "$script" <<UNINSTALL
                 #!/usr/bin/env sh
                 sleep 5
                 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
                   systemctl stop overlord-agent.service 2>/dev/null || true
                   systemctl disable overlord-agent.service 2>/dev/null || true
-                  rm -f /etc/systemd/system/overlord-agent.service
+                  rm -f "${SYSTEMD_SERVICE_FILE}"
                   systemctl daemon-reload 2>/dev/null || true
                 elif command -v rc-service >/dev/null 2>&1 && command -v rc-update >/dev/null 2>&1; then
                   rc-service overlord-agent stop 2>/dev/null || true
                   rc-update del overlord-agent default 2>/dev/null || true
-                  rm -f /etc/init.d/overlord-agent /usr/local/bin/overlord-agent-openrc-wrapper.sh
+                  rm -f "${OPENRC_SERVICE_FILE}" "${OPENRC_WRAPPER}"
                 fi
-                rm -f /usr/local/bin/overlord-agent.sh /etc/overlord-agent.env
-                rm -f "$0"
+                rm -f "${AGENT_BIN}" "${AGENT_ENV}"
+                rm -rf /var/lib/overlord-agent
+                rm -f "\\$0"
                 UNINSTALL
                   chmod 0700 "$script"
                   nohup sh "$script" >/tmp/overlord-agent-uninstall.log 2>&1 &
