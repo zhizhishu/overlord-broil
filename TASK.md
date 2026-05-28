@@ -16,6 +16,7 @@ Close the Broil product flow for urgent use: one cohesive control center, simple
 - Added Docker `host.docker.internal:host-gateway` support to every master compose file for same-host master/agent repair cases while still warning users not to use `127.0.0.1` for remote controlled servers.
 - Moved the 8-module control-center navigation into the left sidebar under the Overlord Broil entry and removed the disliked top module grid from the content page.
 - Added server-card and outbound/routing repair actions when a controlled server has no node-service endpoint, a loopback endpoint or an unhealthy service state.
+- Added direct guardrails to outbound, routing and traffic actions: if a server's node service is missing, loopback or unhealthy, the UI opens the deploy/repair flow instead of letting the user hit a raw failed API path.
 - Added a compact "node service connection" editor in the server modal so endpoint/base path/token/user/password can be fixed from the UI, and protected existing node-service fields from being cleared by blank update payloads.
 - Added backend tests for loopback connection messaging and blank-field preservation.
 - Ran two read-only subagent audits: one for the frontend product surface and one for backend/API/scripts/docs.
@@ -71,6 +72,7 @@ Close the Broil product flow for urgent use: one cohesive control center, simple
 - Passed after node-service/UI repair: Docker Maven tests `XrayRuntimeServiceImplTest` and `ControlServerServiceImplTest`.
 - Passed after node-service/UI repair: `bash scripts/test-xray-runtime-fixture.sh`.
 - Passed after node-service/UI repair: targeted `git diff --check` for all changed files.
+- Passed after frontend action-guard update: `npm run build` in `vite-frontend` and `git diff --check`.
 - Passed after push: GitHub Actions `CI`, `Docker Images` and `Pages` for commit `61f9246`.
 - Passed on `isrco-hk`: upgraded to the new image, generated repair task `8`, agent installed the node service on `5168`, rewrote the bad `127.0.0.1:2053` endpoint to `https://host.docker.internal:5168/ob-1`, and `/node-service/config`, `/node-service/outbounds`, `/node-service/outbounds/traffic`, `/node-service/traffic/sync` all returned code `0`.
 - Passed: `npm run build` in `vite-frontend` after the route/UI simplification.

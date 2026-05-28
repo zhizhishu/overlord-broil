@@ -109,7 +109,8 @@
 - Completed: protected existing node-service endpoint/base path/token/user/password fields from being cleared by blank server-edit payloads.
 - Completed: moved the 8-module navigation under the left sidebar Overlord Broil entry and removed the content-top module grid.
 - Completed: added server-card and outbound/routing repair buttons plus a server-modal node-service connection editor for fixing outbounds/routing/traffic from the UI.
+- Completed: added frontend action guards so outbound, routing and traffic clicks open the deploy/repair flow when the selected server has no healthy node service.
 - Completed: added `host.docker.internal:host-gateway` to all master compose files for same-host repair cases.
-- Validation: frontend `npm run build`, shell syntax, bootstrap syntax, master port contract, agent mock, SQLite schema, node-service fixture, Docker Maven package and the two new Docker Maven tests passed.
+- Validation: frontend `npm run build`, `git diff --check`, shell syntax, bootstrap syntax, master port contract, agent mock, SQLite schema, node-service fixture, Docker Maven package and the two new Docker Maven tests passed.
 - Release: pushed `61f9246` to `main`; GitHub Actions `CI`, `Docker Images` and `Pages` all succeeded.
 - Remote smoke: upgraded `isrco-hk`, created repair task `8`, verified the controlled agent installed node service on `5168`, rewrote the stale `127.0.0.1:2053` endpoint to `https://host.docker.internal:5168/ob-1`, and confirmed config, outbound, outbound traffic and traffic sync APIs returned code `0`.

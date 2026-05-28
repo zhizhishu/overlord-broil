@@ -1196,7 +1196,16 @@ export default function ControlCenterPage() {
     setDetailModalOpen(true);
   };
 
+  const ensureNodeServiceReady = (server: ControlServer, action: string) => {
+    const issue = nodeServiceIssue(server);
+    if (!issue) return true;
+    toast.error(t("{action} 前需要先修复节点服务：{issue}", { action: t(action), issue: t(issue) }));
+    openDeploymentPlanModal(server);
+    return false;
+  };
+
   const showNodeServiceOutbounds = async (server: ControlServer) => {
+    if (!ensureNodeServiceReady(server, "查看出站")) return;
     const res = await getNodeServiceOutbounds(server.id);
     if (isNodeServiceSuccess(res)) {
       rememberOutboundTags(res.data);
@@ -1207,6 +1216,7 @@ export default function ControlCenterPage() {
   };
 
   const showNodeServiceOutboundTraffic = async (server: ControlServer) => {
+    if (!ensureNodeServiceReady(server, "查看出站流量")) return;
     const res = await getNodeServiceOutboundTraffic(server.id);
     if (isNodeServiceSuccess(res)) {
       showNodeServiceDetail(t("{name} 出站流量", { name: server.name }), res.data);
@@ -1221,6 +1231,11 @@ export default function ControlCenterPage() {
       : servers.filter(server => String(server.id) === trafficServerFilter);
     if (targetServers.length === 0) {
       toast.error(t("请选择服务器"));
+      return;
+    }
+    const brokenServer = targetServers.find(server => nodeServiceIssue(server));
+    if (brokenServer) {
+      ensureNodeServiceReady(brokenServer, "同步流量");
       return;
     }
     setSubmitting(true);
@@ -1239,6 +1254,7 @@ export default function ControlCenterPage() {
   };
 
   const openNodeServiceSettingModal = async (server: ControlServer) => {
+    if (!ensureNodeServiceReady(server, "路由规则")) return;
     const res = await getNodeServiceConfig(server.id);
     if (!isNodeServiceSuccess(res)) {
       toast.error(res.msg || res.data?.msg || t("读取路由配置失败"));
