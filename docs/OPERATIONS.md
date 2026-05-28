@@ -91,6 +91,12 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scrip
   | sudo env OB_MASTER_URL="http://MASTER_IP:5166" OB_JOIN_TOKEN="paste-join-token-here" bash -s -- doctor
 ```
 
+Uninstall:
+
+- Master stack: `sudo bash /opt/overlord-broil/install-master.sh uninstall --yes`.
+- Controlled agent from UI: open the server card, click `Uninstall Agent`, confirm, then wait for the generated task to be claimed and reported.
+- Server record cleanup: click `Delete record` only after the agent is offline or you intentionally want to remove the master-side record.
+
 ## Product Modules
 
 | Module | Runtime boundary | Executor |

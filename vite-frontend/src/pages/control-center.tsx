@@ -13,6 +13,7 @@ import toast from "react-hot-toast";
 import { useLanguage } from "@/i18n";
 import {
   createControlServer,
+  createAgentMaintenanceTask,
   createProtocolNode,
   createDeploymentPlanTask,
   createServerForwardRule,
@@ -1293,6 +1294,42 @@ export default function ControlCenterPage() {
     }
   };
 
+  const uninstallAgent = async (server: ControlServer, confirmed = false) => {
+    if (!confirmed) {
+      requestUiConfirmation({
+        title: t("确认卸载 Agent"),
+        message: t("确定要卸载 {name} 的被控 Agent?", { name: server.name }),
+        detail: server.role === "master"
+          ? t("这是主控服务器记录。确认后会生成卸载任务，请确保不会切断当前控制面。")
+          : t("被控 Agent 会领取卸载任务，回报结果后延迟移除服务、脚本和本机凭据。主控记录会保留，方便确认离线状态后再删除。"),
+        confirmText: t("确认卸载 Agent"),
+        color: "danger",
+        testId: "confirm-uninstall-agent",
+        onConfirm: () => uninstallAgent(server, true)
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    const res = await createAgentMaintenanceTask({
+      serverId: server.id,
+      protocol: "agent-maintenance",
+      action: "uninstall-agent",
+      requestJson: JSON.stringify({
+        dangerConfirmed: true,
+        confirmAction: "uninstall-agent"
+      })
+    });
+    setSubmitting(false);
+
+    if (res.code === 0) {
+      toast.success(t("卸载任务已生成，等待被控 Agent 自动领取"));
+      loadData();
+    } else {
+      toast.error(res.msg || t("生成卸载任务失败"));
+    }
+  };
+
   const copyDetail = async () => {
     await navigator.clipboard.writeText(detailText);
     toast.success(t("已复制"));
@@ -1530,6 +1567,8 @@ export default function ControlCenterPage() {
                     <Button size="sm" variant="flat" onPress={() => openServerForwardModal(server)}>{t("新增转发")}</Button>
                     <Button size="sm" variant="flat" onPress={() => syncServerProtocolNodes(server)}>{t("同步节点")}</Button>
                     <Button size="sm" variant="flat" onPress={() => openServerModal(server)}>{t("编辑")}</Button>
+                    <Button size="sm" variant="flat" color="danger" onPress={() => uninstallAgent(server)}>{t("卸载 Agent")}</Button>
+                    <Button size="sm" variant="light" color="danger" onPress={() => removeServer(server)}>{t("删除记录")}</Button>
                   </div>
                   {server.lastError && <p className="text-xs text-danger">{server.lastError}</p>}
                 </CardBody>

@@ -155,6 +155,12 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scrip
 
 The agent runs through systemd or OpenRC, claims tasks from the master, executes them locally and reports results back.
 
+Uninstall paths:
+
+- Master CLI: `sudo bash /opt/overlord-broil/install-master.sh uninstall --yes`
+- Controlled agent CLI: stop/remove `overlord-agent.service` or reinstall/repair with the agent installer.
+- Master UI: open a server card and click `Uninstall Agent`; this creates a confirmed `uninstall-agent` task, the controlled agent reports once, then removes its service, script and local credentials. Use `Delete record` afterward only when you want to remove the server record from the master.
+
 ## Operator Flow
 
 1. Install the master and open `http://MASTER_IP:5166`.

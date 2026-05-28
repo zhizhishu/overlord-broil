@@ -2,6 +2,7 @@ package com.admin.controller;
 
 import com.admin.common.annotation.RequireRole;
 import com.admin.common.aop.LogAnnotation;
+import com.admin.common.dto.DeployTaskDto;
 import com.admin.common.dto.DeploymentPlanDto;
 import com.admin.common.lang.R;
 import com.admin.service.DeployTaskService;
@@ -24,6 +25,14 @@ public class DeployTaskController {
     @PostMapping("/plans")
     public R createDeploymentPlan(@Validated @RequestBody DeploymentPlanDto dto) {
         return deployTaskService.createDeploymentPlanTask(dto);
+    }
+
+    @LogAnnotation
+    @RequireRole
+    @PostMapping("/maintenance")
+    public R createMaintenanceTask(@Validated @RequestBody DeployTaskDto dto) {
+        dto.setProtocol("agent-maintenance");
+        return deployTaskService.createTask(dto);
     }
 
     @LogAnnotation

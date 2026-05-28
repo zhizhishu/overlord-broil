@@ -60,6 +60,7 @@ export const getServerRuleOverview = (serverId: number) => Network.post("/server
 
 // 多服务器协议部署任务
 export const createDeploymentPlanTask = (data: any) => Network.post("/deploy-task/plans", data);
+export const createAgentMaintenanceTask = (data: any) => Network.post("/deploy-task/maintenance", data);
 export const getDeployTaskList = () => Network.post("/deploy-task/list");
 export const getRuntimeStateOverview = () => Network.post("/deploy-task/runtime-state/overview");
 

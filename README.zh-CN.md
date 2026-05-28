@@ -132,6 +132,12 @@ curl -fsSL https://raw.githubusercontent.com/zhizhishu/overlord-broil/main/scrip
 
 Agent 通过 systemd 或 OpenRC 常驻, 主动向主控领取任务, 本机执行, 再把结果回报给主控.
 
+卸载路径:
+
+- 主控命令行: `sudo bash /opt/overlord-broil/install-master.sh uninstall --yes`.
+- 被控 UI: 在服务器卡片点击 `卸载 Agent`, 二次确认后主控会生成 `uninstall-agent` 任务; 被控回报结果后会延迟移除服务、脚本和本机凭据.
+- 记录清理: 确认被控离线后再点 `删除记录`, 这个动作只删除主控侧记录.
+
 ## 使用流程
 
 1. 打开 `http://MASTER_IP:5166`.
