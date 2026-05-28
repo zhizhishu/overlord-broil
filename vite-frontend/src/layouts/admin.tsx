@@ -128,6 +128,7 @@ export default function AdminLayout({
 
   const handleSectionClick = (id: string) => {
     navigate(`/control-center#${id}`);
+    window.dispatchEvent(new CustomEvent('ob-control-section', { detail: id }));
     scrollToSection(id);
     if (isMobile) {
       hideMobileMenu();

@@ -204,7 +204,7 @@ export default function IndexPage() {
 
     } catch (error) {
       console.error('登录错误:', error);
-      toast.error("网络错误，请稍后重试");
+      toast.error("登录请求失败，请确认主控服务可访问");
     } finally {
       setLoading(false);
     }

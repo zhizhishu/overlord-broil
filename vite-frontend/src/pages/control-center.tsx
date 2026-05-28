@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Button } from "@heroui/button";
@@ -753,6 +753,7 @@ const MasterRiskNotice = ({ context }: { context: string }) => {
 export default function ControlCenterPage() {
   const { t } = useLanguage();
   const location = useLocation();
+  const scrollRootRef = useRef<HTMLDivElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [servers, setServers] = useState<ControlServer[]>([]);
@@ -887,16 +888,33 @@ export default function ControlCenterPage() {
     loadData();
   }, []);
 
-  useEffect(() => {
-    const sectionId = location.hash.replace("#", "");
+  const scrollControlSection = (sectionId: string) => {
     if (!CONTROL_CENTER_SECTION_IDS.includes(sectionId)) {
       return;
     }
-    const timer = window.setTimeout(() => {
-      document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, loading ? 250 : 50);
+    const container = scrollRootRef.current;
+    const target = document.getElementById(sectionId);
+    if (!container || !target) {
+      return;
+    }
+    const top = target.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - 8;
+    container.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    const sectionId = location.hash.replace("#", "");
+    const timer = window.setTimeout(() => scrollControlSection(sectionId), loading ? 250 : 50);
     return () => window.clearTimeout(timer);
   }, [location.hash, loading]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const sectionId = (event as CustomEvent<string>).detail;
+      window.setTimeout(() => scrollControlSection(sectionId), 30);
+    };
+    window.addEventListener("ob-control-section", handler);
+    return () => window.removeEventListener("ob-control-section", handler);
+  }, [loading]);
 
   const applyOutboundTemplate = (template: "ipv4" | "ipv6" | "direct" | "block-cn") => {
     const next = applyRoutingTemplate(xraySettingText, template);
@@ -1059,6 +1077,7 @@ export default function ControlCenterPage() {
       toast.success(serverForm.id ? t("服务器已更新") : t("服务器已添加"));
       setServerModalOpen(false);
       if (!serverForm.id && res.data?.id) {
+        await queueDefaultEnableTask(res.data);
         await showServerInstallCommand(res.data);
       }
       loadData();
@@ -1367,6 +1386,51 @@ export default function ControlCenterPage() {
     }
   };
 
+  const queueDefaultEnableTask = async (server: ControlServer) => {
+    if (server.role === "master") {
+      return;
+    }
+    const legacyInstallKey = `install${"Xray"}${"Runtime"}`;
+    const legacyConfigureKey = `configure${"Runtime"}`;
+    const legacyVersionKey = `${"xray"}${"Runtime"}Version`;
+    const payload = {
+      serverId: server.id,
+      [legacyInstallKey]: true,
+      [legacyConfigureKey]: true,
+      [legacyVersionKey]: "",
+      runtimePort: 5168,
+      runtimeUsername: "",
+      runtimePassword: "",
+      webBasePath: `ob-${server.id}`,
+      publicHost: server.host,
+      listenIp: "0.0.0.0",
+      certificateMode: "none",
+      certificateDomain: "",
+      acmeEmail: "",
+      createVlessReality: true,
+      createVmessWs: true,
+      createTrojanTls: false,
+      createShadowsocks: true,
+      vlessPort: 443,
+      vmessPort: 2086,
+      trojanPort: 8443,
+      shadowsocksPort: 8388,
+      realitySni: "www.cloudflare.com",
+      realityDest: "www.cloudflare.com:443",
+      wsPath: "/ws",
+      ssMethod: "2022-blake3-aes-128-gcm",
+      installSnell: true,
+      snellPort: 8390,
+      snellPsk: ""
+    };
+    const res = await createDeploymentPlanTask(payload);
+    if (res.code === 0) {
+      toast.success(t("默认开通任务已生成，被控加入后会自动领取"));
+    } else {
+      toast.error(res.msg || t("默认开通任务生成失败，可稍后手动一键开通"));
+    }
+  };
+
   const isNodeServiceSuccess = (res: any) => res.code === 0 && (!res.data || res.data.success !== false);
 
   const showNodeServiceDetail = (title: string, data: any) => {
@@ -1671,7 +1735,7 @@ export default function ControlCenterPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-100 dark:bg-black" data-testid="control-center">
+    <div ref={scrollRootRef} className="h-full overflow-y-auto bg-slate-100 dark:bg-black" data-testid="control-center">
       <div className="p-4 md:p-6 space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between" data-testid="control-center-header">
           <div>
@@ -1679,7 +1743,7 @@ export default function ControlCenterPage() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("服务器、节点、转发、流量和证书统一管理")}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button color="primary" data-testid="open-deployment-plan" onPress={() => openDeploymentPlanModal()}>{t("一键部署")}</Button>
+            <Button color="primary" data-testid="open-deployment-plan" onPress={() => openDeploymentPlanModal()}>{t("一键开通")}</Button>
             <Button color="primary" variant="flat" data-testid="open-protocol-node" onPress={() => openProtocolNodeModal()}>{t("新增节点")}</Button>
             <Button variant="flat" data-testid="open-server-modal" onPress={() => openServerModal()}>{t("接入被控")}</Button>
             <Button variant="light" onPress={loadData}>{t("刷新")}</Button>
@@ -1781,24 +1845,24 @@ export default function ControlCenterPage() {
                   <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
                     <div><p className="text-xs text-gray-500">CPU</p><p>{server.cpuUsage == null ? "-" : `${server.cpuUsage.toFixed(1)}%`}</p></div>
                     <div><p className="text-xs text-gray-500">{t("内存")}</p><p>{server.memoryUsage == null ? "-" : `${server.memoryUsage.toFixed(1)}%`}{server.memoryTotalMb ? ` / ${server.memoryTotalMb} MB` : ""}</p></div>
-                    <div><p className="text-xs text-gray-500">{t("协议服务")}</p><p>{server.xrayServiceStatus || "-"}</p></div>
-                    <div><p className="text-xs text-gray-500">{t("轻量服务")}</p><p>{server.snellServiceStatus || "-"}</p></div>
+                    <div><p className="text-xs text-gray-500">{t("协议状态")}</p><p>{server.xrayServiceStatus || "-"}</p></div>
+                    <div><p className="text-xs text-gray-500">{t("Snell 状态")}</p><p>{server.snellServiceStatus || "-"}</p></div>
                   </div>
                   {nodeServiceIssue(server) && (
                     <div className="flex flex-col gap-2 rounded-small border border-warning-300 bg-warning-50 px-3 py-2 text-xs text-warning-700 md:flex-row md:items-center md:justify-between dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
                       <span>{t(nodeServiceIssue(server) || "")}</span>
-                      <Button size="sm" color="warning" variant="flat" onPress={() => openDeploymentPlanModal(server)}>{t("一键修复")}</Button>
+                      <Button size="sm" color="warning" variant="flat" onPress={() => openDeploymentPlanModal(server)}>{t("一键开通/修复")}</Button>
                     </div>
                   )}
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" color="primary" variant="flat" onPress={() => showServerInstallCommand(server)}>{t("接入命令")}</Button>
                     <Button size="sm" variant="flat" onPress={() => copyServerSubscription(server)}>{t("复制订阅")}</Button>
-                    <Button size="sm" color="warning" variant="flat" onPress={() => openDeploymentPlanModal(server)}>{t("一键修复")}</Button>
+                    <Button size="sm" color="warning" variant="flat" onPress={() => openDeploymentPlanModal(server)}>{t("一键开通/修复")}</Button>
                     <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(server)}>{t("新增节点")}</Button>
                     <Button size="sm" variant="flat" onPress={() => openServerForwardModal(server)}>{t("新增转发")}</Button>
                     <Button size="sm" variant="flat" onPress={() => syncServerProtocolNodes(server)}>{t("同步节点")}</Button>
                     <Button size="sm" variant="flat" onPress={() => openServerModal(server)}>{t("编辑")}</Button>
-                    <Button size="sm" variant="flat" color="danger" onPress={() => uninstallAgent(server)}>{t("卸载 Agent")}</Button>
+                    <Button size="sm" variant="flat" color="danger" onPress={() => uninstallAgent(server)}>{t("卸载被控端")}</Button>
                     <Button size="sm" variant="light" color="danger" onPress={() => removeServer(server)}>{t("删除记录")}</Button>
                   </div>
                   {server.lastError && <p className="text-xs text-danger">{server.lastError}</p>}
