@@ -722,11 +722,11 @@ const isLoopbackNodeServiceEndpoint = (server?: ControlServer) => {
 
 const nodeServiceIssue = (server?: ControlServer) => {
   if (!server) return "未选择服务器";
-  if (!server.xrayRuntimeEndpoint) return "节点服务未部署";
-  if (isLoopbackNodeServiceEndpoint(server)) return "节点服务地址指向主控容器本机";
+  if (!server.xrayRuntimeEndpoint) return "协议能力未开通";
+  if (isLoopbackNodeServiceEndpoint(server)) return "协议连接地址指向主控本机";
   const status = (server.xrayRuntimeServiceStatus || server.xrayServiceStatus || "").trim();
   if (status && !["active", "running", "ok", "healthy"].includes(status.toLowerCase())) {
-    return `节点服务状态：${status}`;
+    return `协议能力状态：${status}`;
   }
   return null;
 };
@@ -745,7 +745,7 @@ const MasterRiskNotice = ({ context }: { context: string }) => {
 
   return (
     <div className="rounded-small border border-warning-300 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
-      <span className="font-semibold">{t("主控高风险：")}</span>{t("{context}会作用在控制面服务器上，建议确认节点服务、协议节点以及证书任务不会影响现有部署。", { context: t(context) })}
+      <span className="font-semibold">{t("主控高风险：")}</span>{t("{context}会作用在控制面服务器上，建议确认协议节点、转发以及证书任务不会影响现有部署。", { context: t(context) })}
     </div>
   );
 };
@@ -1059,26 +1059,6 @@ export default function ControlCenterPage() {
       toast.success(serverForm.id ? t("服务器已更新") : t("服务器已添加"));
       setServerModalOpen(false);
       if (!serverForm.id && res.data?.id) {
-        const createdServer = res.data as ControlServer;
-        const quickPlan = {
-          ...blankDeploymentPlanForm,
-          serverId: createdServer.id,
-          serverIds: [createdServer.id],
-          publicHost: createdServer.host || serverForm.host,
-          certificateMode: "none",
-          certificateDomain: "",
-          webBasePath: `ob-${createdServer.id}`
-        };
-        await createDeploymentPlanTask({
-          ...quickPlan,
-          installXrayRuntime: quickPlan.installNodeService,
-          configureRuntime: quickPlan.configureNodeService,
-          xrayRuntimeVersion: quickPlan.nodeServiceVersion,
-          serverIds: undefined,
-          installNodeService: undefined,
-          configureNodeService: undefined,
-          nodeServiceVersion: undefined
-        });
         await showServerInstallCommand(res.data);
       }
       loadData();
@@ -1312,11 +1292,11 @@ export default function ControlCenterPage() {
       return;
     }
     if (selectedDeploymentPlanCriticalNanoServers.length > 0 && selectedDeploymentPlanUsesFullNodeServiceStack) {
-      toast.error(t("Nano 被控内存低于 200MB，不支持完整节点服务部署；请关闭完整协议节点选项，仅保留 Snell 或端口转发。"));
+      toast.error(t("Nano 被控内存低于 200MB，不支持完整协议能力；请关闭重型协议节点，仅保留 Snell 或端口转发。"));
       return;
     }
     const ports = [
-      [t("节点服务"), deploymentPlanForm.runtimePort, true],
+      [t("协议底座"), deploymentPlanForm.runtimePort, deploymentPlanForm.installNodeService || deploymentPlanForm.configureNodeService],
       ["VLESS Reality", deploymentPlanForm.vlessPort, deploymentPlanForm.createVlessReality],
       ["VMess WS", deploymentPlanForm.vmessPort, deploymentPlanForm.createVmessWs],
       ["Trojan TLS", deploymentPlanForm.trojanPort, deploymentPlanForm.createTrojanTls],
@@ -1365,7 +1345,7 @@ export default function ControlCenterPage() {
 
     const failed = results.find(res => res.code !== 0);
     if (!failed) {
-      toast.success(t("已生成 {count} 个一键部署任务，等待被控 Agent 自动领取", { count: results.length }));
+      toast.success(t("已生成 {count} 个一键开通任务，等待被控自动领取", { count: results.length }));
       setDeploymentPlanModalOpen(false);
       loadData();
     } else {
@@ -1398,7 +1378,7 @@ export default function ControlCenterPage() {
   const ensureNodeServiceReady = (server: ControlServer, action: string) => {
     const issue = nodeServiceIssue(server);
     if (!issue) return true;
-    toast.error(t("{action} 前需要先修复节点服务：{issue}", { action: t(action), issue: t(issue) }));
+    toast.error(t("{action} 前需要先一键修复：{issue}", { action: t(action), issue: t(issue) }));
     openDeploymentPlanModal(server);
     return false;
   };
@@ -1512,8 +1492,8 @@ export default function ControlCenterPage() {
   const restartNodeService = async (server: ControlServer, confirmed = false) => {
     if (!confirmed) {
       requestUiConfirmation({
-        title: t("确认重启节点服务"),
-        message: t("确定重启 {name} 的节点服务?", { name: server.name }),
+        title: t("确认重启协议能力"),
+        message: t("确定重启 {name} 的协议能力?", { name: server.name }),
         detail: t("该服务器上的活动连接可能会重新连接。"),
         confirmText: t("确认重启"),
         color: "warning",
@@ -1524,10 +1504,10 @@ export default function ControlCenterPage() {
     }
     const res = await restartNodeServiceRequest(server.id);
     if (isNodeServiceSuccess(res)) {
-      toast.success(t("已请求重启节点服务"));
-      showNodeServiceDetail(t("{name} 节点服务重启结果", { name: server.name }), res.data);
+      toast.success(t("已请求重启协议能力"));
+      showNodeServiceDetail(t("{name} 协议能力重启结果", { name: server.name }), res.data);
     } else {
-      toast.error(res.msg || res.data?.msg || t("重启节点服务失败"));
+      toast.error(res.msg || res.data?.msg || t("重启协议能力失败"));
     }
   };
 
@@ -1807,13 +1787,13 @@ export default function ControlCenterPage() {
                   {nodeServiceIssue(server) && (
                     <div className="flex flex-col gap-2 rounded-small border border-warning-300 bg-warning-50 px-3 py-2 text-xs text-warning-700 md:flex-row md:items-center md:justify-between dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
                       <span>{t(nodeServiceIssue(server) || "")}</span>
-                      <Button size="sm" color="warning" variant="flat" onPress={() => openDeploymentPlanModal(server)}>{t("部署/修复节点服务")}</Button>
+                      <Button size="sm" color="warning" variant="flat" onPress={() => openDeploymentPlanModal(server)}>{t("一键修复")}</Button>
                     </div>
                   )}
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" color="primary" variant="flat" onPress={() => showServerInstallCommand(server)}>{t("接入命令")}</Button>
                     <Button size="sm" variant="flat" onPress={() => copyServerSubscription(server)}>{t("复制订阅")}</Button>
-                    <Button size="sm" color="warning" variant="flat" onPress={() => openDeploymentPlanModal(server)}>{t("部署/修复")}</Button>
+                    <Button size="sm" color="warning" variant="flat" onPress={() => openDeploymentPlanModal(server)}>{t("一键修复")}</Button>
                     <Button size="sm" variant="flat" onPress={() => openProtocolNodeModal(server)}>{t("新增节点")}</Button>
                     <Button size="sm" variant="flat" onPress={() => openServerForwardModal(server)}>{t("新增转发")}</Button>
                     <Button size="sm" variant="flat" onPress={() => syncServerProtocolNodes(server)}>{t("同步节点")}</Button>
@@ -2073,15 +2053,15 @@ export default function ControlCenterPage() {
               <div className="md:col-span-2 rounded-small border border-default-200 bg-white p-3 dark:bg-default-50/5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{t("节点服务连接")}</p>
-                    <p className="text-xs text-gray-500">{t("出站、路由和流量需要这里可达；一键部署会自动回填。")}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{t("协议连接")}</p>
+                    <p className="text-xs text-gray-500">{t("出站、路由和流量需要这里可达；一键开通会自动回填。")}</p>
                   </div>
                   <Switch size="sm" isSelected={serverAdvancedOpen} onValueChange={setServerAdvancedOpen}>{t("编辑")}</Switch>
                 </div>
                 {serverAdvancedOpen && (
                   <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                     <Input
-                      label={t("节点服务地址")}
+                      label={t("协议连接地址")}
                       value={serverForm.xrayRuntimeEndpoint}
                       onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeEndpoint: e.target.value }))}
                       variant="bordered"
@@ -2095,21 +2075,21 @@ export default function ControlCenterPage() {
                       placeholder="/ob-1"
                     />
                     <Input
-                      label="API Token"
+                      label={t("访问令牌")}
                       value={serverForm.xrayRuntimeApiToken}
                       onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeApiToken: e.target.value }))}
                       variant="bordered"
                       placeholder={t("留空保留已有值")}
                     />
                     <Input
-                      label={t("节点服务用户")}
+                      label={t("协议连接用户")}
                       value={serverForm.xrayRuntimeUsername}
                       onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeUsername: e.target.value }))}
                       variant="bordered"
                       placeholder={t("留空保留已有值")}
                     />
                     <Input
-                      label={t("节点服务密码")}
+                      label={t("协议连接密码")}
                       type="password"
                       value={serverForm.xrayRuntimePassword}
                       onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimePassword: e.target.value }))}
@@ -2117,7 +2097,7 @@ export default function ControlCenterPage() {
                       placeholder={t("留空保留已有值")}
                     />
                     <Input
-                      label="2FA"
+                      label={t("二次验证码")}
                       value={serverForm.xrayRuntimeTwoFactorCode}
                       onChange={e => setServerForm(prev => ({ ...prev, xrayRuntimeTwoFactorCode: e.target.value }))}
                       variant="bordered"
@@ -2127,7 +2107,7 @@ export default function ControlCenterPage() {
                 )}
               </div>
               <div className="md:col-span-2 rounded-small border border-default-200 bg-default-50/60 p-3 text-xs leading-5 text-gray-600 dark:bg-default-50/5 dark:text-gray-300">
-                {t("保存后主控会自动复制接入命令并预先生成部署任务。到被控服务器执行这一条命令后，Agent 会主动回连主控并自动领取任务，不需要开放管理端口。")}
+                {t("保存后主控会自动复制接入命令。到被控服务器执行这一条命令后，被控会主动回连主控；再按需一键开通协议节点、Snell 或转发。")}
               </div>
             </div>
             {serverForm.role === "master" && (
@@ -2284,7 +2264,7 @@ export default function ControlCenterPage() {
 
       <Modal isOpen={deploymentPlanModalOpen} onOpenChange={setDeploymentPlanModalOpen} size="5xl" scrollBehavior="inside">
         <ModalContent>
-          <ModalHeader>{t("一键部署节点")}</ModalHeader>
+          <ModalHeader>{t("一键开通节点")}</ModalHeader>
           <ModalBody>
             <div className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2309,15 +2289,15 @@ export default function ControlCenterPage() {
                   {renderServerOptions()}
                 </Select>
                 <Input label={t("公网主机")} value={deploymentPlanForm.publicHost} onChange={e => patchDeploymentPlanForm({ publicHost: e.target.value })} variant="bordered" />
-                <Input label={t("节点服务版本")} value={deploymentPlanForm.nodeServiceVersion} onChange={e => patchDeploymentPlanForm({ nodeServiceVersion: e.target.value })} variant="bordered" placeholder={t("留空使用最新版")} />
+                <Input label={t("协议底座版本")} value={deploymentPlanForm.nodeServiceVersion} onChange={e => patchDeploymentPlanForm({ nodeServiceVersion: e.target.value })} variant="bordered" placeholder={t("留空使用最新版")} />
               </div>
               {selectedDeploymentPlanHasMaster && (
                 <MasterRiskNotice context="生成一键部署任务" />
               )}
               <div className="flex items-center justify-between rounded-small border border-default-200 bg-default-50/60 px-3 py-2 dark:bg-default-50/5">
                 <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{t("默认套餐部署")}</p>
-                  <p className="text-xs text-gray-500">{t("选择服务器和协议即可生成任务；账号、密码、PSK 和密钥默认自动生成。")}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{t("默认套餐开通")}</p>
+                  <p className="text-xs text-gray-500">{t("选择服务器和协议即可生成任务；新增单个 Snell 或入站节点也可以直接点新增节点。")}</p>
                 </div>
                 <Switch size="sm" isSelected={deploymentAdvancedOpen} onValueChange={setDeploymentAdvancedOpen}>{t("高级")}</Switch>
               </div>
@@ -2328,24 +2308,24 @@ export default function ControlCenterPage() {
                     : "border-warning-300 bg-warning-50 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300"
                 }`}>
                   <span className="font-semibold">{t("Nano 被控风险：")}</span>
-                  {t("已选择 {count} 台低内存服务器。低于 200MB 时主控会阻止完整节点服务部署；建议只保留 Snell 或端口转发，并先开启 swap。", {
+                  {t("已选择 {count} 台低内存服务器。低于 200MB 时主控会阻止完整协议能力；建议只保留 Snell 或端口转发，并先开启 swap。", {
                     count: selectedDeploymentPlanLowMemoryServers.length
                   })}
                 </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-small border border-default-200 p-4">
-                <Switch isSelected={deploymentPlanForm.installNodeService} onValueChange={value => patchDeploymentPlanForm({ installNodeService: value })}>{t("安装节点服务")}</Switch>
-                <Switch isSelected={deploymentPlanForm.configureNodeService} onValueChange={value => patchDeploymentPlanForm({ configureNodeService: value })}>{t("配置节点服务")}</Switch>
+                <Switch isSelected={deploymentPlanForm.installNodeService} onValueChange={value => patchDeploymentPlanForm({ installNodeService: value })}>{t("开通协议能力")}</Switch>
+                <Switch isSelected={deploymentPlanForm.configureNodeService} onValueChange={value => patchDeploymentPlanForm({ configureNodeService: value })}>{t("写入协议配置")}</Switch>
                 <Switch isSelected={deploymentPlanForm.installSnell} onValueChange={value => patchDeploymentPlanForm({ installSnell: value })}>{t("安装 Snell")}</Switch>
                 <Switch isSelected={deploymentPlanForm.createVlessReality || deploymentPlanForm.createVmessWs || deploymentPlanForm.createTrojanTls || deploymentPlanForm.createShadowsocks} isReadOnly>{t("创建节点")}</Switch>
               </div>
 
               {deploymentAdvancedOpen && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Input label={t("节点服务端口")} type="number" value={deploymentPlanForm.runtimePort.toString()} onChange={e => patchDeploymentPlanForm({ runtimePort: Number(e.target.value) || 5168 })} variant="bordered" />
-                  <Input label={t("节点服务用户")} value={deploymentPlanForm.runtimeUsername} onChange={e => patchDeploymentPlanForm({ runtimeUsername: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
-                  <Input label={t("节点服务密码")} type="password" value={deploymentPlanForm.runtimePassword} onChange={e => patchDeploymentPlanForm({ runtimePassword: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
+                  <Input label={t("协议连接端口")} type="number" value={deploymentPlanForm.runtimePort.toString()} onChange={e => patchDeploymentPlanForm({ runtimePort: Number(e.target.value) || 5168 })} variant="bordered" />
+                  <Input label={t("协议连接用户")} value={deploymentPlanForm.runtimeUsername} onChange={e => patchDeploymentPlanForm({ runtimeUsername: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
+                  <Input label={t("协议连接密码")} type="password" value={deploymentPlanForm.runtimePassword} onChange={e => patchDeploymentPlanForm({ runtimePassword: e.target.value })} variant="bordered" placeholder={t("留空自动生成")} />
                   <Input label={t("访问路径")} value={deploymentPlanForm.webBasePath} onChange={e => patchDeploymentPlanForm({ webBasePath: e.target.value })} variant="bordered" />
                   <Input label={t("监听 IP")} value={deploymentPlanForm.listenIp} onChange={e => patchDeploymentPlanForm({ listenIp: e.target.value })} variant="bordered" />
                   <Select label={t("证书模式")} selectedKeys={[deploymentPlanForm.certificateMode]} onSelectionChange={keys => patchDeploymentPlanForm({ certificateMode: Array.from(keys)[0] as DeploymentPlanForm["certificateMode"] })} variant="bordered">
@@ -2394,7 +2374,7 @@ export default function ControlCenterPage() {
           </ModalBody>
           <ModalFooter>
             <Button variant="light" onPress={() => setDeploymentPlanModalOpen(false)}>{t("取消")}</Button>
-            <Button color="primary" isLoading={submitting} onPress={saveDeploymentPlanTask}>{t("生成一键任务")}</Button>
+            <Button color="primary" isLoading={submitting} onPress={saveDeploymentPlanTask}>{t("生成开通任务")}</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

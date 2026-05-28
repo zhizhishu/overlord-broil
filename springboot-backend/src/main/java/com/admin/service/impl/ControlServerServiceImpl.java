@@ -146,10 +146,7 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
         if (!this.updateById(update)) {
             return R.err("join token create failed");
         }
-        String command = "curl -fsSL " + shellQuote(AGENT_BOOTSTRAP_URL)
-                + " | env OB_MASTER_URL=" + shellQuote(normalizedMasterUrl)
-                + " OB_JOIN_TOKEN=" + shellQuote(joinToken)
-                + " sh";
+        String command = buildJoinCommand(normalizedMasterUrl, joinToken);
 
         return R.ok(command);
     }
@@ -346,6 +343,13 @@ public class ControlServerServiceImpl extends ServiceImpl<ControlServerMapper, C
             return "''";
         }
         return "'" + value.replace("'", "'\"'\"'") + "'";
+    }
+
+    private String buildJoinCommand(String normalizedMasterUrl, String joinToken) {
+        return "curl -fsSL " + shellQuote(AGENT_BOOTSTRAP_URL)
+                + " | sudo env OB_MASTER_URL=" + shellQuote(normalizedMasterUrl)
+                + " OB_JOIN_TOKEN=" + shellQuote(joinToken)
+                + " sh";
     }
 
     private void encryptSecrets(ControlServer server) {

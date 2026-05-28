@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ControlServerServiceImplTest {
 
@@ -37,5 +38,21 @@ class ControlServerServiceImplTest {
         assertEquals("admin", update.getXrayRuntimeUsername());
         assertEquals("secret", update.getXrayRuntimePassword());
         assertEquals("123456", update.getXrayRuntimeTwoFactorCode());
+    }
+
+    @Test
+    void joinCommandUsesSudoEnvForRootInstaller() {
+        ControlServerServiceImpl service = new ControlServerServiceImpl();
+
+        String command = ReflectionTestUtils.invokeMethod(
+                service,
+                "buildJoinCommand",
+                "http://203.0.113.10:5166",
+                "join-token-123");
+
+        assertTrue(command.contains("install-agent-bootstrap.sh"));
+        assertTrue(command.contains("| sudo env OB_MASTER_URL='http://203.0.113.10:5166'"));
+        assertTrue(command.contains("OB_JOIN_TOKEN='join-token-123'"));
+        assertTrue(command.endsWith(" sh"));
     }
 }

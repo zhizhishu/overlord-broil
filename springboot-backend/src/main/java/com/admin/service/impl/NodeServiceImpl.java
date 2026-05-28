@@ -341,7 +341,7 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
         StringBuilder command = new StringBuilder();
         command.append("curl -fsSL ")
                 .append(shellQuote(AGENT_BOOTSTRAP_URL))
-                .append(" | env OB_MASTER_URL=")
+                .append(" | sudo env OB_MASTER_URL=")
                 .append(shellQuote(masterUrl))
                 .append(" OB_SERVER_ID=")
                 .append(shellQuote(String.valueOf(node.getId())))

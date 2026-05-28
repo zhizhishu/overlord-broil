@@ -220,8 +220,9 @@ export default function IndexPage() {
       const checkResponse = await checkCaptcha();
       
       if (checkResponse.code !== 0) {
-        toast.error("检查验证码状态失败，请重试" + checkResponse.msg);
-        setLoading(false);
+        console.warn("Captcha check failed, falling back to password login:", checkResponse.msg);
+        toast("验证码检查暂不可用，已改用账号密码登录");
+        await performLogin();
         return;
       }
 
@@ -238,9 +239,9 @@ export default function IndexPage() {
         }, 100);
       }
     } catch (error) {
-      console.error('检查验证码状态错误:', error);
-      toast.error("网络错误，请稍后重试" + error);
-      setLoading(false);
+      console.warn("Captcha check request failed, falling back to password login:", error);
+      toast("验证码检查暂不可用，已改用账号密码登录");
+      await performLogin();
     }
   };
 

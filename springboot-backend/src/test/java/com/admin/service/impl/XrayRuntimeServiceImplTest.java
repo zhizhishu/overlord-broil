@@ -27,9 +27,9 @@ class XrayRuntimeServiceImplTest {
                 new RestClientException("Connection refused")
         );
 
-        assertTrue(message.contains("节点服务未连接"));
+        assertTrue(message.contains("协议能力未连接"));
         assertTrue(message.contains("127.0.0.1/localhost"));
-        assertTrue(message.contains("部署/修复节点服务"));
+        assertTrue(message.contains("一键修复"));
         assertTrue(message.contains("http://<被控服务器IP>:5168"));
     }
 }

@@ -510,7 +510,7 @@ public class XrayRuntimeServiceImpl implements XrayRuntimeService {
         String lower = raw.toLowerCase(Locale.ROOT);
         StringBuilder message = new StringBuilder();
 
-        message.append("节点服务未连接：").append(serverName);
+        message.append("协议能力未连接：").append(serverName);
         if (!isBlank(endpoint)) {
             message.append("（").append(endpoint).append(basePath).append("）");
         }
@@ -518,17 +518,17 @@ public class XrayRuntimeServiceImpl implements XrayRuntimeService {
 
         if (isLoopbackEndpoint(endpoint)) {
             message.append("当前地址是 127.0.0.1/localhost，主控在 Docker 内时这不是被控服务器。");
-            message.append("请在服务器卡片点击“部署/修复节点服务”，或把节点服务地址改为 http://<被控服务器IP>:5168。");
+            message.append("请在服务器卡片点击“一键修复”，或把协议连接地址改为 http://<被控服务器IP>:5168。");
             message.append("如果主控和被控确实在同一台宿主机，可改用 http://host.docker.internal:5168。");
         } else if (lower.contains("connection refused") || lower.contains("connectexception")) {
-            message.append("目标端口拒绝连接，通常是节点服务未安装、未启动、防火墙未放行，或端口不是 5168。");
-            message.append("请先执行“部署/修复节点服务”，完成后再同步出站/流量。");
+            message.append("目标端口拒绝连接，通常是协议能力未开通、未启动、防火墙未放行，或端口不是 5168。");
+            message.append("请先执行“一键修复”，完成后再同步出站/流量。");
         } else if (lower.contains("timed out") || lower.contains("timeout")) {
-            message.append("连接超时，请检查被控服务器是否在线、端口是否放行、节点服务是否启动。");
+            message.append("连接超时，请检查被控服务器是否在线、端口是否放行、协议能力是否启动。");
         } else if (lower.contains("unknownhost")) {
             message.append("域名或主机不可解析，请检查服务器地址。");
         } else {
-            message.append("请先确认节点服务已部署并在线，再重试出站、路由和流量操作。");
+            message.append("请先确认协议能力已开通并在线，再重试出站、路由和流量操作。");
         }
 
         if (!isBlank(path)) {
