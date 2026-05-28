@@ -1061,6 +1061,9 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
             return false;
         }
         String normalized = key.toLowerCase();
+        if (normalized.endsWith("configured")) {
+            return false;
+        }
         return normalized.contains("token")
                 || normalized.contains("password")
                 || normalized.contains("passwd")
@@ -1072,6 +1075,7 @@ public class DeployTaskServiceImpl extends ServiceImpl<DeployTaskMapper, DeployT
                 || normalized.equals("stdout")
                 || normalized.equals("stderr")
                 || normalized.equals("requestjson")
+                || normalized.equals("resultjson")
                 || normalized.equals("rawresultjson");
     }
 

@@ -26,7 +26,7 @@ class RuntimeProviderServiceTest {
         RuntimeProviderDescriptor xrayRuntime = service.getProvider("xrayRuntime");
 
         assertNotNull(xrayRuntime);
-        assertEquals("Xray Runtime", xrayRuntime.getName());
+        assertEquals("Node Service", xrayRuntime.getName());
         assertTrue(xrayRuntime.getCapabilities().contains("create-inbound"));
         assertTrue(xrayRuntime.getCapabilities().contains("manage-outbound"));
         assertTrue(xrayRuntime.getCapabilities().contains("read-config"));

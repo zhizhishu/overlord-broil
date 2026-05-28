@@ -84,6 +84,10 @@ Close the Broil product flow for urgent use: one cohesive control center, simple
 - Passed after latest cleanup: `bash scripts/test-compose-smoke.sh --build-local --dry-run`.
 - Passed after latest cleanup: `bash scripts/test-install-matrix.sh` across Debian 12, Ubuntu 24.04, Alpine 3.20, Rocky Linux 9 and Oracle Linux 9 userspaces.
 - Passed after latest cleanup: `git diff --check`.
+- GitHub Actions after commit `4896f34`: Pages and Docker Images passed, backend CI failed because contract tests still expected old provider naming and old overview keys.
+- Fixed the backend contract tests to match the productized Node Service naming and `serviceKey` overview response.
+- Fixed deploy-task result sanitizing so `*Configured` boolean flags are not redacted by the generic sensitive-key pass.
+- Passed after CI fix: Docker Maven contract tests `RuntimeProviderServiceTest`, `DeployTaskServiceImplTest`, `XrayRuntimeRouteContractTest` with 28 tests.
 - Browser preview was attempted through the in-app Browser plugin; the protected route needs a real login/local storage state, so visual proof is deferred to a live master session.
 
 ## Remaining

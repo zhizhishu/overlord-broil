@@ -106,7 +106,7 @@ class DeployTaskServiceImplTest {
         JSONObject runtimeState = JSON.parseObject(resultJson).getJSONObject("runtimeState");
 
         assertEquals("xrayRuntime", runtimeState.getString("providerKey"));
-        assertEquals("Xray Runtime", runtimeState.getString("providerName"));
+        assertEquals("Node Service", runtimeState.getString("providerName"));
         assertEquals("vless", runtimeState.getString("protocol"));
         assertEquals("present", runtimeState.getString("action"));
         assertEquals("succeeded", runtimeState.getString("taskState"));
@@ -513,7 +513,7 @@ class DeployTaskServiceImplTest {
         JSONObject runtimeState = JSON.parseObject("""
                 {
                   "providerKey":"snell",
-                  "providerName":"Snell Runtime",
+                  "providerName":"Snell Service",
                   "protocol":"snell",
                   "action":"present",
                   "taskState":"succeeded",
@@ -535,7 +535,7 @@ class DeployTaskServiceImplTest {
         assertNotNull(item);
         assertEquals(7L, item.get("serverId"));
         assertEquals("edge-1", item.get("serverName"));
-        assertEquals("snell", item.get("providerKey"));
+        assertEquals("snell", item.get("serviceKey"));
         assertEquals("active", item.get("status"));
         assertEquals(42L, item.get("taskId"));
         assertEquals(42L, item.get("sourceTaskId"));
