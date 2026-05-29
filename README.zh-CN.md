@@ -52,6 +52,8 @@ Snell 已统一到产品层的“协议节点”管理里, 但它不是 Xray 的
 
 ![Overlord Broil control center](docs/assets/overlord-broil-screenshot.svg)
 
+![Current live control center](docs/assets/live-control-center-current.png)
+
 ![Overlord Broil login](docs/assets/actual-login.png)
 
 当前主控构建的真机 UI 截图:

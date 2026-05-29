@@ -52,6 +52,8 @@ Snell is unified in the inbound-node product flow, but it is not a native Xray c
 
 ![Overlord Broil control center](docs/assets/overlord-broil-screenshot.svg)
 
+![Current live control center](docs/assets/live-control-center-current.png)
+
 ![Overlord Broil login](docs/assets/actual-login.png)
 
 Live UI smoke screenshots from the current master build:

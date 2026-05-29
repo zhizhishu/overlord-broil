@@ -46,6 +46,14 @@ import {
 } from "@/api";
 import type { ControlServer, DeployTask, MonitorAlert, OperationAuditLog, ProtocolNode, RuntimeStateOverview, ServerForwardRule, NodeServiceTrafficSnapshot } from "@/types";
 
+const CONTROL_SECTION_EVENT = "ob-control-section";
+
+const extractControlSectionId = (hash?: string) => {
+  if (!hash) return "dashboard";
+  const normalized = hash.replace(/^#\/control-center#?/, "").replace(/^#/, "");
+  return normalized || "dashboard";
+};
+
 interface ServerForm {
   id?: number;
   name: string;
@@ -878,7 +886,7 @@ export default function ControlCenterPage() {
     loadData();
   }, []);
 
-  const scrollControlSection = (sectionId: string) => {
+  const scrollControlSection = (sectionId: string, behavior: ScrollBehavior = "smooth") => {
     if (!controlCenterSectionIds.includes(sectionId as any)) {
       return;
     }
@@ -887,23 +895,23 @@ export default function ControlCenterPage() {
     if (!container || !target) {
       return;
     }
-    const top = target.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - 8;
-    container.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    const top = target.offsetTop - container.offsetTop - 12;
+    container.scrollTo({ top: Math.max(0, top), behavior });
   };
 
   useEffect(() => {
-    const sectionId = location.hash.replace("#", "");
-    const timer = window.setTimeout(() => scrollControlSection(sectionId), loading ? 250 : 50);
+    const sectionId = extractControlSectionId(window.location.hash || location.hash);
+    const timer = window.setTimeout(() => scrollControlSection(sectionId, "auto"), loading ? 250 : 50);
     return () => window.clearTimeout(timer);
-  }, [location.hash, loading]);
+  }, [location.key, location.hash, loading]);
 
   useEffect(() => {
     const handler = (event: Event) => {
       const sectionId = (event as CustomEvent<string>).detail;
-      window.setTimeout(() => scrollControlSection(sectionId), 30);
+      window.setTimeout(() => scrollControlSection(sectionId, "smooth"), 80);
     };
-    window.addEventListener("ob-control-section", handler);
-    return () => window.removeEventListener("ob-control-section", handler);
+    window.addEventListener(CONTROL_SECTION_EVENT, handler);
+    return () => window.removeEventListener(CONTROL_SECTION_EVENT, handler);
   }, [loading]);
 
   const applyOutboundTemplate = (template: "ipv4" | "ipv6" | "direct" | "block-cn") => {
@@ -1672,6 +1680,35 @@ export default function ControlCenterPage() {
     return `${size.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
   };
 
+  const taskCapabilityLabel = (task: DeployTask) => {
+    const protocol = (task.protocol || "").toLowerCase();
+    if (protocol === "snell") return "Snell";
+    if (protocol === "forward") return t("转发/隧道");
+    if (protocol === "certificate") return t("证书");
+    if (protocol === "firewall") return t("端口规则");
+    if (protocol === "agent-maintenance") return t("被控端维护");
+    if (["vless", "vmess", "trojan", "shadowsocks"].includes(protocol)) return task.protocol.toUpperCase();
+    if (protocol.includes("xray") || protocol.includes("runtime")) return t("节点能力");
+    return task.protocol || t("系统任务");
+  };
+
+  const taskActionLabel = (task: DeployTask) => {
+    const protocol = (task.protocol || "").toLowerCase();
+    const action = (task.action || "").toLowerCase();
+    if (action === "deploy-plan") return t("一键开通");
+    if (action === "present") return protocol === "snell" ? t("Snell 部署") : t("节点部署");
+    if (action === "absent") return protocol === "snell" ? t("Snell 移除") : t("节点移除");
+    if (action.includes("restart")) return t("重启服务");
+    if (action.includes("traffic")) return t("同步流量");
+    if (action.includes("outbound")) return t("出站管理");
+    if (action.includes("route") || action.includes("routing")) return t("路由管理");
+    if (action.includes("certificate")) return t("证书任务");
+    if (action.includes("forward")) return t("转发任务");
+    if (action.includes("repair")) return t("一键修复");
+    if (action.includes("uninstall")) return t("卸载被控端");
+    return task.action || "-";
+  };
+
   const heartbeatColor = (server: ControlServer) => {
     if (server.lastError) return "danger";
     if (!server.lastHeartbeat) return "warning";
@@ -2071,7 +2108,7 @@ export default function ControlCenterPage() {
                       <span className="font-medium text-gray-900 dark:text-white">#{task.id} {task.serverName || task.serverId}</span>
                       <Chip size="sm" variant="flat" color={task.state === "succeeded" ? "success" : task.state === "failed" ? "danger" : "primary"}>{task.state}</Chip>
                     </div>
-                    <p className="mt-1 text-gray-500">{task.protocol} / {task.action} · {formatTime(task.createdTime)}</p>
+                    <p className="mt-1 text-gray-500">{taskCapabilityLabel(task)} / {taskActionLabel(task)} · {formatTime(task.createdTime)}</p>
                   </div>
                 ))}
                 {recentAuditLogs.slice(0, 4).map(log => (
